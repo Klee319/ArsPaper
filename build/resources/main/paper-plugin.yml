@@ -1,0 +1,14 @@
+name: ArsPaper
+version: "0.1.0-SNAPSHOT"
+main: com.arspaper.ArsPaper
+description: Ars Nouveau-inspired magic plugin for Paper servers
+api-version: "1.21"
+author: Klee319
+
+permissions:
+  arspaper.use:
+    description: Basic ArsPaper usage
+    default: true
+  arspaper.admin:
+    description: ArsPaper admin commands
+    default: op

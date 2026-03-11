@@ -1,0 +1,213 @@
+package com.arspaper.command;
+
+import com.arspaper.ArsPaper;
+import com.arspaper.item.BaseCustomItem;
+import com.arspaper.item.ItemKeys;
+import com.arspaper.spell.*;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import io.papermc.paper.command.brigadier.Commands;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.persistence.PersistentDataType;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+
+/**
+ * /ars コマンドルート。Brigadier API使用。
+ */
+@SuppressWarnings("UnstableApiUsage")
+public final class ArsCommand {
+
+    private ArsCommand() {}
+
+    public static void register(Commands commands, ArsPaper plugin) {
+        commands.register(
+            Commands.literal("ars")
+                .then(Commands.literal("give")
+                    .requires(src -> src.getSender().hasPermission("arspaper.admin"))
+                    .then(Commands.argument("itemId", StringArgumentType.word())
+                        .suggests((ctx, builder) -> {
+                            plugin.getItemRegistry().getAll().forEach(item ->
+                                builder.suggest(item.getItemId())
+                            );
+                            return builder.buildFuture();
+                        })
+                        .executes(ctx -> {
+                            if (!(ctx.getSource().getSender() instanceof Player player)) {
+                                ctx.getSource().getSender().sendMessage(
+                                    Component.text("プレイヤー専用コマンドです！", NamedTextColor.RED)
+                                );
+                                return 0;
+                            }
+                            String itemId = StringArgumentType.getString(ctx, "itemId");
+                            return executeGive(plugin, player, itemId);
+                        })
+                    )
+                )
+                .then(Commands.literal("mana")
+                    .executes(ctx -> {
+                        if (!(ctx.getSource().getSender() instanceof Player player)) return 0;
+                        return executeManaInfo(plugin, player);
+                    })
+                )
+                .then(Commands.literal("spell")
+                    .then(Commands.literal("list")
+                        .executes(ctx -> {
+                            if (!(ctx.getSource().getSender() instanceof Player player)) return 0;
+                            return executeSpellList(plugin, player);
+                        })
+                    )
+                    .then(Commands.literal("set")
+                        .then(Commands.argument("slot", IntegerArgumentType.integer(1, 10))
+                            .then(Commands.argument("spellDef", StringArgumentType.greedyString())
+                                .executes(ctx -> {
+                                    if (!(ctx.getSource().getSender() instanceof Player player)) return 0;
+                                    int slot = IntegerArgumentType.getInteger(ctx, "slot");
+                                    String spellDef = StringArgumentType.getString(ctx, "spellDef");
+                                    return executeSpellSet(plugin, player, slot, spellDef);
+                                })
+                            )
+                        )
+                    )
+                )
+                .build(),
+            "ArsPaper main command",
+            List.of("arspaper")
+        );
+    }
+
+    private static int executeGive(ArsPaper plugin, Player player, String itemId) {
+        var optItem = plugin.getItemRegistry().get(itemId);
+        if (optItem.isEmpty()) {
+            player.sendMessage(Component.text("不明なアイテム: " + itemId, NamedTextColor.RED));
+            return 0;
+        }
+        ItemStack stack = optItem.get().createItemStack();
+        player.getInventory().addItem(stack);
+        player.sendMessage(Component.text(itemId + " を付与しました", NamedTextColor.GREEN));
+        return 1;
+    }
+
+    private static int executeManaInfo(ArsPaper plugin, Player player) {
+        int current = plugin.getManaManager().getCurrentMana(player);
+        int max = plugin.getManaManager().getMaxMana(player);
+        player.sendMessage(Component.text("マナ: " + current + " / " + max, NamedTextColor.AQUA));
+        return 1;
+    }
+
+    private static int executeSpellList(ArsPaper plugin, Player player) {
+        player.sendMessage(Component.text("=== 利用可能なグリフ ===", NamedTextColor.GOLD));
+
+        player.sendMessage(Component.text("形態(Form): ", NamedTextColor.GREEN)
+            .append(Component.text(
+                plugin.getSpellRegistry().getForms().stream()
+                    .map(SpellForm::getDisplayName)
+                    .collect(Collectors.joining(", ")),
+                NamedTextColor.WHITE
+            )));
+
+        player.sendMessage(Component.text("効果(Effect): ", NamedTextColor.YELLOW)
+            .append(Component.text(
+                plugin.getSpellRegistry().getEffects().stream()
+                    .map(SpellEffect::getDisplayName)
+                    .collect(Collectors.joining(", ")),
+                NamedTextColor.WHITE
+            )));
+
+        player.sendMessage(Component.text("増強(Augment): ", NamedTextColor.LIGHT_PURPLE)
+            .append(Component.text(
+                plugin.getSpellRegistry().getAugments().stream()
+                    .map(SpellAugment::getDisplayName)
+                    .collect(Collectors.joining(", ")),
+                NamedTextColor.WHITE
+            )));
+
+        return 1;
+    }
+
+    private static int executeSpellSet(ArsPaper plugin, Player player, int slot, String spellDef) {
+        ItemStack hand = player.getInventory().getItemInMainHand();
+        String customId = hand.hasItemMeta()
+            ? hand.getItemMeta().getPersistentDataContainer()
+                .get(ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING)
+            : null;
+
+        if (customId == null || !customId.startsWith("spell_book_")) {
+            player.sendMessage(Component.text("スペルブックを手に持って実行してください！", NamedTextColor.RED));
+            return 0;
+        }
+
+        String[] parts = spellDef.split("\\s+");
+        if (parts.length < 1) {
+            player.sendMessage(Component.text("使い方: /ars spell set <スロット> <名前>:<形態> <効果/増強...>", NamedTextColor.RED));
+            return 0;
+        }
+
+        String nameAndForm = parts[0];
+        String[] nf = nameAndForm.split(":", 2);
+        String spellName = nf[0];
+        if (nf.length < 2) {
+            player.sendMessage(Component.text("形式: <スペル名>:<形態> <効果...>", NamedTextColor.RED));
+            return 0;
+        }
+
+        SpellRegistry registry = plugin.getSpellRegistry();
+        List<SpellComponent> components = new ArrayList<>();
+
+        SpellComponent form = registry.get("arspaper:" + nf[1].toLowerCase());
+        if (form == null || form.getType() != SpellComponent.ComponentType.FORM) {
+            player.sendMessage(Component.text("不明な形態: " + nf[1], NamedTextColor.RED));
+            return 0;
+        }
+        components.add(form);
+
+        for (int i = 1; i < parts.length; i++) {
+            SpellComponent comp = registry.get("arspaper:" + parts[i].toLowerCase());
+            if (comp == null) {
+                player.sendMessage(Component.text("不明なグリフ: " + parts[i], NamedTextColor.RED));
+                return 0;
+            }
+            components.add(comp);
+        }
+
+        SpellRecipe recipe = new SpellRecipe(spellName, components);
+        if (!recipe.isValid()) {
+            player.sendMessage(Component.text("無効なスペルです！先頭はFormである必要があります", NamedTextColor.RED));
+            return 0;
+        }
+
+        String existingSlotsJson = hand.getItemMeta().getPersistentDataContainer()
+            .get(ItemKeys.SPELL_SLOTS, PersistentDataType.STRING);
+
+        List<SpellRecipe> slots;
+        if (existingSlotsJson != null) {
+            slots = new ArrayList<>(SpellSerializer.deserializeSlots(existingSlotsJson, registry));
+        } else {
+            slots = new ArrayList<>();
+        }
+
+        int slotIndex = slot - 1;
+        while (slots.size() <= slotIndex) {
+            slots.add(null);
+        }
+        slots.set(slotIndex, recipe);
+
+        String newSlotsJson = SpellSerializer.serializeSlots(slots);
+        hand.editMeta(meta ->
+            meta.getPersistentDataContainer().set(
+                ItemKeys.SPELL_SLOTS, PersistentDataType.STRING, newSlotsJson
+            )
+        );
+
+        player.sendMessage(Component.text(
+            "スロット" + slot + "に設定: " + spellName + " (マナコスト: " + recipe.getTotalManaCost() + ")",
+            NamedTextColor.GREEN
+        ));
+        return 1;
+    }
+}
