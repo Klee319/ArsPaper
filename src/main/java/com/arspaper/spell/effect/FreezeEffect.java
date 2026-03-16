@@ -3,11 +3,16 @@ package com.arspaper.spell.effect;
 import com.arspaper.spell.SpellContext;
 import com.arspaper.spell.SpellEffect;
 import com.arspaper.spell.SpellFxUtil;
+import com.arspaper.spell.GlyphConfig;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -19,19 +24,21 @@ import org.bukkit.potion.PotionEffectType;
  */
 public class FreezeEffect implements SpellEffect {
 
-    private static final int BASE_DURATION = 100; // 5秒
+    private static final int DEFAULT_BASE_DURATION = 100; // 5秒
     private final NamespacedKey id;
+    private final GlyphConfig config;
 
-    public FreezeEffect(JavaPlugin plugin) {
+    public FreezeEffect(JavaPlugin plugin, GlyphConfig config) {
         this.id = new NamespacedKey(plugin, "freeze");
+        this.config = config;
     }
 
     @Override
     public void applyToEntity(SpellContext context, LivingEntity target) {
-        int duration = BASE_DURATION + context.getDurationTicks();
-        int amplifier = context.getAmplifyLevel();
+        int duration = (int) config.getParam("freeze", "base-duration", DEFAULT_BASE_DURATION) + context.getDurationTicks();
+        int amplifier = Math.max(0, context.getAmplifyLevel());
 
-        target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, duration, amplifier + 1));
+        target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, duration, Math.max(0, amplifier)));
         target.setFreezeTicks(Math.min(target.getFreezeTicks() + duration, target.getMaxFreezeTicks()));
 
         SpellFxUtil.spawnFreezeFx(target.getLocation());
@@ -49,6 +56,22 @@ public class FreezeEffect implements SpellEffect {
         };
 
         if (newType != null) {
+            org.bukkit.entity.Player caster = context.getCaster();
+            if (caster == null) return;
+
+            // 保護プラグイン互換: BlockPlaceEventを発火して許可を確認
+            BlockPlaceEvent placeEvent = new BlockPlaceEvent(
+                block,
+                block.getState(),
+                block.getRelative(BlockFace.DOWN),
+                new ItemStack(newType),
+                caster,
+                true,
+                EquipmentSlot.HAND
+            );
+            org.bukkit.Bukkit.getPluginManager().callEvent(placeEvent);
+            if (placeEvent.isCancelled()) return;
+
             block.setType(newType);
             SpellFxUtil.spawnFreezeFx(blockLocation);
         }
@@ -58,11 +81,14 @@ public class FreezeEffect implements SpellEffect {
     public NamespacedKey getId() { return id; }
 
     @Override
-    public String getDisplayName() { return "Freeze"; }
+    public String getDisplayName() { return "氷結"; }
 
     @Override
-    public int getManaCost() { return 15; }
+    public String getDescription() { return "対象を凍結させ、鈍化を付与する"; }
 
     @Override
-    public int getTier() { return 2; }
+    public int getManaCost() { return config.getManaCost("freeze"); }
+
+    @Override
+    public int getTier() { return config.getTier("freeze"); }
 }

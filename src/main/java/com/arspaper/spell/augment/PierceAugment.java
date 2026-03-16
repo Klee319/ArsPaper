@@ -1,6 +1,7 @@
 package com.arspaper.spell.augment;
 
 import com.arspaper.spell.SpellAugment;
+import com.arspaper.spell.GlyphConfig;
 import com.arspaper.spell.SpellContext;
 import org.bukkit.NamespacedKey;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -13,9 +14,11 @@ import org.bukkit.plugin.java.JavaPlugin;
 public class PierceAugment implements SpellAugment {
 
     private final NamespacedKey id;
+    private final GlyphConfig config;
 
-    public PierceAugment(JavaPlugin plugin) {
+    public PierceAugment(JavaPlugin plugin, GlyphConfig config) {
         this.id = new NamespacedKey(plugin, "pierce");
+        this.config = config;
     }
 
     @Override
@@ -27,11 +30,14 @@ public class PierceAugment implements SpellAugment {
     public NamespacedKey getId() { return id; }
 
     @Override
-    public String getDisplayName() { return "Pierce"; }
+    public String getDisplayName() { return "貫通"; }
 
     @Override
-    public int getManaCost() { return 12; }
+    public String getDescription() { return "飛び道具が対象を貫通する"; }
 
     @Override
-    public int getTier() { return 2; }
+    public int getManaCost() { return config.getManaCost("pierce"); }
+
+    @Override
+    public int getTier() { return config.getTier("pierce"); }
 }

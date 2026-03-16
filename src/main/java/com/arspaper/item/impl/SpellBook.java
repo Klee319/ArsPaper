@@ -129,8 +129,7 @@ public class SpellBook extends BaseCustomItem {
         }
 
         SpellRecipe recipe = slots.get(slot);
-        SpellCaster caster = new SpellCaster(ArsPaper.getInstance().getManaManager());
-        caster.cast(player, recipe);
+        ArsPaper.getInstance().getSpellCaster().cast(player, recipe);
     }
 
     private void switchSlot(Player player, ItemStack item) {

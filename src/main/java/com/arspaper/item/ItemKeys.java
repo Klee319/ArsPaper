@@ -31,4 +31,16 @@ public final class ItemKeys {
 
     /** 防具のティア (1=Novice, 2=Apprentice, 3=Archmage) */
     public static final NamespacedKey ARMOR_TIER = new NamespacedKey(NAMESPACE, "armor_tier");
+
+    /** ワンドのティア (1=Novice, 2=Apprentice, 3=Archmage) */
+    public static final NamespacedKey WAND_TIER = new NamespacedKey(NAMESPACE, "wand_tier");
+
+    /** 防具スレッドのタイプ（旧形式、後方互換用） */
+    public static final NamespacedKey THREAD_TYPE = new NamespacedKey(NAMESPACE, "thread_type");
+
+    /** 防具スレッドスロット（JSON配列: ["mana_regen", null, "mana_boost"]） */
+    public static final NamespacedKey THREAD_SLOTS = new NamespacedKey(NAMESPACE, "thread_slots");
+
+    /** スレッドアイテムのタイプID */
+    public static final NamespacedKey THREAD_ITEM_TYPE = new NamespacedKey(NAMESPACE, "thread_item_type");
 }

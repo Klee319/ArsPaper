@@ -1,8 +1,8 @@
 package com.arspaper.gui;
 
 import com.arspaper.ArsPaper;
-import com.arspaper.mana.ManaConfig;
 import com.arspaper.mana.ManaKeys;
+import com.arspaper.spell.GlyphConfig;
 import com.arspaper.spell.SpellComponent;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -10,8 +10,7 @@ import com.google.gson.JsonParser;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
-import org.bukkit.Location;
-import org.bukkit.Material;
+import org.bukkit.*;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.ItemStack;
@@ -30,9 +29,14 @@ import java.util.Set;
 public class ScribingTableGui extends BaseGui {
 
     private static final Gson GSON = new Gson();
+    private static final int GLYPHS_PER_PAGE = 36; // slots 9-44
+    private static final int BTN_PREV_PAGE = 45;
+    private static final int BTN_NEXT_PAGE = 53;
+
     private final ArsPaper plugin;
     private final Location tableLocation;
     private final List<SpellComponent> displayedGlyphs = new ArrayList<>();
+    private int currentPage = 0;
 
     public ScribingTableGui(ArsPaper plugin, Player player, Location tableLocation) {
         super(player, 6, Component.text("筆記台", NamedTextColor.DARK_AQUA));
@@ -46,25 +50,58 @@ public class ScribingTableGui extends BaseGui {
         displayedGlyphs.clear();
 
         Set<String> unlocked = getUnlockedGlyphs();
+        List<SpellComponent> allGlyphs = new ArrayList<>(plugin.getSpellRegistry().getAll());
+        int totalPages = Math.max(1, (int) Math.ceil((double) allGlyphs.size() / GLYPHS_PER_PAGE));
+        currentPage = Math.min(currentPage, totalPages - 1);
 
         // 装飾用ガラスパネルで上下段を埋める
         fillRow(0, Material.GRAY_STAINED_GLASS_PANE);
         fillRow(5, Material.GRAY_STAINED_GLASS_PANE);
 
-        // グリフをボタンとして配置
-        int slot = 9;
-        for (SpellComponent component : plugin.getSpellRegistry().getAll()) {
-            if (slot >= 45) break;
+        // ページネーション情報を上段中央に表示
+        inventory.setItem(4, createButton(Material.PAPER,
+            Component.text("ページ " + (currentPage + 1) + " / " + totalPages, NamedTextColor.WHITE)));
 
+        // 現在ページのグリフをボタンとして配置
+        int startIndex = currentPage * GLYPHS_PER_PAGE;
+        int slot = 9;
+        for (int i = startIndex; i < allGlyphs.size() && slot < 45; i++) {
+            SpellComponent component = allGlyphs.get(i);
             boolean isUnlocked = unlocked.contains(component.getId().toString());
             inventory.setItem(slot, createGlyphButton(component, isUnlocked));
             displayedGlyphs.add(component);
             slot++;
         }
+
+        // ページネーションボタン
+        if (currentPage > 0) {
+            inventory.setItem(BTN_PREV_PAGE, createButton(Material.ARROW,
+                Component.text("← 前のページ", NamedTextColor.GOLD)));
+        }
+        if (currentPage < totalPages - 1) {
+            inventory.setItem(BTN_NEXT_PAGE, createButton(Material.ARROW,
+                Component.text("次のページ →", NamedTextColor.GOLD)));
+        }
     }
 
     @Override
     public boolean onClick(int slot, Player clicker, InventoryClickEvent event) {
+        // ページネーション
+        if (slot == BTN_PREV_PAGE && currentPage > 0) {
+            currentPage--;
+            render();
+            return true;
+        }
+        if (slot == BTN_NEXT_PAGE) {
+            int totalPages = Math.max(1, (int) Math.ceil(
+                (double) plugin.getSpellRegistry().getAll().size() / GLYPHS_PER_PAGE));
+            if (currentPage < totalPages - 1) {
+                currentPage++;
+                render();
+            }
+            return true;
+        }
+
         if (slot < 9 || slot >= 45) return false;
 
         int glyphIndex = slot - 9;
@@ -78,29 +115,23 @@ public class ScribingTableGui extends BaseGui {
             return true;
         }
 
-        if (!tryPayUnlockCost(clicker, component)) {
+        if (!checkUnlockCost(clicker, component)) {
             return true;
         }
 
-        // アンロック
-        unlocked.add(component.getId().toString());
-        saveUnlockedGlyphs(unlocked);
+        // 経験値レベルを先に消費（アニメーション中断時も返却しない仕様）
+        GlyphConfig glyphConfig = plugin.getGlyphConfig();
+        String glyphKey = component.getId().getKey();
+        int levelCost = glyphConfig.getUnlockLevel(glyphKey);
+        java.util.Map<Material, Integer> materials = glyphConfig.getUnlockMaterials(glyphKey);
+        clicker.setLevel(clicker.getLevel() - levelCost);
 
-        // グリフマナボーナス付与（config値を使用）
-        int currentBonus = clicker.getPersistentDataContainer()
-            .getOrDefault(ManaKeys.GLYPH_MANA_BONUS, PersistentDataType.INTEGER, 0);
-        int perGlyphBonus = plugin.getConfig().getInt("mana.per-glyph-unlock-bonus", 5);
-        clicker.getPersistentDataContainer().set(
-            ManaKeys.GLYPH_MANA_BONUS, PersistentDataType.INTEGER, currentBonus + perGlyphBonus
+        // アンロックアニメーション開始（GUI閉じ→素材消費→軌道演出→アンロック完了）
+        GlyphUnlockAnimation.play(
+            plugin, clicker, component, tableLocation,
+            materials, levelCost, unlocked,
+            () -> saveUnlockedGlyphs(unlocked)
         );
-
-        clicker.sendMessage(Component.text(
-            "解放: " + component.getDisplayName() + "！ (最大マナ+" + perGlyphBonus + ")",
-            NamedTextColor.GREEN
-        ));
-
-        // GUIを再描画
-        render();
         return true;
     }
 
@@ -118,6 +149,10 @@ public class ScribingTableGui extends BaseGui {
         };
 
         List<Component> lore = new ArrayList<>();
+        if (!component.getDescription().isEmpty()) {
+            lore.add(Component.text(component.getDescription(), NamedTextColor.GRAY)
+                .decoration(TextDecoration.ITALIC, false));
+        }
         lore.add(Component.text("種類: " + localizeType(component.getType()), typeColor)
             .decoration(TextDecoration.ITALIC, false));
         lore.add(Component.text("マナコスト: " + component.getManaCost(), NamedTextColor.AQUA)
@@ -142,12 +177,8 @@ public class ScribingTableGui extends BaseGui {
     }
 
     private String getUnlockCostDescription(SpellComponent component) {
-        return switch (component.getTier()) {
-            case 1 -> "5レベル + ラピスラズリ1個";
-            case 2 -> "10レベル + ラピスラズリ4個";
-            case 3 -> "20レベル + ラピスラズリ8個";
-            default -> "不明";
-        };
+        String glyphKey = component.getId().getKey();
+        return plugin.getGlyphConfig().getUnlockCostDescription(glyphKey);
     }
 
     private String localizeType(SpellComponent.ComponentType type) {
@@ -158,19 +189,15 @@ public class ScribingTableGui extends BaseGui {
         };
     }
 
-    private boolean tryPayUnlockCost(Player player, SpellComponent component) {
-        int levelCost = switch (component.getTier()) {
-            case 1 -> 5;
-            case 2 -> 10;
-            case 3 -> 20;
-            default -> 30;
-        };
-        int lapisCost = switch (component.getTier()) {
-            case 1 -> 1;
-            case 2 -> 4;
-            case 3 -> 8;
-            default -> 16;
-        };
+    /**
+     * アンロックコストが支払い可能かチェックする（消費はしない）。
+     * 素材・レベルの消費はアニメーション側で行う。
+     */
+    private boolean checkUnlockCost(Player player, SpellComponent component) {
+        GlyphConfig glyphConfig = plugin.getGlyphConfig();
+        String glyphKey = component.getId().getKey();
+        int levelCost = glyphConfig.getUnlockLevel(glyphKey);
+        java.util.Map<Material, Integer> materials = glyphConfig.getUnlockMaterials(glyphKey);
 
         if (player.getLevel() < levelCost) {
             player.sendMessage(Component.text(
@@ -179,15 +206,17 @@ public class ScribingTableGui extends BaseGui {
             return false;
         }
 
-        if (!player.getInventory().contains(Material.LAPIS_LAZULI, lapisCost)) {
-            player.sendMessage(Component.text(
-                "ラピスラズリが不足しています！必要: " + lapisCost + "個", NamedTextColor.RED
-            ));
-            return false;
+        // 全素材の在庫チェック
+        for (var entry : materials.entrySet()) {
+            if (!player.getInventory().contains(entry.getKey(), entry.getValue())) {
+                player.sendMessage(Component.text(
+                    "素材が不足しています！必要: " + glyphConfig.getUnlockCostDescription(glyphKey),
+                    NamedTextColor.RED
+                ));
+                return false;
+            }
         }
 
-        player.setLevel(player.getLevel() - levelCost);
-        player.getInventory().removeItem(new ItemStack(Material.LAPIS_LAZULI, lapisCost));
         return true;
     }
 

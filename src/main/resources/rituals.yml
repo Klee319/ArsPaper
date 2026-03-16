@@ -1,93 +1,727 @@
 # ArsPaper Ritual Recipes Configuration
+# core-item: Ritual Coreに配置する素材（任意）
+#   - "custom:<item_id>" でカスタムアイテムを指定
+#   - "MATERIAL_NAME" でバニラアイテムを指定
 # pedestal-items: Pedestalに配置する素材（順不同）
 # source: 必要なSource量（近隣のSource Jarから消費）
 # result: "custom:<item_id>" or "MATERIAL_NAME"
+#
+# 本家Ars NouveauのEnchanting Apparatusレシピを参考に、
+# バニラ素材で再現したレシピ構成
+#
+# ※スニーク+右クリックで儀式を発動
+# ※右クリックでコアにアイテムを設置/回収
 
 rituals:
 
-  # Spell Book Upgrade: Novice → Apprentice
+  # ============================================================
+  # 中間素材（Intermediate Materials）
+  # ============================================================
+
+  source_gem:
+    name: "ソースジェム精製"
+    core-item: AMETHYST_SHARD
+    pedestal-items:
+      - AMETHYST_SHARD
+      - AMETHYST_SHARD
+      - AMETHYST_SHARD
+      - LAPIS_LAZULI
+      - LAPIS_LAZULI
+    source: 200
+    result: "custom:source_gem"
+
+  magebloom_fiber:
+    name: "マジックファイバー精製"
+    core-item: WHEAT_SEEDS
+    pedestal-items:
+      - WHEAT_SEEDS
+      - "custom:source_gem"
+      - "custom:source_gem"
+    source: 100
+    result: "custom:magebloom_fiber"
+
+  sourcestone:
+    name: "ソースストーン精製"
+    core-item: STONE
+    pedestal-items:
+      - STONE
+      - STONE
+      - STONE
+      - "custom:source_gem"
+    source: 100
+    result: "custom:sourcestone"
+
+  # ============================================================
+  # Spell Books（スペルブック昇格）
+  # コアに昇格元のスペルブックを置く
+  # ============================================================
+
   upgrade_spell_book_apprentice:
-    name: "Upgrade to Apprentice Spell Book"
+    name: "見習い魔導書への昇格"
+    core-item: "custom:spell_book_novice"
     pedestal-items:
       - DIAMOND
       - DIAMOND
-      - GOLD_INGOT
-      - GOLD_INGOT
-      - LAPIS_LAZULI
-      - LAPIS_LAZULI
-      - BOOK
-      - AMETHYST_SHARD
+      - DIAMOND
+      - QUARTZ_BLOCK
+      - QUARTZ_BLOCK
+      - BLAZE_ROD
+      - BLAZE_ROD
+      - "custom:source_gem"
     source: 500
     result: "custom:spell_book_apprentice"
 
-  # Spell Book Upgrade: Apprentice → Archmage
   upgrade_spell_book_archmage:
-    name: "Upgrade to Archmage Spell Book"
+    name: "大魔導書への昇格"
+    core-item: "custom:spell_book_apprentice"
     pedestal-items:
       - NETHER_STAR
-      - DIAMOND
-      - DIAMOND
       - EMERALD
       - EMERALD
-      - ECHO_SHARD
-      - ECHO_SHARD
-      - BOOK
+      - ENDER_PEARL
+      - ENDER_PEARL
+      - TOTEM_OF_UNDYING
+      - "custom:source_gem"
+      - "custom:source_gem"
     source: 2000
     result: "custom:spell_book_archmage"
 
-  # Mage Armor - Apprentice Set
-  apprentice_armor_set:
-    name: "Apprentice Mage Armor Set"
+  # ============================================================
+  # Mage Armor（メイジアーマー）
+  # コアにバニラの対応装備を置いて魔法装備に変換
+  # ============================================================
+
+  # --- Novice ---
+  mage_novice_helmet:
+    name: "見習いの魔法帽"
+    core-item: LEATHER_HELMET
     pedestal-items:
-      - GOLD_INGOT
-      - GOLD_INGOT
-      - GOLD_INGOT
-      - GOLD_INGOT
       - LAPIS_LAZULI
       - LAPIS_LAZULI
-      - LEATHER
-      - LEATHER
+      - "custom:source_gem"
+    source: 100
+    result: "custom:mage_novice_helmet"
+
+  mage_novice_chestplate:
+    name: "見習いの魔法ローブ"
+    core-item: LEATHER_CHESTPLATE
+    pedestal-items:
+      - LAPIS_LAZULI
+      - LAPIS_LAZULI
+      - "custom:source_gem"
+    source: 100
+    result: "custom:mage_novice_chestplate"
+
+  mage_novice_leggings:
+    name: "見習いの魔法レギンス"
+    core-item: LEATHER_LEGGINGS
+    pedestal-items:
+      - LAPIS_LAZULI
+      - LAPIS_LAZULI
+      - "custom:source_gem"
+    source: 100
+    result: "custom:mage_novice_leggings"
+
+  mage_novice_boots:
+    name: "見習いの魔法ブーツ"
+    core-item: LEATHER_BOOTS
+    pedestal-items:
+      - LAPIS_LAZULI
+      - LAPIS_LAZULI
+      - "custom:source_gem"
+    source: 100
+    result: "custom:mage_novice_boots"
+
+  # --- Apprentice ---
+  mage_apprentice_helmet:
+    name: "熟練の魔法帽"
+    core-item: "custom:mage_novice_helmet"
+    pedestal-items:
+      - "custom:magebloom_fiber"
+      - "custom:magebloom_fiber"
+      - "custom:source_gem"
+      - "custom:source_gem"
+    source: 300
+    result: "custom:mage_apprentice_helmet"
+
+  mage_apprentice_chestplate:
+    name: "熟練の魔法ローブ"
+    core-item: "custom:mage_novice_chestplate"
+    pedestal-items:
+      - "custom:magebloom_fiber"
+      - "custom:magebloom_fiber"
+      - "custom:source_gem"
+      - "custom:source_gem"
     source: 300
     result: "custom:mage_apprentice_chestplate"
 
-  # Mage Armor - Archmage Set
-  archmage_armor_set:
-    name: "Archmage Mage Armor Set"
+  mage_apprentice_leggings:
+    name: "熟練の魔法レギンス"
+    core-item: "custom:mage_novice_leggings"
     pedestal-items:
-      - DIAMOND
-      - DIAMOND
-      - DIAMOND
-      - DIAMOND
-      - EMERALD
-      - EMERALD
+      - "custom:magebloom_fiber"
+      - "custom:magebloom_fiber"
+      - "custom:source_gem"
+      - "custom:source_gem"
+    source: 300
+    result: "custom:mage_apprentice_leggings"
+
+  mage_apprentice_boots:
+    name: "熟練の魔法ブーツ"
+    core-item: "custom:mage_novice_boots"
+    pedestal-items:
+      - "custom:magebloom_fiber"
+      - "custom:magebloom_fiber"
+      - "custom:source_gem"
+      - "custom:source_gem"
+    source: 300
+    result: "custom:mage_apprentice_boots"
+
+  # --- Archmage ---
+  mage_archmage_helmet:
+    name: "大魔導師の帽子"
+    core-item: "custom:mage_apprentice_helmet"
+    pedestal-items:
+      - "custom:magebloom_fiber"
+      - "custom:magebloom_fiber"
+      - "custom:source_gem"
+      - "custom:source_gem"
       - NETHER_STAR
-      - BLAZE_ROD
-    source: 1500
+    source: 800
+    result: "custom:mage_archmage_helmet"
+
+  mage_archmage_chestplate:
+    name: "大魔導師のローブ"
+    core-item: "custom:mage_apprentice_chestplate"
+    pedestal-items:
+      - "custom:magebloom_fiber"
+      - "custom:magebloom_fiber"
+      - "custom:source_gem"
+      - "custom:source_gem"
+      - NETHER_STAR
+    source: 800
     result: "custom:mage_archmage_chestplate"
 
-  # Source Jar (Alternative ritual crafting)
-  ritual_source_jar:
-    name: "Enchanted Source Jar"
+  mage_archmage_leggings:
+    name: "大魔導師のレギンス"
+    core-item: "custom:mage_apprentice_leggings"
     pedestal-items:
-      - GLASS
-      - GLASS
-      - GLASS
-      - GLASS
-      - AMETHYST_SHARD
-    source: 100
-    result: "custom:source_jar"
+      - "custom:magebloom_fiber"
+      - "custom:magebloom_fiber"
+      - "custom:source_gem"
+      - "custom:source_gem"
+      - NETHER_STAR
+    source: 800
+    result: "custom:mage_archmage_leggings"
 
-  # Ritual Core (Self-replicating)
-  ritual_core_craft:
-    name: "Ritual Core"
+  mage_archmage_boots:
+    name: "大魔導師のブーツ"
+    core-item: "custom:mage_apprentice_boots"
     pedestal-items:
-      - LODESTONE
+      - "custom:magebloom_fiber"
+      - "custom:magebloom_fiber"
+      - "custom:source_gem"
+      - "custom:source_gem"
+      - NETHER_STAR
+    source: 800
+    result: "custom:mage_archmage_boots"
+
+  # ============================================================
+  # Infrastructure（インフラ）
+  # ============================================================
+
+  ritual_core_craft:
+    name: "儀式のコア"
+    core-item: LODESTONE
+    pedestal-items:
       - DIAMOND
       - DIAMOND
       - LAPIS_LAZULI
       - LAPIS_LAZULI
       - OBSIDIAN
       - OBSIDIAN
-      - BLAZE_POWDER
+      - "custom:source_gem"
     source: 1000
     result: "custom:ritual_core"
+
+  volcanic_sourcelink_craft:
+    name: "ヴォルカニックソースリンク"
+    core-item: FURNACE
+    pedestal-items:
+      - NETHERRACK
+      - NETHERRACK
+      - MAGMA_BLOCK
+      - MAGMA_BLOCK
+      - BLAZE_POWDER
+      - BLAZE_POWDER
+      - "custom:source_gem"
+    source: 300
+    result: "custom:volcanic_sourcelink"
+
+  mycelial_sourcelink_craft:
+    name: "マイセリアルソースリンク"
+    core-item: SMOKER
+    pedestal-items:
+      - MYCELIUM
+      - MYCELIUM
+      - BROWN_MUSHROOM
+      - RED_MUSHROOM
+      - BONE_MEAL
+      - "custom:source_gem"
+      - "custom:source_gem"
+    source: 300
+    result: "custom:mycelial_sourcelink"
+
+  # ============================================================
+  # Source Berry（ソースベリー生産）
+  # ============================================================
+
+  source_berry:
+    name: "ソースベリー"
+    core-item: GLOW_BERRIES
+    pedestal-items:
+      - GLOW_BERRIES
+      - AMETHYST_SHARD
+      - AMETHYST_SHARD
+    source: 50
+    result: "custom:source_berry"
+
+  source_berry_bulk:
+    name: "ソースベリー（大量生産）"
+    core-item: GLOW_BERRIES
+    pedestal-items:
+      - GLOW_BERRIES
+      - GLOW_BERRIES
+      - GLOW_BERRIES
+      - AMETHYST_SHARD
+      - AMETHYST_SHARD
+      - AMETHYST_SHARD
+      - AMETHYST_SHARD
+    source: 150
+    result: "custom:source_berry"
+
+  # ============================================================
+  # Spell Wand（スペルワンド）
+  # ============================================================
+
+  wand_novice:
+    name: "初級スペルワンド"
+    core-item: BLAZE_ROD
+    pedestal-items:
+      - AMETHYST_SHARD
+      - AMETHYST_SHARD
+      - "custom:source_gem"
+    source: 100
+    result: "custom:wand_novice"
+
+  upgrade_wand_apprentice:
+    name: "中級スペルワンドへの昇格"
+    core-item: "custom:wand_novice"
+    pedestal-items:
+      - DIAMOND
+      - DIAMOND
+      - BLAZE_ROD
+      - "custom:source_gem"
+      - "custom:source_gem"
+    source: 500
+    result: "custom:wand_apprentice"
+
+  upgrade_wand_archmage:
+    name: "上級スペルワンドへの昇格"
+    core-item: "custom:wand_apprentice"
+    pedestal-items:
+      - NETHER_STAR
+      - EMERALD
+      - EMERALD
+      - ENDER_PEARL
+      - "custom:source_gem"
+      - "custom:source_gem"
+    source: 2000
+    result: "custom:wand_archmage"
+
+  # ============================================================
+  # Equipment Threads（防具スレッド）
+  # 空スレッドを精製し、儀式で効果付きスレッドに変換する
+  # 防具へのセットはGUI（スニーク+右クリック）で行う
+  # ============================================================
+
+  empty_thread:
+    name: "空のスレッド精製"
+    core-item: STRING
+    pedestal-items:
+      - "custom:magebloom_fiber"
+      - "custom:source_gem"
+    source: 100
+    result: "custom:thread_empty"
+
+  thread_mana_regen:
+    name: "マナリジェンスレッド"
+    effect-type: thread
+    effect-params:
+      thread: mana_regen
+    core-item: "custom:thread_empty"
+    pedestal-items:
+      - GHAST_TEAR
+      - GHAST_TEAR
+      - "custom:source_gem"
+      - "custom:source_gem"
+    source: 500
+
+  thread_mana_boost:
+    name: "マナブーストスレッド"
+    effect-type: thread
+    effect-params:
+      thread: mana_boost
+    core-item: "custom:thread_empty"
+    pedestal-items:
+      - HEART_OF_THE_SEA
+      - "custom:source_gem"
+      - "custom:source_gem"
+      - "custom:magebloom_fiber"
+      - "custom:magebloom_fiber"
+    source: 800
+
+  thread_speed:
+    name: "迅速のスレッド"
+    effect-type: thread
+    effect-params:
+      thread: speed
+    core-item: "custom:thread_empty"
+    pedestal-items:
+      - SUGAR
+      - SUGAR
+      - RABBIT_FOOT
+      - "custom:source_gem"
+      - "custom:source_gem"
+    source: 600
+
+  thread_jump_boost:
+    name: "跳躍のスレッド"
+    effect-type: thread
+    effect-params:
+      thread: jump_boost
+    core-item: "custom:thread_empty"
+    pedestal-items:
+      - RABBIT_FOOT
+      - RABBIT_FOOT
+      - SLIME_BALL
+      - "custom:source_gem"
+      - "custom:source_gem"
+    source: 600
+
+  thread_night_vision:
+    name: "暗視のスレッド"
+    effect-type: thread
+    effect-params:
+      thread: night_vision
+    core-item: "custom:thread_empty"
+    pedestal-items:
+      - GOLDEN_CARROT
+      - GOLDEN_CARROT
+      - GLOWSTONE_DUST
+      - "custom:source_gem"
+      - "custom:source_gem"
+    source: 600
+
+  thread_fire_resistance:
+    name: "耐火のスレッド"
+    effect-type: thread
+    effect-params:
+      thread: fire_resistance
+    core-item: "custom:thread_empty"
+    pedestal-items:
+      - MAGMA_CREAM
+      - MAGMA_CREAM
+      - BLAZE_POWDER
+      - "custom:source_gem"
+      - "custom:source_gem"
+    source: 800
+
+  thread_water_breathing:
+    name: "水中呼吸のスレッド"
+    effect-type: thread
+    effect-params:
+      thread: water_breathing
+    core-item: "custom:thread_empty"
+    pedestal-items:
+      - PUFFERFISH
+      - PUFFERFISH
+      - PRISMARINE_SHARD
+      - "custom:source_gem"
+      - "custom:source_gem"
+    source: 600
+
+  thread_spell_power:
+    name: "魔力増幅のスレッド"
+    effect-type: thread
+    effect-params:
+      thread: spell_power
+    core-item: "custom:thread_empty"
+    pedestal-items:
+      - BLAZE_ROD
+      - BLAZE_ROD
+      - NETHER_STAR
+      - "custom:source_gem"
+      - "custom:source_gem"
+      - "custom:source_gem"
+    source: 1500
+
+  thread_spell_cost_down:
+    name: "詠唱効率のスレッド"
+    effect-type: thread
+    effect-params:
+      thread: spell_cost_down
+    core-item: "custom:thread_empty"
+    pedestal-items:
+      - LAPIS_LAZULI
+      - LAPIS_LAZULI
+      - DIAMOND
+      - "custom:source_gem"
+      - "custom:source_gem"
+      - "custom:source_gem"
+    source: 1500
+
+  # ============================================================
+  # World-Affecting Rituals（ワールド効果儀式）
+  # ============================================================
+
+  ritual_fertility:
+    name: "豊穣の儀式"
+    effect-type: growth
+    effect-params:
+      radius: "10"
+    pedestal-items:
+      - BONE_MEAL
+      - BONE_MEAL
+      - BONE_MEAL
+      - BONE_MEAL
+      - "custom:source_gem"
+    source: 300
+
+  ritual_cloudshaping:
+    name: "天候操作の儀式"
+    effect-type: weather
+    pedestal-items:
+      - PRISMARINE_SHARD
+      - PRISMARINE_SHARD
+      - LIGHTNING_ROD
+      - LIGHTNING_ROD
+      - "custom:source_gem"
+      - "custom:source_gem"
+    source: 1000
+
+  # 飛行の儀式
+  ritual_flight:
+    name: "飛行の儀式"
+    effect-type: flight
+    effect-params:
+      duration: "300"
+    pedestal-items:
+      - FEATHER
+      - FEATHER
+      - FEATHER
+      - FEATHER
+      - PHANTOM_MEMBRANE
+      - PHANTOM_MEMBRANE
+      - "custom:source_gem"
+      - "custom:source_gem"
+    source: 2000
+
+  # 月落としの儀式
+  ritual_moonfall:
+    name: "月落としの儀式"
+    effect-type: moonfall
+    pedestal-items:
+      - CLOCK
+      - GLOWSTONE_DUST
+      - GLOWSTONE_DUST
+      - "custom:source_gem"
+    source: 500
+
+  # 日の出の儀式
+  ritual_sunrise:
+    name: "日の出の儀式"
+    effect-type: sunrise
+    pedestal-items:
+      - CLOCK
+      - SUNFLOWER
+      - SUNFLOWER
+      - "custom:source_gem"
+    source: 500
+
+  # 修復の儀式
+  ritual_repair:
+    name: "修復の儀式"
+    effect-type: repair
+    pedestal-items:
+      - IRON_INGOT
+      - IRON_INGOT
+      - DIAMOND
+      - "custom:source_gem"
+      - "custom:source_gem"
+    source: 800
+
+  # 帰還ポイント設定
+  ritual_recall_set:
+    name: "帰還ポイントの設定"
+    effect-type: recall
+    effect-params:
+      mode: set
+    pedestal-items:
+      - ENDER_PEARL
+      - ENDER_PEARL
+      - COMPASS
+      - "custom:source_gem"
+    source: 300
+
+  # 帰還（テレポート）
+  ritual_recall_teleport:
+    name: "帰還の儀式"
+    effect-type: recall
+    effect-params:
+      mode: teleport
+    pedestal-items:
+      - ENDER_PEARL
+      - ENDER_PEARL
+      - ENDER_PEARL
+      - ENDER_PEARL
+      - "custom:source_gem"
+      - "custom:source_gem"
+    source: 1500
+
+  # 封じ込めの儀式
+  ritual_containment:
+    name: "封じ込めの儀式"
+    effect-type: containment
+    effect-params:
+      radius: "30"
+      duration: "6000"
+    pedestal-items:
+      - IRON_BARS
+      - IRON_BARS
+      - IRON_BARS
+      - IRON_BARS
+      - TORCH
+      - TORCH
+      - "custom:source_gem"
+      - "custom:source_gem"
+    source: 1000
+
+  # 動物召喚の儀式
+  ritual_animal_summon:
+    name: "動物召喚の儀式"
+    effect-type: animal_summon
+    effect-params:
+      count: "5"
+    pedestal-items:
+      - WHEAT
+      - WHEAT
+      - CARROT
+      - CARROT
+      - "custom:source_gem"
+    source: 400
+
+  # ============================================================
+  # Enchanted Books（エンチャント本）
+  # コアに本を置いてカスタムエンチャント本にクラフト
+  # ============================================================
+
+  # --- マナ加速 ---
+  enchant_book_mana_regen_1:
+    name: "マナ加速I のエンチャント本"
+    effect-type: enchant_book
+    effect-params:
+      enchantment: mana_regen
+      level: "1"
+    core-item: BOOK
+    pedestal-items:
+      - "custom:source_gem"
+      - "custom:source_gem"
+      - GHAST_TEAR
+      - LAPIS_LAZULI
+      - LAPIS_LAZULI
+    source: 500
+
+  enchant_book_mana_regen_2:
+    name: "マナ加速II のエンチャント本"
+    effect-type: enchant_book
+    effect-params:
+      enchantment: mana_regen
+      level: "2"
+    core-item: BOOK
+    pedestal-items:
+      - "custom:source_gem"
+      - "custom:source_gem"
+      - "custom:source_gem"
+      - GHAST_TEAR
+      - GHAST_TEAR
+      - DIAMOND
+      - LAPIS_LAZULI
+    source: 1000
+
+  enchant_book_mana_regen_3:
+    name: "マナ加速III のエンチャント本"
+    effect-type: enchant_book
+    effect-params:
+      enchantment: mana_regen
+      level: "3"
+    core-item: BOOK
+    pedestal-items:
+      - "custom:source_gem"
+      - "custom:source_gem"
+      - "custom:source_gem"
+      - "custom:source_gem"
+      - GHAST_TEAR
+      - GHAST_TEAR
+      - NETHER_STAR
+    source: 2000
+
+  # --- マナ上昇 ---
+  enchant_book_mana_boost_1:
+    name: "マナ上昇I のエンチャント本"
+    effect-type: enchant_book
+    effect-params:
+      enchantment: mana_boost
+      level: "1"
+    core-item: BOOK
+    pedestal-items:
+      - "custom:source_gem"
+      - "custom:source_gem"
+      - HEART_OF_THE_SEA
+      - LAPIS_LAZULI
+      - LAPIS_LAZULI
+    source: 500
+
+  enchant_book_mana_boost_2:
+    name: "マナ上昇II のエンチャント本"
+    effect-type: enchant_book
+    effect-params:
+      enchantment: mana_boost
+      level: "2"
+    core-item: BOOK
+    pedestal-items:
+      - "custom:source_gem"
+      - "custom:source_gem"
+      - "custom:source_gem"
+      - HEART_OF_THE_SEA
+      - DIAMOND
+      - DIAMOND
+      - LAPIS_LAZULI
+    source: 1000
+
+  enchant_book_mana_boost_3:
+    name: "マナ上昇III のエンチャント本"
+    effect-type: enchant_book
+    effect-params:
+      enchantment: mana_boost
+      level: "3"
+    core-item: BOOK
+    pedestal-items:
+      - "custom:source_gem"
+      - "custom:source_gem"
+      - "custom:source_gem"
+      - "custom:source_gem"
+      - HEART_OF_THE_SEA
+      - NETHER_STAR
+      - NETHER_STAR
+    source: 2000

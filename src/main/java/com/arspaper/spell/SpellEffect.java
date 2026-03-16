@@ -19,6 +19,26 @@ public interface SpellEffect extends SpellComponent {
      */
     void applyToBlock(SpellContext context, Location blockLocation);
 
+    /**
+     * AOE拡張を効果側で内部的に処理するかどうか。
+     * trueの場合、SpellContextの外部AOE拡張をスキップする。
+     */
+    default boolean handlesAoeInternally() { return false; }
+
+    /**
+     * ブロックAOE展開モード。
+     * FIXED: 常にXZ+Yの固定軸（デフォルト）
+     * HIT_FACE_INWARD: ヒット面に沿って展開、垂直は奥行き方向（破壊系）
+     * HIT_FACE_OUTWARD: ヒット面に沿って展開、垂直は手前方向（設置系）
+     */
+    default AoeMode getAoeMode() { return AoeMode.FIXED; }
+
+    enum AoeMode {
+        FIXED,            // XZ+Y固定軸
+        HIT_FACE_INWARD,  // 奥行き方向（破壊）
+        HIT_FACE_OUTWARD  // 手前方向（設置）
+    }
+
     @Override
     default ComponentType getType() {
         return ComponentType.EFFECT;

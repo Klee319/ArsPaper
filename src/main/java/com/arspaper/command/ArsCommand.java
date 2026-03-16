@@ -1,20 +1,29 @@
 package com.arspaper.command;
 
 import com.arspaper.ArsPaper;
+import com.arspaper.block.BlockKeys;
 import com.arspaper.item.BaseCustomItem;
 import com.arspaper.item.ItemKeys;
+import com.arspaper.mana.ManaKeys;
 import com.arspaper.spell.*;
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonParser;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import io.papermc.paper.command.brigadier.Commands;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.command.CommandSender;
+import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -54,6 +63,57 @@ public final class ArsCommand {
                         if (!(ctx.getSource().getSender() instanceof Player player)) return 0;
                         return executeManaInfo(plugin, player);
                     })
+                )
+                .then(Commands.literal("cleanup")
+                    .requires(src -> src.getSender().hasPermission("arspaper.admin"))
+                    .executes(ctx -> {
+                        if (!(ctx.getSource().getSender() instanceof Player player)) return 0;
+                        return executeCleanup(player);
+                    })
+                )
+                .then(Commands.literal("debug")
+                    .requires(src -> src.getSender().hasPermission("arspaper.admin"))
+                    .then(Commands.literal("mana")
+                        .executes(ctx -> {
+                            if (!(ctx.getSource().getSender() instanceof Player player)) return 0;
+                            return executeDebugMana(plugin, player);
+                        })
+                    )
+                )
+                .then(Commands.literal("reload")
+                    .requires(src -> src.getSender().hasPermission("arspaper.admin"))
+                    .executes(ctx -> {
+                        return executeReload(plugin, ctx.getSource().getSender());
+                    })
+                )
+                .then(Commands.literal("pvp")
+                    .requires(src -> src.getSender().hasPermission("arspaper.admin"))
+                    .then(Commands.argument("state", StringArgumentType.word())
+                        .suggests((ctx, builder) -> {
+                            builder.suggest("on");
+                            builder.suggest("off");
+                            return builder.buildFuture();
+                        })
+                        .executes(ctx -> {
+                            String state = StringArgumentType.getString(ctx, "state");
+                            return executePvpToggle(plugin, ctx.getSource().getSender(), state);
+                        })
+                    )
+                )
+                .then(Commands.literal("glyph")
+                    .requires(src -> src.getSender().hasPermission("arspaper.admin"))
+                    .then(Commands.literal("unlockall")
+                        .executes(ctx -> {
+                            if (!(ctx.getSource().getSender() instanceof Player player)) return 0;
+                            return executeGlyphUnlockAll(plugin, player);
+                        })
+                    )
+                    .then(Commands.literal("lockall")
+                        .executes(ctx -> {
+                            if (!(ctx.getSource().getSender() instanceof Player player)) return 0;
+                            return executeGlyphLockAll(player);
+                        })
+                    )
                 )
                 .then(Commands.literal("spell")
                     .then(Commands.literal("list")
@@ -97,6 +157,93 @@ public final class ArsCommand {
         int current = plugin.getManaManager().getCurrentMana(player);
         int max = plugin.getManaManager().getMaxMana(player);
         player.sendMessage(Component.text("マナ: " + current + " / " + max, NamedTextColor.AQUA));
+        return 1;
+    }
+
+    private static int executeCleanup(Player player) {
+        int removed = 0;
+        for (ArmorStand stand : player.getWorld().getEntitiesByClass(ArmorStand.class)) {
+            if (stand.getPersistentDataContainer().has(BlockKeys.DISPLAY_MARKER)) {
+                stand.remove();
+                removed++;
+            }
+        }
+        player.sendMessage(Component.text(
+            "ArsPaper表示用ArmorStandを" + removed + "体除去しました", NamedTextColor.GREEN));
+        return 1;
+    }
+
+    private static int executeDebugMana(ArsPaper plugin, Player player) {
+        boolean enabled = plugin.getManaManager().toggleInfiniteMana(player);
+        if (enabled) {
+            player.sendMessage(Component.text("マナ無限モード: ON", NamedTextColor.GREEN));
+        } else {
+            player.sendMessage(Component.text("マナ無限モード: OFF", NamedTextColor.YELLOW));
+        }
+        return 1;
+    }
+
+    private static int executeReload(ArsPaper plugin, CommandSender sender) {
+        long start = System.currentTimeMillis();
+
+        // config.yml リロード
+        plugin.reloadConfig();
+
+        // glyphs.yml リロード（グリフのティア・コスト・係数）
+        plugin.reloadGlyphConfig();
+
+        // rituals.yml リロード
+        plugin.getRitualRecipeRegistry().loadRecipes();
+
+        // recipes.yml リロード
+        plugin.getRecipeManager().unloadRecipes();
+        plugin.getRecipeManager().loadRecipes();
+
+        long elapsed = System.currentTimeMillis() - start;
+        sender.sendMessage(Component.text(
+            "ArsPaper設定をリロードしました (" + elapsed + "ms)", NamedTextColor.GREEN));
+        return 1;
+    }
+
+    private static int executePvpToggle(ArsPaper plugin, CommandSender sender, String state) {
+        boolean enabled;
+        if ("on".equalsIgnoreCase(state)) {
+            enabled = true;
+        } else if ("off".equalsIgnoreCase(state)) {
+            enabled = false;
+        } else {
+            sender.sendMessage(Component.text("使い方: /ars pvp <on|off>", NamedTextColor.RED));
+            return 0;
+        }
+        plugin.getConfig().set("pvp.enabled", enabled);
+        plugin.saveConfig();
+        sender.sendMessage(Component.text(
+            "スペルPvP: " + (enabled ? "ON" : "OFF"),
+            enabled ? NamedTextColor.GREEN : NamedTextColor.YELLOW));
+        return 1;
+    }
+
+    private static int executeGlyphUnlockAll(ArsPaper plugin, Player player) {
+        Set<String> allGlyphs = new HashSet<>();
+        for (SpellComponent comp : plugin.getSpellRegistry().getAll()) {
+            allGlyphs.add(comp.getId().toString());
+        }
+
+        JsonArray arr = new JsonArray();
+        allGlyphs.forEach(arr::add);
+        player.getPersistentDataContainer().set(
+            ManaKeys.UNLOCKED_GLYPHS, PersistentDataType.STRING, new Gson().toJson(arr)
+        );
+
+        player.sendMessage(Component.text(
+            allGlyphs.size() + " 個の全グリフをアンロックしました", NamedTextColor.GREEN));
+        return 1;
+    }
+
+    private static int executeGlyphLockAll(Player player) {
+        player.getPersistentDataContainer().remove(ManaKeys.UNLOCKED_GLYPHS);
+        player.sendMessage(Component.text(
+            "全グリフをロックしました", NamedTextColor.YELLOW));
         return 1;
     }
 

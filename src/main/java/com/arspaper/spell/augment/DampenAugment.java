@@ -1,38 +1,42 @@
 package com.arspaper.spell.augment;
 
 import com.arspaper.spell.SpellAugment;
+import com.arspaper.spell.GlyphConfig;
 import com.arspaper.spell.SpellContext;
 import org.bukkit.NamespacedKey;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /**
- * Amplifyの逆。効果の威力を下げるAugment。
- * Ars NouveauのEffectDampenに準拠。
- * マナコスト0だが効果を弱めるため、自傷軽減などの用途がある。
+ * パワー-1.0。Amplifyの逆。特定エフェクトで特殊動作あり。
+ * Ars Nouveau: amplification -= 1.0
  */
 public class DampenAugment implements SpellAugment {
 
     private final NamespacedKey id;
+    private final GlyphConfig config;
 
-    public DampenAugment(JavaPlugin plugin) {
+    public DampenAugment(JavaPlugin plugin, GlyphConfig config) {
         this.id = new NamespacedKey(plugin, "dampen");
+        this.config = config;
     }
 
     @Override
     public void modify(SpellContext context) {
-        context.setAmplifyLevel(Math.max(0, context.getAmplifyLevel() - 1));
-        context.setDamageMultiplier(Math.max(0.25, context.getDamageMultiplier() - 0.5));
+        context.applyDampen();
     }
 
     @Override
     public NamespacedKey getId() { return id; }
 
     @Override
-    public String getDisplayName() { return "Dampen"; }
+    public String getDisplayName() { return "減衰"; }
 
     @Override
-    public int getManaCost() { return 0; }
+    public String getDescription() { return "効果の威力を抑える"; }
 
     @Override
-    public int getTier() { return 1; }
+    public int getManaCost() { return config.getManaCost("dampen"); }
+
+    @Override
+    public int getTier() { return config.getTier("dampen"); }
 }

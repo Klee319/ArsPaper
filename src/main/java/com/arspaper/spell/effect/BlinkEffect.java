@@ -3,6 +3,7 @@ package com.arspaper.spell.effect;
 import com.arspaper.spell.SpellContext;
 import com.arspaper.spell.SpellEffect;
 import com.arspaper.spell.SpellFxUtil;
+import com.arspaper.spell.GlyphConfig;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.block.Block;
@@ -23,9 +24,11 @@ public class BlinkEffect implements SpellEffect {
     private static final int MAX_DISTANCE = 32;
     private static final int MIN_Y = -64;
     private final NamespacedKey id;
+    private final GlyphConfig config;
 
-    public BlinkEffect(JavaPlugin plugin) {
+    public BlinkEffect(JavaPlugin plugin, GlyphConfig config) {
         this.id = new NamespacedKey(plugin, "blink");
+        this.config = config;
     }
 
     @Override
@@ -102,11 +105,14 @@ public class BlinkEffect implements SpellEffect {
     public NamespacedKey getId() { return id; }
 
     @Override
-    public String getDisplayName() { return "Blink"; }
+    public String getDisplayName() { return "瞬間移動"; }
 
     @Override
-    public int getManaCost() { return 20; }
+    public String getDescription() { return "視線方向にテレポートする"; }
 
     @Override
-    public int getTier() { return 2; }
+    public int getManaCost() { return config.getManaCost("blink"); }
+
+    @Override
+    public int getTier() { return config.getTier("blink"); }
 }

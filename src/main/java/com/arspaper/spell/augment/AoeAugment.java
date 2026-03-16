@@ -1,37 +1,42 @@
 package com.arspaper.spell.augment;
 
 import com.arspaper.spell.SpellAugment;
+import com.arspaper.spell.GlyphConfig;
 import com.arspaper.spell.SpellContext;
 import org.bukkit.NamespacedKey;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /**
- * 効果範囲を拡大するAugment。
- * スタック可能（AOE + AOE = より広い範囲）。
+ * 範囲+1.0。ブロック/エンティティの影響範囲拡大。
+ * Ars Nouveau: aoeMultiplier += 1.0
  */
 public class AoeAugment implements SpellAugment {
 
-    private static final double RADIUS_PER_STACK = 3.0;
     private final NamespacedKey id;
+    private final GlyphConfig config;
 
-    public AoeAugment(JavaPlugin plugin) {
+    public AoeAugment(JavaPlugin plugin, GlyphConfig config) {
         this.id = new NamespacedKey(plugin, "aoe");
+        this.config = config;
     }
 
     @Override
     public void modify(SpellContext context) {
-        context.setAoeRadius(context.getAoeRadius() + RADIUS_PER_STACK);
+        context.setAoeLevel(context.getAoeLevel() + 1);
     }
 
     @Override
     public NamespacedKey getId() { return id; }
 
     @Override
-    public String getDisplayName() { return "AOE"; }
+    public String getDisplayName() { return "範囲[水平]"; }
 
     @Override
-    public int getManaCost() { return 15; }
+    public String getDescription() { return "ヒット面に沿って効果の範囲を拡大する"; }
 
     @Override
-    public int getTier() { return 1; }
+    public int getManaCost() { return config.getManaCost("aoe"); }
+
+    @Override
+    public int getTier() { return config.getTier("aoe"); }
 }

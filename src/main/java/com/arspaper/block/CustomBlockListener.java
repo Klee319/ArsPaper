@@ -1,9 +1,11 @@
 package com.arspaper.block;
 
-import com.arspaper.item.ItemKeys;
+import com.arspaper.source.SourcelinkTickTask;
+import com.arspaper.source.sourcelink.Sourcelink;
 import com.arspaper.util.PdcHelper;
 import org.bukkit.block.Block;
 import org.bukkit.block.TileState;
+import org.bukkit.GameMode;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -23,18 +25,23 @@ import java.util.Optional;
 /**
  * カスタムブロックの設置・破壊・インタラクションイベントを処理するリスナー。
  *
- * 設置時: ItemStack PDC → TileState PDC へ転送 + ArmorStand生成
- * 破壊時: TileState PDC → ドロップItemStack PDC へ復元 + ArmorStand除去
+ * 設置時: ItemStack PDC → TileState PDC へ転送 + パーティクルキャッシュ登録
+ * 破壊時: TileState PDC → ドロップItemStack PDC へ復元 + パーティクルキャッシュ除去
  * インタラクション: カスタムブロックのonBlockInteractを呼び出し
  */
 public class CustomBlockListener implements Listener {
 
     private final JavaPlugin plugin;
     private final CustomBlockRegistry registry;
+    private final BlockParticleTask particleTask;
+    private final SourcelinkTickTask sourcelinkTickTask;
 
-    public CustomBlockListener(JavaPlugin plugin, CustomBlockRegistry registry) {
+    public CustomBlockListener(JavaPlugin plugin, CustomBlockRegistry registry,
+                               BlockParticleTask particleTask, SourcelinkTickTask sourcelinkTickTask) {
         this.plugin = plugin;
         this.registry = registry;
+        this.particleTask = particleTask;
+        this.sourcelinkTickTask = sourcelinkTickTask;
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -54,10 +61,12 @@ public class CustomBlockListener implements Listener {
         // ItemStack PDC → TileState PDC 転送
         cb.writeToTileState(tileState, item);
 
-        // ArmorStandによる見た目付与
-        ItemStack displayHead = cb.getDisplayHeadItem();
-        if (displayHead != null) {
-            BlockDisplayModule.spawn(plugin, block.getLocation(), cb.getItemId(), displayHead);
+        // パーティクルキャッシュに登録
+        particleTask.addBlock(block.getLocation(), cb.getItemId());
+
+        // Sourcelinkの場合はティックタスクに登録
+        if (cb instanceof Sourcelink) {
+            sourcelinkTickTask.addSourcelink(block.getLocation(), cb.getItemId());
         }
 
         // カスタムブロック固有の初期化
@@ -84,12 +93,22 @@ public class CustomBlockListener implements Listener {
         // バニラドロップを抑制
         event.setDropItems(false);
 
+        // パーティクルキャッシュから除去
+        particleTask.removeBlock(block.getLocation());
+
+        // Sourcelinkの場合はティックタスクから除去
+        if (cb instanceof Sourcelink) {
+            sourcelinkTickTask.removeSourcelink(block.getLocation());
+        }
+
+        // クリエイティブモードではカスタムアイテムもドロップしない
+        if (event.getPlayer().getGameMode() == GameMode.CREATIVE) {
+            return;
+        }
+
         // TileState PDC → ドロップItemStack PDC 復元
         ItemStack drop = cb.createDropWithData(tileState);
         block.getWorld().dropItemNaturally(block.getLocation(), drop);
-
-        // ArmorStand除去
-        BlockDisplayModule.remove(block.getLocation());
     }
 
     @EventHandler

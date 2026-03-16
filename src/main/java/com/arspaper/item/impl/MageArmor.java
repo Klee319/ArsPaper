@@ -1,5 +1,6 @@
 package com.arspaper.item.impl;
 
+import com.arspaper.gui.ThreadGui;
 import com.arspaper.item.ArmorSlot;
 import com.arspaper.item.ArmorTier;
 import com.arspaper.item.BaseCustomItem;
@@ -9,6 +10,7 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Color;
 import org.bukkit.Material;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.persistence.PersistentDataType;
@@ -67,10 +69,22 @@ public class MageArmor extends BaseCustomItem {
                 Component.text("ティア: " + armorTier.getDisplayName(), NamedTextColor.GRAY)
                     .decoration(TextDecoration.ITALIC, false),
                 Component.text("マナボーナス: +" + armorTier.getManaBonus(), NamedTextColor.AQUA)
+                    .decoration(TextDecoration.ITALIC, false),
+                Component.text("スレッドスロット: " + armorTier.getThreadSlots(), NamedTextColor.DARK_AQUA)
                     .decoration(TextDecoration.ITALIC, false)
             ));
         });
         return item;
+    }
+
+    @Override
+    public void onRightClick(PlayerInteractEvent event) {
+        if (event.getPlayer().isSneaking()) {
+            event.setCancelled(true);
+            ItemStack held = event.getItem();
+            if (held == null) return;
+            new ThreadGui(event.getPlayer(), held).open();
+        }
     }
 
     public ArmorTier getArmorTier() {

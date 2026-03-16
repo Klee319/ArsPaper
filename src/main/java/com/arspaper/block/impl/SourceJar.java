@@ -2,14 +2,17 @@ package com.arspaper.block.impl;
 
 import com.arspaper.block.BlockKeys;
 import com.arspaper.block.CustomBlock;
+import com.arspaper.item.ItemKeys;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.block.Block;
 import org.bukkit.block.TileState;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -67,27 +70,72 @@ public class SourceJar extends CustomBlock {
         return head;
     }
 
+    /** Source量をItemStackのPDCに保存するキー */
+    private static final NamespacedKey ITEM_SOURCE_KEY = new NamespacedKey("arspaper", "stored_source");
+
     @Override
     public void onBlockPlaced(Player player, Block block, TileState tileState) {
-        // 初期Source量を0に設定
+        // 設置に使ったアイテムからSource量を復元
+        ItemStack handItem = player.getInventory().getItemInMainHand();
+        int restoredSource = 0;
+        if (handItem.hasItemMeta()) {
+            Integer stored = handItem.getItemMeta().getPersistentDataContainer()
+                .get(ITEM_SOURCE_KEY, PersistentDataType.INTEGER);
+            if (stored != null) restoredSource = stored;
+        }
         tileState.getPersistentDataContainer().set(
-            BlockKeys.SOURCE_AMOUNT, PersistentDataType.INTEGER, 0
+            BlockKeys.SOURCE_AMOUNT, PersistentDataType.INTEGER, restoredSource
         );
         tileState.update();
     }
 
     @Override
-    public void onBlockInteract(Player player, Block block, TileState tileState) {
+    public ItemStack createDropWithData(TileState tileState) {
+        ItemStack drop = super.createDropWithData(tileState);
         int source = getSourceAmount(tileState);
-        player.sendMessage(Component.text(
-            "ソース: " + source + " / " + MAX_SOURCE, NamedTextColor.AQUA
-        ));
+        drop.editMeta(meta -> {
+            // Source量をアイテムPDCに保存
+            meta.getPersistentDataContainer().set(
+                ITEM_SOURCE_KEY, PersistentDataType.INTEGER, source
+            );
+            // Lore に現在のSource量を反映
+            meta.lore(List.of(
+                Component.text("魔法のソースエネルギーを貯蔵", NamedTextColor.GRAY)
+                    .decoration(TextDecoration.ITALIC, false),
+                Component.text("ソース: " + source + " / " + MAX_SOURCE, NamedTextColor.AQUA)
+                    .decoration(TextDecoration.ITALIC, false)
+            ));
+        });
+        return drop;
+    }
+
+    @Override
+    public void onBlockInteract(Player player, Block block, TileState tileState) {
+        if (isInfinite(tileState)) {
+            player.sendMessage(Component.text(
+                "ソース: \u221E (無限)", NamedTextColor.LIGHT_PURPLE
+            ));
+        } else {
+            int source = getSourceAmount(tileState);
+            player.sendMessage(Component.text(
+                "ソース: " + source + " / " + MAX_SOURCE, NamedTextColor.AQUA
+            ));
+        }
     }
 
     /**
-     * TileStateからSource量を取得。
+     * TileStateが無限ソースかどうかを判定する。
+     */
+    public static boolean isInfinite(TileState tileState) {
+        return tileState.getPersistentDataContainer()
+            .getOrDefault(BlockKeys.SOURCE_INFINITE, PersistentDataType.BYTE, (byte) 0) != 0;
+    }
+
+    /**
+     * TileStateからSource量を取得。無限の場合は常にMAX_SOURCE。
      */
     public static int getSourceAmount(TileState tileState) {
+        if (isInfinite(tileState)) return MAX_SOURCE;
         return tileState.getPersistentDataContainer()
             .getOrDefault(BlockKeys.SOURCE_AMOUNT, PersistentDataType.INTEGER, 0);
     }
@@ -121,11 +169,12 @@ public class SourceJar extends CustomBlock {
     }
 
     /**
-     * Sourceを消費する。
+     * Sourceを消費する。無限の場合は減らさずに成功を返す。
      *
      * @return 消費に成功したかどうか
      */
     public static boolean consumeSource(TileState tileState, int amount) {
+        if (isInfinite(tileState)) return true;
         int current = getSourceAmount(tileState);
         if (current < amount) return false;
         setSourceAmount(tileState, current - amount);

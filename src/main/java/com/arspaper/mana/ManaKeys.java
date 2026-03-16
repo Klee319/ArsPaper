@@ -26,6 +26,27 @@ public final class ManaKeys {
     /** マナ回復レート */
     public static final NamespacedKey REGEN_RATE = new NamespacedKey(NAMESPACE, "regen_rate");
 
+    /** スレッドによるリジェンボーナス */
+    public static final NamespacedKey THREAD_REGEN_BONUS = new NamespacedKey(NAMESPACE, "thread_regen_bonus");
+
+    /** スレッドによるマナボーナス */
+    public static final NamespacedKey THREAD_MANA_BONUS = new NamespacedKey(NAMESPACE, "thread_mana_bonus");
+
     /** アンロック済みグリフIDのJSON配列 */
     public static final NamespacedKey UNLOCKED_GLYPHS = new NamespacedKey(NAMESPACE, "unlocked_glyphs");
+
+    /** 帰還ポイント（JSON: world, x, y, z, yaw, pitch） */
+    public static final NamespacedKey RECALL_POINT = new NamespacedKey(NAMESPACE, "recall_point");
+
+    /** エンチャントによるマナボーナス */
+    public static final NamespacedKey ENCHANT_MANA_BONUS = new NamespacedKey(NAMESPACE, "enchant_mana_bonus");
+
+    /** エンチャントによるリジェンボーナス */
+    public static final NamespacedKey ENCHANT_REGEN_BONUS = new NamespacedKey(NAMESPACE, "enchant_regen_bonus");
+
+    /** スレッドによるスペル威力ボーナス（%） */
+    public static final NamespacedKey THREAD_SPELL_POWER = new NamespacedKey(NAMESPACE, "thread_spell_power");
+
+    /** スレッドによるマナコスト削減（%） */
+    public static final NamespacedKey THREAD_COST_REDUCTION = new NamespacedKey(NAMESPACE, "thread_cost_reduction");
 }

@@ -13,6 +13,10 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
+
 /**
  * プレイヤーのマナの消費・回復を管理する。
  * PDCで永続化し、BossBarで表示する。
@@ -23,6 +27,7 @@ public class ManaManager implements Listener {
     private final ManaConfig config;
     private final ManaBarDisplay barDisplay;
     private final BukkitTask regenTask;
+    private final Set<UUID> infiniteManaPlayers = new HashSet<>();
 
     public ManaManager(JavaPlugin plugin, ManaConfig config) {
         this.plugin = plugin;
@@ -47,7 +52,9 @@ public class ManaManager implements Listener {
         PersistentDataContainer pdc = player.getPersistentDataContainer();
         int glyphBonus = pdc.getOrDefault(ManaKeys.GLYPH_MANA_BONUS, PersistentDataType.INTEGER, 0);
         int armorBonus = pdc.getOrDefault(ManaKeys.ARMOR_MANA_BONUS, PersistentDataType.INTEGER, 0);
-        return config.defaultMaxMana() + glyphBonus + armorBonus;
+        int threadBonus = pdc.getOrDefault(ManaKeys.THREAD_MANA_BONUS, PersistentDataType.INTEGER, 0);
+        int enchantBonus = pdc.getOrDefault(ManaKeys.ENCHANT_MANA_BONUS, PersistentDataType.INTEGER, 0);
+        return config.defaultMaxMana() + glyphBonus + armorBonus + threadBonus + enchantBonus;
     }
 
     /**
@@ -67,10 +74,32 @@ public class ManaManager implements Listener {
     }
 
     public boolean consumeMana(Player player, int amount) {
+        if (infiniteManaPlayers.contains(player.getUniqueId())) return true;
         int current = getCurrentMana(player);
         if (current < amount) return false;
         setCurrentMana(player, current - amount);
         return true;
+    }
+
+    /**
+     * マナ無限モードをトグルする。
+     * @return トグル後の状態（true=無限ON）
+     */
+    public boolean toggleInfiniteMana(Player player) {
+        UUID uuid = player.getUniqueId();
+        if (infiniteManaPlayers.contains(uuid)) {
+            infiniteManaPlayers.remove(uuid);
+            plugin.getLogger().info("[Debug] Infinite mana OFF for " + player.getName());
+            return false;
+        } else {
+            infiniteManaPlayers.add(uuid);
+            plugin.getLogger().info("[Debug] Infinite mana ON for " + player.getName());
+            return true;
+        }
+    }
+
+    public boolean isInfiniteMana(Player player) {
+        return infiniteManaPlayers.contains(player.getUniqueId());
     }
 
     public void addMana(Player player, int amount) {
@@ -89,8 +118,11 @@ public class ManaManager implements Listener {
     }
 
     private int getRegenRate(Player player) {
-        return player.getPersistentDataContainer()
-            .getOrDefault(ManaKeys.REGEN_RATE, PersistentDataType.INTEGER, config.defaultRegenRate());
+        PersistentDataContainer pdc = player.getPersistentDataContainer();
+        int baseRate = pdc.getOrDefault(ManaKeys.REGEN_RATE, PersistentDataType.INTEGER, config.defaultRegenRate());
+        int threadBonus = pdc.getOrDefault(ManaKeys.THREAD_REGEN_BONUS, PersistentDataType.INTEGER, 0);
+        int enchantBonus = pdc.getOrDefault(ManaKeys.ENCHANT_REGEN_BONUS, PersistentDataType.INTEGER, 0);
+        return baseRate + threadBonus + enchantBonus;
     }
 
     private void tickRegeneration() {
@@ -123,6 +155,10 @@ public class ManaManager implements Listener {
             player.hideBossBar(bar);
         }
         barDisplay.remove(player.getUniqueId());
+        infiniteManaPlayers.remove(player.getUniqueId());
+
+        // SpellCasterのクールダウンをクリーンアップ
+        ArsPaper.getInstance().getSpellCaster().clearCooldown(player.getUniqueId());
 
         // Wandの選択状態をクリーンアップ
         ArsPaper.getInstance().getItemRegistry().get("dominion_wand")

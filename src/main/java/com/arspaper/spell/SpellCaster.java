@@ -1,9 +1,11 @@
 package com.arspaper.spell;
 
+import com.arspaper.mana.ManaKeys;
 import com.arspaper.mana.ManaManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.entity.Player;
+import org.bukkit.persistence.PersistentDataType;
 
 import java.util.Map;
 import java.util.UUID;
@@ -15,7 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class SpellCaster {
 
-    private static final long DEFAULT_COOLDOWN_MS = 500; // 0.5秒
+    private static final long DEFAULT_COOLDOWN_MS = 200; // 0.2秒
 
     private final ManaManager manaManager;
     private final Map<UUID, Long> cooldowns = new ConcurrentHashMap<>();
@@ -44,7 +46,10 @@ public class SpellCaster {
             return false;
         }
 
-        int cost = recipe.getTotalManaCost();
+        int baseCost = recipe.getTotalManaCost();
+        int costReduction = caster.getPersistentDataContainer()
+            .getOrDefault(ManaKeys.THREAD_COST_REDUCTION, PersistentDataType.INTEGER, 0);
+        int cost = Math.max(1, baseCost - baseCost * costReduction / 100);
         if (!manaManager.consumeMana(caster, cost)) {
             caster.sendMessage(Component.text("マナが不足しています！", NamedTextColor.RED));
             return false;

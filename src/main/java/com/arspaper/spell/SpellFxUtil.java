@@ -70,7 +70,7 @@ public final class SpellFxUtil {
         destination.getWorld().spawnParticle(Particle.END_ROD, destination.clone().add(0, 1, 0),
             10, 0.3, 0.5, 0.3, 0.1);
         destination.getWorld().playSound(destination,
-            Sound.ENTITY_ILLUSIONER_MIRROR_MOVE, SoundCategory.PLAYERS, 1.0f, 1.0f);
+            Sound.ENTITY_ENDERMAN_TELEPORT, SoundCategory.PLAYERS, 1.0f, 1.2f);
     }
 
     /** Bounce: スイープアタック + 風パーティクル */
@@ -151,5 +151,86 @@ public final class SpellFxUtil {
             15, 0.3, 0.3, 0.3, 0, cobwebData);
         loc.getWorld().playSound(loc, Sound.ENTITY_SPIDER_AMBIENT,
             SoundCategory.PLAYERS, 0.6f, 0.8f);
+    }
+
+    /** Pull: 引き寄せパーティクル（渦巻き状エンチャントパーティクル） */
+    public static void spawnPullFx(Location loc) {
+        loc.getWorld().spawnParticle(Particle.ENCHANT, loc.clone().add(0, 1, 0),
+            20, 0.5, 0.5, 0.5, 1.5);
+        loc.getWorld().playSound(loc, Sound.ENTITY_FISHING_BOBBER_SPLASH,
+            SoundCategory.PLAYERS, 0.6f, 1.2f);
+    }
+
+    /** Harvest: 骨粉パーティクル + 収穫サウンド */
+    public static void spawnHarvestFx(Location loc) {
+        loc.getWorld().playEffect(loc, Effect.BONE_MEAL_USE, 0);
+        loc.getWorld().playSound(loc, Sound.BLOCK_CROP_BREAK,
+            SoundCategory.PLAYERS, 0.8f, 1.0f);
+    }
+
+    /** Leap: 飛び出しパーティクル（風+エンドロッド） */
+    public static void spawnLeapFx(Location loc) {
+        loc.getWorld().spawnParticle(Particle.END_ROD, loc.clone().add(0, 0.5, 0),
+            12, 0.3, 0.3, 0.3, 0.15);
+        loc.getWorld().spawnParticle(Particle.SWEEP_ATTACK, loc.clone().add(0, 0.5, 0),
+            3, 0.3, 0.1, 0.3, 0);
+        loc.getWorld().playSound(loc, Sound.ENTITY_BAT_TAKEOFF,
+            SoundCategory.PLAYERS, 0.7f, 1.3f);
+    }
+
+    /** Delay: 時計パーティクル（魔法+ノート） */
+    public static void spawnDelayFx(Location loc, int delayTicks) {
+        loc.getWorld().spawnParticle(Particle.NOTE, loc.clone().add(0, 1.5, 0),
+            5, 0.3, 0.2, 0.3, 1.0);
+        loc.getWorld().spawnParticle(Particle.WITCH, loc.clone().add(0, 1, 0),
+            8, 0.2, 0.4, 0.2, 0.05);
+        loc.getWorld().playSound(loc, Sound.BLOCK_NOTE_BLOCK_CHIME,
+            SoundCategory.PLAYERS, 0.5f, 1.0f);
+    }
+
+    /** Dispel: 牛乳バケツパーティクル（スプラッシュ+クリア） */
+    public static void spawnDispelFx(Location loc) {
+        loc.getWorld().spawnParticle(Particle.SPLASH, loc.clone().add(0, 1, 0),
+            20, 0.3, 0.5, 0.3, 0.2);
+        loc.getWorld().spawnParticle(Particle.ENCHANTED_HIT, loc.clone().add(0, 1, 0),
+            10, 0.4, 0.4, 0.4, 0.3);
+        loc.getWorld().playSound(loc, Sound.ITEM_BUCKET_EMPTY,
+            SoundCategory.PLAYERS, 0.6f, 1.5f);
+    }
+
+    /** Evaporate: 蒸気パーティクル（水/溶岩に応じて変化） */
+    public static void spawnEvaporateFx(Location loc, Material liquidType) {
+        loc.getWorld().spawnParticle(Particle.CLOUD, loc.clone().add(0.5, 0.5, 0.5),
+            15, 0.3, 0.3, 0.3, 0.05);
+        if (liquidType == Material.LAVA) {
+            loc.getWorld().spawnParticle(Particle.FLAME, loc.clone().add(0.5, 0.5, 0.5),
+                10, 0.3, 0.3, 0.3, 0.03);
+            loc.getWorld().playSound(loc, Sound.BLOCK_LAVA_EXTINGUISH,
+                SoundCategory.PLAYERS, 0.8f, 1.0f);
+        } else {
+            loc.getWorld().playSound(loc, Sound.BLOCK_FIRE_EXTINGUISH,
+                SoundCategory.PLAYERS, 0.6f, 1.2f);
+        }
+    }
+
+    /** PhantomBlock: ガラス設置/消滅パーティクル */
+    public static void spawnPhantomBlockFx(Location loc) {
+        BlockData glassData = Material.GLASS.createBlockData();
+        loc.getWorld().spawnParticle(Particle.BLOCK, loc.clone().add(0.5, 0.5, 0.5),
+            12, 0.3, 0.3, 0.3, 0, glassData);
+        loc.getWorld().spawnParticle(Particle.END_ROD, loc.clone().add(0.5, 0.5, 0.5),
+            8, 0.3, 0.3, 0.3, 0.05);
+        loc.getWorld().playSound(loc, Sound.BLOCK_GLASS_PLACE,
+            SoundCategory.PLAYERS, 0.6f, 1.2f);
+    }
+
+    /** Reset: アメジストパーティクル（初期化） */
+    public static void spawnResetFx(Location loc) {
+        loc.getWorld().spawnParticle(Particle.ENCHANTED_HIT, loc.clone().add(0, 1, 0),
+            20, 0.4, 0.5, 0.4, 0.3);
+        loc.getWorld().spawnParticle(Particle.ENCHANT, loc.clone().add(0, 1, 0),
+            15, 0.5, 0.5, 0.5, 1.0);
+        loc.getWorld().playSound(loc, Sound.BLOCK_AMETHYST_BLOCK_CHIME,
+            SoundCategory.PLAYERS, 0.8f, 1.0f);
     }
 }

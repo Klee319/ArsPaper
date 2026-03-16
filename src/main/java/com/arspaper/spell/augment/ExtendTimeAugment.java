@@ -1,37 +1,43 @@
 package com.arspaper.spell.augment;
 
 import com.arspaper.spell.SpellAugment;
+import com.arspaper.spell.GlyphConfig;
 import com.arspaper.spell.SpellContext;
 import org.bukkit.NamespacedKey;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /**
- * 直後のEffectの持続時間を延長するAugment。
- * 1スタックにつき+200tick (10秒)。
+ * 持続時間+1.0。各エフェクトが個別に解釈する。
+ * Ars Nouveau: durationMultiplier += 1.0
+ * 例: Ignite=+2秒/stack, Harm=Poison化, Light=一時光源化
  */
 public class ExtendTimeAugment implements SpellAugment {
 
-    private static final int TICKS_PER_STACK = 200; // 10秒
     private final NamespacedKey id;
+    private final GlyphConfig config;
 
-    public ExtendTimeAugment(JavaPlugin plugin) {
+    public ExtendTimeAugment(JavaPlugin plugin, GlyphConfig config) {
         this.id = new NamespacedKey(plugin, "extend_time");
+        this.config = config;
     }
 
     @Override
     public void modify(SpellContext context) {
-        context.setDurationTicks(context.getDurationTicks() + TICKS_PER_STACK);
+        context.setDurationLevel(context.getDurationLevel() + 1);
     }
 
     @Override
     public NamespacedKey getId() { return id; }
 
     @Override
-    public String getDisplayName() { return "Extend Time"; }
+    public String getDisplayName() { return "延長"; }
 
     @Override
-    public int getManaCost() { return 8; }
+    public String getDescription() { return "効果の持続時間を延長する"; }
 
     @Override
-    public int getTier() { return 2; }
+    public int getManaCost() { return config.getManaCost("extend_time"); }
+
+    @Override
+    public int getTier() { return config.getTier("extend_time"); }
 }

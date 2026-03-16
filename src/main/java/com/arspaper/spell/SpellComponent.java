@@ -22,6 +22,11 @@ public interface SpellComponent {
     /** ティア (1=Novice, 2=Apprentice, 3=Archmage) */
     int getTier();
 
+    /** グリフの説明文 */
+    default String getDescription() {
+        return "";
+    }
+
     enum ComponentType {
         FORM,
         EFFECT,

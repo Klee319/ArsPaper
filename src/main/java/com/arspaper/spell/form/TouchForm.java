@@ -7,6 +7,7 @@ import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import com.arspaper.spell.GlyphConfig;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.util.RayTraceResult;
 
@@ -18,9 +19,11 @@ public class TouchForm implements SpellForm {
 
     private static final double RANGE = 5.0;
     private final NamespacedKey id;
+    private final GlyphConfig config;
 
-    public TouchForm(JavaPlugin plugin) {
+    public TouchForm(JavaPlugin plugin, GlyphConfig config) {
         this.id = new NamespacedKey(plugin, "touch");
+        this.config = config;
     }
 
     @Override
@@ -44,6 +47,9 @@ public class TouchForm implements SpellForm {
             context.resolveOnEntity(target);
         } else if (result.getHitBlock() != null) {
             SpellFxUtil.spawnImpactBurst(result.getHitBlock().getLocation().add(0.5, 0.5, 0.5));
+            if (result.getHitBlockFace() != null) {
+                context.setHitFace(result.getHitBlockFace());
+            }
             context.resolveOnBlock(result.getHitBlock().getLocation());
         }
     }
@@ -52,11 +58,14 @@ public class TouchForm implements SpellForm {
     public NamespacedKey getId() { return id; }
 
     @Override
-    public String getDisplayName() { return "Touch"; }
+    public String getDisplayName() { return "接触"; }
 
     @Override
-    public int getManaCost() { return 3; }
+    public String getDescription() { return "近距離の対象に直接効果を適用する"; }
 
     @Override
-    public int getTier() { return 1; }
+    public int getManaCost() { return config.getManaCost("touch"); }
+
+    @Override
+    public int getTier() { return config.getTier("touch"); }
 }

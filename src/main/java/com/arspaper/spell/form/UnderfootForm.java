@@ -3,6 +3,7 @@ package com.arspaper.spell.form;
 import com.arspaper.spell.SpellContext;
 import com.arspaper.spell.SpellForm;
 import com.arspaper.spell.SpellFxUtil;
+import com.arspaper.spell.GlyphConfig;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
@@ -14,9 +15,11 @@ import org.bukkit.plugin.java.JavaPlugin;
 public class UnderfootForm implements SpellForm {
 
     private final NamespacedKey id;
+    private final GlyphConfig config;
 
-    public UnderfootForm(JavaPlugin plugin) {
+    public UnderfootForm(JavaPlugin plugin, GlyphConfig config) {
         this.id = new NamespacedKey(plugin, "underfoot");
+        this.config = config;
     }
 
     @Override
@@ -30,11 +33,14 @@ public class UnderfootForm implements SpellForm {
     public NamespacedKey getId() { return id; }
 
     @Override
-    public String getDisplayName() { return "Underfoot"; }
+    public String getDisplayName() { return "足元"; }
 
     @Override
-    public int getManaCost() { return 2; }
+    public String getDescription() { return "足元のブロックに効果を適用する"; }
 
     @Override
-    public int getTier() { return 1; }
+    public int getManaCost() { return config.getManaCost("underfoot"); }
+
+    @Override
+    public int getTier() { return config.getTier("underfoot"); }
 }

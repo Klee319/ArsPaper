@@ -1,6 +1,7 @@
 # ArsPaper Recipes Configuration
 # result: "custom:<item_id>" でカスタムアイテムを指定
 # result: "MATERIAL_NAME" でバニラアイテムを指定
+# ingredients: "custom:<item_id>" でカスタムアイテム素材を指定
 # type: "shaped" or "shapeless"
 
 recipes:
@@ -23,6 +24,7 @@ recipes:
 
   spell_book_apprentice:
     type: shaped
+    craft-method: ritual
     result: "custom:spell_book_apprentice"
     amount: 1
     shape:
@@ -37,6 +39,7 @@ recipes:
 
   spell_book_archmage:
     type: shaped
+    craft-method: ritual
     result: "custom:spell_book_archmage"
     amount: 1
     shape:
@@ -69,11 +72,12 @@ recipes:
     result: "custom:scribing_table"
     amount: 1
     shape:
-      - "LLL"
+      - "LGL"
       - " B "
       - " B "
     ingredients:
       L: LAPIS_LAZULI
+      G: "custom:source_gem"
       B: BOOKSHELF
 
   source_jar:
@@ -82,13 +86,15 @@ recipes:
     amount: 1
     shape:
       - "GGG"
-      - "G G"
+      - "GSG"
       - "GGG"
     ingredients:
       G: GLASS
+      S: "custom:source_gem"
 
   volcanic_sourcelink:
     type: shaped
+    craft-method: ritual
     result: "custom:volcanic_sourcelink"
     amount: 1
     shape:
@@ -101,6 +107,7 @@ recipes:
 
   mycelial_sourcelink:
     type: shaped
+    craft-method: ritual
     result: "custom:mycelial_sourcelink"
     amount: 1
     shape:
@@ -110,6 +117,32 @@ recipes:
     ingredients:
       M: MYCELIUM
       S: SMOKER
+
+  ritual_core:
+    type: shaped
+    craft-method: ritual
+    result: "custom:ritual_core"
+    amount: 1
+    shape:
+      - "OLO"
+      - "LDL"
+      - "OLO"
+    ingredients:
+      O: OBSIDIAN
+      L: LAPIS_LAZULI
+      D: LODESTONE
+
+  pedestal:
+    type: shaped
+    result: "custom:pedestal"
+    amount: 2
+    shape:
+      - " G "
+      - " S "
+      - "SSS"
+    ingredients:
+      G: GOLD_INGOT
+      S: "custom:sourcestone"
 
   # === Mage Armor - Novice ===
 
@@ -166,46 +199,46 @@ recipes:
     result: "custom:mage_apprentice_helmet"
     amount: 1
     shape:
-      - "GLG"
-      - "G G"
+      - "FRF"
+      - "F F"
     ingredients:
-      G: GOLD_INGOT
-      L: LAPIS_LAZULI
+      F: "custom:magebloom_fiber"
+      R: LAPIS_LAZULI
 
   mage_apprentice_chestplate:
     type: shaped
     result: "custom:mage_apprentice_chestplate"
     amount: 1
     shape:
-      - "G G"
-      - "GLG"
-      - "GGG"
+      - "F F"
+      - "FRF"
+      - "FFF"
     ingredients:
-      G: GOLD_INGOT
-      L: LAPIS_LAZULI
+      F: "custom:magebloom_fiber"
+      R: LAPIS_LAZULI
 
   mage_apprentice_leggings:
     type: shaped
     result: "custom:mage_apprentice_leggings"
     amount: 1
     shape:
-      - "GLG"
-      - "G G"
-      - "G G"
+      - "FRF"
+      - "F F"
+      - "F F"
     ingredients:
-      G: GOLD_INGOT
-      L: LAPIS_LAZULI
+      F: "custom:magebloom_fiber"
+      R: LAPIS_LAZULI
 
   mage_apprentice_boots:
     type: shaped
     result: "custom:mage_apprentice_boots"
     amount: 1
     shape:
-      - "G G"
-      - "GLG"
+      - "F F"
+      - "FRF"
     ingredients:
-      G: GOLD_INGOT
-      L: LAPIS_LAZULI
+      F: "custom:magebloom_fiber"
+      R: LAPIS_LAZULI
 
   # === Mage Armor - Archmage ===
 
@@ -214,43 +247,43 @@ recipes:
     result: "custom:mage_archmage_helmet"
     amount: 1
     shape:
-      - "DED"
-      - "D D"
+      - "FGF"
+      - "F F"
     ingredients:
-      D: DIAMOND
-      E: EMERALD
+      F: "custom:magebloom_fiber"
+      G: "custom:source_gem"
 
   mage_archmage_chestplate:
     type: shaped
     result: "custom:mage_archmage_chestplate"
     amount: 1
     shape:
-      - "D D"
-      - "DED"
-      - "DDD"
+      - "F F"
+      - "FGF"
+      - "FFF"
     ingredients:
-      D: DIAMOND
-      E: EMERALD
+      F: "custom:magebloom_fiber"
+      G: "custom:source_gem"
 
   mage_archmage_leggings:
     type: shaped
     result: "custom:mage_archmage_leggings"
     amount: 1
     shape:
-      - "DED"
-      - "D D"
-      - "D D"
+      - "FGF"
+      - "F F"
+      - "F F"
     ingredients:
-      D: DIAMOND
-      E: EMERALD
+      F: "custom:magebloom_fiber"
+      G: "custom:source_gem"
 
   mage_archmage_boots:
     type: shaped
     result: "custom:mage_archmage_boots"
     amount: 1
     shape:
-      - "D D"
-      - "DED"
+      - "F F"
+      - "FGF"
     ingredients:
-      D: DIAMOND
-      E: EMERALD
+      F: "custom:magebloom_fiber"
+      G: "custom:source_gem"

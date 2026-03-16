@@ -1,7 +1,9 @@
 package com.arspaper;
 
+import com.arspaper.block.BlockParticleTask;
 import com.arspaper.block.CustomBlockListener;
 import com.arspaper.block.CustomBlockRegistry;
+import com.arspaper.block.impl.CreativeSourceJar;
 import com.arspaper.block.impl.Pedestal;
 import com.arspaper.block.impl.RitualCore;
 import com.arspaper.block.impl.ScribingTable;
@@ -10,31 +12,41 @@ import com.arspaper.command.ArsCommand;
 import com.arspaper.gui.GuiListener;
 import com.arspaper.item.*;
 import com.arspaper.item.impl.MageArmor;
+import com.arspaper.item.impl.MagebloomFiber;
+import com.arspaper.item.impl.SourceBerry;
+import com.arspaper.item.impl.SourceGem;
+import com.arspaper.item.impl.Sourcestone;
 import com.arspaper.item.impl.SpellBook;
+import com.arspaper.item.impl.SpellWand;
+import com.arspaper.item.impl.ThreadItem;
 import com.arspaper.item.impl.Wand;
 import com.arspaper.mana.ManaConfig;
 import com.arspaper.mana.ManaManager;
 import com.arspaper.recipe.RecipeManager;
+import com.arspaper.ritual.RitualEffectRegistry;
 import com.arspaper.ritual.RitualManager;
 import com.arspaper.ritual.RitualRecipeRegistry;
+import com.arspaper.ritual.effect.*;
+
 import com.arspaper.source.SourceNetwork;
 import com.arspaper.source.SourcelinkTickTask;
 import com.arspaper.source.sourcelink.MycelialSourcelink;
 import com.arspaper.source.sourcelink.VolcanicSourcelink;
+import com.arspaper.spell.GlyphConfig;
+import com.arspaper.spell.PhantomBlockListener;
 import com.arspaper.spell.ProjectileHitListener;
+import com.arspaper.spell.SpellCaster;
 import com.arspaper.spell.SpellRegistry;
-import com.arspaper.spell.augment.AccelerateAugment;
-import com.arspaper.spell.augment.AmplifyAugment;
-import com.arspaper.spell.augment.AoeAugment;
-import com.arspaper.spell.augment.DampenAugment;
-import com.arspaper.spell.augment.ExtendTimeAugment;
-import com.arspaper.spell.augment.PierceAugment;
-import com.arspaper.spell.augment.SplitAugment;
+import com.arspaper.spell.SummonedMobListener;
+import com.arspaper.spell.augment.*;
+import com.arspaper.spell.augment.LingerAugment;
+import com.arspaper.spell.augment.TrailAugment;
 import com.arspaper.spell.effect.*;
-import com.arspaper.spell.form.ProjectileForm;
-import com.arspaper.spell.form.SelfForm;
-import com.arspaper.spell.form.TouchForm;
-import com.arspaper.spell.form.UnderfootForm;
+import com.arspaper.spell.effect.LingerEffect;
+import com.arspaper.spell.effect.PhantomBlockEffect;
+import com.arspaper.spell.effect.RotateEffect;
+import com.arspaper.spell.form.*;
+import com.arspaper.spell.form.BeamForm;
 import io.papermc.paper.command.brigadier.Commands;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -50,7 +62,11 @@ public class ArsPaper extends JavaPlugin {
     private SourcelinkTickTask sourcelinkTickTask;
     private RecipeManager recipeManager;
     private RitualRecipeRegistry ritualRecipeRegistry;
+    private RitualEffectRegistry ritualEffectRegistry;
     private RitualManager ritualManager;
+    private BlockParticleTask blockParticleTask;
+    private GlyphConfig glyphConfig;
+    private SpellCaster spellCaster;
 
     @Override
     public void onEnable() {
@@ -65,10 +81,24 @@ public class ArsPaper extends JavaPlugin {
         recipeManager = new RecipeManager(this);
         recipeManager.loadRecipes();
 
+        // 儀式エフェクトレジストリ
+        ritualEffectRegistry = new RitualEffectRegistry();
+        ritualEffectRegistry.register("growth", new GrowthRitualEffect());
+        ritualEffectRegistry.register("weather", new WeatherRitualEffect());
+        ritualEffectRegistry.register("thread", new ThreadRitualEffect());
+        ritualEffectRegistry.register("flight", new FlightRitualEffect());
+        ritualEffectRegistry.register("moonfall", new MoonfallRitualEffect());
+        ritualEffectRegistry.register("sunrise", new SunriseRitualEffect());
+        ritualEffectRegistry.register("repair", new RepairRitualEffect());
+        ritualEffectRegistry.register("recall", new RecallRitualEffect());
+        ritualEffectRegistry.register("containment", new ContainmentRitualEffect());
+        ritualEffectRegistry.register("animal_summon", new AnimalSummonRitualEffect());
+        ritualEffectRegistry.register("enchant_book", new EnchantBookRitualEffect());
+
         // 儀式レシピ読み込み
         ritualRecipeRegistry = new RitualRecipeRegistry(this);
         ritualRecipeRegistry.loadRecipes();
-        ritualManager = new RitualManager(ritualRecipeRegistry);
+        ritualManager = new RitualManager(ritualRecipeRegistry, ritualEffectRegistry);
 
         getLogger().info("ArsPaper enabled!");
     }
@@ -84,13 +114,28 @@ public class ArsPaper extends JavaPlugin {
         if (sourcelinkTickTask != null) {
             sourcelinkTickTask.stop();
         }
+        if (blockParticleTask != null) {
+            blockParticleTask.cancel();
+        }
         if (recipeManager != null) {
             recipeManager.unloadRecipes();
         }
+        if (ritualManager != null) {
+            ritualManager.shutdown();
+        }
+        // 一時的なスペル効果をクリーンアップ
+        PhantomBlockEffect.cleanupAll();
+        LingerEffect.cleanupAll();
+        BeamForm.cleanupAll();
+        RotateEffect.cleanupAll();
+        ContainmentRitualEffect.cleanupAll();
         getLogger().info("ArsPaper disabled!");
     }
 
     private void initRegistries() {
+        // グリフ設定
+        glyphConfig = new GlyphConfig(this);
+
         // スペルレジストリ
         spellRegistry = new SpellRegistry();
         registerDefaultGlyphs();
@@ -98,6 +143,9 @@ public class ArsPaper extends JavaPlugin {
         // マナマネージャー
         ManaConfig manaConfig = ManaConfig.fromConfig(getConfig());
         manaManager = new ManaManager(this, manaConfig);
+
+        // スペルキャスター（シングルトン）
+        spellCaster = new SpellCaster(manaManager);
 
         // カスタムアイテムレジストリ
         itemRegistry = new CustomItemRegistry();
@@ -113,39 +161,110 @@ public class ArsPaper extends JavaPlugin {
         // SourcelinkティックTask
         sourcelinkTickTask = new SourcelinkTickTask(this, blockRegistry);
         sourcelinkTickTask.start();
+
+        // ブロックパーティクルTask
+        blockParticleTask = new BlockParticleTask(this);
+        blockParticleTask.start();
     }
 
     private void registerDefaultGlyphs() {
-        // Forms
-        spellRegistry.register(new ProjectileForm(this));
-        spellRegistry.register(new TouchForm(this));
-        spellRegistry.register(new SelfForm(this));
-        spellRegistry.register(new UnderfootForm(this));
+        // Forms (6種)
+        spellRegistry.register(new ProjectileForm(this, glyphConfig));
+        spellRegistry.register(new TouchForm(this, glyphConfig));
+        spellRegistry.register(new SelfForm(this, glyphConfig));
+        spellRegistry.register(new UnderfootForm(this, glyphConfig));
+        spellRegistry.register(new OrbitForm(this, glyphConfig));
+        spellRegistry.register(new BeamForm(this, glyphConfig));
 
-        // Effects
-        spellRegistry.register(new BreakEffect(this));
-        spellRegistry.register(new HarmEffect(this));
-        spellRegistry.register(new HealEffect(this));
-        spellRegistry.register(new GrowEffect(this));
-        spellRegistry.register(new LightEffect(this));
-        spellRegistry.register(new SpeedEffect(this));
-        spellRegistry.register(new BlinkEffect(this));
-        spellRegistry.register(new BounceEffect(this));
-        spellRegistry.register(new IgniteEffect(this));
-        spellRegistry.register(new FreezeEffect(this));
-        spellRegistry.register(new LightningEffect(this));
-        spellRegistry.register(new KnockbackEffect(this));
-        spellRegistry.register(new ShieldEffect(this));
-        spellRegistry.register(new SnareEffect(this));
+        // Effects - Tier 1 (Novice)
+        spellRegistry.register(new BreakEffect(this, glyphConfig));
+        spellRegistry.register(new HarmEffect(this, glyphConfig));
+        spellRegistry.register(new IgniteEffect(this, glyphConfig));
+        spellRegistry.register(new FreezeEffect(this, glyphConfig));
+        spellRegistry.register(new KnockbackEffect(this, glyphConfig));
+        spellRegistry.register(new PullEffect(this, glyphConfig));
+        spellRegistry.register(new GravityEffect(this, glyphConfig));
+        spellRegistry.register(new LightEffect(this, glyphConfig));
+        spellRegistry.register(new HarvestEffect(this, glyphConfig));
+        spellRegistry.register(new CutEffect(this, glyphConfig));
+        spellRegistry.register(new InteractEffect(this, glyphConfig));
+        spellRegistry.register(new PickupEffect(this, glyphConfig));
+        spellRegistry.register(new RotateEffect(this, glyphConfig));
+        spellRegistry.register(new FellEffect(this, glyphConfig));
+        // RedstoneSignalEffect は削除済み
+        spellRegistry.register(new PhantomBlockEffect(this, glyphConfig));
+        spellRegistry.register(new PlaceBlockEffect(this, glyphConfig));
+        spellRegistry.register(new TossEffect(this, glyphConfig));
+        spellRegistry.register(new LaunchEffect(this, glyphConfig));
+        spellRegistry.register(new LeapEffect(this, glyphConfig));
+        spellRegistry.register(new BounceEffect(this, glyphConfig));
+        spellRegistry.register(new SnareEffect(this, glyphConfig));
+        spellRegistry.register(new EvaporateEffect(this, glyphConfig));
+        spellRegistry.register(new DispelEffect(this, glyphConfig));
+        spellRegistry.register(new RuneEffect(this, glyphConfig));
+        spellRegistry.register(new SummonSteedEffect(this, glyphConfig));
+        spellRegistry.register(new SummonWolvesEffect(this, glyphConfig));
+        spellRegistry.register(new WololoEffect(this, glyphConfig));
+        spellRegistry.register(new BubbleEffect(this, glyphConfig));
+        spellRegistry.register(new PrestidigitationEffect(this, glyphConfig));
 
-        // Augments
-        spellRegistry.register(new AmplifyAugment(this));
-        spellRegistry.register(new AoeAugment(this));
-        spellRegistry.register(new ExtendTimeAugment(this));
-        spellRegistry.register(new PierceAugment(this));
-        spellRegistry.register(new DampenAugment(this));
-        spellRegistry.register(new AccelerateAugment(this));
-        spellRegistry.register(new SplitAugment(this));
+        // Effects - Tier 2 (Apprentice)
+        spellRegistry.register(new HealEffect(this, glyphConfig));
+        spellRegistry.register(new GrowEffect(this, glyphConfig));
+        spellRegistry.register(new ExplosionEffect(this, glyphConfig));
+        spellRegistry.register(new ExchangeEffect(this, glyphConfig));
+        spellRegistry.register(new SmeltEffect(this, glyphConfig));
+        spellRegistry.register(new CrushEffect(this, glyphConfig));
+        spellRegistry.register(new ColdSnapEffect(this, glyphConfig));
+        spellRegistry.register(new FlareEffect(this, glyphConfig));
+        spellRegistry.register(new WindshearEffect(this, glyphConfig));
+        spellRegistry.register(new ConjureWaterEffect(this, glyphConfig));
+        spellRegistry.register(new SlowfallEffect(this, glyphConfig));
+        spellRegistry.register(new InvisibilityEffect(this, glyphConfig));
+        spellRegistry.register(new InfuseEffect(this, glyphConfig));
+        spellRegistry.register(new CraftEffect(this, glyphConfig));
+        spellRegistry.register(new AnimateEffect(this, glyphConfig));
+        spellRegistry.register(new FireworkEffect(this, glyphConfig));
+        spellRegistry.register(new NameEffect(this, glyphConfig));
+        spellRegistry.register(new WindBurstEffect(this, glyphConfig));
+        spellRegistry.register(new SpeedBoostEffect(this, glyphConfig));
+        spellRegistry.register(new LevitateEffect(this, glyphConfig));
+
+        // Effects - Tier 3 (Archmage)
+        spellRegistry.register(new AdvancedBreakEffect(this, glyphConfig));
+        spellRegistry.register(new BlinkEffect(this, glyphConfig));
+        spellRegistry.register(new LightningEffect(this, glyphConfig));
+        spellRegistry.register(new WitherEffect(this, glyphConfig));
+        spellRegistry.register(new ShieldEffect(this, glyphConfig));
+        spellRegistry.register(new HexEffect(this, glyphConfig));
+        spellRegistry.register(new GlideEffect(this, glyphConfig));
+        spellRegistry.register(new FangsEffect(this, glyphConfig));
+        spellRegistry.register(new IntangibleEffect(this, glyphConfig));
+        spellRegistry.register(new RewindEffect(this, glyphConfig));
+        spellRegistry.register(new SummonUndeadEffect(this, glyphConfig));
+        spellRegistry.register(new SummonVexEffect(this, glyphConfig));
+        spellRegistry.register(new SummonDecoyEffect(this, glyphConfig));
+
+        // Augments (19種)
+        spellRegistry.register(new AmplifyAugment(this, glyphConfig));
+        spellRegistry.register(new DampenAugment(this, glyphConfig));
+        spellRegistry.register(new AoeAugment(this, glyphConfig));
+        spellRegistry.register(new AoeVerticalAugment(this, glyphConfig));
+        spellRegistry.register(new AoeRadiusAugment(this, glyphConfig));
+        spellRegistry.register(new ExtendTimeAugment(this, glyphConfig));
+        spellRegistry.register(new DurationDownAugment(this, glyphConfig));
+        spellRegistry.register(new AccelerateAugment(this, glyphConfig));
+        spellRegistry.register(new DecelerateAugment(this, glyphConfig));
+        spellRegistry.register(new PierceAugment(this, glyphConfig));
+        spellRegistry.register(new SplitAugment(this, glyphConfig));
+        spellRegistry.register(new ExtractAugment(this, glyphConfig));
+        spellRegistry.register(new FortuneAugment(this, glyphConfig));
+        spellRegistry.register(new RandomizeAugment(this, glyphConfig));
+        spellRegistry.register(new DelayAugment(this, glyphConfig));
+        spellRegistry.register(new WallAugment(this, glyphConfig));
+        spellRegistry.register(new LingerAugment(this, glyphConfig));
+        spellRegistry.register(new ResetAugment(this, glyphConfig));
+        spellRegistry.register(new TrailAugment(this, glyphConfig));
     }
 
     private void registerDefaultItems() {
@@ -156,11 +275,25 @@ public class ArsPaper extends JavaPlugin {
 
         itemRegistry.register(new Wand(this));
 
+        // Spell Wands (3 tiers)
+        for (WandTier wandTier : WandTier.values()) {
+            itemRegistry.register(new SpellWand(this, spellRegistry, wandTier));
+        }
+        itemRegistry.register(new SourceBerry(this));
+        itemRegistry.register(new SourceGem(this));
+        itemRegistry.register(new MagebloomFiber(this));
+        itemRegistry.register(new Sourcestone(this));
+
         // Mage Armor (3 tiers × 4 slots)
         for (ArmorTier armorTier : ArmorTier.values()) {
             for (ArmorSlot armorSlot : ArmorSlot.values()) {
                 itemRegistry.register(new MageArmor(this, armorTier, armorSlot));
             }
+        }
+
+        // Thread Items (空 + 効果付き)
+        for (ThreadType threadType : ThreadType.values()) {
+            itemRegistry.register(new ThreadItem(this, threadType));
         }
     }
 
@@ -172,8 +305,11 @@ public class ArsPaper extends JavaPlugin {
         RitualCore ritualCore = new RitualCore(this);
         Pedestal pedestal = new Pedestal(this);
 
+        CreativeSourceJar creativeSourceJar = new CreativeSourceJar(this);
+
         blockRegistry.register(scribingTable);
         blockRegistry.register(sourceJar);
+        blockRegistry.register(creativeSourceJar);
         blockRegistry.register(volcanicSourcelink);
         blockRegistry.register(mycelialSourcelink);
         blockRegistry.register(ritualCore);
@@ -182,6 +318,7 @@ public class ArsPaper extends JavaPlugin {
         // カスタムブロックもアイテムとして取得できるようにする
         itemRegistry.register(scribingTable);
         itemRegistry.register(sourceJar);
+        itemRegistry.register(creativeSourceJar);
         itemRegistry.register(volcanicSourcelink);
         itemRegistry.register(mycelialSourcelink);
         itemRegistry.register(ritualCore);
@@ -191,11 +328,15 @@ public class ArsPaper extends JavaPlugin {
     private void registerListeners() {
         var pluginManager = getServer().getPluginManager();
         pluginManager.registerEvents(new CustomItemListener(itemRegistry), this);
-        pluginManager.registerEvents(new CustomBlockListener(this, blockRegistry), this);
+        pluginManager.registerEvents(new CustomBlockListener(this, blockRegistry, blockParticleTask, sourcelinkTickTask), this);
         pluginManager.registerEvents(new ProjectileHitListener(), this);
         pluginManager.registerEvents(new GuiListener(), this);
         pluginManager.registerEvents(manaManager, this);
         pluginManager.registerEvents(new ArmorManaListener(this), this);
+        pluginManager.registerEvents(new SourceBerryListener(this), this);
+        pluginManager.registerEvents(new PhantomBlockListener(), this);
+        pluginManager.registerEvents(new SummonedMobListener(this), this);
+        pluginManager.registerEvents(new com.arspaper.enchant.EnchantBookListener(), this);
     }
 
     @SuppressWarnings("UnstableApiUsage")
@@ -240,5 +381,27 @@ public class ArsPaper extends JavaPlugin {
 
     public RitualRecipeRegistry getRitualRecipeRegistry() {
         return ritualRecipeRegistry;
+    }
+
+    public BlockParticleTask getBlockParticleTask() {
+        return blockParticleTask;
+    }
+
+    public GlyphConfig getGlyphConfig() {
+        return glyphConfig;
+    }
+
+    public SpellCaster getSpellCaster() {
+        return spellCaster;
+    }
+
+    /**
+     * glyphs.ymlを再読み込みする。
+     * 同一GlyphConfigインスタンスをreloadするため、
+     * 既存のSpellComponentが保持する参照はそのまま有効。
+     * ティア・コスト・係数(params)が即座に反映される。
+     */
+    public void reloadGlyphConfig() {
+        glyphConfig.reload();
     }
 }

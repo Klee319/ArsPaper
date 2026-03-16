@@ -3,11 +3,17 @@ package com.arspaper.spell.effect;
 import com.arspaper.spell.SpellContext;
 import com.arspaper.spell.SpellEffect;
 import com.arspaper.spell.SpellFxUtil;
+import com.arspaper.spell.GlyphConfig;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.Ageable;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /**
@@ -17,9 +23,11 @@ import org.bukkit.plugin.java.JavaPlugin;
 public class GrowEffect implements SpellEffect {
 
     private final NamespacedKey id;
+    private final GlyphConfig config;
 
-    public GrowEffect(JavaPlugin plugin) {
+    public GrowEffect(JavaPlugin plugin, GlyphConfig config) {
         this.id = new NamespacedKey(plugin, "grow");
+        this.config = config;
     }
 
     @Override
@@ -32,6 +40,22 @@ public class GrowEffect implements SpellEffect {
         Block block = blockLocation.getBlock();
         if (!(block.getBlockData() instanceof Ageable ageable)) return;
 
+        org.bukkit.entity.Player caster = context.getCaster();
+        if (caster == null) return;
+
+        // 保護プラグイン互換: BlockPlaceEventを発火して許可を確認
+        BlockPlaceEvent placeEvent = new BlockPlaceEvent(
+            block,
+            block.getState(),
+            block.getRelative(BlockFace.DOWN),
+            new ItemStack(block.getType()),
+            caster,
+            true,
+            EquipmentSlot.HAND
+        );
+        org.bukkit.Bukkit.getPluginManager().callEvent(placeEvent);
+        if (placeEvent.isCancelled()) return;
+
         int growth = 1 + context.getAmplifyLevel();
         int newAge = Math.min(ageable.getAge() + growth, ageable.getMaximumAge());
         ageable.setAge(newAge);
@@ -43,11 +67,14 @@ public class GrowEffect implements SpellEffect {
     public NamespacedKey getId() { return id; }
 
     @Override
-    public String getDisplayName() { return "Grow"; }
+    public String getDisplayName() { return "成長"; }
 
     @Override
-    public int getManaCost() { return 10; }
+    public String getDescription() { return "作物を成長させる"; }
 
     @Override
-    public int getTier() { return 1; }
+    public int getManaCost() { return config.getManaCost("grow"); }
+
+    @Override
+    public int getTier() { return config.getTier("grow"); }
 }

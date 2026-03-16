@@ -1,5 +1,6 @@
 package com.arspaper.spell;
 
+import org.bukkit.Location;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -17,6 +18,9 @@ public class ProjectileHitListener implements Listener {
     private static final String META_KEY = "ars_spell_context";
     private static final String META_PIERCE_REMAINING = "ars_pierce_remaining";
 
+    public ProjectileHitListener() {
+    }
+
     @EventHandler
     public void onProjectileHit(ProjectileHitEvent event) {
         List<MetadataValue> metadata = event.getEntity().getMetadata(META_KEY);
@@ -26,19 +30,24 @@ public class ProjectileHitListener implements Listener {
         if (!(value instanceof SpellContext context)) return;
 
         if (event.getHitEntity() instanceof LivingEntity target) {
+            // Pierce処理
+            int pierceRemaining = getPierceRemaining(event);
+
             SpellFxUtil.spawnImpactBurst(target.getLocation());
             context.resolveOnEntity(target);
 
-            // Pierce処理: 残り貫通回数が0より大きければ弾を維持
-            int pierceRemaining = getPierceRemaining(event);
             if (pierceRemaining > 0) {
-                event.setCancelled(true); // 弾の消滅をキャンセル
+                event.setCancelled(true);
                 setPierceRemaining(event, pierceRemaining - 1);
                 return;
             }
         } else if (event.getHitBlock() != null) {
-            SpellFxUtil.spawnImpactBurst(event.getHitBlock().getLocation().add(0.5, 0.5, 0.5));
-            context.resolveOnBlock(event.getHitBlock().getLocation());
+            Location blockLoc = event.getHitBlock().getLocation();
+            SpellFxUtil.spawnImpactBurst(blockLoc.clone().add(0.5, 0.5, 0.5));
+            if (event.getHitBlockFace() != null) {
+                context.setHitFace(event.getHitBlockFace());
+            }
+            context.resolveOnBlock(blockLoc);
         }
 
         event.getEntity().remove();
@@ -47,7 +56,6 @@ public class ProjectileHitListener implements Listener {
     private int getPierceRemaining(ProjectileHitEvent event) {
         List<MetadataValue> meta = event.getEntity().getMetadata(META_PIERCE_REMAINING);
         if (meta.isEmpty()) {
-            // 初回ヒット: SpellContextからpierceCountを取得して初期化
             List<MetadataValue> ctxMeta = event.getEntity().getMetadata(META_KEY);
             if (!ctxMeta.isEmpty() && ctxMeta.get(0).value() instanceof SpellContext ctx) {
                 return ctx.getPierceCount();

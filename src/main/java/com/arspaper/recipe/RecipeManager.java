@@ -51,6 +51,13 @@ public class RecipeManager {
             if (recipeSection == null) continue;
 
             try {
+                // craft-method: workbench, ritual, or both (default: workbench)
+                String craftMethod = recipeSection.getString("craft-method", "workbench").toLowerCase();
+                if ("ritual".equals(craftMethod)) {
+                    // workbenchレシピとしては登録しない
+                    continue;
+                }
+
                 String type = recipeSection.getString("type", "shaped");
                 switch (type.toLowerCase()) {
                     case "shaped" -> registerShaped(key, recipeSection);
@@ -86,11 +93,9 @@ public class RecipeManager {
         if (ingredients != null) {
             for (String symbol : ingredients.getKeys(false)) {
                 String materialName = ingredients.getString(symbol);
-                Material mat = Material.matchMaterial(materialName);
-                if (mat != null) {
-                    recipe.setIngredient(symbol.charAt(0), new RecipeChoice.MaterialChoice(mat));
-                } else {
-                    plugin.getLogger().warning("Unknown material: " + materialName + " in recipe " + key);
+                RecipeChoice choice = resolveIngredient(materialName, key);
+                if (choice != null) {
+                    recipe.setIngredient(symbol.charAt(0), choice);
                 }
             }
         }
@@ -109,18 +114,43 @@ public class RecipeManager {
         NamespacedKey nsKey = new NamespacedKey(plugin, key);
         ShapelessRecipe recipe = new ShapelessRecipe(nsKey, result);
 
-        List<String> materialNames = section.getStringList("ingredients");
-        for (String materialName : materialNames) {
-            Material mat = Material.matchMaterial(materialName);
-            if (mat != null) {
-                recipe.addIngredient(new RecipeChoice.MaterialChoice(mat));
-            } else {
-                plugin.getLogger().warning("Unknown material: " + materialName + " in recipe " + key);
+        List<String> ingredientNames = section.getStringList("ingredients");
+        for (String ingredientName : ingredientNames) {
+            RecipeChoice choice = resolveIngredient(ingredientName, key);
+            if (choice != null) {
+                recipe.addIngredient(choice);
             }
         }
 
         Bukkit.addRecipe(recipe);
         registeredRecipes.put(nsKey, recipe);
+    }
+
+    /**
+     * 素材文字列をRecipeChoiceに変換。"custom:item_id"形式ならExactChoice。
+     */
+    private RecipeChoice resolveIngredient(String ingredientName, String recipeKey) {
+        if (ingredientName == null) return null;
+
+        if (ingredientName.startsWith("custom:")) {
+            String customId = ingredientName.substring("custom:".length());
+            ItemStack customItem = ArsPaper.getInstance().getItemRegistry()
+                .get(customId)
+                .map(item -> item.createItemStack())
+                .orElse(null);
+            if (customItem != null) {
+                return new RecipeChoice.ExactChoice(customItem);
+            }
+            plugin.getLogger().warning("Unknown custom ingredient: " + customId + " in recipe " + recipeKey);
+            return null;
+        }
+
+        Material mat = Material.matchMaterial(ingredientName);
+        if (mat != null) {
+            return new RecipeChoice.MaterialChoice(mat);
+        }
+        plugin.getLogger().warning("Unknown material: " + ingredientName + " in recipe " + recipeKey);
+        return null;
     }
 
     /**
