@@ -59,6 +59,8 @@ public class PlaceBlockEffect implements SpellEffect {
             }
         }
 
+        if (com.arspaper.spell.SpellFxUtil.isEntityOccupying(blockLocation)) return;
+
         Player caster = context.getCaster();
         if (caster == null) return;
 
@@ -106,6 +108,31 @@ public class PlaceBlockEffect implements SpellEffect {
 
         // ブロックを設置
         block.setType(foundItem.getType());
+
+        // 向き付きブロックの方向を設定（バニラ準拠）
+        org.bukkit.block.data.BlockData blockData = block.getBlockData();
+        if (blockData instanceof org.bukkit.block.data.Directional directional) {
+            // ヒット面がある場合はヒット面の方向、なければキャスターの向きの逆
+            org.bukkit.block.BlockFace placeFace = context.getHitFace();
+            if (placeFace == null) {
+                // キャスターの視線方向の逆（プレイヤーに向く）
+                org.bukkit.util.Vector look = caster.getLocation().getDirection().setY(0);
+                if (look.lengthSquared() > 0.01) {
+                    look.normalize();
+                    double absX = Math.abs(look.getX());
+                    double absZ = Math.abs(look.getZ());
+                    if (absX > absZ) {
+                        placeFace = look.getX() > 0 ? BlockFace.WEST : BlockFace.EAST;
+                    } else {
+                        placeFace = look.getZ() > 0 ? BlockFace.NORTH : BlockFace.SOUTH;
+                    }
+                }
+            }
+            if (placeFace != null && directional.getFaces().contains(placeFace)) {
+                directional.setFacing(placeFace);
+                block.setBlockData(directional);
+            }
+        }
 
         // インベントリから1個消費
         ItemStack current = inv.getItem(foundSlot);

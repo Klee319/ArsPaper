@@ -25,12 +25,12 @@ public class ResetAugment implements SpellAugment {
     public void modify(SpellContext context) {
         context.setAmplifyLevel(0);
         context.setAoeLevel(0);
-        context.setAoeVerticalLevel(0);
+        context.setAoeHeight(0);
+        context.setAoeDepth(0);
         context.setAoeRadiusLevel(0);
         context.setDurationLevel(0);
         context.setWallPattern(false);
         context.setLingerPattern(false);
-        context.setTrailActive(false);
         context.setDelayTicks(0);
     }
 

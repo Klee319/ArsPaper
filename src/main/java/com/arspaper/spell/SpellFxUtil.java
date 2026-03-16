@@ -1,9 +1,12 @@
 package com.arspaper.spell;
 
 import org.bukkit.*;
+import org.bukkit.block.Block;
 import org.bukkit.block.data.BlockData;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.util.BoundingBox;
 
 /**
  * スペルのパーティクル/サウンドエフェクトを管理するユーティリティ。
@@ -12,6 +15,7 @@ import org.bukkit.entity.Player;
  *
  * 全てバニラパーティクル/サウンドを使用（Geyser互換）。
  */
+@SuppressWarnings("unused")
 public final class SpellFxUtil {
 
     private SpellFxUtil() {}
@@ -232,5 +236,20 @@ public final class SpellFxUtil {
             15, 0.5, 0.5, 0.5, 1.0);
         loc.getWorld().playSound(loc, Sound.BLOCK_AMETHYST_BLOCK_CHIME,
             SoundCategory.PLAYERS, 0.8f, 1.0f);
+    }
+
+    /**
+     * 指定ブロック位置にエンティティが存在するか（設置キャンセル判定用）。
+     * バニラと同様、エンティティのバウンディングボックスとブロック位置が重なる場合true。
+     */
+    public static boolean isEntityOccupying(Location blockLocation) {
+        Block block = blockLocation.getBlock();
+        BoundingBox blockBox = BoundingBox.of(block);
+        for (Entity entity : block.getWorld().getNearbyEntities(blockBox)) {
+            if (entity instanceof LivingEntity) {
+                return true;
+            }
+        }
+        return false;
     }
 }

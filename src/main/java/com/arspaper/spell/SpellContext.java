@@ -55,7 +55,7 @@ public class SpellContext {
     private boolean wallPattern = false;    // 壁パターン（壁状AOE）
     private boolean lingerPattern = false;  // 残留パターン（ルーン持続化）
     private int delayTicks = 0;             // 遅延ティック
-    private boolean trailActive = false;    // 軌跡パターン（照射形態用）
+    private int rapidFireLevel = 0;         // 連射レベル（CT短縮）
 
     // Form-augment用（ProjectileForm等が参照）
     private double projectileSpeedMultiplier = 1.0;
@@ -103,20 +103,24 @@ public class SpellContext {
         }
     }
 
-    // === AOE (水平) ===
+    // === AOE 視線基準3軸 ===
+    // 横: 視線に対して左右
+    public int getAoeWidth() { return aoeLevel; }
+    public void setAoeWidth(int w) { this.aoeLevel = w; }
+    // 縦: 視線に対して上下
+    private int aoeHeightLevel = 0;
+    public int getAoeHeight() { return aoeHeightLevel; }
+    public void setAoeHeight(int h) { this.aoeHeightLevel = h; }
+    // 奥: 視線方向
+    private int aoeVerticalLevel = 0;
+    public int getAoeDepth() { return aoeVerticalLevel; }
+    public void setAoeDepth(int d) { this.aoeVerticalLevel = d; }
+
+    // 後方互換
     public int getAoeLevel() { return aoeLevel; }
     public void setAoeLevel(int aoeLevel) { this.aoeLevel = aoeLevel; }
-
-    /** 後方互換: 旧aoeRadiusとして使用するEffect向け。基本半径にaoeLevelを加算して使う */
-    public double getAoeRadius() { return aoeLevel; }
-
-    /** 水平+垂直の合計AOEレベル。内部AOE処理エフェクト（召喚数等）で使用。 */
-    public int getTotalAoeLevel() { return aoeLevel + aoeVerticalLevel; }
-
-    // === AOE (垂直) ===
-    private int aoeVerticalLevel = 0;
     public int getAoeVerticalLevel() { return aoeVerticalLevel; }
-    public void setAoeVerticalLevel(int aoeVerticalLevel) { this.aoeVerticalLevel = aoeVerticalLevel; }
+    public void setAoeVerticalLevel(int v) { this.aoeVerticalLevel = v; }
 
     // === AOE (半径) - 内部AOE処理エフェクト用（召喚数/爆発威力/拾い範囲等） ===
     private int aoeRadiusLevel = 0;
@@ -195,8 +199,8 @@ public class SpellContext {
     public void setDelayTicks(int delayTicks) { this.delayTicks = delayTicks; }
 
     // === Trail ===
-    public boolean isTrailActive() { return trailActive; }
-    public void setTrailActive(boolean trailActive) { this.trailActive = trailActive; }
+    public int getRapidFireLevel() { return rapidFireLevel; }
+    public void setRapidFireLevel(int rapidFireLevel) { this.rapidFireLevel = rapidFireLevel; }
 
     /**
      * コンテキストコピー（Split等で独立コンテキストが必要な場合）。
@@ -205,6 +209,7 @@ public class SpellContext {
         SpellContext copy = new SpellContext(this);
         copy.amplifyLevel = this.amplifyLevel;
         copy.aoeLevel = this.aoeLevel;
+        copy.aoeHeightLevel = this.aoeHeightLevel;
         copy.aoeVerticalLevel = this.aoeVerticalLevel;
         copy.aoeRadiusLevel = this.aoeRadiusLevel;
         copy.hitFace = this.hitFace;
@@ -220,7 +225,7 @@ public class SpellContext {
         copy.wallPattern = this.wallPattern;
         copy.lingerPattern = this.lingerPattern;
         copy.delayTicks = this.delayTicks;
-        copy.trailActive = this.trailActive;
+        copy.rapidFireLevel = this.rapidFireLevel;
         return copy;
     }
 
@@ -524,50 +529,67 @@ public class SpellContext {
                     int r2 = aoeVerticalLevel;
                     Location projBase = effectBlockLoc;
 
-                    org.bukkit.block.BlockFace face = hitFace;
-                    if (face == null) {
-                        // hitFaceがない場合（自己/足元形態等）: 視線の水平方向で代用
-                        org.bukkit.util.Vector look = caster.getLocation().getDirection().setY(0);
-                        if (look.lengthSquared() < 0.01) look = new org.bukkit.util.Vector(0, 0, 1);
-                        look.normalize();
-                        // 最も近い水平BlockFaceを選択
-                        double absX = Math.abs(look.getX());
-                        double absZ = Math.abs(look.getZ());
-                        if (absX > absZ) {
-                            face = look.getX() > 0 ? org.bukkit.block.BlockFace.EAST : org.bukkit.block.BlockFace.WEST;
+                    // 投影: hitFaceがあればヒット面基準、なければ視線基準
+                    org.bukkit.block.BlockFace projFace = hitFace;
+                    if (projFace == null) {
+                        // hitFaceがない場合は視線から推定
+                        org.bukkit.util.Vector lookDir = caster.getLocation().getDirection();
+                        if (Math.abs(lookDir.getY()) > 0.7) {
+                            projFace = lookDir.getY() > 0 ? org.bukkit.block.BlockFace.UP : org.bukkit.block.BlockFace.DOWN;
                         } else {
-                            face = look.getZ() > 0 ? org.bukkit.block.BlockFace.SOUTH : org.bukkit.block.BlockFace.NORTH;
+                            double absX = Math.abs(lookDir.getX());
+                            double absZ = Math.abs(lookDir.getZ());
+                            if (absX > absZ) {
+                                projFace = lookDir.getX() > 0 ? org.bukkit.block.BlockFace.EAST : org.bukkit.block.BlockFace.WEST;
+                            } else {
+                                projFace = lookDir.getZ() > 0 ? org.bukkit.block.BlockFace.SOUTH : org.bukkit.block.BlockFace.NORTH;
+                            }
                         }
                     }
 
-                    int ny = Math.abs(face.getDirection().getBlockY());
+                    org.bukkit.util.Vector look = caster.getLocation().getDirection();
+                    boolean isHorizontalFace = Math.abs(projFace.getDirection().getBlockY()) > 0;
 
-                    if (ny > 0) {
-                        // 上/下面ヒット → XZ平面（床/天井）を投影
-                        org.bukkit.util.Vector fwd = caster.getLocation().getDirection().setY(0);
-                        if (fwd.lengthSquared() < 0.01) fwd = new org.bukkit.util.Vector(0, 0, 1);
-                        fwd.normalize();
-                        org.bukkit.util.Vector right = new org.bukkit.util.Vector(-fwd.getZ(), 0, fwd.getX());
-                        for (int a = -r1; a <= r1; a++) {
-                            for (int b = -r2; b <= r2; b++) {
-                                if (a == 0 && b == 0) continue;
-                                Location nearby = projBase.clone()
-                                    .add(right.clone().multiply(a))
-                                    .add(fwd.clone().multiply(b));
-                                group.effect.applyToBlock(this, nearby.getBlock().getLocation());
+                    if (isHorizontalFace) {
+                        // 地面/天井ヒット → 視線方向に壁を投影
+                        // 水平=視線方向×横の正方形壁面、垂直=視線方向の厚み
+                        org.bukkit.util.Vector lookH = look.clone().setY(0);
+                        if (lookH.lengthSquared() < 0.01) lookH = new org.bukkit.util.Vector(0, 0, 1);
+                        boolean fwdIsZ = Math.abs(lookH.getZ()) >= Math.abs(lookH.getX());
+                        int fwdX = fwdIsZ ? 0 : (lookH.getX() > 0 ? 1 : -1);
+                        int fwdZ = fwdIsZ ? (lookH.getZ() > 0 ? 1 : -1) : 0;
+                        int rightX = fwdIsZ ? (lookH.getZ() > 0 ? -1 : 1) : 0;
+                        int rightZ = fwdIsZ ? 0 : (lookH.getX() > 0 ? 1 : -1);
+                        // 横は両側展開、高さは上方向に片側展開
+                        int wallHeight = r1 * 2;
+                        for (int w = -r1; w <= r1; w++) {
+                            for (int h = 0; h <= wallHeight; h++) {
+                                for (int d = 0; d <= r2; d++) {
+                                    if (w == 0 && h == 0 && d == 0) continue;
+                                    Location nearby = projBase.clone()
+                                        .add(rightX * w, h, rightZ * w)
+                                        .add(fwdX * d, 0, fwdZ * d);
+                                    group.effect.applyToBlock(this, nearby.getBlock().getLocation());
+                                }
                             }
                         }
                     } else {
-                        // 側面ヒット → ヒット面に垂直な壁面を投影
-                        int nx = Math.abs(face.getDirection().getBlockX());
-                        for (int w = -r1; w <= r1; w++) {
-                            for (int h = -r2; h <= r2; h++) {
-                                if (w == 0 && h == 0) continue;
-                                // X面ヒット → Z方向に横展開、Z面ヒット → X方向に横展開
-                                int dx = (nx > 0) ? 0 : w;
-                                int dz = (nx > 0) ? w : 0;
-                                Location nearby = projBase.clone().add(dx, h, dz);
-                                group.effect.applyToBlock(this, nearby.getBlock().getLocation());
+                        // 側面ヒット → 法線方向に水平面を投影（橋・床が手前に伸びる）
+                        // 水平=法線方向×横の正方形水平面、垂直=下方向の厚み
+                        int pnx = projFace.getDirection().getBlockX();
+                        int pnz = projFace.getDirection().getBlockZ();
+                        boolean isXFace = Math.abs(pnx) > 0;
+                        // 法線方向（手前）に片側展開、横は両側展開
+                        int span = r1 * 2;
+                        for (int depth = 0; depth <= span; depth++) {
+                            for (int lateral = -r1; lateral <= r1; lateral++) {
+                                for (int h = 0; h <= r2; h++) {
+                                    if (depth == 0 && lateral == 0 && h == 0) continue;
+                                    int dx = isXFace ? pnx * depth : lateral;
+                                    int dz = isXFace ? lateral : pnz * depth;
+                                    Location nearby = projBase.clone().add(dx, -h, dz);
+                                    group.effect.applyToBlock(this, nearby.getBlock().getLocation());
+                                }
                             }
                         }
                     }
@@ -697,6 +719,7 @@ public class SpellContext {
         dampenAccum = 0;
         durationDownAccum = 0;
         aoeLevel = 0;
+        aoeHeightLevel = 0;
         aoeVerticalLevel = 0;
         aoeRadiusLevel = 0;
         durationLevel = 0;
@@ -711,6 +734,6 @@ public class SpellContext {
         wallPattern = false;
         lingerPattern = false;
         delayTicks = 0;
-        trailActive = false;
+        // rapidFireLevel はForm-levelのためリセットしない
     }
 }

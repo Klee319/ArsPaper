@@ -65,6 +65,7 @@ public class ConjureWaterEffect implements SpellEffect {
         if (caster == null) return;
 
         // 対象が空気または炎ブロックの場合に水を設置
+        if (block.getType().isAir() && com.arspaper.spell.SpellFxUtil.isEntityOccupying(blockLocation)) return;
         if (block.getType().isAir() || block.getType() == Material.FIRE
                 || block.getType() == Material.SOUL_FIRE) {
 

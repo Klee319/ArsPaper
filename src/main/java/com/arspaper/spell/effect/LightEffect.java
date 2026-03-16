@@ -4,10 +4,13 @@ import com.arspaper.spell.SpellContext;
 import com.arspaper.spell.SpellEffect;
 import com.arspaper.spell.SpellFxUtil;
 import com.arspaper.spell.GlyphConfig;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
+import org.bukkit.block.data.Directional;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.inventory.EquipmentSlot;
@@ -17,8 +20,8 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
 /**
- * ブロックに光源を設置、エンティティに夜間視覚と発光を付与するEffect。
- * 保護プラグイン互換: BlockPlaceEventを発火して許可を確認する。
+ * ブロックに松明を設置、エンティティに暗視と発光を付与するEffect。
+ * 設置先に隣接するソリッドブロックがない場合は設置失敗。
  */
 public class LightEffect implements SpellEffect {
 
@@ -43,60 +46,53 @@ public class LightEffect implements SpellEffect {
     @Override
     public void applyToBlock(SpellContext context, Location blockLocation) {
         Block block = blockLocation.getBlock();
-
         org.bukkit.entity.Player caster = context.getCaster();
         if (caster == null) return;
+        if (block.getType().isAir() && SpellFxUtil.isEntityOccupying(blockLocation)) return;
 
-        // ターゲットが空気ブロック: そのまま松明を設置
-        if (block.getType().isAir()) {
-            if (placeTorchWithProtection(block, caster)) {
+        if (!block.getType().isAir()) return;
+
+        // 下にソリッドブロックがあれば通常の松明
+        Block below = block.getRelative(BlockFace.DOWN);
+        if (below.getType().isSolid()) {
+            if (placeTorch(block, below, caster)) {
                 SpellFxUtil.spawnLightFx(blockLocation);
             }
             return;
         }
 
-        // ターゲットが固体ブロック: 上面の空気ブロックに松明を設置
-        Block above = block.getRelative(org.bukkit.block.BlockFace.UP);
-        if (above.getType().isAir()) {
-            if (placeTorchWithProtection(above, caster)) {
-                SpellFxUtil.spawnLightFx(above.getLocation());
-            }
-            return;
-        }
-
-        // 上面がダメなら側面にウォールトーチを試行
-        for (org.bukkit.block.BlockFace face : new org.bukkit.block.BlockFace[]{
-            org.bukkit.block.BlockFace.NORTH, org.bukkit.block.BlockFace.SOUTH,
-            org.bukkit.block.BlockFace.EAST, org.bukkit.block.BlockFace.WEST}) {
+        // 隣接にソリッドブロックがあれば壁松明
+        for (BlockFace face : new BlockFace[]{
+                BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST}) {
             Block adjacent = block.getRelative(face);
-            if (adjacent.getType().isAir()) {
-                if (placeWallTorchWithProtection(adjacent, face.getOppositeFace(), caster)) {
-                    SpellFxUtil.spawnLightFx(adjacent.getLocation());
+            if (adjacent.getType().isSolid()) {
+                if (placeWallTorch(block, face, caster)) {
+                    SpellFxUtil.spawnLightFx(blockLocation);
                 }
                 return;
             }
         }
+        // 隣接にソリッドブロックがない → 設置失敗（宙に浮かない）
     }
 
-    private boolean placeTorchWithProtection(Block block, org.bukkit.entity.Player caster) {
-        BlockPlaceEvent placeEvent = new BlockPlaceEvent(
-            block, block.getState(), block.getRelative(org.bukkit.block.BlockFace.DOWN),
+    private boolean placeTorch(Block block, Block support, org.bukkit.entity.Player caster) {
+        BlockPlaceEvent event = new BlockPlaceEvent(
+            block, block.getState(), support,
             new ItemStack(Material.TORCH), caster, true, EquipmentSlot.HAND);
-        org.bukkit.Bukkit.getPluginManager().callEvent(placeEvent);
-        if (placeEvent.isCancelled()) return false;
+        Bukkit.getPluginManager().callEvent(event);
+        if (event.isCancelled()) return false;
         block.setType(Material.TORCH);
         return true;
     }
 
-    private boolean placeWallTorchWithProtection(Block block, org.bukkit.block.BlockFace attachedFace,
-                                                  org.bukkit.entity.Player caster) {
-        BlockPlaceEvent placeEvent = new BlockPlaceEvent(
+    private boolean placeWallTorch(Block block, BlockFace attachedFace, org.bukkit.entity.Player caster) {
+        BlockPlaceEvent event = new BlockPlaceEvent(
             block, block.getState(), block.getRelative(attachedFace),
             new ItemStack(Material.WALL_TORCH), caster, true, EquipmentSlot.HAND);
-        org.bukkit.Bukkit.getPluginManager().callEvent(placeEvent);
-        if (placeEvent.isCancelled()) return false;
+        Bukkit.getPluginManager().callEvent(event);
+        if (event.isCancelled()) return false;
         block.setType(Material.WALL_TORCH);
-        org.bukkit.block.data.Directional directional = (org.bukkit.block.data.Directional) block.getBlockData();
+        Directional directional = (Directional) block.getBlockData();
         directional.setFacing(attachedFace.getOppositeFace());
         block.setBlockData(directional);
         return true;
@@ -112,7 +108,7 @@ public class LightEffect implements SpellEffect {
     public String getDisplayName() { return "光明"; }
 
     @Override
-    public String getDescription() { return "光源を設置、または暗視を付与する"; }
+    public String getDescription() { return "松明を設置、または暗視を付与"; }
 
     @Override
     public int getManaCost() { return config.getManaCost("light"); }

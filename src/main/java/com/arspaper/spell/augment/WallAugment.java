@@ -32,7 +32,7 @@ public class WallAugment implements SpellAugment {
     public String getDisplayName() { return "投影"; }
 
     @Override
-    public String getDescription() { return "視線に垂直な面に効果を投影する"; }
+    public String getDescription() { return "設置方向を面と垂直にする"; }
 
     @Override
     public int getManaCost() { return config.getManaCost("wall"); }

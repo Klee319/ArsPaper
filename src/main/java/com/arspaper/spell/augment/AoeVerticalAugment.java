@@ -22,17 +22,17 @@ public class AoeVerticalAugment implements SpellAugment {
 
     @Override
     public void modify(SpellContext context) {
-        context.setAoeVerticalLevel(context.getAoeVerticalLevel() + 1);
+        context.setAoeDepth(context.getAoeDepth() + 1);
     }
 
     @Override
     public NamespacedKey getId() { return id; }
 
     @Override
-    public String getDisplayName() { return "範囲[垂直]"; }
+    public String getDisplayName() { return "範囲[奥]"; }
 
     @Override
-    public String getDescription() { return "ヒット面に対し垂直に効果の範囲を拡大する"; }
+    public String getDescription() { return "視線方向に範囲を拡大する"; }
 
     @Override
     public int getManaCost() { return config.getManaCost("aoe_vertical"); }

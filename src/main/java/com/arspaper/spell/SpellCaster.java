@@ -2,6 +2,7 @@ package com.arspaper.spell;
 
 import com.arspaper.mana.ManaKeys;
 import com.arspaper.mana.ManaManager;
+import com.arspaper.spell.form.BeamForm;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.entity.Player;
@@ -17,7 +18,8 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class SpellCaster {
 
-    private static final long DEFAULT_COOLDOWN_MS = 200; // 0.2秒
+    private static final long DEFAULT_COOLDOWN_MS = 500; // 0.5秒
+    private static final long MIN_COOLDOWN_MS = 100;    // 最低CT
 
     private final ManaManager manaManager;
     private final Map<UUID, Long> cooldowns = new ConcurrentHashMap<>();
@@ -39,10 +41,32 @@ public class SpellCaster {
             return false;
         }
 
-        // クールダウンチェック
+        // 連射レベルを計算（Form直後のrapid_fire増強をカウント）
+        int rapidFireLevel = 0;
+        SpellForm form = recipe.getForm();
+        // 照射形態は連射2個内蔵
+        if (form != null && form.getId().getKey().equals("beam")) {
+            rapidFireLevel = 2;
+        }
+        boolean pastForm = false;
+        for (SpellComponent comp : recipe.getComponents()) {
+            if (comp instanceof SpellForm) { pastForm = true; continue; }
+            if (!pastForm) continue;
+            if (comp instanceof SpellAugment && comp.getId().getKey().equals("rapid_fire")) {
+                rapidFireLevel++;
+            } else {
+                break; // Form直後の連射増強のみカウント
+            }
+        }
+
+        // クールダウン: 連射1つにつき-100ms（最低100ms）
+        // 500 → 400 → 300 → 200 → 100
+        long cooldownMs = Math.max(MIN_COOLDOWN_MS,
+            DEFAULT_COOLDOWN_MS - rapidFireLevel * 100L);
+
         long now = System.currentTimeMillis();
         Long lastCast = cooldowns.get(caster.getUniqueId());
-        if (lastCast != null && now - lastCast < DEFAULT_COOLDOWN_MS) {
+        if (lastCast != null && now - lastCast < cooldownMs) {
             return false;
         }
 
@@ -59,8 +83,8 @@ public class SpellCaster {
 
         SpellContext context = new SpellContext(caster, recipe);
         context.applyFormAugments();
-        SpellForm form = recipe.getForm();
-        form.cast(caster, context);
+        SpellForm spellForm = recipe.getForm();
+        spellForm.cast(caster, context);
 
         return true;
     }

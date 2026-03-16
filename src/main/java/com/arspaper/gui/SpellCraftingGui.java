@@ -29,8 +29,8 @@ import java.util.*;
  */
 public class SpellCraftingGui extends BaseGui {
 
-    private static final int MAX_GLYPHS = 8;
-    private static final int COMPOSITION_START = 1;
+    private static final int MAX_GLYPHS = 9;
+    private static final int COMPOSITION_START = 0;
     private static final int COMPOSITION_END = 8;
     private static final int GLYPH_START = 19;
     private static final int GLYPH_END = 43;

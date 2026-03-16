@@ -7,9 +7,9 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /**
- * 軌跡増強: 照射形態のビーム軌道上にも後続の効果を与える。
- * この効果を付けているとき、長押しでレーザーを打ち続けることができる（チャネリング）。
- * 消費マナ = スペルマナ × 継続時間[秒]
+ * 連射増強: 形態に付与するとスペルのクールダウンを短縮する。
+ * 1つにつきCTを半減（最低100ms）。
+ * 形態グリフと互換。
  */
 public class TrailAugment implements SpellAugment {
 
@@ -17,27 +17,27 @@ public class TrailAugment implements SpellAugment {
     private final GlyphConfig config;
 
     public TrailAugment(JavaPlugin plugin, GlyphConfig config) {
-        this.id = new NamespacedKey(plugin, "trail");
+        this.id = new NamespacedKey(plugin, "rapid_fire");
         this.config = config;
     }
 
     @Override
     public void modify(SpellContext context) {
-        context.setTrailActive(true);
+        context.setRapidFireLevel(context.getRapidFireLevel() + 1);
     }
 
     @Override
     public NamespacedKey getId() { return id; }
 
     @Override
-    public String getDisplayName() { return "軌跡"; }
+    public String getDisplayName() { return "連射"; }
 
     @Override
-    public String getDescription() { return "ビーム軌道上に効果を適用する"; }
+    public String getDescription() { return "スペルのCTを短縮する"; }
 
     @Override
-    public int getManaCost() { return config.getManaCost("trail"); }
+    public int getManaCost() { return config.getManaCost("rapid_fire"); }
 
     @Override
-    public int getTier() { return config.getTier("trail"); }
+    public int getTier() { return config.getTier("rapid_fire"); }
 }

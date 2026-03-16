@@ -55,6 +55,7 @@ public class PhantomBlockEffect implements SpellEffect {
     public void applyToBlock(SpellContext context, Location blockLocation) {
         Block block = blockLocation.getBlock();
         if (!block.getType().isAir()) return;
+        if (SpellFxUtil.isEntityOccupying(blockLocation)) return;
 
         org.bukkit.entity.Player caster = context.getCaster();
         if (caster == null) return;
