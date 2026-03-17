@@ -29,10 +29,10 @@ public class AoeVerticalAugment implements SpellAugment {
     public NamespacedKey getId() { return id; }
 
     @Override
-    public String getDisplayName() { return "範囲[奥]"; }
+    public String getDisplayName() { return "範囲[法線]"; }
 
     @Override
-    public String getDescription() { return "視線方向に範囲を拡大する"; }
+    public String getDescription() { return "対象の面に垂直な方向に範囲を広げる"; }
 
     @Override
     public int getManaCost() { return config.getManaCost("aoe_vertical"); }

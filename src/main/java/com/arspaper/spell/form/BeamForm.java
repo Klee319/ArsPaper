@@ -105,6 +105,19 @@ public class BeamForm implements SpellForm {
             point.getWorld().spawnParticle(Particle.DUST, point, 1, 0, 0, 0, 0, dustOptions);
         }
 
+        // 軌跡モード: ビーム軌道上のブロックにも効果を適用
+        if (context.isTraceActive()) {
+            Set<Location> processedBlocks = new HashSet<>();
+            for (double dist = 1.0; dist <= effectiveRange; dist += 1.0) {
+                Location point = origin.clone().add(direction.clone().multiply(dist));
+                Location blockLoc = point.getBlock().getLocation();
+                if (processedBlocks.add(blockLoc)) {
+                    SpellContext trailCtx = context.copy();
+                    trailCtx.resolveOnBlockNoAoe(blockLoc);
+                }
+            }
+        }
+
         // エンティティヒット処理（貫通: pierceCount+1体、非貫通: 1体）
         {
             int maxHits = 1 + pierceRemaining; // 貫通0=1体、貫通1=2体、貫通2=3体

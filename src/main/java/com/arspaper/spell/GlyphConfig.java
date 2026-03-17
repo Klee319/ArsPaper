@@ -179,13 +179,13 @@ public class GlyphConfig {
      */
     private static final Map<String, Set<String>> AUGMENT_COMPAT = Map.ofEntries(
         // === Forms ===
-        Map.entry("projectile", Set.of("accelerate", "decelerate", "pierce", "split", "rapid_fire")),
+        Map.entry("projectile", Set.of("accelerate", "decelerate", "pierce", "split", "rapid_fire", "trace")),
         Map.entry("touch",      Set.of("rapid_fire")),
         Map.entry("self",       Set.of("rapid_fire")),
         Map.entry("underfoot",  Set.of("rapid_fire")),
         Map.entry("orbit",      Set.of("amplify", "dampen", "split", "extend_time", "duration_down", "rapid_fire")),
         Map.entry("wall",       Set.of("accelerate", "decelerate", "split", "rapid_fire")),
-        Map.entry("beam",       Set.of("accelerate", "decelerate", "pierce", "split", "aoe_radius", "rapid_fire")),
+        Map.entry("beam",       Set.of("accelerate", "decelerate", "pierce", "split", "aoe_radius", "rapid_fire", "trace")),
         // === Effects - Tier 1 ===
         // aoe = 範囲[水平]/[垂直]（方向性あり: 破壊/設置系）
         // aoe_radius = 半径増加（単純な範囲拡大: それ以外）
@@ -196,15 +196,15 @@ public class GlyphConfig {
         Map.entry("knockback",       Set.of("amplify", "dampen", "aoe_radius")),
         Map.entry("pull",            Set.of("amplify", "dampen", "aoe_radius")),
         Map.entry("gravity",         Set.of("amplify", "dampen", "aoe_radius", "extend_time", "duration_down")),
-        Map.entry("light",           Set.of("amplify", "dampen", "aoe", "extend_time", "duration_down", "wall")),
+        Map.entry("light",           Set.of("amplify", "dampen", "aoe", "extend_time", "duration_down")),
         Map.entry("harvest",         Set.of("amplify", "dampen", "aoe_radius", "fortune", "extract")),
         Map.entry("cut",             Set.of("amplify", "dampen", "aoe_radius", "fortune", "extract")),
         Map.entry("interact",        Set.of("aoe_radius", "extend_time", "duration_down")),
         Map.entry("pickup",          Set.of("aoe_radius")),
         Map.entry("rotate",          Set.of("amplify", "dampen", "aoe_radius", "extend_time", "duration_down")),
         Map.entry("fell",            Set.of("aoe_radius", "fortune", "extract")),
-        Map.entry("phantom_block",   Set.of("amplify", "dampen", "aoe", "extend_time", "duration_down", "wall")),
-        Map.entry("place_block",     Set.of("aoe", "wall")),
+        Map.entry("phantom_block",   Set.of("amplify", "dampen", "aoe", "extend_time", "duration_down")),
+        Map.entry("place_block",     Set.of("aoe")),
         Map.entry("toss",            Set.of("amplify", "dampen", "aoe_radius")),
         Map.entry("launch",          Set.of("amplify", "dampen")),
         Map.entry("leap",            Set.of("amplify", "dampen")),
@@ -213,7 +213,7 @@ public class GlyphConfig {
         Map.entry("evaporate",       Set.of("aoe_radius")),
         Map.entry("dispel",          Set.of("amplify", "dampen", "aoe_radius")),
         Map.entry("reset",           Set.of()),
-        Map.entry("rune",            Set.of("extend_time", "duration_down", "linger", "wall")),
+        Map.entry("rune",            Set.of("extend_time", "duration_down", "linger")),
         Map.entry("summon_steed",    Set.of("amplify", "dampen", "extend_time", "duration_down")),
         Map.entry("summon_wolves",   Set.of("amplify", "dampen", "aoe_radius", "extend_time", "duration_down")),
         Map.entry("wololo",          Set.of("amplify", "dampen", "aoe_radius", "randomize")),
@@ -229,7 +229,7 @@ public class GlyphConfig {
         Map.entry("cold_snap",       Set.of("amplify", "dampen", "aoe_radius")),
         Map.entry("flare",           Set.of("amplify", "dampen", "aoe_radius")),
         Map.entry("windshear",       Set.of("amplify", "dampen", "aoe_radius")),
-        Map.entry("conjure_water",   Set.of("aoe", "extend_time", "duration_down", "wall")),
+        Map.entry("conjure_water",   Set.of("aoe", "extend_time", "duration_down")),
         Map.entry("slowfall",        Set.of("aoe_radius", "extend_time", "duration_down")),
         Map.entry("invisibility",    Set.of("extend_time", "duration_down")),
         Map.entry("infuse",          Set.of("amplify", "dampen", "aoe_radius", "extend_time", "duration_down")),
@@ -263,8 +263,8 @@ public class GlyphConfig {
         Set<String> compatible = AUGMENT_COMPAT.get(glyphKey);
         if (compatible == null) return false;
 
-        // aoe_vertical は aoe と同じ互換性を持つ
-        if ("aoe_vertical".equals(augmentKey)) {
+        // aoe_vertical(奥行き) と aoe_height(上下) は aoe(幅) と同じ互換性を持つ
+        if ("aoe_vertical".equals(augmentKey) || "aoe_height".equals(augmentKey)) {
             return compatible.contains("aoe");
         }
 
@@ -300,12 +300,17 @@ public class GlyphConfig {
      */
     /** 1個までしか積めない増強（トグル系） */
     private static final Set<String> SINGLE_STACK_AUGMENTS = Set.of(
-        "wall", "linger", "randomize", "extract"
+        "linger", "randomize", "extract", "trace"
     );
 
     public int getMaxAugmentStack(String glyphKey, String augmentKey) {
         // トグル系増強は常に1個まで
         if (SINGLE_STACK_AUGMENTS.contains(augmentKey)) return 1;
+
+        // 連射: 照射は内蔵2個あるので追加最大2個、その他は最大4個
+        if ("rapid_fire".equals(augmentKey)) {
+            return "beam".equals(glyphKey) ? 2 : 4;
+        }
 
         GlyphData data = glyphData.get(glyphKey);
         if (data == null || data.maxAugments == null) return Integer.MAX_VALUE;

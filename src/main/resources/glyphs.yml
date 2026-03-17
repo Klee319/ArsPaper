@@ -14,8 +14,9 @@
 # ===== 増強カテゴリ一覧 =====
 # amplify    (増幅)     : 効果の強度・威力を上昇させる
 # dampen     (減少)     : 効果の強度・威力を低下させる
-# aoe        (範囲[面])   : 効果の展開面を拡大する
-# aoe_vertical(範囲[厚さ]): 効果に厚みを追加する
+# aoe        (幅)         : 左右に範囲を広げる
+# aoe_height (上下)       : 上下に範囲を広げる
+# aoe_vertical(範囲[全長]): 面に垂直な方向に2ブロック延長
 # aoe_radius (半径増加)  : 爆発威力・召喚数・拾い範囲等を拡大する
 # extend_time(延長)     : 持続時間を延長する
 # duration_down(短縮)   : 持続時間を短縮する
@@ -31,7 +32,7 @@
 # delay      (遅延)     : 後続効果の発動を遅延させる（複数積みで遅延時間加算）
 # reset      (初期化)   : 増強状態をリセットする
 # --- 以下は限定互換増強 ---
-# wall       (投影)   : 設置方向を面と垂直にする（設置/ルーン/光源/水生成等）
+# wall       (壁)     : 廃止
 # linger     (残留)   : ルーンのみ。トリガー後も持続時間中消えない
 
 glyphs:
@@ -1130,6 +1131,15 @@ glyphs:
         GUNPOWDER: 4
         TNT: 1
 
+  aoe_height:
+    tier: 2
+    mana-cost: 35
+    unlock-cost:
+      level: 10
+      materials:
+        GUNPOWDER: 4
+        LADDER: 2
+
   aoe_vertical:
     tier: 2
     mana-cost: 35
@@ -1239,12 +1249,22 @@ glyphs:
   rapid_fire:
     tier: 2
     mana-cost: 15
-    # 全形態互換。1つにつきCTを半減（最低100ms）
+    # 全形態互換。1つにつきCTを-100ms（最低100ms）
     unlock-cost:
       level: 10
       materials:
         SUGAR: 4
         BLAZE_POWDER: 2
+
+  trace:
+    tier: 2
+    mana-cost: 20
+    # 投射/照射互換。飛行経路上にも効果を適用
+    unlock-cost:
+      level: 15
+      materials:
+        ENDER_PEARL: 2
+        BLAZE_ROD: 2
 
   # ============================================================
   # Forms（形態）- Tier 3

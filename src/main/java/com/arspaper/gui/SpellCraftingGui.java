@@ -454,16 +454,68 @@ public class SpellCraftingGui extends BaseGui {
         render();
     }
 
+    /**
+     * スペル構成の互換性を検証する。
+     * Form-Effect、Form-Augment、Effect-Augmentの互換性をチェック。
+     * @return エラーメッセージ（互換性OK→null）
+     */
+    private String validateCompatibility() {
+        List<SpellComponent> compacted = compactComposition();
+        if (compacted.isEmpty()) return null;
+
+        GlyphConfig glyphConfig = plugin.getGlyphConfig();
+
+        // Formを取得
+        SpellComponent form = compacted.stream()
+            .filter(c -> c.getType() == SpellComponent.ComponentType.FORM)
+            .findFirst().orElse(null);
+        if (form == null) return null;
+
+        String formKey = form.getId().getKey();
+        SpellComponent lastTarget = form; // 現在の増強対象
+
+        for (SpellComponent comp : compacted) {
+            if (comp.getType() == SpellComponent.ComponentType.FORM) continue;
+
+            if (comp.getType() == SpellComponent.ComponentType.EFFECT) {
+                // Form-Effect互換性
+                String effectKey = comp.getId().getKey();
+                if (!glyphConfig.isEffectCompatibleWithForm(formKey, effectKey)) {
+                    return form.getDisplayName() + "と" + comp.getDisplayName() + "は互換性がありません";
+                }
+                lastTarget = comp;
+            } else if (comp.getType() == SpellComponent.ComponentType.AUGMENT) {
+                // Augment-Target互換性
+                String augKey = comp.getId().getKey();
+                String targetKey = lastTarget.getId().getKey();
+                if (!glyphConfig.isAugmentCompatible(targetKey, augKey)) {
+                    return lastTarget.getDisplayName() + "に" + comp.getDisplayName() + "は使えません";
+                }
+            }
+        }
+        return null;
+    }
+
     private void saveSpell(Player clicker) {
         List<SpellComponent> compacted = compactComposition();
         if (compacted.isEmpty()) {
             clicker.sendMessage(Component.text("スペルが空です！", NamedTextColor.RED));
+            clicker.playSound(clicker.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
+            return;
+        }
+
+        // 互換性チェック
+        String compatError = validateCompatibility();
+        if (compatError != null) {
+            clicker.sendMessage(Component.text(compatError, NamedTextColor.RED));
+            clicker.playSound(clicker.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
             return;
         }
 
         SpellRecipe recipe = new SpellRecipe("スペル" + (spellSlot + 1), compacted);
         if (!recipe.isValid()) {
             clicker.sendMessage(Component.text("無効なスペルです！形態(Form)で始まる必要があります", NamedTextColor.RED));
+            clicker.playSound(clicker.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
             return;
         }
 

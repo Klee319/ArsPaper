@@ -249,6 +249,7 @@ public class ArsPaper extends JavaPlugin {
         spellRegistry.register(new AmplifyAugment(this, glyphConfig));
         spellRegistry.register(new DampenAugment(this, glyphConfig));
         spellRegistry.register(new AoeAugment(this, glyphConfig));
+        spellRegistry.register(new AoeHeightAugment(this, glyphConfig));
         spellRegistry.register(new AoeVerticalAugment(this, glyphConfig));
         spellRegistry.register(new AoeRadiusAugment(this, glyphConfig));
         spellRegistry.register(new ExtendTimeAugment(this, glyphConfig));
@@ -261,10 +262,11 @@ public class ArsPaper extends JavaPlugin {
         spellRegistry.register(new FortuneAugment(this, glyphConfig));
         spellRegistry.register(new RandomizeAugment(this, glyphConfig));
         spellRegistry.register(new DelayAugment(this, glyphConfig));
-        spellRegistry.register(new WallAugment(this, glyphConfig));
+        // WallAugment は廃止
         spellRegistry.register(new LingerAugment(this, glyphConfig));
         spellRegistry.register(new ResetAugment(this, glyphConfig));
         spellRegistry.register(new TrailAugment(this, glyphConfig));
+        spellRegistry.register(new TraceAugment(this, glyphConfig));
     }
 
     private void registerDefaultItems() {
@@ -337,6 +339,7 @@ public class ArsPaper extends JavaPlugin {
         pluginManager.registerEvents(new PhantomBlockListener(), this);
         pluginManager.registerEvents(new SummonedMobListener(this), this);
         pluginManager.registerEvents(new com.arspaper.enchant.EnchantBookListener(), this);
+        pluginManager.registerEvents(new com.arspaper.spell.SpellBindListener(), this);
     }
 
     @SuppressWarnings("UnstableApiUsage")

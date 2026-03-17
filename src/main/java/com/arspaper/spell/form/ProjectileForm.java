@@ -57,9 +57,11 @@ public class ProjectileForm implements SpellForm {
             projectile.setMetadata("ars_spell_context", new FixedMetadataValue(plugin, projectileContext));
             projectile.setGlowing(true);
 
-            // 軌跡パーティクル（タイムアウト付き）
+            // 軌跡パーティクル + 軌跡エフェクト（タイムアウト付き）
+            boolean traceMode = projectileContext.isTraceActive();
             new BukkitRunnable() {
                 private int ticks = 0;
+                private final java.util.Set<Location> processedBlocks = new java.util.HashSet<>();
 
                 @Override
                 public void run() {
@@ -69,6 +71,15 @@ public class ProjectileForm implements SpellForm {
                         return;
                     }
                     SpellFxUtil.spawnProjectileTrail(projectile.getLocation());
+
+                    // 軌跡モード: 飛行経路上のブロックにも効果適用
+                    if (traceMode) {
+                        Location blockLoc = projectile.getLocation().getBlock().getLocation();
+                        if (processedBlocks.add(blockLoc)) {
+                            SpellContext trailCtx = projectileContext.copy();
+                            trailCtx.resolveOnBlockNoAoe(blockLoc);
+                        }
+                    }
                 }
             }.runTaskTimer(plugin, 1L, 1L);
         }

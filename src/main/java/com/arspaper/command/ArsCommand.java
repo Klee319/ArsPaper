@@ -134,6 +134,21 @@ public final class ArsCommand {
                             )
                         )
                     )
+                    .then(Commands.literal("bind")
+                        .then(Commands.argument("slot", IntegerArgumentType.integer(1, 10))
+                            .executes(ctx -> {
+                                if (!(ctx.getSource().getSender() instanceof Player player)) return 0;
+                                int slot = IntegerArgumentType.getInteger(ctx, "slot");
+                                return executeSpellBind(plugin, player, slot);
+                            })
+                        )
+                    )
+                    .then(Commands.literal("unbind")
+                        .executes(ctx -> {
+                            if (!(ctx.getSource().getSender() instanceof Player player)) return 0;
+                            return executeSpellUnbind(player);
+                        })
+                    )
                 )
                 .build(),
             "ArsPaper main command",
@@ -245,6 +260,52 @@ public final class ArsCommand {
         player.sendMessage(Component.text(
             "全グリフをロックしました", NamedTextColor.YELLOW));
         return 1;
+    }
+
+    private static int executeSpellBind(ArsPaper plugin, Player player, int slot) {
+        // オフハンドのアイテムにバインド
+        ItemStack offhand = player.getInventory().getItemInOffHand();
+        if (offhand.getType().isAir()) {
+            player.sendMessage(Component.text("オフハンドにバインド先のアイテムを持ってください", NamedTextColor.RED));
+            return 0;
+        }
+
+        // メインハンドのスペルブックからスペルを取得
+        ItemStack mainHand = player.getInventory().getItemInMainHand();
+        String customId = mainHand.hasItemMeta()
+            ? mainHand.getItemMeta().getPersistentDataContainer()
+                .get(ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING)
+            : null;
+        if (customId == null || (!customId.startsWith("spell_book_") && !customId.startsWith("wand_"))) {
+            player.sendMessage(Component.text("メインハンドにスペルブック/ワンドを持ってください", NamedTextColor.RED));
+            return 0;
+        }
+
+        String slotsJson = mainHand.getItemMeta().getPersistentDataContainer()
+            .get(ItemKeys.SPELL_SLOTS, PersistentDataType.STRING);
+        if (slotsJson == null) {
+            player.sendMessage(Component.text("スペルが設定されていません", NamedTextColor.RED));
+            return 0;
+        }
+
+        java.util.List<com.arspaper.spell.SpellRecipe> slots =
+            com.arspaper.spell.SpellSerializer.deserializeSlots(slotsJson, plugin.getSpellRegistry());
+        int idx = slot - 1;
+        if (idx >= slots.size() || slots.get(idx) == null) {
+            player.sendMessage(Component.text("スロット" + slot + "にスペルがありません", NamedTextColor.RED));
+            return 0;
+        }
+
+        return com.arspaper.spell.SpellBindListener.bindSpell(player, offhand, slots.get(idx)) ? 1 : 0;
+    }
+
+    private static int executeSpellUnbind(Player player) {
+        ItemStack mainHand = player.getInventory().getItemInMainHand();
+        if (mainHand.getType().isAir()) {
+            player.sendMessage(Component.text("バインド解除するアイテムを手に持ってください", NamedTextColor.RED));
+            return 0;
+        }
+        return com.arspaper.spell.SpellBindListener.unbindSpell(player, mainHand) ? 1 : 0;
     }
 
     private static int executeSpellList(ArsPaper plugin, Player player) {

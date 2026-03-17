@@ -56,6 +56,7 @@ public class SpellContext {
     private boolean lingerPattern = false;  // 残留パターン（ルーン持続化）
     private int delayTicks = 0;             // 遅延ティック
     private int rapidFireLevel = 0;         // 連射レベル（CT短縮）
+    private boolean traceActive = false;     // 軌跡（経路上に効果適用）
 
     // Form-augment用（ProjectileForm等が参照）
     private double projectileSpeedMultiplier = 1.0;
@@ -202,6 +203,9 @@ public class SpellContext {
     public int getRapidFireLevel() { return rapidFireLevel; }
     public void setRapidFireLevel(int rapidFireLevel) { this.rapidFireLevel = rapidFireLevel; }
 
+    public boolean isTraceActive() { return traceActive; }
+    public void setTraceActive(boolean traceActive) { this.traceActive = traceActive; }
+
     /**
      * コンテキストコピー（Split等で独立コンテキストが必要な場合）。
      */
@@ -212,6 +216,7 @@ public class SpellContext {
         copy.aoeHeightLevel = this.aoeHeightLevel;
         copy.aoeVerticalLevel = this.aoeVerticalLevel;
         copy.aoeRadiusLevel = this.aoeRadiusLevel;
+        copy.traceActive = this.traceActive;
         copy.hitFace = this.hitFace;
         copy.durationLevel = this.durationLevel;
         copy.acceleration = this.acceleration;
@@ -406,24 +411,14 @@ public class SpellContext {
 
             group.effect.applyToEntity(this, target);
 
-            // AOE展開（水平・垂直分離）
+            // エンティティAOE展開（半径増加ベース）
             if (!group.effect.handlesAoeInternally()) {
-                double hRadius = Math.min(aoeLevel, MAX_AOE_RADIUS);
-                double vRadius = Math.min(aoeVerticalLevel, MAX_AOE_RADIUS);
-                double searchRadius = Math.max(hRadius, vRadius);
-                if (searchRadius > 0) {
+                double radius = Math.min(aoeRadiusLevel, MAX_AOE_RADIUS);
+                if (radius > 0) {
                     Location center = target.getLocation();
-                    center.getNearbyLivingEntities(searchRadius).stream()
+                    center.getNearbyLivingEntities(radius).stream()
                         .filter(e -> !e.equals(target) && !e.equals(caster))
                         .filter(e -> isValidAoeTarget(e, caster))
-                        .filter(e -> {
-                            double dx = e.getLocation().getX() - center.getX();
-                            double dy = e.getLocation().getY() - center.getY();
-                            double dz = e.getLocation().getZ() - center.getZ();
-                            double hDist = Math.sqrt(dx * dx + dz * dz);
-                            return (hRadius <= 0 || hDist <= hRadius)
-                                && (vRadius <= 0 || Math.abs(dy) <= vRadius);
-                        })
                         .forEach(e -> group.effect.applyToEntity(this, e));
                 }
             }
@@ -511,6 +506,15 @@ public class SpellContext {
                 }
             }
 
+            // 設置系: 設置予定位置のいずれかにキャスター自身がいたらスペル全体をキャンセル
+            if (group.effect.getAoeMode() == SpellEffect.AoeMode.HIT_FACE_OUTWARD && caster != null) {
+                if (isPlacementBlockedByCaster(caster, effectBlockLoc, blockLocation)) {
+                    caster.sendActionBar(net.kyori.adventure.text.Component.text(
+                        "§c設置先に自分がいます"));
+                    return;
+                }
+            }
+
             // Linger増強: 後続グループをゾーンで定期適用（Rune以外の効果用）
             if (lingerPattern) {
                 group.effect.applyToBlock(this, effectBlockLoc);
@@ -520,143 +524,68 @@ public class SpellContext {
 
             group.effect.applyToBlock(this, effectBlockLoc);
 
-            // AOE展開（wall/通常）
+            // === AOE展開（新3軸: 幅/上下/奥行き + 壁グリフ） ===
             if (!group.effect.handlesAoeInternally()) {
-                if (wallPattern && caster != null) {
-                    // 投影パターン: ヒット面に沿って効果を投影する
-                    // hitFaceがない場合は視線の水平方向で代用
-                    int r1 = aoeLevel;
-                    int r2 = aoeVerticalLevel;
-                    Location projBase = effectBlockLoc;
+                int width = (int) Math.min(aoeLevel, MAX_AOE_RADIUS);       // 幅
+                int height = (int) Math.min(aoeHeightLevel, MAX_AOE_RADIUS); // 上下
+                int depth = (int) Math.min(aoeVerticalLevel, MAX_AOE_RADIUS); // 奥行き
 
-                    // 投影: hitFaceがあればヒット面基準、なければ視線基準
-                    org.bukkit.block.BlockFace projFace = hitFace;
-                    if (projFace == null) {
-                        // hitFaceがない場合は視線から推定
-                        org.bukkit.util.Vector lookDir = caster.getLocation().getDirection();
-                        if (Math.abs(lookDir.getY()) > 0.7) {
-                            projFace = lookDir.getY() > 0 ? org.bukkit.block.BlockFace.UP : org.bukkit.block.BlockFace.DOWN;
-                        } else {
-                            double absX = Math.abs(lookDir.getX());
-                            double absZ = Math.abs(lookDir.getZ());
-                            if (absX > absZ) {
-                                projFace = lookDir.getX() > 0 ? org.bukkit.block.BlockFace.EAST : org.bukkit.block.BlockFace.WEST;
-                            } else {
-                                projFace = lookDir.getZ() > 0 ? org.bukkit.block.BlockFace.SOUTH : org.bukkit.block.BlockFace.NORTH;
-                            }
-                        }
+                if (width > 0 || height > 0 || depth > 0) {
+                    boolean inward = group.effect.getAoeMode() == SpellEffect.AoeMode.HIT_FACE_INWARD;
+                    Location aoeLoc = inward ? blockLocation : effectBlockLoc;
+
+                    // ヒット面から座標系を決定
+                    org.bukkit.block.BlockFace face = hitFace;
+                    if (face == null) {
+                        face = org.bukkit.block.BlockFace.UP; // デフォルト=床
                     }
 
-                    org.bukkit.util.Vector look = caster.getLocation().getDirection();
-                    boolean isHorizontalFace = Math.abs(projFace.getDirection().getBlockY()) > 0;
+                    int ny = Math.abs(face.getDirection().getBlockY());
+                    int nx = face.getDirection().getBlockX();
+                    int nz = face.getDirection().getBlockZ();
 
-                    if (isHorizontalFace) {
-                        // 地面/天井ヒット → 視線方向に壁を投影
-                        // 水平=視線方向×横の正方形壁面、垂直=視線方向の厚み
-                        org.bukkit.util.Vector lookH = look.clone().setY(0);
+                    // 法線方向の符号（破壊=奥へ、設置=手前へ）
+                    int depthSign = inward ? -1 : 1;
+
+                    if (ny > 0) {
+                        // --- 床/天井ヒット ---
+                        // 幅=左右、上下=前後、奥行き=上下
+                        // 視線の水平方向を軸にスナップ
+                        org.bukkit.util.Vector lookH = caster.getLocation().getDirection().setY(0);
                         if (lookH.lengthSquared() < 0.01) lookH = new org.bukkit.util.Vector(0, 0, 1);
-                        boolean fwdIsZ = Math.abs(lookH.getZ()) >= Math.abs(lookH.getX());
-                        int fwdX = fwdIsZ ? 0 : (lookH.getX() > 0 ? 1 : -1);
-                        int fwdZ = fwdIsZ ? (lookH.getZ() > 0 ? 1 : -1) : 0;
-                        int rightX = fwdIsZ ? (lookH.getZ() > 0 ? -1 : 1) : 0;
-                        int rightZ = fwdIsZ ? 0 : (lookH.getX() > 0 ? 1 : -1);
-                        // 横は両側展開、高さは上方向に片側展開
-                        int wallHeight = r1 * 2;
-                        for (int w = -r1; w <= r1; w++) {
-                            for (int h = 0; h <= wallHeight; h++) {
-                                for (int d = 0; d <= r2; d++) {
+                        boolean fwdZ = Math.abs(lookH.getZ()) >= Math.abs(lookH.getX());
+                        int fX = fwdZ ? 0 : (lookH.getX() > 0 ? 1 : -1);
+                        int fZ = fwdZ ? (lookH.getZ() > 0 ? 1 : -1) : 0;
+                        int rX = fwdZ ? 1 : 0;
+                        int rZ = fwdZ ? 0 : 1;
+                        int dY = depthSign * face.getDirection().getBlockY(); // 上面→上、下面→下
+
+                        for (int w = -width; w <= width; w++) {
+                            for (int h = -height; h <= height; h++) {
+                                for (int d = 0; d <= depth; d++) {
                                     if (w == 0 && h == 0 && d == 0) continue;
-                                    Location nearby = projBase.clone()
-                                        .add(rightX * w, h, rightZ * w)
-                                        .add(fwdX * d, 0, fwdZ * d);
-                                    group.effect.applyToBlock(this, nearby.getBlock().getLocation());
+                                    int dx = rX * w + fX * h;
+                                    int dy = dY * d;
+                                    int dz = rZ * w + fZ * h;
+                                    group.effect.applyToBlock(this,
+                                        aoeLoc.clone().add(dx, dy, dz));
                                 }
                             }
                         }
                     } else {
-                        // 側面ヒット → 法線方向に水平面を投影（橋・床が手前に伸びる）
-                        // 水平=法線方向×横の正方形水平面、垂直=下方向の厚み
-                        int pnx = projFace.getDirection().getBlockX();
-                        int pnz = projFace.getDirection().getBlockZ();
-                        boolean isXFace = Math.abs(pnx) > 0;
-                        // 法線方向（手前）に片側展開、横は両側展開
-                        int span = r1 * 2;
-                        for (int depth = 0; depth <= span; depth++) {
-                            for (int lateral = -r1; lateral <= r1; lateral++) {
-                                for (int h = 0; h <= r2; h++) {
-                                    if (depth == 0 && lateral == 0 && h == 0) continue;
-                                    int dx = isXFace ? pnx * depth : lateral;
-                                    int dz = isXFace ? lateral : pnz * depth;
-                                    Location nearby = projBase.clone().add(dx, -h, dz);
-                                    group.effect.applyToBlock(this, nearby.getBlock().getLocation());
-                                }
-                            }
-                        }
-                    }
-                } else if (group.effect.getAoeMode() != SpellEffect.AoeMode.FIXED && hitFace != null) {
-                    // ヒット面依存AOE: ヒット面に沿って展開
-                    boolean inward = group.effect.getAoeMode() == SpellEffect.AoeMode.HIT_FACE_INWARD;
-                    // 水平 = 面に沿った広がり、垂直 = 法線方向の奥行き
-                    // 上/下面: 水平=XZ平面, 垂直=Y方向（深掘り）
-                    // 東/西面: 水平=面横(Z)+面縦(Y), 垂直=X方向（奥掘り）
-                    // 南/北面: 水平=面横(X)+面縦(Y), 垂直=Z方向（奥掘り）
-                    int hAoe = (int) Math.min(aoeLevel, MAX_AOE_RADIUS);
-                    int vAoe = (int) Math.min(aoeVerticalLevel, MAX_AOE_RADIUS);
-                    if (hAoe > 0 || vAoe > 0) {
-                        org.bukkit.util.Vector normal = hitFace.getDirection();
-                        int nx = normal.getBlockX();
-                        int ny = normal.getBlockY();
-                        int nz = normal.getBlockZ();
+                        // --- 壁ヒット ---
+                        // 幅=左右、上下=Y方向、奥行き=法線方向
+                        boolean isXFace = Math.abs(nx) > 0;
 
-                        // inward: 奥行き=法線の逆方向（ブロック内部へ、破壊用）
-                        // outward: 奥行き=法線と同方向（手前へ、設置用）
-                        int sign = inward ? -1 : 1;
-
-                        // INWARDは元のblockLocation基準、OUTWARDはeffectBlockLoc基準
-                        Location aoeLoc = inward ? blockLocation : effectBlockLoc;
-                        if (Math.abs(ny) > 0) {
-                            // 上/下面: XZ=水平, Y=垂直
-                            int depthDir = sign * ny;
-                            for (int dx = -hAoe; dx <= hAoe; dx++) {
-                                for (int dz = -hAoe; dz <= hAoe; dz++) {
-                                    for (int d = 0; d <= vAoe; d++) {
-                                        if (dx == 0 && dz == 0 && d == 0) continue;
-                                        group.effect.applyToBlock(this,
-                                            aoeLoc.clone().add(dx, depthDir * d, dz));
-                                    }
-                                }
-                            }
-                        } else {
-                            // 側面: 面上=水平(横+Y), 法線方向=垂直
-                            boolean isXFace = Math.abs(nx) > 0;
-                            int depthDirX = sign * nx;
-                            int depthDirZ = sign * nz;
-                            for (int a = -hAoe; a <= hAoe; a++) {
-                                for (int dy = -hAoe; dy <= hAoe; dy++) {
-                                    for (int d = 0; d <= vAoe; d++) {
-                                        if (a == 0 && dy == 0 && d == 0) continue;
-                                        int dx = isXFace ? depthDirX * d : a;
-                                        int dz = isXFace ? a : depthDirZ * d;
-                                        group.effect.applyToBlock(this,
-                                            aoeLoc.clone().add(dx, dy, dz));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    // 通常AOE（水平・垂直分離）
-                    int hAoe = (int) Math.min(aoeLevel, MAX_AOE_RADIUS);
-                    int vAoe = (int) Math.min(aoeVerticalLevel, MAX_AOE_RADIUS);
-                    if (hAoe > 0 || vAoe > 0) {
-                        int hr = Math.max(hAoe, 0);
-                        int vr = Math.max(vAoe, 0);
-                        for (int dx = -hr; dx <= hr; dx++) {
-                            for (int dy = -vr; dy <= vr; dy++) {
-                                for (int dz = -hr; dz <= hr; dz++) {
-                                    if (dx == 0 && dy == 0 && dz == 0) continue;
-                                    Location nearby = effectBlockLoc.clone().add(dx, dy, dz);
-                                    group.effect.applyToBlock(this, nearby);
+                        for (int w = -width; w <= width; w++) {
+                            for (int h = -height; h <= height; h++) {
+                                for (int d = 0; d <= depth; d++) {
+                                    if (w == 0 && h == 0 && d == 0) continue;
+                                    int ddx = isXFace ? nx * d * depthSign : w;
+                                    int ddy = h;
+                                    int ddz = isXFace ? w : nz * d * depthSign;
+                                    group.effect.applyToBlock(this,
+                                        aoeLoc.clone().add(ddx, ddy, ddz));
                                 }
                             }
                         }
@@ -686,6 +615,19 @@ public class SpellContext {
         final SpellEffect effect;
         final List<SpellAugment> augments = new ArrayList<>();
         EffectGroup(SpellEffect effect) { this.effect = effect; }
+    }
+
+    /**
+     * 設置系エフェクトの設置予定位置にキャスター自身がいるかチェック。
+     * 起点ブロック位置のみ簡易チェック（AOE展開位置は起点から広がるため、
+     * キャスターが起点にいればほぼ確実に重なる）。
+     */
+    private boolean isPlacementBlockedByCaster(Player caster, Location effectBlockLoc, Location blockLocation) {
+        // 起点チェック
+        if (SpellFxUtil.isPlayerOccupying(effectBlockLoc, caster)) return true;
+        // 元のヒットブロック位置もチェック（隣接変換前）
+        if (SpellFxUtil.isPlayerOccupying(blockLocation, caster)) return true;
+        return false;
     }
 
     public boolean isValidAoeTarget(LivingEntity entity, Player caster) {

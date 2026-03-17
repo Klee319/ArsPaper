@@ -48,7 +48,7 @@ public class LightEffect implements SpellEffect {
         Block block = blockLocation.getBlock();
         org.bukkit.entity.Player caster = context.getCaster();
         if (caster == null) return;
-        if (block.getType().isAir() && SpellFxUtil.isEntityOccupying(blockLocation)) return;
+        // エンティティチェックはSpellContext側で一括実施
 
         if (!block.getType().isAir()) return;
 

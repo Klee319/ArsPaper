@@ -219,13 +219,10 @@ public final class SpellFxUtil {
 
     /** PhantomBlock: ガラス設置/消滅パーティクル */
     public static void spawnPhantomBlockFx(Location loc) {
-        BlockData glassData = Material.GLASS.createBlockData();
-        loc.getWorld().spawnParticle(Particle.BLOCK, loc.clone().add(0.5, 0.5, 0.5),
-            12, 0.3, 0.3, 0.3, 0, glassData);
         loc.getWorld().spawnParticle(Particle.END_ROD, loc.clone().add(0.5, 0.5, 0.5),
-            8, 0.3, 0.3, 0.3, 0.05);
+            3, 0.2, 0.2, 0.2, 0.02);
         loc.getWorld().playSound(loc, Sound.BLOCK_GLASS_PLACE,
-            SoundCategory.PLAYERS, 0.6f, 1.2f);
+            SoundCategory.PLAYERS, 0.3f, 1.2f);
     }
 
     /** Reset: アメジストパーティクル（初期化） */
@@ -241,6 +238,19 @@ public final class SpellFxUtil {
     /**
      * 指定ブロック位置にエンティティが存在するか（設置キャンセル判定用）。
      * バニラと同様、エンティティのバウンディングボックスとブロック位置が重なる場合true。
+     */
+    /**
+     * 指定位置に特定のプレイヤーが存在するか判定。
+     */
+    public static boolean isPlayerOccupying(Location blockLocation, Player player) {
+        if (player == null) return false;
+        Block block = blockLocation.getBlock();
+        BoundingBox blockBox = BoundingBox.of(block);
+        return player.getBoundingBox().overlaps(blockBox);
+    }
+
+    /**
+     * 後方互換: 任意のLivingEntityがいるか（非推奨）
      */
     public static boolean isEntityOccupying(Location blockLocation) {
         Block block = blockLocation.getBlock();

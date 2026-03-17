@@ -29,10 +29,10 @@ public class WallAugment implements SpellAugment {
     public NamespacedKey getId() { return id; }
 
     @Override
-    public String getDisplayName() { return "投影"; }
+    public String getDisplayName() { return "壁"; }
 
     @Override
-    public String getDescription() { return "設置方向を面と垂直にする"; }
+    public String getDescription() { return "上下を高さ方向に固定する"; }
 
     @Override
     public int getManaCost() { return config.getManaCost("wall"); }

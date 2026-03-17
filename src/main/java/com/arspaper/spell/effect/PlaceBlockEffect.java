@@ -59,8 +59,6 @@ public class PlaceBlockEffect implements SpellEffect {
             }
         }
 
-        if (com.arspaper.spell.SpellFxUtil.isEntityOccupying(blockLocation)) return;
-
         Player caster = context.getCaster();
         if (caster == null) return;
 

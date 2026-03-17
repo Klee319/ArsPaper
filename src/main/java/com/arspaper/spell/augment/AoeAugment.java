@@ -29,10 +29,10 @@ public class AoeAugment implements SpellAugment {
     public NamespacedKey getId() { return id; }
 
     @Override
-    public String getDisplayName() { return "範囲[横]"; }
+    public String getDisplayName() { return "範囲[幅]"; }
 
     @Override
-    public String getDescription() { return "視線の左右に範囲を拡大する"; }
+    public String getDescription() { return "対象の面の左右方向に範囲を広げる"; }
 
     @Override
     public int getManaCost() { return config.getManaCost("aoe"); }
