@@ -326,7 +326,7 @@ public class SpellCraftingGui extends BaseGui {
             Material.TNT, Component.text("全消去", NamedTextColor.RED)
         ));
         inventory.setItem(BTN_UNDO, createButton(
-            Material.CARROT_ON_A_STICK, Component.text("元に戻す", NamedTextColor.GOLD)
+            Material.COMPARATOR, Component.text("設定", NamedTextColor.GOLD)
         ));
         inventory.setItem(BTN_SAVE, createButton(
             Material.WRITABLE_BOOK,
@@ -396,13 +396,12 @@ public class SpellCraftingGui extends BaseGui {
             return true;
         }
 
-        // Undo（最後の非null要素を除去）
+        // 設定GUI
         if (slot == BTN_UNDO) {
-            int last = lastOccupiedSlot();
-            if (last >= 0) {
-                composition[last] = null;
-                render();
-            }
+            SpellSettingsGui settingsGui = new SpellSettingsGui(
+                clicker, spellBookItem, spellSlot, plugin
+            );
+            settingsGui.open();
             return true;
         }
 
@@ -624,6 +623,16 @@ public class SpellCraftingGui extends BaseGui {
             }
         }
         return null;
+    }
+
+    /**
+     * GUI閉じ時の処理。ESCで閉じた場合、構成は保存されない。
+     * 構成の保存はsaveSpell()（保存ボタンクリック時）でのみ行われるため、
+     * ここでは何もしない。これにより強制クローズ時のデータ安全性が保たれる。
+     */
+    @Override
+    public void onClose(Player player) {
+        // No-op: ESCで閉じた場合は変更を破棄。保存は明示的な保存ボタンのみ。
     }
 
     private NamedTextColor getTypeColor(SpellComponent.ComponentType type) {

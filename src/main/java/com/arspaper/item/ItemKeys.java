@@ -43,4 +43,13 @@ public final class ItemKeys {
 
     /** スレッドアイテムのタイプID */
     public static final NamespacedKey THREAD_ITEM_TYPE = new NamespacedKey(NAMESPACE, "thread_item_type");
+
+    /** スペルブックのUUID（個体識別用） */
+    public static final NamespacedKey SPELL_BOOK_UUID = new NamespacedKey(NAMESPACE, "spell_book_uuid");
+
+    /** バインド先スペルブックのUUID */
+    public static final NamespacedKey BOUND_BOOK_UUID = new NamespacedKey(NAMESPACE, "bound_book_uuid");
+
+    /** バインド先スペルスロット番号（0-indexed） */
+    public static final NamespacedKey BOUND_SPELL_SLOT = new NamespacedKey(NAMESPACE, "bound_spell_slot");
 }

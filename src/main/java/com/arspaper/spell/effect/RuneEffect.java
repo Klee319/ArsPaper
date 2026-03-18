@@ -64,6 +64,7 @@ public class RuneEffect implements SpellEffect {
 
         BukkitRunnable detectRunnable = new BukkitRunnable() {
             private int ticksElapsed = 0;
+            private static final int GRACE_PERIOD = 20; // 設置後1秒間はトリガーしない
             private final java.util.Set<java.util.UUID> recentlyTriggered = new java.util.HashSet<>();
             private static final int RETRIGGER_COOLDOWN = 20; // 1秒クールダウン
             private final java.util.Map<java.util.UUID, Integer> triggerCooldowns = new java.util.HashMap<>();
@@ -75,6 +76,9 @@ public class RuneEffect implements SpellEffect {
                 if (ticksElapsed % PARTICLE_INTERVAL == 0) {
                     spawnRuneIdleFx(runeLoc);
                 }
+
+                // グレース期間中はトリガーしない
+                if (ticksElapsed < GRACE_PERIOD) return;
 
                 for (LivingEntity entity : runeLoc.getWorld().getNearbyLivingEntities(runeLoc, trigRadius)) {
                     if (entity.getLocation().distanceSquared(runeLoc) > triggerRadiusSq) continue;

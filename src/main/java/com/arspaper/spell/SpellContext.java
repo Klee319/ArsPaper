@@ -549,8 +549,6 @@ public class SpellContext {
 
                     if (ny > 0) {
                         // --- 床/天井ヒット ---
-                        // 幅=左右、上下=前後、奥行き=上下
-                        // 視線の水平方向を軸にスナップ
                         org.bukkit.util.Vector lookH = caster.getLocation().getDirection().setY(0);
                         if (lookH.lengthSquared() < 0.01) lookH = new org.bukkit.util.Vector(0, 0, 1);
                         boolean fwdZ = Math.abs(lookH.getZ()) >= Math.abs(lookH.getX());
@@ -558,17 +556,29 @@ public class SpellContext {
                         int fZ = fwdZ ? (lookH.getZ() > 0 ? 1 : -1) : 0;
                         int rX = fwdZ ? 1 : 0;
                         int rZ = fwdZ ? 0 : 1;
-                        int dY = depthSign * face.getDirection().getBlockY(); // 上面→上、下面→下
+                        int dY = depthSign * face.getDirection().getBlockY();
+                        boolean outward = !inward;
 
                         for (int w = -width; w <= width; w++) {
                             for (int h = -height; h <= height; h++) {
                                 for (int d = 0; d <= depth; d++) {
                                     if (w == 0 && h == 0 && d == 0) continue;
                                     int dx = rX * w + fX * h;
-                                    int dy = dY * d;
                                     int dz = rZ * w + fZ * h;
-                                    group.effect.applyToBlock(this,
-                                        aoeLoc.clone().add(dx, dy, dz));
+
+                                    if (outward && dY > 0) {
+                                        // 設置系 + 上面ヒット: 各XZ位置で地表に合わせる
+                                        Location columnBase = aoeLoc.clone().add(dx, 0, dz);
+                                        Location surfaceLoc = findSurfaceUp(columnBase, aoeLoc.getBlockY());
+                                        if (surfaceLoc == null) continue; // 既にブロックがある
+                                        Location placeLoc = surfaceLoc.clone().add(0, d, 0);
+                                        if (!placeLoc.getBlock().getType().isAir()) continue;
+                                        group.effect.applyToBlock(this, placeLoc);
+                                    } else {
+                                        int dy = dY * d;
+                                        group.effect.applyToBlock(this,
+                                            aoeLoc.clone().add(dx, dy, dz));
+                                    }
                                 }
                             }
                         }
@@ -622,6 +632,33 @@ public class SpellContext {
      * 起点ブロック位置のみ簡易チェック（AOE展開位置は起点から広がるため、
      * キャスターが起点にいればほぼ確実に重なる）。
      */
+    /**
+     * 指定XZ位置で基準Y付近の地表（空気ブロック）を探す。
+     * 基準Yから上下3ブロック以内で探索。
+     * 空気ブロックが見つからない（全てソリッド）場合はnullを返す。
+     */
+    private Location findSurfaceUp(Location columnBase, int referenceY) {
+        // 基準Yから下に探索して最初のソリッドブロックの上面を見つける
+        for (int dy = 3; dy >= -3; dy--) {
+            Location check = columnBase.clone();
+            check.setY(referenceY + dy);
+            if (!check.getBlock().getType().isAir()) {
+                // このブロックの上が空気なら、そこが地表
+                Location above = check.clone().add(0, 1, 0);
+                if (above.getBlock().getType().isAir()) {
+                    return above;
+                }
+            }
+        }
+        // 全部空気の場合は基準Yをそのまま使用
+        Location fallback = columnBase.clone();
+        fallback.setY(referenceY);
+        if (fallback.getBlock().getType().isAir()) {
+            return fallback;
+        }
+        return null; // 設置不可
+    }
+
     private boolean isPlacementBlockedByCaster(Player caster, Location effectBlockLoc, Location blockLocation) {
         // 起点チェック
         if (SpellFxUtil.isPlayerOccupying(effectBlockLoc, caster)) return true;

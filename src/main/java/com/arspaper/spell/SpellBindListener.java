@@ -5,7 +5,7 @@ import com.arspaper.item.ItemKeys;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
-import org.bukkit.Material;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -20,20 +20,13 @@ import org.bukkit.persistence.PersistentDataType;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 /**
- * スペルバインドシステム。
- * 任意アイテムにスペルをバインドし、右クリックでスペル発動。
- *
- * バインド条件: displayName以外のNBT（エンチャント等）を持たないアイテムのみ。
- * バインド/解除はコマンド /ars spell bind / unbind で行う。
+ * スペルバインドシステム（参照ベース）。
+ * バインド済みアイテムには魔導書のUUIDとスロット番号を保持し、
+ * 発動時にプレイヤーインベントリ内の該当魔導書からスペルを読み取る。
  */
 public class SpellBindListener implements Listener {
-
-    private static final String BIND_SPELL_KEY = "bound_spell";
-    private static final org.bukkit.NamespacedKey BOUND_SPELL =
-        new org.bukkit.NamespacedKey("arspaper", BIND_SPELL_KEY);
 
     /**
      * バインド済みアイテムの右クリックでスペル発動。
@@ -51,18 +44,39 @@ public class SpellBindListener implements Listener {
             .get(ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING);
         if (customId != null) return;
 
-        // バインドされたスペルデータを取得
-        String spellJson = item.getItemMeta().getPersistentDataContainer()
-            .get(BOUND_SPELL, PersistentDataType.STRING);
-        if (spellJson == null) return;
+        PersistentDataContainer pdc = item.getItemMeta().getPersistentDataContainer();
+        String bookUuid = pdc.get(ItemKeys.BOUND_BOOK_UUID, PersistentDataType.STRING);
+        Integer spellSlot = pdc.get(ItemKeys.BOUND_SPELL_SLOT, PersistentDataType.INTEGER);
+        if (bookUuid == null || spellSlot == null) return;
 
         event.setCancelled(true);
 
         Player player = event.getPlayer();
-        SpellRegistry registry = ArsPaper.getInstance().getSpellRegistry();
-        SpellRecipe recipe = SpellSerializer.deserialize(spellJson, registry);
 
-        if (recipe == null || !recipe.isValid()) {
+        // プレイヤーのインベントリから該当UUIDのスペルブックを検索
+        ItemStack bookItem = findBookByUuid(player, bookUuid);
+        if (bookItem == null) {
+            player.sendMessage(Component.text("§c魔導書が必要です"));
+            return;
+        }
+
+        // スペルブックからスペルを読み取る
+        String slotsJson = bookItem.getItemMeta().getPersistentDataContainer()
+            .get(ItemKeys.SPELL_SLOTS, PersistentDataType.STRING);
+        if (slotsJson == null) {
+            player.sendMessage(Component.text("魔導書にスペルが設定されていません", NamedTextColor.RED));
+            return;
+        }
+
+        SpellRegistry registry = ArsPaper.getInstance().getSpellRegistry();
+        List<SpellRecipe> slots = SpellSerializer.deserializeSlots(slotsJson, registry);
+        if (spellSlot >= slots.size() || slots.get(spellSlot) == null) {
+            player.sendMessage(Component.text("指定スロットにスペルが設定されていません", NamedTextColor.RED));
+            return;
+        }
+
+        SpellRecipe recipe = slots.get(spellSlot);
+        if (!recipe.isValid()) {
             player.sendMessage(Component.text("バインドされたスペルが無効です", NamedTextColor.RED));
             return;
         }
@@ -71,10 +85,31 @@ public class SpellBindListener implements Listener {
     }
 
     /**
-     * アイテムにスペルをバインドする。
+     * プレイヤーのインベントリから指定UUIDのスペルブックを検索する。
+     */
+    private static ItemStack findBookByUuid(Player player, String uuid) {
+        for (ItemStack stack : player.getInventory().getContents()) {
+            if (stack == null || !stack.hasItemMeta()) continue;
+            String bookUuid = stack.getItemMeta().getPersistentDataContainer()
+                .get(ItemKeys.SPELL_BOOK_UUID, PersistentDataType.STRING);
+            if (uuid.equals(bookUuid)) return stack;
+        }
+        return null;
+    }
+
+    /**
+     * アイテムにスペルをバインドする（参照ベース）。
+     * バインド先アイテムには魔導書のUUIDとスロット番号のみを保持する。
+     *
+     * @param player プレイヤー
+     * @param item バインド先アイテム
+     * @param bookItem スペルブックアイテム
+     * @param spellSlot スペルスロット番号（0-indexed）
+     * @param recipe 表示用のスペルレシピ（Lore生成に使用）
      * @return 成功したらtrue
      */
-    public static boolean bindSpell(Player player, ItemStack item, SpellRecipe recipe) {
+    public static boolean bindSpell(Player player, ItemStack item, ItemStack bookItem,
+                                     int spellSlot, SpellRecipe recipe) {
         if (!canBind(item)) {
             player.sendMessage(Component.text(
                 "エンチャント等のNBTを持つアイテムにはバインドできません", NamedTextColor.RED));
@@ -82,23 +117,32 @@ public class SpellBindListener implements Listener {
             return false;
         }
 
-        String spellJson = SpellSerializer.serialize(recipe);
+        String bookUuid = bookItem.getItemMeta().getPersistentDataContainer()
+            .get(ItemKeys.SPELL_BOOK_UUID, PersistentDataType.STRING);
+        if (bookUuid == null) {
+            player.sendMessage(Component.text("魔導書にUUIDがありません", NamedTextColor.RED));
+            return false;
+        }
 
         item.editMeta(meta -> {
-            meta.getPersistentDataContainer().set(BOUND_SPELL, PersistentDataType.STRING, spellJson);
+            PersistentDataContainer pdc = meta.getPersistentDataContainer();
+            pdc.set(ItemKeys.BOUND_BOOK_UUID, PersistentDataType.STRING, bookUuid);
+            pdc.set(ItemKeys.BOUND_SPELL_SLOT, PersistentDataType.INTEGER, spellSlot);
 
             // Loreにスペル情報を追加
             List<Component> lore = meta.lore() != null ? new ArrayList<>(meta.lore()) : new ArrayList<>();
             // 既存のバインド情報を除去
             lore.removeIf(line -> {
-                String plain = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
-                    .plainText().serialize(line);
-                return plain.startsWith("スペル:") || plain.startsWith("マナ:");
+                String plain = PlainTextComponentSerializer.plainText().serialize(line);
+                return plain.startsWith("スペル:") || plain.startsWith("マナ:")
+                    || plain.contains("魔導書を持っている必要があります");
             });
             lore.add(Component.text("スペル: " + recipe.getName(), NamedTextColor.LIGHT_PURPLE)
                 .decoration(TextDecoration.ITALIC, false));
             lore.add(Component.text("マナ: " + recipe.getTotalManaCost(), NamedTextColor.AQUA)
                 .decoration(TextDecoration.ITALIC, false));
+            lore.add(Component.text("発動時には魔導書を持っている必要があります", NamedTextColor.GRAY)
+                .decoration(TextDecoration.ITALIC, true));
             meta.lore(lore);
         });
 
@@ -114,23 +158,25 @@ public class SpellBindListener implements Listener {
     public static boolean unbindSpell(Player player, ItemStack item) {
         if (!item.hasItemMeta()) return false;
 
-        String existing = item.getItemMeta().getPersistentDataContainer()
-            .get(BOUND_SPELL, PersistentDataType.STRING);
+        PersistentDataContainer pdc = item.getItemMeta().getPersistentDataContainer();
+        String existing = pdc.get(ItemKeys.BOUND_BOOK_UUID, PersistentDataType.STRING);
         if (existing == null) {
             player.sendMessage(Component.text("このアイテムにはスペルがバインドされていません", NamedTextColor.RED));
             return false;
         }
 
         item.editMeta(meta -> {
-            meta.getPersistentDataContainer().remove(BOUND_SPELL);
+            meta.getPersistentDataContainer().remove(ItemKeys.BOUND_BOOK_UUID);
+            meta.getPersistentDataContainer().remove(ItemKeys.BOUND_SPELL_SLOT);
 
             // バインドLoreを除去
             List<Component> lore = meta.lore();
             if (lore != null) {
+                lore = new ArrayList<>(lore);
                 lore.removeIf(line -> {
-                    String plain = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
-                        .plainText().serialize(line);
-                    return plain.startsWith("スペル:") || plain.startsWith("マナ:");
+                    String plain = PlainTextComponentSerializer.plainText().serialize(line);
+                    return plain.startsWith("スペル:") || plain.startsWith("マナ:")
+                        || plain.contains("魔導書を持っている必要があります");
                 });
                 meta.lore(lore.isEmpty() ? null : lore);
             }

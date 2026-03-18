@@ -183,7 +183,7 @@ public class GlyphConfig {
         Map.entry("touch",      Set.of("rapid_fire")),
         Map.entry("self",       Set.of("rapid_fire")),
         Map.entry("underfoot",  Set.of("rapid_fire")),
-        Map.entry("orbit",      Set.of("amplify", "dampen", "split", "extend_time", "duration_down", "rapid_fire")),
+        Map.entry("orbit",      Set.of("amplify", "dampen", "split", "extend_time", "duration_down", "rapid_fire", "aoe_radius")),
         Map.entry("wall",       Set.of("accelerate", "decelerate", "split", "rapid_fire")),
         Map.entry("beam",       Set.of("accelerate", "decelerate", "pierce", "split", "aoe_radius", "rapid_fire", "trace")),
         // === Effects - Tier 1 ===

@@ -48,31 +48,53 @@ public class LightEffect implements SpellEffect {
         Block block = blockLocation.getBlock();
         org.bukkit.entity.Player caster = context.getCaster();
         if (caster == null) return;
-        // エンティティチェックはSpellContext側で一括実施
 
-        if (!block.getType().isAir()) return;
+        // 対象が空気ブロック → そのまま松明設置を試みる
+        if (block.getType().isAir()) {
+            if (tryPlaceTorchAt(block, caster)) return;
+        }
 
-        // 下にソリッドブロックがあれば通常の松明
-        Block below = block.getRelative(BlockFace.DOWN);
-        if (below.getType().isSolid()) {
-            if (placeTorch(block, below, caster)) {
-                SpellFxUtil.spawnLightFx(blockLocation);
+        // 対象がソリッドブロック → 隣接の空気ブロックに松明設置を試みる
+        if (block.getType().isSolid()) {
+            // 上面を優先
+            Block above = block.getRelative(BlockFace.UP);
+            if (above.getType().isAir() && tryPlaceTorchAt(above, caster)) return;
+
+            // 側面を試行
+            for (BlockFace face : new BlockFace[]{
+                    BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST}) {
+                Block adj = block.getRelative(face);
+                if (adj.getType().isAir() && tryPlaceTorchAt(adj, caster)) return;
             }
-            return;
+        }
+    }
+
+    /**
+     * 指定の空気ブロックに松明を設置する。
+     * 下にソリッドがあれば通常松明、隣接にソリッドがあれば壁松明。
+     */
+    private boolean tryPlaceTorchAt(Block airBlock, org.bukkit.entity.Player caster) {
+        // 下にソリッドがあれば通常の松明
+        Block below = airBlock.getRelative(BlockFace.DOWN);
+        if (below.getType().isSolid()) {
+            if (placeTorch(airBlock, below, caster)) {
+                SpellFxUtil.spawnLightFx(airBlock.getLocation());
+                return true;
+            }
         }
 
         // 隣接にソリッドブロックがあれば壁松明
         for (BlockFace face : new BlockFace[]{
                 BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST}) {
-            Block adjacent = block.getRelative(face);
+            Block adjacent = airBlock.getRelative(face);
             if (adjacent.getType().isSolid()) {
-                if (placeWallTorch(block, face, caster)) {
-                    SpellFxUtil.spawnLightFx(blockLocation);
+                if (placeWallTorch(airBlock, face, caster)) {
+                    SpellFxUtil.spawnLightFx(airBlock.getLocation());
+                    return true;
                 }
-                return;
             }
         }
-        // 隣接にソリッドブロックがない → 設置失敗（宙に浮かない）
+        return false;
     }
 
     private boolean placeTorch(Block block, Block support, org.bukkit.entity.Player caster) {
@@ -98,8 +120,7 @@ public class LightEffect implements SpellEffect {
         return true;
     }
 
-    @Override
-    public AoeMode getAoeMode() { return AoeMode.HIT_FACE_OUTWARD; }
+    // 松明は自分で隣接空気を探すのでFIXED（OUTWARD変換不要）
 
     @Override
     public NamespacedKey getId() { return id; }

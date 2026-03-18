@@ -5,6 +5,7 @@ import com.arspaper.mana.ManaManager;
 import com.arspaper.spell.form.BeamForm;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataType;
 
@@ -85,6 +86,9 @@ public class SpellCaster {
         context.applyFormAugments();
         SpellForm spellForm = recipe.getForm();
         spellForm.cast(caster, context);
+
+        // アクションバーにスペル名を表示
+        caster.sendActionBar(Component.text("§d" + recipe.getName()));
 
         return true;
     }

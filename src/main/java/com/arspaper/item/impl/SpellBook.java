@@ -17,6 +17,7 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * スペルブック。ティアに応じてスロット数・使用可能グリフティアが変わる。
@@ -61,6 +62,10 @@ public class SpellBook extends BaseCustomItem {
             meta.getPersistentDataContainer().set(
                 ItemKeys.SPELL_SLOT, PersistentDataType.INTEGER, 0
             );
+            // 新規作成時にUUIDを付与
+            meta.getPersistentDataContainer().set(
+                ItemKeys.SPELL_BOOK_UUID, PersistentDataType.STRING, UUID.randomUUID().toString()
+            );
             meta.lore(List.of(
                 Component.text("ティア: " + bookTier.getDisplayName(), NamedTextColor.GRAY)
                     .decoration(TextDecoration.ITALIC, false),
@@ -77,12 +82,34 @@ public class SpellBook extends BaseCustomItem {
         return item;
     }
 
+    /**
+     * スペルブックのUUIDを取得する。存在しない場合は生成して設定する。
+     */
+    public static String getOrCreateUUID(ItemStack item) {
+        if (!item.hasItemMeta()) return null;
+        String uuid = item.getItemMeta().getPersistentDataContainer()
+            .get(ItemKeys.SPELL_BOOK_UUID, PersistentDataType.STRING);
+        if (uuid == null) {
+            uuid = UUID.randomUUID().toString();
+            String finalUuid = uuid;
+            item.editMeta(meta ->
+                meta.getPersistentDataContainer().set(
+                    ItemKeys.SPELL_BOOK_UUID, PersistentDataType.STRING, finalUuid
+                )
+            );
+        }
+        return uuid;
+    }
+
     @Override
     public void onRightClick(PlayerInteractEvent event) {
         event.setCancelled(true);
         Player player = event.getPlayer();
         ItemStack item = event.getItem();
         if (item == null) return;
+
+        // UUID未設定の既存ブックに対してUUIDを付与
+        getOrCreateUUID(item);
 
         if (player.isSneaking()) {
             switchSlot(player, item);
@@ -139,7 +166,15 @@ public class SpellBook extends BaseCustomItem {
 
         int current = item.getItemMeta().getPersistentDataContainer()
             .getOrDefault(ItemKeys.SPELL_SLOT, PersistentDataType.INTEGER, 0);
-        int next = (current + 1) % maxSlots;
+
+        // ジャンプ中なら逆方向にスロット切替
+        boolean jumping = player.getVelocity().getY() > 0.1;
+        int next;
+        if (jumping) {
+            next = (current - 1 + maxSlots) % maxSlots;
+        } else {
+            next = (current + 1) % maxSlots;
+        }
 
         item.editMeta(meta ->
             meta.getPersistentDataContainer().set(
@@ -149,7 +184,7 @@ public class SpellBook extends BaseCustomItem {
 
         String slotName = getSlotSpellName(item, next);
         player.sendActionBar(
-            Component.text("スロット " + (next + 1) + "/" + maxSlots + ": " + slotName, NamedTextColor.AQUA)
+            Component.text("§d" + slotName + " §7(スロット" + (next + 1) + ")")
         );
     }
 

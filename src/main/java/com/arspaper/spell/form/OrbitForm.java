@@ -56,11 +56,13 @@ public class OrbitForm implements SpellForm {
             + durationLevel * EXTEND_DURATION_BONUS);
         double angularSpeed = BASE_ANGULAR_SPEED * (1.0 + amplifyLevel * 0.3);
 
+        double radius = ORBIT_RADIUS + context.getAoeRadiusLevel() * 1.0;
+
         for (int orbIndex = 0; orbIndex < orbCount; orbIndex++) {
             double phaseOffset = (2.0 * Math.PI / orbCount) * orbIndex;
             SpellContext orbContext = context.copy();
 
-            new OrbitTask(caster, orbContext, totalDuration, angularSpeed, phaseOffset)
+            new OrbitTask(caster, orbContext, totalDuration, angularSpeed, phaseOffset, radius)
                 .runTaskTimer(plugin, 0L, 2L);
         }
     }
@@ -76,17 +78,19 @@ public class OrbitForm implements SpellForm {
         private final int maxTicks;
         private final double angularSpeed;
         private final double phaseOffset;
+        private final double radius;
         /** エンティティUUID → 最後にヒットしたtick */
         private final Map<UUID, Integer> hitCooldowns = new HashMap<>();
 
         private int elapsed = 0;
 
-        OrbitTask(Player caster, SpellContext context, int maxTicks, double angularSpeed, double phaseOffset) {
+        OrbitTask(Player caster, SpellContext context, int maxTicks, double angularSpeed, double phaseOffset, double radius) {
             this.caster = caster;
             this.context = context;
             this.maxTicks = maxTicks;
             this.angularSpeed = angularSpeed;
             this.phaseOffset = phaseOffset;
+            this.radius = radius;
         }
 
         @Override
@@ -101,8 +105,8 @@ public class OrbitForm implements SpellForm {
             // 現在のorb位置を算出
             double angle = phaseOffset + angularSpeed * elapsed;
             Location center = caster.getLocation().add(0, 1.0, 0);
-            double x = Math.cos(angle) * ORBIT_RADIUS;
-            double z = Math.sin(angle) * ORBIT_RADIUS;
+            double x = Math.cos(angle) * radius;
+            double z = Math.sin(angle) * radius;
             Location orbLoc = center.clone().add(x, 0, z);
 
             // 軌跡パーティクル

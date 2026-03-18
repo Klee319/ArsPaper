@@ -296,7 +296,10 @@ public final class ArsCommand {
             return 0;
         }
 
-        return com.arspaper.spell.SpellBindListener.bindSpell(player, offhand, slots.get(idx)) ? 1 : 0;
+        // スペルブックにUUIDがなければ付与
+        com.arspaper.item.impl.SpellBook.getOrCreateUUID(mainHand);
+        // mainHandはスペルブック、offhandがバインド先アイテム
+        return com.arspaper.spell.SpellBindListener.bindSpell(player, offhand, mainHand, idx, slots.get(idx)) ? 1 : 0;
     }
 
     private static int executeSpellUnbind(Player player) {
