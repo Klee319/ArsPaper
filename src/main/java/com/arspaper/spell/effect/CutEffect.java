@@ -66,8 +66,8 @@ public class CutEffect implements SpellEffect {
             }
             return;
         }
-        // キノコ牛→キノコをドロップし通常牛に変換（子牛は不可、バニラ準拠）
-        if (target instanceof MushroomCow mushroomCow && mushroomCow.isAdult()) {
+        // キノコ牛→キノコをドロップし通常牛に変換
+        if (target instanceof MushroomCow mushroomCow) {
             Material mushroomType = mushroomCow.getVariant() == MushroomCow.Variant.BROWN
                 ? Material.BROWN_MUSHROOM : Material.RED_MUSHROOM;
             for (int i = 0; i < 5; i++) {

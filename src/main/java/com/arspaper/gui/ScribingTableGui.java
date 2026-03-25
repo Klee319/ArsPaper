@@ -52,7 +52,11 @@ public class ScribingTableGui extends BaseGui {
         displayedGlyphs.clear();
 
         Set<String> unlocked = getUnlockedGlyphs();
+        // カテゴリ順（形態→効果→増強）、同カテゴリ内はtier順にソート
         List<SpellComponent> allGlyphs = new ArrayList<>(plugin.getSpellRegistry().getAll());
+        allGlyphs.sort(java.util.Comparator
+            .<SpellComponent, Integer>comparing(c -> c.getType().ordinal())
+            .thenComparingInt(SpellComponent::getTier));
         int totalPages = Math.max(1, (int) Math.ceil((double) allGlyphs.size() / GLYPHS_PER_PAGE));
         currentPage = Math.min(currentPage, totalPages - 1);
 

@@ -31,6 +31,7 @@ public class SpellRegistry {
     public List<SpellComponent> getByType(SpellComponent.ComponentType type) {
         return components.values().stream()
             .filter(c -> c.getType() == type)
+            .sorted(Comparator.comparingInt(SpellComponent::getTier))
             .collect(Collectors.toUnmodifiableList());
     }
 

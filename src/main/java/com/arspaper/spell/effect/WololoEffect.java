@@ -142,7 +142,7 @@ public class WololoEffect implements SpellEffect {
 
     private void spawnWololoFx(Location loc) {
         loc.getWorld().spawnParticle(Particle.ENTITY_EFFECT, loc.clone().add(0, 1, 0),
-            15, 0.4, 0.4, 0.4, 0);
+            15, 0.4, 0.4, 0.4, 0, org.bukkit.Color.fromRGB(255, 100, 255));
         loc.getWorld().playSound(loc, Sound.ENTITY_EVOKER_PREPARE_WOLOLO,
             SoundCategory.PLAYERS, 1.0f, 1.0f);
     }

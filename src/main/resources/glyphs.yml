@@ -954,7 +954,7 @@ glyphs:
   # 説明: 花火を打ち上げる
   firework:
     tier: 2
-    mana-cost: 50
+    mana-cost: 15
     # 増幅:花火規模↑ | 減少:規模↓ | 半径増加:花火数↑
     # 延長:持続延長 | 短縮:持続短縮 | 無作為:ランダム花火
     max-augments:

@@ -123,13 +123,24 @@ public class OrbitForm implements SpellForm {
                 Integer lastHitTick = hitCooldowns.get(entityId);
                 if (lastHitTick != null && (elapsed - lastHitTick) < HIT_COOLDOWN_TICKS) continue;
 
-                // ヒット処理
                 hitCooldowns.put(entityId, elapsed);
                 SpellFxUtil.spawnImpactBurst(entity.getLocation());
 
-                // 独立コンテキストで効果適用（AOE展開あり: ヒット地点を起点に範囲効果）
                 SpellContext hitContext = context.copy();
                 hitContext.resolveOnEntity(entity);
+            }
+
+            // ブロック衝突判定（破壊/収穫/伐採/精錬/交換/無形 等のブロック系効果用）
+            org.bukkit.block.Block block = orbLoc.getBlock();
+            if (!block.getType().isAir()) {
+                long blockKey = block.getLocation().hashCode();
+                String blockKeyStr = block.getX() + "," + block.getY() + "," + block.getZ();
+                Integer lastBlockHit = hitCooldowns.get(UUID.nameUUIDFromBytes(blockKeyStr.getBytes()));
+                if (lastBlockHit == null || (elapsed - lastBlockHit) >= HIT_COOLDOWN_TICKS) {
+                    hitCooldowns.put(UUID.nameUUIDFromBytes(blockKeyStr.getBytes()), elapsed);
+                    SpellContext blockContext = context.copy();
+                    blockContext.resolveOnBlock(block.getLocation());
+                }
             }
         }
     }
