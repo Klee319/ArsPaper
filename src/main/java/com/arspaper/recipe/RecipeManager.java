@@ -201,13 +201,17 @@ public class RecipeManager {
 
         if (resultStr.startsWith("custom:")) {
             String customId = resultStr.substring("custom:".length());
-            return ArsPaper.getInstance().getItemRegistry()
-                .get(customId)
-                .map(item -> item.createItemStack())
-                .orElseGet(() -> {
-                    plugin.getLogger().warning("Unknown custom item: " + customId);
-                    return null;
-                });
+            var opt = ArsPaper.getInstance().getItemRegistry().get(customId);
+            if (opt.isPresent()) {
+                return opt.get().createItemStack();
+            }
+            // カスタムアイテムが見つからない場合、バニラMaterialとしてフォールバック
+            Material fallback = Material.matchMaterial(customId);
+            if (fallback != null) {
+                return new ItemStack(fallback);
+            }
+            plugin.getLogger().warning("Unknown custom item or material: " + customId);
+            return null;
         }
 
         Material mat = Material.matchMaterial(resultStr);
