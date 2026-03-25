@@ -27,7 +27,7 @@ import java.util.Map;
  */
 public class RecipeBrowserGui extends BaseGui {
 
-    private static final int ITEMS_PER_PAGE = 21; // 3行×7列
+    private static final int ITEMS_PER_PAGE = 28; // 4行×7列
     private static final int ITEM_START = 10;
     private static final int BTN_PREV = 45;
     private static final int BTN_NEXT = 53;
