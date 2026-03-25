@@ -268,23 +268,19 @@ public class ArmorManaListener implements Listener {
      */
     private static final java.util.Set<java.util.UUID> flightThreadPlayers =
         java.util.concurrent.ConcurrentHashMap.newKeySet();
-    /** allowFlight再有効化の重複防止フラグ */
-    private static final java.util.Set<java.util.UUID> glideCooldown =
-        java.util.concurrent.ConcurrentHashMap.newKeySet();
     private boolean flightTaskStarted = false;
     private BukkitTask flightTask;
 
     /**
      * 飛行スレッドの状態を更新する。
-     * GlideEffect（滑空グリフ）と同じバニラエリトラ方式。
-     * 空中にいる間は自動でsetGliding(true)を維持。
+     * allowFlightは常にtrue維持（ジャンプキー検出用）。
+     * ジャンプキーでグライドのON/OFFをトグルする。
      */
     private void updateFlightThread(Player player, boolean hasFlightThread) {
         if (!hasFlightThread) {
             if (flightThreadPlayers.remove(player.getUniqueId())) {
                 player.setGliding(false);
                 player.setFallDistance(0f);
-                // クリエイティブ/スペクテイター以外はallowFlight解除
                 if (player.getGameMode() != org.bukkit.GameMode.CREATIVE
                         && player.getGameMode() != org.bukkit.GameMode.SPECTATOR) {
                     player.setAllowFlight(false);
@@ -294,7 +290,6 @@ public class ArmorManaListener implements Listener {
         }
 
         flightThreadPlayers.add(player.getUniqueId());
-        // ジャンプキー検出のためにallowFlight有効化
         if (player.getGameMode() != org.bukkit.GameMode.CREATIVE
                 && player.getGameMode() != org.bukkit.GameMode.SPECTATOR) {
             player.setAllowFlight(true);
@@ -302,17 +297,12 @@ public class ArmorManaListener implements Listener {
         startFlightTask();
     }
 
-    /**
-     * 飛行スレッド用の定期タスクを開始。
-     * プレイヤーがいる間のみ実行し、空になったらタスクを停止する。
-     */
     private void startFlightTask() {
         if (flightTaskStarted) return;
         flightTaskStarted = true;
 
         flightTask = org.bukkit.Bukkit.getScheduler().runTaskTimer(
             ArsPaper.getInstance(), () -> {
-                // プレイヤーがいない場合はタスクを停止
                 if (flightThreadPlayers.isEmpty()) {
                     stopFlightTask();
                     return;
@@ -325,36 +315,19 @@ public class ArmorManaListener implements Listener {
                         iterator.remove();
                         continue;
                     }
-                    // 着地: 滑空を解除
+                    // 着地時に滑空解除
                     if (p.isOnGround() && p.isGliding()) {
                         p.setGliding(false);
                         p.setFallDistance(0f);
                     }
-                    // 滑空中: 落下ダメージリセット
                     if (p.isGliding()) {
                         p.setFallDistance(0f);
                     }
-                    // allowFlight維持（ジャンプキー検出用: 滑空開始/停止の両方に必要）
-                    // glideCooldown中は再有効化しない（滑空開始の1tick遅延を妨げないため）
-                    if (!p.isOnGround() && !p.getAllowFlight()
-                            && !glideCooldown.contains(p.getUniqueId())
+                    // allowFlightを常に維持（クリエイティブ飛行はToggleFlightでキャンセル）
+                    if (!p.getAllowFlight()
                             && p.getGameMode() != org.bukkit.GameMode.CREATIVE
                             && p.getGameMode() != org.bukkit.GameMode.SPECTATOR) {
-                        // 滑空中は2tick後に再有効化（即座に設定すると滑空が解除される）
-                        if (p.isGliding()) {
-                            java.util.UUID uid = p.getUniqueId();
-                            glideCooldown.add(uid);
-                            org.bukkit.Bukkit.getScheduler().runTaskLater(
-                                ArsPaper.getInstance(), () -> {
-                                    glideCooldown.remove(uid);
-                                    if (p.isOnline() && p.isGliding()
-                                            && flightThreadPlayers.contains(uid)) {
-                                        p.setAllowFlight(true);
-                                    }
-                                }, 2L);
-                        } else {
-                            p.setAllowFlight(true);
-                        }
+                        p.setAllowFlight(true);
                     }
                 }
             }, 0L, 1L);
@@ -369,8 +342,8 @@ public class ArmorManaListener implements Listener {
     }
 
     /**
-     * 飛行スレッド: 空中でジャンプキーを押すと滑空を開始（バニラエリトラと同じ操作）。
-     * setAllowFlight(true)状態で空中ジャンプするとPlayerToggleFlightEventが発火する。
+     * 飛行スレッド: 空中でジャンプキーを押すと滑空をトグル。
+     * allowFlightは常にtrue維持し、クリエイティブ飛行だけキャンセルする。
      */
     @org.bukkit.event.EventHandler
     public void onPlayerToggleFlight(org.bukkit.event.player.PlayerToggleFlightEvent event) {
@@ -379,27 +352,16 @@ public class ArmorManaListener implements Listener {
         if (player.getGameMode() == org.bukkit.GameMode.CREATIVE
                 || player.getGameMode() == org.bukkit.GameMode.SPECTATOR) return;
 
+        // クリエイティブ飛行を常にキャンセル
         event.setCancelled(true);
-        player.setAllowFlight(false);
         player.setFlying(false);
 
         if (player.isGliding()) {
-            // 滑空中にジャンプキー → 滑空解除
             player.setGliding(false);
             player.setFallDistance(0f);
         } else if (!player.isOnGround()) {
-            // 非滑空中にジャンプキー → 1tick後に滑空開始
-            // 同一tickでallowFlight(false)+setGliding(true)するとPaperが無視するため遅延必須
-            // glideCooldownでtaskがallowFlightを復帰するのを防ぐ
-            glideCooldown.add(player.getUniqueId());
-            org.bukkit.Bukkit.getScheduler().runTaskLater(ArsPaper.getInstance(), () -> {
-                glideCooldown.remove(player.getUniqueId());
-                if (player.isOnline() && !player.isOnGround() && !player.isGliding()
-                        && flightThreadPlayers.contains(player.getUniqueId())) {
-                    player.setGliding(true);
-                    player.setFallDistance(0f);
-                }
-            }, 1L);
+            player.setGliding(true);
+            player.setFallDistance(0f);
         }
     }
 
