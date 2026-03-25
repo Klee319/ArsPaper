@@ -322,10 +322,10 @@ public class UnifiedRecipeLoader {
             if (itemOpt.isPresent()) {
                 String displayName = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
                     .plainText().serialize(itemOpt.get().getDisplayName());
-                return displayName + " 儀式レシピ";
+                return displayName;
             }
         }
-        return fallbackId + " 儀式レシピ";
+        return fallbackId;
     }
 
     private YamlConfiguration loadYml(String filename) {
