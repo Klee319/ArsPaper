@@ -172,6 +172,12 @@ public final class ArsCommand {
                         return 1;
                     })
                 )
+                .then(Commands.literal("status")
+                    .executes(ctx -> {
+                        if (!(ctx.getSource().getSender() instanceof Player player)) return 0;
+                        return executeStatus(plugin, player);
+                    })
+                )
                 .then(Commands.literal("pvp")
                     .requires(src -> src.getSender().hasPermission("arspaper.admin"))
                     .then(Commands.argument("state", StringArgumentType.word())
@@ -300,6 +306,71 @@ public final class ArsCommand {
 
         player.getInventory().addItem(book);
         player.sendMessage(Component.text(displayName + " " + roman + " のエンチャント本を付与しました", NamedTextColor.GREEN));
+        return 1;
+    }
+
+    private static int executeStatus(ArsPaper plugin, Player player) {
+        var pdc = player.getPersistentDataContainer();
+        var config = plugin.getManaManager().getConfig();
+
+        // === マナ上限 ===
+        int baseMana = config.defaultMaxMana();
+        int glyphBonus = pdc.getOrDefault(ManaKeys.GLYPH_MANA_BONUS, PersistentDataType.INTEGER, 0);
+        int armorManaBonus = pdc.getOrDefault(ManaKeys.ARMOR_MANA_BONUS, PersistentDataType.INTEGER, 0);
+        int threadManaBonus = pdc.getOrDefault(ManaKeys.THREAD_MANA_BONUS, PersistentDataType.INTEGER, 0);
+        int enchantManaBonus = pdc.getOrDefault(ManaKeys.ENCHANT_MANA_BONUS, PersistentDataType.INTEGER, 0);
+        int totalMana = baseMana + glyphBonus + armorManaBonus + threadManaBonus + enchantManaBonus;
+        int currentMana = plugin.getManaManager().getCurrentMana(player);
+
+        // === マナ回復 ===
+        int baseRegen = pdc.getOrDefault(ManaKeys.REGEN_RATE, PersistentDataType.INTEGER, config.defaultRegenRate());
+        int threadRegenBonus = pdc.getOrDefault(ManaKeys.THREAD_REGEN_BONUS, PersistentDataType.INTEGER, 0);
+        int enchantRegenBonus = pdc.getOrDefault(ManaKeys.ENCHANT_REGEN_BONUS, PersistentDataType.INTEGER, 0);
+        int armorRegenBonus = pdc.getOrDefault(ManaKeys.ARMOR_REGEN_BONUS, PersistentDataType.INTEGER, 0);
+        int totalRegen = baseRegen + threadRegenBonus + enchantRegenBonus + armorRegenBonus;
+
+        // === スレッド特殊ボーナス ===
+        int spellPower = pdc.getOrDefault(ManaKeys.THREAD_SPELL_POWER, PersistentDataType.INTEGER, 0);
+        int costReduction = pdc.getOrDefault(ManaKeys.THREAD_COST_REDUCTION, PersistentDataType.INTEGER, 0);
+
+        // === 表示 ===
+        player.sendMessage(Component.text("═══ ArsPaper ステータス ═══", NamedTextColor.GOLD));
+
+        // マナ
+        player.sendMessage(Component.text("マナ: ", NamedTextColor.AQUA)
+            .append(Component.text(currentMana + " / " + totalMana, NamedTextColor.WHITE)));
+        player.sendMessage(Component.text("  基本: " + baseMana, NamedTextColor.GRAY));
+        if (glyphBonus > 0)
+            player.sendMessage(Component.text("  グリフ: +" + glyphBonus, NamedTextColor.GRAY));
+        if (armorManaBonus > 0)
+            player.sendMessage(Component.text("  防具: +" + armorManaBonus, NamedTextColor.GRAY));
+        if (threadManaBonus > 0)
+            player.sendMessage(Component.text("  スレッド: +" + threadManaBonus, NamedTextColor.GRAY));
+        if (enchantManaBonus > 0)
+            player.sendMessage(Component.text("  エンチャント: +" + enchantManaBonus, NamedTextColor.GRAY));
+
+        // 回復
+        double regenInterval = config.regenIntervalTicks() / 20.0;
+        double regenPerSec = totalRegen / regenInterval;
+        player.sendMessage(Component.text("回復: ", NamedTextColor.GREEN)
+            .append(Component.text(totalRegen + "/tick (" + String.format("%.1f", regenPerSec) + "/秒)", NamedTextColor.WHITE)));
+        player.sendMessage(Component.text("  基本: " + baseRegen, NamedTextColor.GRAY));
+        if (armorRegenBonus > 0)
+            player.sendMessage(Component.text("  防具: +" + armorRegenBonus, NamedTextColor.GRAY));
+        if (threadRegenBonus > 0)
+            player.sendMessage(Component.text("  スレッド: +" + threadRegenBonus, NamedTextColor.GRAY));
+        if (enchantRegenBonus > 0)
+            player.sendMessage(Component.text("  エンチャント: +" + enchantRegenBonus, NamedTextColor.GRAY));
+
+        // スレッド特殊
+        if (spellPower > 0 || costReduction > 0) {
+            player.sendMessage(Component.text("特殊: ", NamedTextColor.LIGHT_PURPLE));
+            if (spellPower > 0)
+                player.sendMessage(Component.text("  スペル威力: +" + spellPower + "%", NamedTextColor.GRAY));
+            if (costReduction > 0)
+                player.sendMessage(Component.text("  コスト削減: -" + costReduction + "%", NamedTextColor.GRAY));
+        }
+
         return 1;
     }
 

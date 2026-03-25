@@ -58,6 +58,10 @@ public class ManaManager implements Listener {
         return rankingCache;
     }
 
+    public ManaConfig getConfig() {
+        return config;
+    }
+
     /**
      * ManaConfigを再読み込みする。/ars reload で呼ばれる。
      * ※ regenTaskのインターバルは変更不可（サーバ再起動が必要）。
