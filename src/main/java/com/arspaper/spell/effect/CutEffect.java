@@ -55,9 +55,9 @@ public class CutEffect implements SpellEffect {
 
     @Override
     public void applyToEntity(SpellContext context, LivingEntity target) {
-        // 羊→刈り取り
+        // 羊→刈り取り（子羊は不可、バニラ準拠）
         if (target instanceof Sheep sheep) {
-            if (!sheep.isSheared()) {
+            if (sheep.isAdult() && !sheep.isSheared()) {
                 sheep.setSheared(true);
                 target.getWorld().dropItemNaturally(
                     target.getLocation(),
@@ -66,8 +66,8 @@ public class CutEffect implements SpellEffect {
             }
             return;
         }
-        // キノコ牛→キノコをドロップし通常牛に変換
-        if (target instanceof MushroomCow mushroomCow) {
+        // キノコ牛→キノコをドロップし通常牛に変換（子牛は不可、バニラ準拠）
+        if (target instanceof MushroomCow mushroomCow && mushroomCow.isAdult()) {
             Material mushroomType = mushroomCow.getVariant() == MushroomCow.Variant.BROWN
                 ? Material.BROWN_MUSHROOM : Material.RED_MUSHROOM;
             for (int i = 0; i < 5; i++) {
