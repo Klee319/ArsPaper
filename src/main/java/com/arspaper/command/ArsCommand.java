@@ -330,7 +330,6 @@ public final class ArsCommand {
         int totalRegen = baseRegen + threadRegenBonus + enchantRegenBonus + armorRegenBonus;
 
         // === スレッド特殊ボーナス ===
-        int spellPower = pdc.getOrDefault(ManaKeys.THREAD_SPELL_POWER, PersistentDataType.INTEGER, 0);
         int costReduction = pdc.getOrDefault(ManaKeys.THREAD_COST_REDUCTION, PersistentDataType.INTEGER, 0);
 
         // === 表示 ===
@@ -363,12 +362,9 @@ public final class ArsCommand {
             player.sendMessage(Component.text("  エンチャント: +" + enchantRegenBonus, NamedTextColor.GRAY));
 
         // スレッド特殊
-        if (spellPower > 0 || costReduction > 0) {
+        if (costReduction > 0) {
             player.sendMessage(Component.text("特殊: ", NamedTextColor.LIGHT_PURPLE));
-            if (spellPower > 0)
-                player.sendMessage(Component.text("  スペル威力: +" + spellPower + "%", NamedTextColor.GRAY));
-            if (costReduction > 0)
-                player.sendMessage(Component.text("  コスト削減: -" + costReduction + "%", NamedTextColor.GRAY));
+            player.sendMessage(Component.text("  コスト削減: -" + costReduction + "%", NamedTextColor.GRAY));
         }
 
         return 1;
