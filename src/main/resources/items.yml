@@ -186,6 +186,7 @@ items:
         C: PRISMARINE_CRYSTAL
         D: DIAMOND_BLOCK
         A: COPPER_BLOCK
+      result: TRIDENT
 
 
 
@@ -369,7 +370,7 @@ items:
       pedestal-items:
         - "ENDER_PEARL x2"
         - "custom:source_gem x2"
-        - "CHORUS_FLUIT x2"
+        - "CHORUS_FRUIT x2"
         - "LAPIS_BLOCK x2"
       source: 600
       result: "custom:teleport_compass"
