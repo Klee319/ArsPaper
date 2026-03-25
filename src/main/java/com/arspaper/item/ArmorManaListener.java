@@ -268,6 +268,9 @@ public class ArmorManaListener implements Listener {
      */
     private static final java.util.Set<java.util.UUID> flightThreadPlayers =
         java.util.concurrent.ConcurrentHashMap.newKeySet();
+    /** allowFlight再有効化の重複防止フラグ */
+    private static final java.util.Set<java.util.UUID> glideCooldown =
+        java.util.concurrent.ConcurrentHashMap.newKeySet();
     private boolean flightTaskStarted = false;
     private BukkitTask flightTask;
 
@@ -331,12 +334,26 @@ public class ArmorManaListener implements Listener {
                     if (p.isGliding()) {
                         p.setFallDistance(0f);
                     }
-                    // 滑空中でなければallowFlightを維持（ジャンプキー検出用）
-                    // 滑空中にallowFlight=trueにすると滑空が解除されるため除外
-                    if (!p.isGliding() && !p.isOnGround() && !p.getAllowFlight()
+                    // allowFlight維持（ジャンプキー検出用: 滑空開始/停止の両方に必要）
+                    if (!p.isOnGround() && !p.getAllowFlight()
                             && p.getGameMode() != org.bukkit.GameMode.CREATIVE
                             && p.getGameMode() != org.bukkit.GameMode.SPECTATOR) {
-                        p.setAllowFlight(true);
+                        // 滑空中は2tick後に再有効化（即座に設定すると滑空が解除される）
+                        if (p.isGliding()) {
+                            if (!glideCooldown.contains(p.getUniqueId())) {
+                                glideCooldown.add(p.getUniqueId());
+                                org.bukkit.Bukkit.getScheduler().runTaskLater(
+                                    ArsPaper.getInstance(), () -> {
+                                        glideCooldown.remove(p.getUniqueId());
+                                        if (p.isOnline() && p.isGliding()
+                                                && flightThreadPlayers.contains(p.getUniqueId())) {
+                                            p.setAllowFlight(true);
+                                        }
+                                    }, 2L);
+                            }
+                        } else {
+                            p.setAllowFlight(true);
+                        }
                     }
                 }
             }, 0L, 1L);
@@ -361,11 +378,16 @@ public class ArmorManaListener implements Listener {
         if (player.getGameMode() == org.bukkit.GameMode.CREATIVE
                 || player.getGameMode() == org.bukkit.GameMode.SPECTATOR) return;
 
-        // クリエイティブ飛行をキャンセルし、代わりに滑空を開始
         event.setCancelled(true);
         player.setAllowFlight(false);
         player.setFlying(false);
-        if (!player.isOnGround()) {
+
+        if (player.isGliding()) {
+            // 滑空中にジャンプキー → 滑空解除
+            player.setGliding(false);
+            player.setFallDistance(0f);
+        } else if (!player.isOnGround()) {
+            // 非滑空中にジャンプキー → 滑空開始
             player.setGliding(true);
             player.setFallDistance(0f);
         }
