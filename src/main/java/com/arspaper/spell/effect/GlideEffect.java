@@ -111,9 +111,13 @@ public class GlideEffect implements SpellEffect, Listener {
 
         glidingPlayers.add(player.getUniqueId());
 
-        // 空中にいる場合は即座に滑空開始
+        // 空中にいる場合は滑空開始（1tick遅延で地面判定のタイミング問題を回避）
         if (!player.isOnGround()) {
-            player.setGliding(true);
+            org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (player.isOnline() && !player.isOnGround() && glidingPlayers.contains(player.getUniqueId())) {
+                    player.setGliding(true);
+                }
+            }, 1L);
         }
 
         player.sendActionBar(Component.text("滑空モード有効", NamedTextColor.AQUA));

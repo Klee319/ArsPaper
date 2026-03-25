@@ -362,11 +362,15 @@ public class ArmorManaListener implements Listener {
 
         // クリエイティブ飛行をキャンセルし、代わりに滑空を開始
         event.setCancelled(true);
-        player.setAllowFlight(false); // 飛行許可を一旦解除（次tick以降のタスクで再付与）
-        if (!player.isOnGround() && !player.isGliding()) {
-            player.setGliding(true);
-            player.setFallDistance(0f);
-        }
+        player.setAllowFlight(false);
+        // 1tick遅延で滑空開始（崖から歩いて落ちた場合のisOnGround()タイミング問題を回避）
+        org.bukkit.Bukkit.getScheduler().runTaskLater(ArsPaper.getInstance(), () -> {
+            if (!player.isOnline() || !flightThreadPlayers.contains(player.getUniqueId())) return;
+            if (!player.isOnGround() && !player.isGliding()) {
+                player.setGliding(true);
+                player.setFallDistance(0f);
+            }
+        }, 1L);
     }
 
     /**
