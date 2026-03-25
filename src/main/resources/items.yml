@@ -183,7 +183,7 @@ items:
         - "D  "
       ingredients:
         P: PRISMARINE_SHARD
-        C: PRISMARINE_CRYSTAL
+        C: PRISMARINE_CRYSTALS
         D: DIAMOND_BLOCK
         A: COPPER_BLOCK
       result: TRIDENT
@@ -379,7 +379,7 @@ items:
   # 既存アイテム儀式レシピの追加
   # 必要に応じてコメントアウトしてください
   # ==========================================================
-  enchanted_golden_apple:
+  エンチャントされた金リンゴ:
     recipe:
       method: ritual
       core-item: "APPLE"

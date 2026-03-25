@@ -331,8 +331,9 @@ public class ArmorManaListener implements Listener {
                     if (p.isGliding()) {
                         p.setFallDistance(0f);
                     }
-                    // ジャンプキーを受け取るためにsetAllowFlight(true)を維持
-                    if (!p.isOnGround() && !p.getAllowFlight()
+                    // 滑空中でなければallowFlightを維持（ジャンプキー検出用）
+                    // 滑空中にallowFlight=trueにすると滑空が解除されるため除外
+                    if (!p.isGliding() && !p.isOnGround() && !p.getAllowFlight()
                             && p.getGameMode() != org.bukkit.GameMode.CREATIVE
                             && p.getGameMode() != org.bukkit.GameMode.SPECTATOR) {
                         p.setAllowFlight(true);
@@ -363,14 +364,11 @@ public class ArmorManaListener implements Listener {
         // クリエイティブ飛行をキャンセルし、代わりに滑空を開始
         event.setCancelled(true);
         player.setAllowFlight(false);
-        // 1tick遅延で滑空開始（崖から歩いて落ちた場合のisOnGround()タイミング問題を回避）
-        org.bukkit.Bukkit.getScheduler().runTaskLater(ArsPaper.getInstance(), () -> {
-            if (!player.isOnline() || !flightThreadPlayers.contains(player.getUniqueId())) return;
-            if (!player.isOnGround() && !player.isGliding()) {
-                player.setGliding(true);
-                player.setFallDistance(0f);
-            }
-        }, 1L);
+        player.setFlying(false);
+        if (!player.isOnGround()) {
+            player.setGliding(true);
+            player.setFallDistance(0f);
+        }
     }
 
     /**
