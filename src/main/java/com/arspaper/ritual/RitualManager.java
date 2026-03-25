@@ -45,7 +45,7 @@ public class RitualManager {
      * 儀式の実行を試みる。
      */
     public void tryPerformRitual(Player player, Location coreLocation) {
-        // 排他制御
+        // 排他制御（Block座標のみで比較、yaw/pitchを除外）
         if (activatingRituals.contains(coreLocation.getBlock().getLocation())) {
             player.sendMessage(Component.text("儀式が進行中です！", NamedTextColor.YELLOW));
             return;
@@ -84,14 +84,19 @@ public class RitualManager {
 
         RitualRecipe recipe = matchOpt.get();
 
-        // Source残量チェック
+        // Source予約消費（TOCTOU防止: チェックと消費を一体化）
+        // アニメーション中に他の儀式がSourceを使い切るのを防ぐため、先に消費する
+        final boolean sourceReserved;
         if (recipe.sourceRequired() > 0) {
-            if (!hasEnoughSource(coreLocation, recipe.sourceRequired())) {
+            if (!consumeSourceFromNearby(coreLocation, recipe.sourceRequired())) {
                 player.sendMessage(Component.text(
                     "ソースが不足しています！必要量: " + recipe.sourceRequired(), NamedTextColor.RED));
                 player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, SoundCategory.PLAYERS, 1.0f, 0.5f);
                 return;
             }
+            sourceReserved = true;
+        } else {
+            sourceReserved = false;
         }
 
         // アニメーション付き儀式実行（3秒）
@@ -170,6 +175,7 @@ public class RitualManager {
                 Block revalidateBlock = coreLocation.getBlock();
                 if (!(revalidateBlock.getState() instanceof TileState revalidateCore)) {
                     player.sendMessage(Component.text("儀式が中断されました！", NamedTextColor.RED));
+                    refundSource(coreLocation, sourceReserved ? recipe.sourceRequired() : 0);
                     return;
                 }
                 RitualIngredient revalidateCoreItem = RitualCore.getCoreIngredient(revalidateCore);
@@ -181,17 +187,20 @@ public class RitualManager {
                 Optional<RitualRecipe> revalidateMatch = recipeRegistry.findMatch(revalidateCoreItem, revalidateIngredients);
                 if (revalidateMatch.isEmpty() || !revalidateMatch.get().equals(recipe)) {
                     player.sendMessage(Component.text("素材が変更されたため儀式が失敗しました！", NamedTextColor.RED));
+                    refundSource(coreLocation, sourceReserved ? recipe.sourceRequired() : 0);
                     return;
                 }
 
-                // Source消費
-                if (recipe.sourceRequired() > 0) {
-                    if (!consumeSourceFromNearby(coreLocation, recipe.sourceRequired())) {
-                        player.sendMessage(Component.text(
-                            "ソースが不足しています！", NamedTextColor.RED));
+                // エフェクトの事前検証（素材消費前にチェック）
+                if (!recipe.isCraftType()) {
+                    Optional<RitualEffect> preValidateEffect = effectRegistry.get(recipe.effectType());
+                    if (preValidateEffect.isPresent() && !preValidateEffect.get().validate(coreLocation, player, recipe)) {
+                        refundSource(coreLocation, sourceReserved ? recipe.sourceRequired() : 0);
                         return;
                     }
                 }
+
+                // Source消費は予約済み（アニメーション前に消費済み）
 
                 // Pedestalの素材を消費（再検証後のPedestalを使用）
                 consumePedestalItems(revalidatePedestals, recipe.pedestalItems());
@@ -201,8 +210,11 @@ public class RitualManager {
                     // world_effect / thread タイプ
                     Optional<RitualEffect> effectOpt = effectRegistry.get(recipe.effectType());
                     if (effectOpt.isPresent()) {
-                        // thread以外ではコアアイテムを消費
-                        if (recipe.coreItem() != null && !"thread".equals(recipe.effectType())) {
+                        // thread/enchant_book以外ではコアアイテムを消費
+                        // enchant_bookはエフェクト内で本の存在確認後に自身でクリアする
+                        if (recipe.coreItem() != null
+                                && !"thread".equals(recipe.effectType())
+                                && !"enchant_book".equals(recipe.effectType())) {
                             RitualCore.clearCoreItem(revalidateCore);
                         }
                         effectOpt.get().execute(coreLocation, player, recipe);
@@ -224,23 +236,57 @@ public class RitualManager {
 
                     // コアアイテムを消費（レシピがコアアイテムを要求する場合）
                     if (recipe.coreItem() != null) {
-                        // スペルブック/ワンド昇格の場合: 旧データを結果に転送
-                        if (recipe.isCustomResult() && (recipe.resultId().startsWith("spell_book_") || recipe.resultId().startsWith("wand_"))) {
-                            String oldSpellSlots = RitualCore.getStoredSpellSlots(revalidateCore);
-                            Integer oldSpellSlot = RitualCore.getStoredSpellSlot(revalidateCore);
-                            if (oldSpellSlots != null || oldSpellSlot != null) {
-                                result.editMeta(meta -> {
-                                    var pdc = meta.getPersistentDataContainer();
-                                    if (oldSpellSlots != null) {
-                                        pdc.set(ItemKeys.SPELL_SLOTS, PersistentDataType.STRING, oldSpellSlots);
+                        // アップグレード儀式: 旧アイテムのデータを結果に転送
+                        if (recipe.isCustomResult()) {
+                            String rid = recipe.resultId();
+                            if (rid.startsWith("spell_book_") || rid.startsWith("wand_")) {
+                                // スペルブック/ワンド: スペルデータ転送
+                                String oldSpellSlots = RitualCore.getStoredSpellSlots(revalidateCore);
+                                Integer oldSpellSlot = RitualCore.getStoredSpellSlot(revalidateCore);
+                                if (oldSpellSlots != null || oldSpellSlot != null) {
+                                    result.editMeta(meta -> {
+                                        var pdc = meta.getPersistentDataContainer();
+                                        if (oldSpellSlots != null) {
+                                            pdc.set(ItemKeys.SPELL_SLOTS, PersistentDataType.STRING, oldSpellSlots);
+                                        }
+                                        if (oldSpellSlot != null) {
+                                            pdc.set(ItemKeys.SPELL_SLOT, PersistentDataType.INTEGER, oldSpellSlot);
+                                        }
+                                    });
+                                }
+                            } else if (rid.startsWith("mage_")) {
+                                // 防具: スレッド・エンチャントを転送
+                                ItemStack oldItem = RitualCore.getStoredItem(revalidateCore);
+                                if (oldItem != null && oldItem.hasItemMeta()) {
+                                    var oldMeta = oldItem.getItemMeta();
+                                    var oldPdc = oldMeta.getPersistentDataContainer();
+
+                                    // スレッドスロット転送
+                                    String threadSlots = oldPdc.get(ItemKeys.THREAD_SLOTS, PersistentDataType.STRING);
+
+                                    // エンチャント転送（バニラ + カスタム両方）
+                                    var enchants = oldMeta.getEnchants();
+
+                                    if (threadSlots != null || !enchants.isEmpty()) {
+                                        result.editMeta(meta -> {
+                                            if (threadSlots != null) {
+                                                meta.getPersistentDataContainer().set(
+                                                    ItemKeys.THREAD_SLOTS, PersistentDataType.STRING, threadSlots);
+                                            }
+                                            for (var entry : enchants.entrySet()) {
+                                                meta.addEnchant(entry.getKey(), entry.getValue(), true);
+                                            }
+                                        });
                                     }
-                                    if (oldSpellSlot != null) {
-                                        pdc.set(ItemKeys.SPELL_SLOT, PersistentDataType.INTEGER, oldSpellSlot);
-                                    }
-                                });
+                                }
                             }
                         }
                         RitualCore.clearCoreItem(revalidateCore);
+                    }
+
+                    // 結果数量を適用
+                    if (recipe.resultAmount() > 1) {
+                        result.setAmount(recipe.resultAmount());
                     }
 
                     // 結果をドロップ
@@ -353,6 +399,28 @@ public class RitualManager {
             remaining -= consume;
         }
         return true;
+    }
+
+    /**
+     * 儀式失敗時にSourceを返還する。最寄りのSourceJarに追加。
+     */
+    private void refundSource(Location center, int amount) {
+        if (amount <= 0) return;
+        int remaining = amount;
+        int searchRadius = 5;
+        for (int x = -searchRadius; x <= searchRadius && remaining > 0; x++) {
+            for (int y = -2; y <= 2 && remaining > 0; y++) {
+                for (int z = -searchRadius; z <= searchRadius && remaining > 0; z++) {
+                    Block block = center.getBlock().getRelative(x, y, z);
+                    if (!(block.getState() instanceof TileState tileState)) continue;
+                    String blockId = tileState.getPersistentDataContainer()
+                        .get(BlockKeys.CUSTOM_BLOCK_ID, PersistentDataType.STRING);
+                    if (!"source_jar".equals(blockId)) continue;
+                    int added = SourceJar.addSource(tileState, remaining);
+                    remaining -= added;
+                }
+            }
+        }
     }
 
     private void consumePedestalItems(List<PedestalInfo> pedestals, List<RitualIngredient> requiredItems) {

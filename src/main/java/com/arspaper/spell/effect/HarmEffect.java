@@ -35,22 +35,39 @@ public class HarmEffect implements SpellEffect {
     public void applyToEntity(SpellContext context, LivingEntity target) {
         int durationLevel = context.getDurationLevel();
         if (durationLevel > 0) {
-            // ExtendTime付き: Poison付与
+            // ExtendTime付き: 継続ダメージ（DoT）付与
             int basePoisonSeconds = (int) config.getParam("harm", "base-poison-seconds", DEFAULT_BASE_POISON_SECONDS);
             int poisonSecondsPerDuration = (int) config.getParam("harm", "poison-seconds-per-duration", DEFAULT_POISON_SECONDS_PER_DURATION);
             int seconds = basePoisonSeconds + poisonSecondsPerDuration * durationLevel;
             int durationTicks = seconds * 20;
             int amplifier = Math.max(0, context.getAmplifyLevel());
+            // アンデッドMobはPoisonが無効 → WITHERで代替
+            PotionEffectType dotType = isUndead(target)
+                ? PotionEffectType.WITHER
+                : PotionEffectType.POISON;
             target.addPotionEffect(new PotionEffect(
-                PotionEffectType.POISON, durationTicks, amplifier, false, true, true));
+                dotType, durationTicks, amplifier, false, true, true));
         } else {
             // 通常: 直接ダメージ
             double baseDamage = config.getParam("harm", "base-damage", DEFAULT_BASE_DAMAGE);
             double amplifyBonus = config.getParam("harm", "amplify-bonus", DEFAULT_AMPLIFY_BONUS);
             double damage = Math.max(0, baseDamage + context.getAmplifyLevel() * amplifyBonus);
+            damage = context.calculateSpellDamage(damage, target);
             target.damage(damage, context.getCaster());
         }
         SpellFxUtil.spawnHarmFx(target.getLocation());
+    }
+
+    /**
+     * アンデッドMobかどうかを判定する。
+     * Paper 1.21+ではEntityCategory廃止のため、EntityTypeで直接判定。
+     */
+    private boolean isUndead(LivingEntity entity) {
+        return entity.getType().getKey().getKey().matches(
+            "zombie|skeleton|wither_skeleton|stray|husk|drowned|phantom|"
+            + "zombified_piglin|zoglin|wither|skeleton_horse|zombie_horse|"
+            + "zombie_villager|bogged"
+        );
     }
 
     @Override

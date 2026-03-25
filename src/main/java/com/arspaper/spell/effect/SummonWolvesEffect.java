@@ -75,10 +75,13 @@ public class SummonWolvesEffect implements SpellEffect {
                 w.setOwner(caster);
                 w.setPersistent(false);
 
-                // 召喚モブマーカー
+                // 召喚モブマーカー + 召喚者UUID
                 w.getPersistentDataContainer().set(
                     new NamespacedKey(plugin, "summoned"),
                     PersistentDataType.BYTE, (byte) 1);
+                w.getPersistentDataContainer().set(
+                    new NamespacedKey(plugin, "summoner_uuid"),
+                    PersistentDataType.STRING, caster.getUniqueId().toString());
                 w.customName(net.kyori.adventure.text.Component.text("召喚オオカミ")
                     .color(net.kyori.adventure.text.format.NamedTextColor.GREEN));
                 w.setCustomNameVisible(true);
@@ -120,6 +123,9 @@ public class SummonWolvesEffect implements SpellEffect {
 
     @Override
     public boolean handlesAoeInternally() { return true; }
+
+    @Override
+    public boolean allowsTraceRepeating() { return false; }
 
     @Override
     public NamespacedKey getId() { return id; }

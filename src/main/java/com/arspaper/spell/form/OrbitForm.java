@@ -22,7 +22,7 @@ import java.util.UUID;
  * クールダウン付きで繰り返し発動する。
  *
  * Split: オーブ数増加（最大5）
- * Accelerate: 回転速度↑、持続時間↑
+ * Accelerate: 回転速度↑
  * Decelerate: 回転速度↓
  */
 public class OrbitForm implements SpellForm {
@@ -50,11 +50,11 @@ public class OrbitForm implements SpellForm {
         SpellFxUtil.playCastSound(caster);
 
         int orbCount = Math.min(3 + context.getSplitCount(), MAX_ORBS);
-        int amplifyLevel = context.getAmplifyLevel(); // 増幅:発動頻度↑ / 減少:頻度↓
+        double accel = context.getAcceleration(); // 加速:回転速度↑ / 減速:回転速度↓
         int durationLevel = context.getDurationLevel(); // ExtendTime(+) / DurationDown(-)
         int totalDuration = Math.max(1, BASE_DURATION_TICKS
             + durationLevel * EXTEND_DURATION_BONUS);
-        double angularSpeed = BASE_ANGULAR_SPEED * (1.0 + amplifyLevel * 0.3);
+        double angularSpeed = BASE_ANGULAR_SPEED * (1.0 + accel * 0.3);
 
         double radius = ORBIT_RADIUS + context.getAoeRadiusLevel() * 1.0;
 

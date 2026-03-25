@@ -39,7 +39,10 @@ public class SenseMagicEffect implements SpellEffect {
         int durationLevel = context.getDurationLevel();
         int amplifyLevel = Math.max(0, context.getAmplifyLevel());
 
-        int durationTicks = Math.max(1, BASE_DURATION_TICKS + durationLevel * DURATION_PER_LEVEL_TICKS);
+        int baseDuration = (int) config.getParam("sense_magic", "base-duration-ticks", (double) BASE_DURATION_TICKS);
+        int durationPerLevel = (int) config.getParam("sense_magic", "duration-per-level", (double) DURATION_PER_LEVEL_TICKS);
+        int nightVisionBase = (int) config.getParam("sense_magic", "night-vision-duration-ticks", (double) NIGHT_VISION_DURATION_TICKS);
+        int durationTicks = Math.max(1, baseDuration + durationLevel * durationPerLevel);
 
         // GLOWING効果を付与（魔力感知の核心）
         target.addPotionEffect(new PotionEffect(
@@ -47,7 +50,7 @@ public class SenseMagicEffect implements SpellEffect {
 
         // NIGHT_VISION を付与（短時間の暗視）
         target.addPotionEffect(new PotionEffect(
-            PotionEffectType.NIGHT_VISION, NIGHT_VISION_DURATION_TICKS + durationLevel * DURATION_PER_LEVEL_TICKS,
+            PotionEffectType.NIGHT_VISION, nightVisionBase + durationLevel * durationPerLevel,
             0, false, true, true));
 
         spawnSenseMagicFx(target.getLocation());

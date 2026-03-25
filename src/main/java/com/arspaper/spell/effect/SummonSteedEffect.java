@@ -20,9 +20,10 @@ import org.bukkit.plugin.java.JavaPlugin;
  */
 public class SummonSteedEffect implements SpellEffect {
 
-    private static final int BASE_DURATION_TICKS = 600;       // 30秒
-    private static final int DURATION_PER_LEVEL = 200;        // ExtendTimeごと +10秒
+    private static final int BASE_DURATION_TICKS = 1200;      // 60秒
+    private static final int DURATION_PER_LEVEL = 600;        // ExtendTimeごと +30秒
     private static final double SPEED_BOOST_PER_AMPLIFY = 0.05;
+    private static final int DEFAULT_MAX_SPEED_LEVEL = 3;
     private final NamespacedKey id;
     private final GlyphConfig config;
     private final JavaPlugin plugin;
@@ -47,7 +48,9 @@ public class SummonSteedEffect implements SpellEffect {
         Player caster = context.getCaster();
         if (caster == null) return;
 
-        int duration = Math.max(1, BASE_DURATION_TICKS + context.getDurationLevel() * DURATION_PER_LEVEL);
+        int baseDuration = (int) config.getParam("summon_steed", "base-duration-ticks", (double) BASE_DURATION_TICKS);
+        int durationPerLevel = (int) config.getParam("summon_steed", "duration-per-level", (double) DURATION_PER_LEVEL);
+        int duration = Math.max(1, baseDuration + context.getDurationLevel() * durationPerLevel);
         int amplifyLevel = context.getAmplifyLevel();
 
         Horse horse = location.getWorld().spawn(location, Horse.class, h -> {
@@ -55,10 +58,13 @@ public class SummonSteedEffect implements SpellEffect {
             h.setOwner(caster);
             h.setPersistent(false);
 
-            // 召喚モブマーカー
+            // 召喚モブマーカー + 召喚者UUID
             h.getPersistentDataContainer().set(
                 new NamespacedKey(plugin, "summoned"),
                 PersistentDataType.BYTE, (byte) 1);
+            h.getPersistentDataContainer().set(
+                new NamespacedKey(plugin, "summoner_uuid"),
+                PersistentDataType.STRING, caster.getUniqueId().toString());
 
             h.customName(net.kyori.adventure.text.Component.text("召喚馬")
                 .color(net.kyori.adventure.text.format.NamedTextColor.GREEN));
@@ -67,13 +73,15 @@ public class SummonSteedEffect implements SpellEffect {
             // サドル装備
             h.getInventory().setSaddle(new ItemStack(Material.SADDLE));
 
-            // Amplifyによるスピードブースト（最大3段階）
-            int clampedAmplify = Math.min(Math.max(0, amplifyLevel), 3);
+            // Amplifyによるスピードブースト（最大設定可能）
+            int maxSpeedLevel = (int) config.getParam("summon_steed", "max-speed-level", (double) DEFAULT_MAX_SPEED_LEVEL);
+            int clampedAmplify = Math.min(Math.max(0, amplifyLevel), maxSpeedLevel);
             if (clampedAmplify > 0) {
                 AttributeInstance speedAttr = h.getAttribute(Attribute.MOVEMENT_SPEED);
                 if (speedAttr != null) {
+                    double speedBoost = config.getParam("summon_steed", "speed-boost-per-amplify", SPEED_BOOST_PER_AMPLIFY);
                     double baseSpeed = speedAttr.getBaseValue();
-                    speedAttr.setBaseValue(baseSpeed + SPEED_BOOST_PER_AMPLIFY * clampedAmplify);
+                    speedAttr.setBaseValue(baseSpeed + speedBoost * clampedAmplify);
                 }
             }
         });
@@ -109,6 +117,9 @@ public class SummonSteedEffect implements SpellEffect {
 
     @Override
     public boolean handlesAoeInternally() { return true; }
+
+    @Override
+    public boolean allowsTraceRepeating() { return false; }
 
     @Override
     public NamespacedKey getId() { return id; }

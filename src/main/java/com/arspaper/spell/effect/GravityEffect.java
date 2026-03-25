@@ -53,7 +53,9 @@ public class GravityEffect implements SpellEffect {
             // バニラ互換でSLOW_FALLINGを強制除去 + 下方向速度を継続的に押さえる手段として
             // MOVEMENT_SLOWDOWN (SLOWNESS) + 落下ダメージ増幅を組み合わせる
             target.removePotionEffect(PotionEffectType.SLOW_FALLING);
-            int durationTicks = GRAVITY_DURATION_BASE_TICKS + durationLevel * GRAVITY_DURATION_PER_LEVEL_TICKS;
+            int baseDurationTicks = (int) config.getParam("gravity", "gravity-duration-base-ticks", GRAVITY_DURATION_BASE_TICKS);
+            int durationPerLevel = (int) config.getParam("gravity", "gravity-duration-per-level-ticks", GRAVITY_DURATION_PER_LEVEL_TICKS);
+            int durationTicks = baseDurationTicks + durationLevel * durationPerLevel;
             int amplifier = Math.max(0, amplifyLevel);
             // WEAKNESS と SLOWNESS の組み合わせで重力効果を模倣
             target.addPotionEffect(new PotionEffect(
@@ -72,7 +74,9 @@ public class GravityEffect implements SpellEffect {
      * エンティティに下方向速度を付与する。
      */
     private void applyDownwardVelocity(LivingEntity target, int amplifyLevel) {
-        double downSpeed = BASE_PUSH_DOWN + amplifyLevel * AMPLIFY_PUSH_BONUS;
+        double basePush = config.getParam("gravity", "base-push-down", BASE_PUSH_DOWN);
+        double amplifyBonus = config.getParam("gravity", "amplify-push-bonus", AMPLIFY_PUSH_BONUS);
+        double downSpeed = basePush + amplifyLevel * amplifyBonus;
         Vector velocity = target.getVelocity();
         // 現在の横方向速度を維持しつつ、縦方向を強制的に下に
         target.setVelocity(new Vector(velocity.getX(), -downSpeed, velocity.getZ()));
@@ -99,7 +103,9 @@ public class GravityEffect implements SpellEffect {
 
         // ブロックをFallingBlockエンティティに変換
         block.setType(Material.AIR);
-        double downSpeed = BASE_PUSH_DOWN + context.getAmplifyLevel() * AMPLIFY_PUSH_BONUS;
+        double basePush = config.getParam("gravity", "base-push-down", BASE_PUSH_DOWN);
+        double amplifyBonus = config.getParam("gravity", "amplify-push-bonus", AMPLIFY_PUSH_BONUS);
+        double downSpeed = basePush + context.getAmplifyLevel() * amplifyBonus;
         FallingBlock fallingBlock = blockLocation.getWorld().spawn(
             blockLocation.clone().add(0.5, 0, 0.5),
             FallingBlock.class,

@@ -25,6 +25,7 @@ import org.bukkit.potion.PotionEffectType;
 public class FreezeEffect implements SpellEffect {
 
     private static final int DEFAULT_BASE_DURATION = 100; // 5秒
+    private static final int DEFAULT_DURATION_PER_LEVEL = 200; // 10秒/段
     private final NamespacedKey id;
     private final GlyphConfig config;
 
@@ -35,7 +36,9 @@ public class FreezeEffect implements SpellEffect {
 
     @Override
     public void applyToEntity(SpellContext context, LivingEntity target) {
-        int duration = (int) config.getParam("freeze", "base-duration", DEFAULT_BASE_DURATION) + context.getDurationTicks();
+        int baseDuration = (int) config.getParam("freeze", "base-duration", DEFAULT_BASE_DURATION);
+        int durationPerLevel = (int) config.getParam("freeze", "duration-per-level", DEFAULT_DURATION_PER_LEVEL);
+        int duration = baseDuration + context.getDurationLevel() * durationPerLevel;
         int amplifier = Math.max(0, context.getAmplifyLevel());
 
         target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, duration, Math.max(0, amplifier)));

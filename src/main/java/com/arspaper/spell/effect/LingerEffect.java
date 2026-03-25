@@ -62,7 +62,11 @@ public class LingerEffect implements SpellEffect {
         Player caster = context.getCaster();
         if (caster == null) return;
 
-        int duration = Math.max(1, BASE_DURATION_TICKS + context.getDurationLevel() * DURATION_BONUS_PER_LEVEL);
+        double zoneRadius = config.getParam("linger", "zone-radius", ZONE_RADIUS);
+        int baseDuration = (int) config.getParam("linger", "base-duration-ticks", BASE_DURATION_TICKS);
+        int durationBonus = (int) config.getParam("linger", "duration-bonus-per-level", DURATION_BONUS_PER_LEVEL);
+        int tickInterval = (int) config.getParam("linger", "zone-tick-interval", ZONE_TICK_INTERVAL);
+        int duration = Math.max(1, baseDuration + context.getDurationLevel() * durationBonus);
 
         final BukkitTask[] taskHolder = new BukkitTask[1];
         taskHolder[0] = new BukkitRunnable() {
@@ -70,7 +74,7 @@ public class LingerEffect implements SpellEffect {
 
             @Override
             public void run() {
-                elapsed += ZONE_TICK_INTERVAL;
+                elapsed += tickInterval;
 
                 if (elapsed > duration || !caster.isOnline()) {
                     cancel();
@@ -80,17 +84,19 @@ public class LingerEffect implements SpellEffect {
 
                 spawnZoneParticles(center);
 
-                // ゾーン内エンティティに効果適用（キャスターは除外）
-                for (LivingEntity entity : center.getWorld().getNearbyLivingEntities(center, ZONE_RADIUS)) {
+                // ゾーン内エンティティに効果適用（キャスターは除外、最大16体）
+                int entityCount = 0;
+                for (LivingEntity entity : center.getWorld().getNearbyLivingEntities(center, zoneRadius)) {
                     if (entity.equals(caster)) continue;
                     if (!context.isValidAoeTarget(entity, caster)) continue;
                     applyRemainingEffects(context, entity, remainingEffects, remainingAugments);
+                    if (++entityCount >= 16) break;
                 }
 
                 // 中心ブロックに効果適用
                 applyRemainingBlockEffects(context, center, remainingEffects, remainingAugments);
             }
-        }.runTaskTimer(plugin, 0L, ZONE_TICK_INTERVAL);
+        }.runTaskTimer(plugin, 0L, tickInterval);
 
         activeZones.add(taskHolder[0]);
     }
@@ -154,7 +160,12 @@ public class LingerEffect implements SpellEffect {
 
         // Player強参照を避けるためUUIDを保持
         final java.util.UUID casterUuid = caster.getUniqueId();
-        int duration = Math.max(1, BASE_DURATION_TICKS + context.getDurationLevel() * DURATION_BONUS_PER_LEVEL);
+        GlyphConfig glyphConfig = ArsPaper.getInstance().getGlyphConfig();
+        double zoneRadius = glyphConfig.getParam("linger", "zone-radius", ZONE_RADIUS);
+        int baseDuration = (int) glyphConfig.getParam("linger", "base-duration-ticks", BASE_DURATION_TICKS);
+        int durationBonus = (int) glyphConfig.getParam("linger", "duration-bonus-per-level", DURATION_BONUS_PER_LEVEL);
+        int tickInterval = (int) glyphConfig.getParam("linger", "zone-tick-interval", ZONE_TICK_INTERVAL);
+        int duration = Math.max(1, baseDuration + context.getDurationLevel() * durationBonus);
 
         final BukkitTask[] taskHolder = new BukkitTask[1];
         taskHolder[0] = new BukkitRunnable() {
@@ -162,7 +173,7 @@ public class LingerEffect implements SpellEffect {
 
             @Override
             public void run() {
-                elapsed += ZONE_TICK_INTERVAL;
+                elapsed += tickInterval;
 
                 Player onlineCaster = org.bukkit.Bukkit.getPlayer(casterUuid);
                 if (elapsed > duration || onlineCaster == null || !onlineCaster.isOnline()) {
@@ -173,8 +184,9 @@ public class LingerEffect implements SpellEffect {
 
                 spawnZoneParticles(center);
 
-                // ゾーン内エンティティに効果適用（キャスターは除外）
-                for (LivingEntity entity : center.getWorld().getNearbyLivingEntities(center, ZONE_RADIUS)) {
+                // ゾーン内エンティティに効果適用（キャスターは除外、最大16体）
+                int entityCount = 0;
+                for (LivingEntity entity : center.getWorld().getNearbyLivingEntities(center, zoneRadius)) {
                     if (entity.equals(onlineCaster)) continue;
                     if (!context.isValidAoeTarget(entity, onlineCaster)) continue;
                     for (int i = 0; i < remainingEffects.size(); i++) {
@@ -185,6 +197,7 @@ public class LingerEffect implements SpellEffect {
                         }
                         remainingEffects.get(i).applyToEntity(ctx, entity);
                     }
+                    if (++entityCount >= 16) break;
                 }
 
                 // 中心ブロックに効果適用
@@ -197,14 +210,19 @@ public class LingerEffect implements SpellEffect {
                     remainingEffects.get(i).applyToBlock(ctx, center.getBlock().getLocation());
                 }
             }
-        }.runTaskTimer(plugin, 0L, ZONE_TICK_INTERVAL);
+        }.runTaskTimer(plugin, 0L, tickInterval);
 
         activeZones.add(taskHolder[0]);
     }
 
     public int calculateDuration(SpellContext context) {
-        return Math.max(1, BASE_DURATION_TICKS + context.getDurationLevel() * DURATION_BONUS_PER_LEVEL);
+        int baseDuration = (int) config.getParam("linger", "base-duration-ticks", BASE_DURATION_TICKS);
+        int durationBonus = (int) config.getParam("linger", "duration-bonus-per-level", DURATION_BONUS_PER_LEVEL);
+        return Math.max(1, baseDuration + context.getDurationLevel() * durationBonus);
     }
+
+    @Override
+    public boolean allowsTraceRepeating() { return false; }
 
     @Override
     public NamespacedKey getId() { return id; }

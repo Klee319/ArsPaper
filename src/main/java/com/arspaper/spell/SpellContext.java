@@ -3,6 +3,7 @@ package com.arspaper.spell;
 import com.arspaper.ArsPaper;
 import com.arspaper.spell.effect.LingerEffect;
 import com.arspaper.spell.effect.RuneEffect;
+import com.arspaper.util.WorldGuardHelper;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.LivingEntity;
@@ -57,6 +58,8 @@ public class SpellContext {
     private int delayTicks = 0;             // 遅延ティック
     private int rapidFireLevel = 0;         // 連射レベル（CT短縮）
     private boolean traceActive = false;     // 軌跡（経路上に効果適用）
+    private boolean propagateActive = false; // 伝播（ブロック着弾時に周辺エンティティにも適用）
+    private int reachLevel = 0;              // 延伸（射程/距離延長）
 
     // Form-augment用（ProjectileForm等が参照）
     private double projectileSpeedMultiplier = 1.0;
@@ -143,16 +146,50 @@ public class SpellContext {
     public int getDurationTicks() { return durationLevel * 200; }
 
     /**
-     * スレッドによるスペル威力倍率を返す。
-     * @return 1.0 + (スペルパワー% / 100)。例: 15% → 1.15
+     * スペルダメージを攻撃力上昇/弱体化/耐性で補正して返す。
+     * 1レベルにつき10%の乗算。
+     *
+     * @param baseDamage 基本ダメージ（Amplify等で計算済み）
+     * @param target ダメージ対象
+     * @return 補正後ダメージ（最低0）
      */
-    public double getSpellPowerMultiplier() {
+    public double calculateSpellDamage(double baseDamage, LivingEntity target) {
+        double damage = baseDamage;
         Player caster = getCaster();
-        if (caster == null) return 1.0;
-        int spellPower = caster.getPersistentDataContainer()
-            .getOrDefault(com.arspaper.mana.ManaKeys.THREAD_SPELL_POWER,
-                org.bukkit.persistence.PersistentDataType.INTEGER, 0);
-        return 1.0 + spellPower / 100.0;
+
+        // キャスターの攻撃力上昇: +10%/lv (乗算)
+        if (caster != null) {
+            org.bukkit.potion.PotionEffect strength = caster.getPotionEffect(
+                org.bukkit.potion.PotionEffectType.STRENGTH);
+            if (strength != null) {
+                damage *= 1.0 + (strength.getAmplifier() + 1) * 0.1;
+            }
+            // キャスターの弱体化: -10%/lv (乗算)
+            org.bukkit.potion.PotionEffect weakness = caster.getPotionEffect(
+                org.bukkit.potion.PotionEffectType.WEAKNESS);
+            if (weakness != null) {
+                damage *= Math.max(0, 1.0 - (weakness.getAmplifier() + 1) * 0.1);
+            }
+        }
+
+        // ターゲットの耐性: -10%/lv (乗算)
+        if (target != null) {
+            org.bukkit.potion.PotionEffect resistance = target.getPotionEffect(
+                org.bukkit.potion.PotionEffectType.RESISTANCE);
+            if (resistance != null) {
+                damage *= Math.max(0, 1.0 - (resistance.getAmplifier() + 1) * 0.1);
+            }
+        }
+
+        return Math.max(0, damage);
+    }
+
+    /**
+     * @deprecated spell_power スレッド削除済み。常に1.0を返す。
+     */
+    @Deprecated
+    public double getSpellPowerMultiplier() {
+        return 1.0;
     }
 
     // === Acceleration ===
@@ -206,6 +243,12 @@ public class SpellContext {
     public boolean isTraceActive() { return traceActive; }
     public void setTraceActive(boolean traceActive) { this.traceActive = traceActive; }
 
+    public boolean isPropagateActive() { return propagateActive; }
+    public void setPropagateActive(boolean propagateActive) { this.propagateActive = propagateActive; }
+
+    public int getReachLevel() { return reachLevel; }
+    public void setReachLevel(int reachLevel) { this.reachLevel = reachLevel; }
+
     /**
      * コンテキストコピー（Split等で独立コンテキストが必要な場合）。
      */
@@ -217,6 +260,8 @@ public class SpellContext {
         copy.aoeVerticalLevel = this.aoeVerticalLevel;
         copy.aoeRadiusLevel = this.aoeRadiusLevel;
         copy.traceActive = this.traceActive;
+        copy.propagateActive = this.propagateActive;
+        copy.reachLevel = this.reachLevel;
         copy.hitFace = this.hitFace;
         copy.durationLevel = this.durationLevel;
         copy.acceleration = this.acceleration;
@@ -231,6 +276,8 @@ public class SpellContext {
         copy.lingerPattern = this.lingerPattern;
         copy.delayTicks = this.delayTicks;
         copy.rapidFireLevel = this.rapidFireLevel;
+        copy.dampenAccum = this.dampenAccum;
+        copy.durationDownAccum = this.durationDownAccum;
         return copy;
     }
 
@@ -360,6 +407,9 @@ public class SpellContext {
         Player caster = getCaster();
         if (caster == null) return;
 
+        // PVPチェックはisValidAoeTarget()とEntityDamageEvent(WorldGuard等)で処理。
+        // ここではブロックしない（回復スペルが味方に効かなくなるため）。
+
         List<EffectGroup> groups = buildEffectGroups();
         resolveGroupsOnEntity(groups, 0, target);
     }
@@ -446,6 +496,26 @@ public class SpellContext {
     }
 
     /**
+     * 軌跡モード用: 飛行経路上のブロックにEffectチェーンを実行する。
+     * allowsTraceRepeating() == false のエフェクトはスキップする。
+     */
+    public void resolveOnBlockTrace(Location blockLocation) {
+        Player caster = getCaster();
+        if (caster == null) return;
+
+        List<EffectGroup> groups = buildEffectGroups();
+        for (EffectGroup group : groups) {
+            if (!group.effect.allowsTraceRepeating()) continue;
+            resetAugmentState();
+            for (SpellAugment aug : group.augments) {
+                aug.modify(this);
+            }
+            group.effect.applyToBlock(this, blockLocation);
+        }
+        resetAugmentState();
+    }
+
+    /**
      * ヒット対象にEffectチェーンを実行する（ブロック対象）。
      */
     public void resolveOnBlock(Location blockLocation) {
@@ -458,6 +528,7 @@ public class SpellContext {
 
     private void resolveGroupsOnBlock(List<EffectGroup> groups, int startIndex, Location blockLocation) {
         Player caster = getCaster();
+        if (caster == null) return;
 
         for (int i = startIndex; i < groups.size(); i++) {
             EffectGroup group = groups.get(i);
@@ -506,15 +577,6 @@ public class SpellContext {
                 }
             }
 
-            // 設置系: 設置予定位置のいずれかにキャスター自身がいたらスペル全体をキャンセル
-            if (group.effect.getAoeMode() == SpellEffect.AoeMode.HIT_FACE_OUTWARD && caster != null) {
-                if (isPlacementBlockedByCaster(caster, effectBlockLoc, blockLocation)) {
-                    caster.sendActionBar(net.kyori.adventure.text.Component.text(
-                        "§c設置先に自分がいます"));
-                    return;
-                }
-            }
-
             // Linger増強: 後続グループをゾーンで定期適用（Rune以外の効果用）
             if (lingerPattern) {
                 group.effect.applyToBlock(this, effectBlockLoc);
@@ -523,6 +585,18 @@ public class SpellContext {
             }
 
             group.effect.applyToBlock(this, effectBlockLoc);
+
+            // === 伝播: ブロック着弾時に周辺エンティティにもエフェクト適用 ===
+            if (propagateActive) {
+                double propagateRadius = Math.max(2.0, aoeRadiusLevel + 2.0);
+                Location center = effectBlockLoc.clone().add(0.5, 0.5, 0.5);
+                if (caster != null) {
+                    center.getNearbyLivingEntities(propagateRadius).stream()
+                        .filter(e -> !e.equals(caster))
+                        .filter(e -> isValidAoeTarget(e, caster))
+                        .forEach(e -> group.effect.applyToEntity(this, e));
+                }
+            }
 
             // === AOE展開（新3軸: 幅/上下/奥行き + 壁グリフ） ===
             if (!group.effect.handlesAoeInternally()) {
@@ -557,28 +631,16 @@ public class SpellContext {
                         int rX = fwdZ ? 1 : 0;
                         int rZ = fwdZ ? 0 : 1;
                         int dY = depthSign * face.getDirection().getBlockY();
-                        boolean outward = !inward;
 
                         for (int w = -width; w <= width; w++) {
                             for (int h = -height; h <= height; h++) {
                                 for (int d = 0; d <= depth; d++) {
-                                    if (w == 0 && h == 0 && d == 0) continue;
+                                    if (w == 0 && h == 0 && d == 0) continue; // 中心は既に処理済
                                     int dx = rX * w + fX * h;
                                     int dz = rZ * w + fZ * h;
-
-                                    if (outward && dY > 0) {
-                                        // 設置系 + 上面ヒット: 各XZ位置で地表に合わせる
-                                        Location columnBase = aoeLoc.clone().add(dx, 0, dz);
-                                        Location surfaceLoc = findSurfaceUp(columnBase, aoeLoc.getBlockY());
-                                        if (surfaceLoc == null) continue; // 既にブロックがある
-                                        Location placeLoc = surfaceLoc.clone().add(0, d, 0);
-                                        if (!placeLoc.getBlock().getType().isAir()) continue;
-                                        group.effect.applyToBlock(this, placeLoc);
-                                    } else {
-                                        int dy = dY * d;
-                                        group.effect.applyToBlock(this,
-                                            aoeLoc.clone().add(dx, dy, dz));
-                                    }
+                                    int dy = dY * d;
+                                    group.effect.applyToBlock(this,
+                                        aoeLoc.clone().add(dx, dy, dz));
                                 }
                             }
                         }
@@ -628,52 +690,20 @@ public class SpellContext {
     }
 
     /**
-     * 設置系エフェクトの設置予定位置にキャスター自身がいるかチェック。
-     * 起点ブロック位置のみ簡易チェック（AOE展開位置は起点から広がるため、
-     * キャスターが起点にいればほぼ確実に重なる）。
+     * PVP対象として有効かチェックする。
+     * ワールドPVPフラグ、config設定、WorldGuardリージョンフラグを確認。
      */
-    /**
-     * 指定XZ位置で基準Y付近の地表（空気ブロック）を探す。
-     * 基準Yから上下3ブロック以内で探索。
-     * 空気ブロックが見つからない（全てソリッド）場合はnullを返す。
-     */
-    private Location findSurfaceUp(Location columnBase, int referenceY) {
-        // 基準Yから下に探索して最初のソリッドブロックの上面を見つける
-        for (int dy = 3; dy >= -3; dy--) {
-            Location check = columnBase.clone();
-            check.setY(referenceY + dy);
-            if (!check.getBlock().getType().isAir()) {
-                // このブロックの上が空気なら、そこが地表
-                Location above = check.clone().add(0, 1, 0);
-                if (above.getBlock().getType().isAir()) {
-                    return above;
-                }
-            }
-        }
-        // 全部空気の場合は基準Yをそのまま使用
-        Location fallback = columnBase.clone();
-        fallback.setY(referenceY);
-        if (fallback.getBlock().getType().isAir()) {
-            return fallback;
-        }
-        return null; // 設置不可
-    }
-
-    private boolean isPlacementBlockedByCaster(Player caster, Location effectBlockLoc, Location blockLocation) {
-        // 起点チェック
-        if (SpellFxUtil.isPlayerOccupying(effectBlockLoc, caster)) return true;
-        // 元のヒットブロック位置もチェック（隣接変換前）
-        if (SpellFxUtil.isPlayerOccupying(blockLocation, caster)) return true;
-        return false;
+    private boolean isValidPvPTarget(Player target) {
+        if (!target.getWorld().getPVP()) return false;
+        boolean pvpEnabled = ArsPaper.getInstance().getConfig().getBoolean("pvp.enabled", true);
+        if (!pvpEnabled) return false;
+        return WorldGuardHelper.isPvPAllowed(target.getLocation());
     }
 
     public boolean isValidAoeTarget(LivingEntity entity, Player caster) {
         // PvP無効時はプレイヤーをスペル対象から除外
-        if (entity instanceof Player && entity != caster) {
-            boolean pvpEnabled = ArsPaper.getInstance().getConfig().getBoolean("pvp.enabled", true);
-            if (!pvpEnabled || !entity.getWorld().getPVP()) {
-                return false;
-            }
+        if (entity instanceof Player targetPlayer && targetPlayer != caster) {
+            if (!isValidPvPTarget(targetPlayer)) return false;
         }
         if (entity instanceof Tameable tameable && tameable.isTamed()) {
             if (caster.equals(tameable.getOwner())) return false;
@@ -713,6 +743,9 @@ public class SpellContext {
         wallPattern = false;
         lingerPattern = false;
         delayTicks = 0;
+        traceActive = false;
+        propagateActive = false;
+        reachLevel = 0;
         // rapidFireLevel はForm-levelのためリセットしない
     }
 }

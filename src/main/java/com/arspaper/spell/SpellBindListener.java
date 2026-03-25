@@ -1,6 +1,7 @@
 package com.arspaper.spell;
 
 import com.arspaper.ArsPaper;
+import com.arspaper.enchant.ArsEnchantments;
 import com.arspaper.item.ItemKeys;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -81,14 +82,70 @@ public class SpellBindListener implements Listener {
             return;
         }
 
-        ArsPaper.getInstance().getSpellCaster().cast(player, recipe);
+        // Lore遅延更新: スペル内容が変更されている場合にLoreを最新化
+        updateBindLore(item, recipe);
+
+        // スニーク+上を向いている場合はスペル構成を表示
+        if (player.isSneaking() && player.getLocation().getPitch() < -60) {
+            displaySpellComposition(player, recipe);
+            return;
+        }
+
+        // 共有エンチャントチェック: 魔導書にshareエンチャントがあればグリフチェックをスキップ
+        boolean sharedSpell = ArsEnchantments.hasShareEnchant(bookItem);
+        ArsPaper.getInstance().getSpellCaster().cast(player, recipe, sharedSpell);
+    }
+
+    /**
+     * スペル構成をチャットに表示する。
+     * Form=緑, Effect=黄, Augment=水色 で色分けし、日本語名で表示。
+     */
+    private void displaySpellComposition(Player player, SpellRecipe recipe) {
+        player.sendMessage(Component.text("━━━ スペル構成 ━━━", NamedTextColor.GOLD)
+            .decoration(TextDecoration.BOLD, true));
+        player.sendMessage(Component.text("名前: ", NamedTextColor.GRAY)
+            .append(Component.text(recipe.getName(), NamedTextColor.LIGHT_PURPLE)));
+        player.sendMessage(Component.text("マナ消費: ", NamedTextColor.GRAY)
+            .append(Component.text(recipe.getTotalManaCost(), NamedTextColor.AQUA)));
+
+        // グリフ構成を種別ごとに色分けして表示
+        Component glyphLine = Component.text("構成: ", NamedTextColor.GRAY);
+        boolean first = true;
+        for (SpellComponent comp : recipe.getComponents()) {
+            if (!first) {
+                glyphLine = glyphLine.append(Component.text(" → ", NamedTextColor.DARK_GRAY));
+            }
+            NamedTextColor color = switch (comp.getType()) {
+                case FORM -> NamedTextColor.GREEN;
+                case EFFECT -> NamedTextColor.YELLOW;
+                case AUGMENT -> NamedTextColor.AQUA;
+            };
+            glyphLine = glyphLine.append(Component.text(comp.getDisplayName(), color));
+            first = false;
+        }
+        player.sendMessage(glyphLine);
+        player.sendMessage(Component.text("━━━━━━━━━━━━━━", NamedTextColor.GOLD));
+
+        player.playSound(player.getLocation(), Sound.BLOCK_ENCHANTMENT_TABLE_USE, 0.3f, 1.8f);
     }
 
     /**
      * プレイヤーのインベントリから指定UUIDのスペルブックを検索する。
+     * 検索順: オフハンド → インベントリ右端から左端（スロット35→0）
      */
     private static ItemStack findBookByUuid(Player player, String uuid) {
-        for (ItemStack stack : player.getInventory().getContents()) {
+        // 1. オフハンド優先
+        ItemStack offhand = player.getInventory().getItemInOffHand();
+        if (offhand.hasItemMeta()) {
+            String bookUuid = offhand.getItemMeta().getPersistentDataContainer()
+                .get(ItemKeys.SPELL_BOOK_UUID, PersistentDataType.STRING);
+            if (uuid.equals(bookUuid)) return offhand;
+        }
+
+        // 2. インベントリを右端から検索（スロット35→0）
+        ItemStack[] contents = player.getInventory().getStorageContents();
+        for (int i = contents.length - 1; i >= 0; i--) {
+            ItemStack stack = contents[i];
             if (stack == null || !stack.hasItemMeta()) continue;
             String bookUuid = stack.getItemMeta().getPersistentDataContainer()
                 .get(ItemKeys.SPELL_BOOK_UUID, PersistentDataType.STRING);
@@ -112,7 +169,7 @@ public class SpellBindListener implements Listener {
                                      int spellSlot, SpellRecipe recipe) {
         if (!canBind(item)) {
             player.sendMessage(Component.text(
-                "エンチャント等のNBTを持つアイテムにはバインドできません", NamedTextColor.RED));
+                "このアイテムにはバインドできません", NamedTextColor.RED));
             player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
             return false;
         }
@@ -135,13 +192,13 @@ public class SpellBindListener implements Listener {
             lore.removeIf(line -> {
                 String plain = PlainTextComponentSerializer.plainText().serialize(line);
                 return plain.startsWith("スペル:") || plain.startsWith("マナ:")
-                    || plain.contains("魔導書を持っている必要があります");
+                    || plain.contains("魔導書") || plain.contains("オフハンド");
             });
             lore.add(Component.text("スペル: " + recipe.getName(), NamedTextColor.LIGHT_PURPLE)
                 .decoration(TextDecoration.ITALIC, false));
             lore.add(Component.text("マナ: " + recipe.getTotalManaCost(), NamedTextColor.AQUA)
                 .decoration(TextDecoration.ITALIC, false));
-            lore.add(Component.text("発動時には魔導書を持っている必要があります", NamedTextColor.GRAY)
+            lore.add(Component.text("魔導書必要", NamedTextColor.GRAY)
                 .decoration(TextDecoration.ITALIC, true));
             meta.lore(lore);
         });
@@ -176,7 +233,7 @@ public class SpellBindListener implements Listener {
                 lore.removeIf(line -> {
                     String plain = PlainTextComponentSerializer.plainText().serialize(line);
                     return plain.startsWith("スペル:") || plain.startsWith("マナ:")
-                        || plain.contains("魔導書を持っている必要があります");
+                        || plain.contains("魔導書");
                 });
                 meta.lore(lore.isEmpty() ? null : lore);
             }
@@ -188,31 +245,40 @@ public class SpellBindListener implements Listener {
     }
 
     /**
+     * バインド済みアイテムのLoreを最新のスペル内容で更新する（遅延更新）。
+     */
+    private static void updateBindLore(ItemStack item, SpellRecipe recipe) {
+        item.editMeta(meta -> {
+            List<Component> lore = meta.lore() != null ? new ArrayList<>(meta.lore()) : new ArrayList<>();
+            // 既存のバインド情報を除去
+            lore.removeIf(line -> {
+                String plain = PlainTextComponentSerializer.plainText().serialize(line);
+                return plain.startsWith("スペル:") || plain.startsWith("マナ:")
+                    || plain.contains("魔導書");
+            });
+            lore.add(Component.text("スペル: " + recipe.getName(), NamedTextColor.LIGHT_PURPLE)
+                .decoration(TextDecoration.ITALIC, false));
+            lore.add(Component.text("マナ: " + recipe.getTotalManaCost(), NamedTextColor.AQUA)
+                .decoration(TextDecoration.ITALIC, false));
+            lore.add(Component.text("魔導書必要", NamedTextColor.GRAY)
+                .decoration(TextDecoration.ITALIC, true));
+            meta.lore(lore);
+        });
+    }
+
+    /**
      * アイテムがバインド可能か判定。
-     * displayName以外のNBT（エンチャント、属性等）を持つアイテムはバインド不可。
+     * ArsPaperのカスタムアイテム（スペルブック等）のみバインド不可。
+     * エンチャント・属性修飾子・耐久値を持つアイテムにもバインド可能。
      */
     public static boolean canBind(ItemStack item) {
         if (item == null || item.getType().isAir()) return false;
 
-        // カスタムアイテムはバインド不可
+        // ArsPaperのカスタムアイテムはバインド不可（スペルブック/ワンド等）
         if (item.hasItemMeta()) {
             String customId = item.getItemMeta().getPersistentDataContainer()
                 .get(ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING);
             if (customId != null) return false;
-        }
-
-        // エンチャントがあるアイテムはバインド不可
-        if (!item.getEnchantments().isEmpty()) return false;
-
-        // ItemMetaの追加チェック
-        if (item.hasItemMeta()) {
-            ItemMeta meta = item.getItemMeta();
-            // 耐久値が変更されているアイテムは不可
-            if (meta instanceof org.bukkit.inventory.meta.Damageable damageable) {
-                if (damageable.getDamage() > 0) return false;
-            }
-            // 属性修飾子があるアイテムは不可
-            if (meta.hasAttributeModifiers()) return false;
         }
 
         return true;

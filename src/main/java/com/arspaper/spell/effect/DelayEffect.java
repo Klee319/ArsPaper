@@ -33,7 +33,9 @@ public class DelayEffect implements SpellEffect {
      * 遅延tickを計算する。SpellContextのresolve処理から呼ばれる。
      */
     public int calculateDelayTicks(SpellContext context) {
-        int delayTicks = BASE_DELAY_TICKS + context.getDurationLevel() * DURATION_BONUS_TICKS;
+        int baseDelay = (int) config.getParam("delay", "base-delay-ticks", BASE_DELAY_TICKS);
+        int durationBonus = (int) config.getParam("delay", "duration-bonus-ticks", DURATION_BONUS_TICKS);
+        int delayTicks = baseDelay + context.getDurationLevel() * durationBonus;
         if (context.isRandomizing()) {
             double variation = 1.0 + (Math.random() * 0.5 - 0.25); // ±25%
             delayTicks = (int) (delayTicks * variation);

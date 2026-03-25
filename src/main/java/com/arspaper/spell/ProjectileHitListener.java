@@ -34,7 +34,9 @@ public class ProjectileHitListener implements Listener {
             int pierceRemaining = getPierceRemaining(event);
 
             SpellFxUtil.spawnImpactBurst(target.getLocation());
-            context.resolveOnEntity(target);
+            // 貫通時にオリジナルcontextのForm-level状態(trace等)が破壊されるのを防止
+            SpellContext hitContext = context.copy();
+            hitContext.resolveOnEntity(target);
 
             if (pierceRemaining > 0) {
                 event.setCancelled(true);

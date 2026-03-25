@@ -14,8 +14,10 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.block.TileState;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.EnchantmentStorageMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 
@@ -23,10 +25,7 @@ import java.util.List;
 
 /**
  * エンチャント本クラフトの儀式 - コアに置いた本をカスタムエンチャント本に変換する。
- * PDCベースのカスタムエンチャント。アンビルではなく防具に直接右クリックで適用。
- * effect-params:
- *   enchantment: "mana_regen" or "mana_boost"
- *   level: "1"-"3"
+ * Paper Registry APIで登録されたエンチャントを使用し、EnchantmentStorageMetaに格納する。
  */
 public class EnchantBookRitualEffect implements RitualEffect {
 
@@ -40,8 +39,8 @@ public class EnchantBookRitualEffect implements RitualEffect {
             return;
         }
 
-        NamespacedKey enchantKey = ArsEnchantments.getKeyFromId(enchantId);
-        if (enchantKey == null) {
+        Enchantment enchant = ArsEnchantments.getFromId(enchantId);
+        if (enchant == null) {
             player.sendMessage(Component.text("不明なエンチャント: " + enchantId, NamedTextColor.RED));
             return;
         }
@@ -70,7 +69,7 @@ public class EnchantBookRitualEffect implements RitualEffect {
         String displayName = ArsEnchantments.getDisplayName(enchantId);
         String roman = ArsEnchantments.toRoman(level);
 
-        // PDCベースのエンチャント本を生成
+        // Bukkit APIベースのエンチャント本を生成
         ItemStack enchantedBook = new ItemStack(Material.ENCHANTED_BOOK);
         enchantedBook.editMeta(meta -> {
             meta.displayName(Component.text(displayName + " " + roman, NamedTextColor.LIGHT_PURPLE)
@@ -78,13 +77,17 @@ public class EnchantBookRitualEffect implements RitualEffect {
             meta.getPersistentDataContainer().set(
                 ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING, "enchant_book"
             );
-            meta.getPersistentDataContainer().set(enchantKey, PersistentDataType.INTEGER, level);
+
+            // EnchantmentStorageMetaにエンチャントを格納
+            if (meta instanceof EnchantmentStorageMeta storageMeta) {
+                storageMeta.addStoredEnchant(enchant, level, true);
+            }
 
             meta.lore(List.of(
                 Component.text(displayName + " " + roman, NamedTextColor.GRAY)
                     .decoration(TextDecoration.ITALIC, false),
                 Component.empty(),
-                Component.text("メイジアーマーに右クリックで適用", NamedTextColor.DARK_GRAY)
+                Component.text("金床でメイジアーマーに適用", NamedTextColor.DARK_GRAY)
                     .decoration(TextDecoration.ITALIC, false)
             ));
         });

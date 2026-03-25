@@ -28,13 +28,13 @@ public class BubbleEffect implements SpellEffect {
 
     @Override
     public void applyToEntity(SpellContext context, LivingEntity target) {
-        int duration = Math.max(1, BASE_DURATION_TICKS + context.getDurationLevel() * DURATION_PER_LEVEL);
-        int amplifier = Math.max(0, context.getAmplifyLevel());
-
+        int baseDuration = (int) config.getParam("bubble", "base-duration-ticks", BASE_DURATION_TICKS);
+        int durationPerLevel = (int) config.getParam("bubble", "duration-per-level", DURATION_PER_LEVEL);
+        int duration = Math.max(1, baseDuration + context.getDurationLevel() * durationPerLevel);
         target.addPotionEffect(new PotionEffect(
             PotionEffectType.WATER_BREATHING, duration, 0, false, true, true));
         target.addPotionEffect(new PotionEffect(
-            PotionEffectType.CONDUIT_POWER, duration, amplifier, false, true, true));
+            PotionEffectType.CONDUIT_POWER, duration, 0, false, true, true));
 
         spawnBubbleFx(target.getLocation());
     }

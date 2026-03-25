@@ -36,7 +36,9 @@ public class RewindEffect implements SpellEffect {
     @Override
     public void applyToEntity(SpellContext context, LivingEntity target) {
         int durationLevel = context.getDurationLevel();
-        int delayTicks = Math.max(1, BASE_DELAY_TICKS + durationLevel * DELAY_PER_LEVEL_TICKS);
+        int baseDelay = (int) config.getParam("rewind", "base-delay-ticks", BASE_DELAY_TICKS);
+        int delayPerLevel = (int) config.getParam("rewind", "delay-per-level-ticks", DELAY_PER_LEVEL_TICKS);
+        int delayTicks = Math.max(1, baseDelay + durationLevel * delayPerLevel);
 
         // 現在位置を記録（マーク）
         Location markedLocation = target.getLocation().clone();

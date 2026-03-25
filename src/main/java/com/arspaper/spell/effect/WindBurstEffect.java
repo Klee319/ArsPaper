@@ -37,11 +37,23 @@ public class WindBurstEffect implements SpellEffect {
 
     @Override
     public void applyToEntity(SpellContext context, LivingEntity target) {
-        // 単体ターゲットをノックバック（AOEはSpellContext.resolveOnEntity()が処理）
         Player caster = context.getCaster();
-        Location impactPoint = target.getLocation();
-        double force = BASE_FORCE + AMPLIFY_FORCE_BONUS * context.getAmplifyLevel();
+        double baseForce = config.getParam("wind_burst", "base-force", BASE_FORCE);
+        double amplifyForceBonus = config.getParam("wind_burst", "amplify-force-bonus", AMPLIFY_FORCE_BONUS);
+        double force = baseForce + amplifyForceBonus * context.getAmplifyLevel();
 
+        if (caster != null && caster.equals(target)) {
+            // 自己対象: 視線と反対方向に飛び出す
+            Vector backward = caster.getLocation().getDirection().multiply(-1).normalize();
+            backward.setY(Math.max(backward.getY(), 0.3));
+            backward.normalize().multiply(force);
+            target.setVelocity(backward);
+            spawnWindBurstFx(target.getLocation());
+            return;
+        }
+
+        // 他者対象: 衝撃点からノックバック
+        Location impactPoint = target.getLocation();
         knockbackAway(target, impactPoint, force);
         spawnWindBurstFx(impactPoint);
     }
@@ -54,8 +66,11 @@ public class WindBurstEffect implements SpellEffect {
         int amplifyLevel = context.getAmplifyLevel();
         int aoeLevel = context.getAoeRadiusLevel();
         Location impactPoint = blockLocation.clone().add(0.5, 0.5, 0.5);
-        double radius = BASE_RADIUS + aoeLevel;
-        double force = BASE_FORCE + AMPLIFY_FORCE_BONUS * amplifyLevel;
+        double baseRadius = config.getParam("wind_burst", "base-radius", BASE_RADIUS);
+        double baseForceB = config.getParam("wind_burst", "base-force", BASE_FORCE);
+        double amplifyForceBonusB = config.getParam("wind_burst", "amplify-force-bonus", AMPLIFY_FORCE_BONUS);
+        double radius = baseRadius + aoeLevel;
+        double force = baseForceB + amplifyForceBonusB * amplifyLevel;
 
         for (LivingEntity nearby : impactPoint.getNearbyLivingEntities(radius)) {
             if (caster != null && nearby.equals(caster)) continue;

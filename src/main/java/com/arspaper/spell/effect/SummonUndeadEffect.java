@@ -90,10 +90,15 @@ public class SummonUndeadEffect implements SpellEffect {
             z.setShouldBurnInDay(false);
             z.setCanPickupItems(false);
 
-            // 召喚モブマーカー
+            // 召喚モブマーカー + 召喚者UUID
             z.getPersistentDataContainer().set(
                 new NamespacedKey(plugin, "summoned"),
                 PersistentDataType.BYTE, (byte) 1);
+            if (caster != null) {
+                z.getPersistentDataContainer().set(
+                    new NamespacedKey(plugin, "summoner_uuid"),
+                    PersistentDataType.STRING, caster.getUniqueId().toString());
+            }
 
             // 装備ドロップを無効化
             EntityEquipment equip = z.getEquipment();
@@ -118,10 +123,15 @@ public class SummonUndeadEffect implements SpellEffect {
             s.setPersistent(false);
             s.setShouldBurnInDay(false);
 
-            // 召喚モブマーカー
+            // 召喚モブマーカー + 召喚者UUID
             s.getPersistentDataContainer().set(
                 new NamespacedKey(plugin, "summoned"),
                 PersistentDataType.BYTE, (byte) 1);
+            if (caster != null) {
+                s.getPersistentDataContainer().set(
+                    new NamespacedKey(plugin, "summoner_uuid"),
+                    PersistentDataType.STRING, caster.getUniqueId().toString());
+            }
 
             // 装備ドロップを無効化
             EntityEquipment equip = s.getEquipment();
@@ -201,6 +211,9 @@ public class SummonUndeadEffect implements SpellEffect {
 
     @Override
     public boolean handlesAoeInternally() { return true; }
+
+    @Override
+    public boolean allowsTraceRepeating() { return false; }
 
     @Override
     public NamespacedKey getId() { return id; }

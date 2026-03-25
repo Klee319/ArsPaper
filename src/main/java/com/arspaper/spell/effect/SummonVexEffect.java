@@ -54,12 +54,17 @@ public class SummonVexEffect implements SpellEffect {
     private void spawnVexAt(SpellContext context, Location spawnLoc) {
         Player caster = context.getCaster();
         int durationLevel = context.getDurationLevel();
-        int durationTicks = Math.max(1, BASE_DURATION_TICKS + durationLevel * DURATION_PER_LEVEL_TICKS);
+        int baseDuration = (int) config.getParam("summon_vex", "base-duration-ticks", (double) BASE_DURATION_TICKS);
+        int durationPerLevel = (int) config.getParam("summon_vex", "duration-per-level", (double) DURATION_PER_LEVEL_TICKS);
+        int durationTicks = Math.max(1, baseDuration + durationLevel * durationPerLevel);
         int amplifyLevel = context.getAmplifyLevel();
         int aoeLevel = context.getAoeRadiusLevel();
-        int summonCount = Math.min(1 + Math.min(aoeLevel, 2), MAX_SUMMONS);
+        int maxSummons = (int) config.getParam("summon_vex", "max-summons", (double) MAX_SUMMONS);
+        int summonCount = Math.min(1 + Math.min(aoeLevel, 2), maxSummons);
 
-        double health = BASE_HEALTH + Math.max(0, amplifyLevel) * HEALTH_PER_AMPLIFY;
+        double baseHealth = config.getParam("summon_vex", "base-health", BASE_HEALTH);
+        double healthPerAmplify = config.getParam("summon_vex", "health-per-amplify", HEALTH_PER_AMPLIFY);
+        double health = baseHealth + Math.max(0, amplifyLevel) * healthPerAmplify;
 
         for (int i = 0; i < summonCount; i++) {
             // 召喚位置を少しずらす
@@ -73,10 +78,15 @@ public class SummonVexEffect implements SpellEffect {
                 v.setCustomNameVisible(true);
                 v.setPersistent(false);
 
-                // 召喚モブマーカー
+                // 召喚モブマーカー + 召喚者UUID
                 v.getPersistentDataContainer().set(
                     new NamespacedKey(plugin, "summoned"),
                     PersistentDataType.BYTE, (byte) 1);
+                if (caster != null) {
+                    v.getPersistentDataContainer().set(
+                        new NamespacedKey(plugin, "summoner_uuid"),
+                        PersistentDataType.STRING, caster.getUniqueId().toString());
+                }
 
                 // HPをAmplifyで強化
                 var maxHpAttr = v.getAttribute(Attribute.MAX_HEALTH);
@@ -150,6 +160,9 @@ public class SummonVexEffect implements SpellEffect {
 
     @Override
     public boolean handlesAoeInternally() { return true; }
+
+    @Override
+    public boolean allowsTraceRepeating() { return false; }
 
     @Override
     public NamespacedKey getId() { return id; }

@@ -1,5 +1,6 @@
 package com.arspaper.gui;
 
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -16,11 +17,20 @@ public class GuiListener implements Listener {
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getInventory().getHolder(false) instanceof BaseGui gui)) return;
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+
+        // ThreadGui: プレイヤーインベントリ側のクリックを許可（カーソルにスレッドを載せる操作）
+        // ただしshift-click/number-keyはGUIへの不正アイテム移動を防止するためキャンセル
+        if (gui instanceof ThreadGui && event.getClickedInventory() != gui.getInventory()) {
+            if (event.isShiftClick() || event.getClick() == org.bukkit.event.inventory.ClickType.NUMBER_KEY) {
+                event.setCancelled(true);
+            }
+            return;
+        }
 
         event.setCancelled(true);
 
         if (event.getClickedInventory() != gui.getInventory()) return;
-        if (!(event.getWhoClicked() instanceof Player player)) return;
 
         gui.onClick(event.getSlot(), player, event);
     }
@@ -34,9 +44,24 @@ public class GuiListener implements Listener {
 
     @EventHandler
     public void onInventoryClose(InventoryCloseEvent event) {
-        if (!(event.getInventory().getHolder(false) instanceof BaseGui gui)) return;
-        if (!(event.getPlayer() instanceof Player player)) return;
+        if (event.getInventory().getHolder(false) instanceof BaseGui gui) {
+            if (event.getPlayer() instanceof Player player) {
+                gui.onClose(player);
+            }
+            return;
+        }
 
-        gui.onClose(player);
+        // バックパックGUI: タイトルで判別し、装備中の防具PDCにデータ保存
+        if (event.getPlayer() instanceof Player player && event.getView().title() != null) {
+            String title = PlainTextComponentSerializer.plainText().serialize(event.getView().title());
+            if ("バックパック".equals(title)) {
+                for (org.bukkit.inventory.ItemStack armor : player.getInventory().getArmorContents()) {
+                    if (armor != null && BackpackGui.countBackpackThreads(armor) > 0) {
+                        BackpackGui.saveBackpackContents(armor, event.getInventory());
+                        break;
+                    }
+                }
+            }
+        }
     }
 }

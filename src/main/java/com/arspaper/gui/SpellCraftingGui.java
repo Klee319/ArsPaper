@@ -30,6 +30,11 @@ import java.util.*;
 public class SpellCraftingGui extends BaseGui {
 
     private static final int MAX_GLYPHS = 9;
+
+    /** 手持ちアイテムを消費するグリフのキー集合 */
+    private static final java.util.Set<String> ITEM_CONSUMING_GLYPHS = java.util.Set.of(
+        "infuse", "place_block"
+    );
     private static final int COMPOSITION_START = 0;
     private static final int COMPOSITION_END = 8;
     private static final int GLYPH_START = 19;
@@ -59,7 +64,7 @@ public class SpellCraftingGui extends BaseGui {
     private final Set<String> unlockedGlyphs;
 
     public SpellCraftingGui(ArsPaper plugin, Player player, ItemStack spellBookItem, int spellSlot, int maxGlyphTier) {
-        super(player, 6, Component.text("スペル作成 - スロット" + (spellSlot + 1), NamedTextColor.DARK_PURPLE));
+        super(player, 6, buildTitle(spellBookItem, spellSlot, plugin));
         this.plugin = plugin;
         this.spellSlot = spellSlot;
         this.spellBookItem = spellBookItem;
@@ -67,6 +72,25 @@ public class SpellCraftingGui extends BaseGui {
         this.unlockedGlyphs = loadUnlockedGlyphs(player);
 
         loadExistingSpell();
+    }
+
+    /**
+     * GUIタイトルを構築する。既存スペル名があればそれを使い、なければ「スロットN」。
+     */
+    private static Component buildTitle(ItemStack spellBookItem, int spellSlot, ArsPaper plugin) {
+        String slotLabel = "スロット" + (spellSlot + 1);
+        if (spellBookItem.hasItemMeta()) {
+            String slotsJson = spellBookItem.getItemMeta().getPersistentDataContainer()
+                .get(ItemKeys.SPELL_SLOTS, PersistentDataType.STRING);
+            if (slotsJson != null) {
+                List<SpellRecipe> slots = SpellSerializer.deserializeSlots(
+                    slotsJson, plugin.getSpellRegistry());
+                if (spellSlot < slots.size() && slots.get(spellSlot) != null) {
+                    slotLabel = slots.get(spellSlot).getName();
+                }
+            }
+        }
+        return Component.text("スペル作成 - " + slotLabel, NamedTextColor.DARK_PURPLE);
     }
 
     private void loadExistingSpell() {
@@ -116,6 +140,19 @@ public class SpellCraftingGui extends BaseGui {
             if (composition[i] == null) return i;
         }
         return -1;
+    }
+
+    /** 配列のnullギャップを詰めて連続化する。増強スタックバイパスを防止。 */
+    private void compactCompositionArray() {
+        int write = 0;
+        for (int read = 0; read < MAX_GLYPHS; read++) {
+            if (composition[read] != null) {
+                composition[write++] = composition[read];
+            }
+        }
+        for (int i = write; i < MAX_GLYPHS; i++) {
+            composition[i] = null;
+        }
     }
 
     /** 最後の非nullスロットのインデックスを返す。空なら-1。 */
@@ -199,6 +236,12 @@ public class SpellCraftingGui extends BaseGui {
             List<Component> lore = new ArrayList<>();
             if (!comp.getDescription().isEmpty()) {
                 lore.add(Component.text(comp.getDescription(), NamedTextColor.GRAY));
+            }
+            // 手持ちアイテムを消費するグリフに注釈を追加
+            String glyphKey = comp.getId().getKey();
+            if (ITEM_CONSUMING_GLYPHS.contains(glyphKey)) {
+                lore.add(Component.text("オフハンド又はホットバー右側から使用",
+                    NamedTextColor.DARK_GRAY).decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, true));
             }
             lore.add(Component.text("マナ: " + comp.getManaCost(), NamedTextColor.AQUA));
             if (!isUnlocked) {
@@ -342,6 +385,8 @@ public class SpellCraftingGui extends BaseGui {
             int index = slot - COMPOSITION_START;
             if (index < MAX_GLYPHS && composition[index] != null) {
                 composition[index] = null;
+                // nullギャップを詰める（増強スタックバイパス防止）
+                compactCompositionArray();
                 render();
             }
             return true;
@@ -511,13 +556,7 @@ public class SpellCraftingGui extends BaseGui {
             return;
         }
 
-        SpellRecipe recipe = new SpellRecipe("スペル" + (spellSlot + 1), compacted);
-        if (!recipe.isValid()) {
-            clicker.sendMessage(Component.text("無効なスペルです！形態(Form)で始まる必要があります", NamedTextColor.RED));
-            clicker.playSound(clicker.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
-            return;
-        }
-
+        // 既存のスペル名を保持する
         SpellRegistry registry = plugin.getSpellRegistry();
         String existingJson = spellBookItem.getItemMeta().getPersistentDataContainer()
             .get(ItemKeys.SPELL_SLOTS, PersistentDataType.STRING);
@@ -527,6 +566,18 @@ public class SpellCraftingGui extends BaseGui {
             slots = new ArrayList<>(SpellSerializer.deserializeSlots(existingJson, registry));
         } else {
             slots = new ArrayList<>();
+        }
+
+        String spellName = "スペル" + (spellSlot + 1);
+        if (spellSlot < slots.size() && slots.get(spellSlot) != null) {
+            spellName = slots.get(spellSlot).getName();
+        }
+
+        SpellRecipe recipe = new SpellRecipe(spellName, compacted);
+        if (!recipe.isValid()) {
+            clicker.sendMessage(Component.text("無効なスペルです！形態(Form)で始まる必要があります", NamedTextColor.RED));
+            clicker.playSound(clicker.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
+            return;
         }
 
         while (slots.size() <= spellSlot) {
@@ -562,6 +613,10 @@ public class SpellCraftingGui extends BaseGui {
     /**
      * Augmentタブ表示時、直前のEffect/Formとの互換性をチェック。
      * 構成配列上で、追加予定位置の直前にあるEffect/Formを基準にする。
+     *
+     * max-augments上限チェックでは、対象Effect/Formに属する全Augmentを
+     * 漏れなくカウントするため、対象の位置から前方(右方向)にスキャンし、
+     * 次のEffect/Formまたは配列末尾までの全スロットを検査する。
      */
     private boolean isAugmentCompatibleWithContext(SpellComponent comp) {
         if (comp.getType() != SpellComponent.ComponentType.AUGMENT) return true;
@@ -570,28 +625,31 @@ public class SpellCraftingGui extends BaseGui {
         int insertSlot = firstEmptySlot();
         if (insertSlot < 0) return false;
 
-        SpellComponent lastTarget = null;
+        int targetIndex = -1;
         for (int i = insertSlot - 1; i >= 0; i--) {
             SpellComponent c = composition[i];
             if (c != null && (c.getType() == SpellComponent.ComponentType.EFFECT
                 || c.getType() == SpellComponent.ComponentType.FORM)) {
-                lastTarget = c;
+                targetIndex = i;
                 break;
             }
         }
-        if (lastTarget == null) return false;
+        if (targetIndex < 0) return false;
 
+        SpellComponent lastTarget = composition[targetIndex];
         String targetKey = lastTarget.getId().getKey();
         String augmentKey = comp.getId().getKey();
         if (!plugin.getGlyphConfig().isAugmentCompatible(targetKey, augmentKey)) {
             return false;
         }
 
-        // max-augmentsの上限チェック: 直前のEffect/Formに対して同じAugmentが既に上限に達しているか
+        // max-augmentsの上限チェック: 対象Effect/Formの後ろから次のEffect/Formまで
+        // 全スロットをスキャンし、同一Augmentの総数をカウントする。
+        // これにより、null gaps の前後に分散したAugmentも正しくカウントされる。
         int maxStack = plugin.getGlyphConfig().getMaxAugmentStack(targetKey, augmentKey);
         if (maxStack < Integer.MAX_VALUE) {
             int currentCount = 0;
-            for (int j = insertSlot - 1; j >= 0; j--) {
+            for (int j = targetIndex + 1; j < MAX_GLYPHS; j++) {
                 SpellComponent c = composition[j];
                 if (c == null) continue;
                 if (c.getType() == SpellComponent.ComponentType.EFFECT

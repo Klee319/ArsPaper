@@ -13,6 +13,7 @@ import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.Ageable;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Player;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -21,9 +22,13 @@ import java.util.Collection;
 
 /**
  * 成熟した作物を収穫するEffect。Ars NouveauのEffectHarvestに準拠。
- * - Ageable作物: 最大成長時に収穫。Amplifyレベルに応じて植え直し確率が変動。
- * - 耕地化: DIRT/GRASS_BLOCK等をFARMLANDに変換。
+ * - Ageable作物: 最大成長時に収穫+植え直し。
+ * - 耕地化: DIRT/GRASS_BLOCK等をFARMLANDに変換し、上の作物も収穫。
  * - 非作物植物: 花・雑草等を自然に破壊。
+ *
+ * AOEは半径増加(aoe_radius)で正方形範囲に拡大。内部処理。
+ * Amplify: 植え直し確率（0=なし, 1=33%, 2=66%, 3+=100%）
+ * Fortune: 作物ドロップ数増加。Extract: シルクタッチ（ブロックそのものをドロップ）。
  */
 public class HarvestEffect implements SpellEffect {
 
@@ -37,60 +42,112 @@ public class HarvestEffect implements SpellEffect {
 
     @Override
     public void applyToEntity(SpellContext context, LivingEntity target) {
-        // HarvestはエンティティにはNoOp
+        // エンティティの足元で発動
+        applyToBlock(context, target.getLocation());
     }
 
     @Override
     public void applyToBlock(SpellContext context, Location blockLocation) {
-        Block block = blockLocation.getBlock();
+        Player caster = context.getCaster();
+        if (caster == null) return;
+
+        int radius = context.getAoeRadiusLevel();
+        int amplify = Math.max(0, context.getAmplifyLevel());
+        int fortuneLevel = context.getFortuneLevel();
+        boolean extract = context.getExtractCount() > 0;
+        int centerX = blockLocation.getBlockX();
+        int centerY = blockLocation.getBlockY();
+        int centerZ = blockLocation.getBlockZ();
+
+        // 半径0 = 着弾ブロック＋上のみ、半径1以上 = 正方形範囲
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dz = -radius; dz <= radius; dz++) {
+                // 着弾Y付近を広めにスキャン（足元形態対応: 地面+作物+上段）
+                for (int dy = -1; dy <= 2; dy++) {
+                    Block block = blockLocation.getWorld().getBlockAt(
+                        centerX + dx, centerY + dy, centerZ + dz);
+                    processBlock(block, caster, amplify, fortuneLevel, extract);
+                }
+            }
+        }
+    }
+
+    /**
+     * 1ブロックに対する収穫処理。
+     */
+    private void processBlock(Block block, Player caster, int amplify, int fortuneLevel, boolean extract) {
         Material type = block.getType();
 
-        // Case 1: Ageable crops (wheat, carrots, potatoes, etc.)
+        // Case 1: Ageable作物（小麦、ニンジン等）
         if (block.getBlockData() instanceof Ageable ageable) {
             if (ageable.getAge() < ageable.getMaximumAge()) return;
 
-            // 保護プラグイン互換: BlockBreakEventを発火して許可を確認
-            org.bukkit.entity.Player caster = context.getCaster();
-            if (caster == null) return;
             BlockBreakEvent breakEvent = new BlockBreakEvent(block, caster);
             Bukkit.getPluginManager().callEvent(breakEvent);
             if (breakEvent.isCancelled()) return;
 
-            // Amplifyレベルに応じて植え直し判定（スペル1回につき1回判定）
-            int amplify = Math.max(0, context.getAmplifyLevel());
             boolean shouldReplant = shouldReplant(amplify);
 
-            if (shouldReplant) {
-                // ブロック情報を保存
+            // Extract: シルクタッチ（作物ブロックそのものをドロップ）
+            if (extract) {
+                ItemStack tool = new ItemStack(Material.WOODEN_HOE);
+                tool.addEnchantment(org.bukkit.enchantments.Enchantment.SILK_TOUCH, 1);
+                Collection<ItemStack> drops = block.getDrops(tool);
+                block.setType(Material.AIR);
+                Location dropLoc = block.getLocation().add(0.5, 0.5, 0.5);
+                for (ItemStack drop : drops) {
+                    if (!drop.getType().isAir() && drop.getAmount() > 0) {
+                        block.getWorld().dropItemNaturally(dropLoc, drop);
+                    }
+                }
+            } else if (shouldReplant) {
                 Material savedMaterial = block.getType();
                 BlockData savedBlockData = block.getBlockData();
 
-                // ドロップを取得してから手動でブロックを消す
-                Collection<ItemStack> drops = block.getDrops();
+                // Fortune: 幸運ツールでドロップ計算
+                Collection<ItemStack> drops;
+                if (fortuneLevel > 0) {
+                    ItemStack tool = new ItemStack(Material.WOODEN_HOE);
+                    tool.addUnsafeEnchantment(org.bukkit.enchantments.Enchantment.FORTUNE, fortuneLevel);
+                    drops = block.getDrops(tool);
+                } else {
+                    drops = block.getDrops();
+                }
                 block.setType(Material.AIR);
 
-                // 植え直し分の種を1つ除去
                 removeSeedFromDrops(drops, savedMaterial);
 
-                Location dropLoc = blockLocation.clone().add(0.5, 0.5, 0.5);
+                Location dropLoc = block.getLocation().add(0.5, 0.5, 0.5);
                 for (ItemStack drop : drops) {
                     if (!drop.getType().isAir() && drop.getAmount() > 0) {
                         block.getWorld().dropItemNaturally(dropLoc, drop);
                     }
                 }
 
-                // 植え直し: 成長段階0で復元
+                // 植え直し
                 block.setType(savedMaterial);
                 if (savedBlockData instanceof Ageable resetAgeable) {
                     resetAgeable.setAge(0);
                     block.setBlockData(resetAgeable);
                 }
             } else {
-                // 植え直さずに収穫のみ
-                block.breakNaturally();
+                if (fortuneLevel > 0) {
+                    ItemStack tool = new ItemStack(Material.WOODEN_HOE);
+                    tool.addUnsafeEnchantment(org.bukkit.enchantments.Enchantment.FORTUNE, fortuneLevel);
+                    Collection<ItemStack> drops = block.getDrops(tool);
+                    block.setType(Material.AIR);
+                    Location dropLoc = block.getLocation().add(0.5, 0.5, 0.5);
+                    for (ItemStack drop : drops) {
+                        if (!drop.getType().isAir() && drop.getAmount() > 0) {
+                            block.getWorld().dropItemNaturally(dropLoc, drop);
+                        }
+                    }
+                } else {
+                    block.breakNaturally();
+                }
             }
 
-            SpellFxUtil.spawnHarvestFx(blockLocation);
+            SpellFxUtil.spawnHarvestFx(block.getLocation());
             return;
         }
 
@@ -99,23 +156,38 @@ public class HarvestEffect implements SpellEffect {
             Block above = block.getRelative(BlockFace.UP);
             if (above.getType().isAir() || above.getBlockData() instanceof Ageable) {
                 block.setType(Material.FARMLAND);
-                SpellFxUtil.spawnHarvestFx(blockLocation);
+                SpellFxUtil.spawnHarvestFx(block.getLocation());
+            }
+            // 上に作物があれば同時に収穫
+            if (above.getBlockData() instanceof Ageable) {
+                processBlock(above, caster, amplify, fortuneLevel, extract);
             }
             return;
         }
 
-        // Case 3: 非作物植物（花、雑草等）を自然に破壊
+        // Case 3: 非作物植物（花、雑草等）
         if (isHarvestablePlant(type)) {
-            block.breakNaturally();
-            SpellFxUtil.spawnHarvestFx(blockLocation);
-            return;
+            if (fortuneLevel > 0) {
+                ItemStack tool = new ItemStack(Material.WOODEN_HOE);
+                tool.addUnsafeEnchantment(org.bukkit.enchantments.Enchantment.FORTUNE, fortuneLevel);
+                Collection<ItemStack> drops = block.getDrops(tool);
+                block.setType(Material.AIR);
+                Location dropLoc = block.getLocation().add(0.5, 0.5, 0.5);
+                for (ItemStack drop : drops) {
+                    if (!drop.getType().isAir() && drop.getAmount() > 0) {
+                        block.getWorld().dropItemNaturally(dropLoc, drop);
+                    }
+                }
+            } else {
+                block.breakNaturally();
+            }
+            SpellFxUtil.spawnHarvestFx(block.getLocation());
         }
     }
 
-    /**
-     * Amplifyレベルに応じた植え直し判定。
-     * 0以下: 植え直さない, 1: 33%, 2: 66%, 3+: 100%
-     */
+    @Override
+    public boolean handlesAoeInternally() { return true; }
+
     private boolean shouldReplant(int amplifyLevel) {
         if (amplifyLevel <= 0) return false;
         if (amplifyLevel >= 3) return true;
@@ -143,9 +215,6 @@ public class HarvestEffect implements SpellEffect {
                 || type == Material.LILY_PAD;
     }
 
-    /**
-     * ドロップから種を1つ除去する（植え直し分）。
-     */
     private void removeSeedFromDrops(Collection<ItemStack> drops, Material cropType) {
         Material seedType = getSeedType(cropType);
         if (seedType == null) return;

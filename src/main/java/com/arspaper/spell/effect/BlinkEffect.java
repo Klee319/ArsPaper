@@ -5,6 +5,7 @@ import com.arspaper.spell.SpellEffect;
 import com.arspaper.spell.SpellFxUtil;
 import com.arspaper.spell.GlyphConfig;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.block.Block;
 import org.bukkit.entity.LivingEntity;
@@ -21,7 +22,8 @@ public class BlinkEffect implements SpellEffect {
 
     private static final int BASE_DISTANCE = 8;
     private static final int AMPLIFY_BONUS = 4;
-    private static final int MAX_DISTANCE = 32;
+    private static final int REACH_BONUS = 8;
+    private static final int MAX_DISTANCE = 48;
     private static final int MIN_Y = -64;
     private final NamespacedKey id;
     private final GlyphConfig config;
@@ -33,25 +35,32 @@ public class BlinkEffect implements SpellEffect {
 
     @Override
     public void applyToEntity(SpellContext context, LivingEntity target) {
-        int distance = Math.min(BASE_DISTANCE + context.getAmplifyLevel() * AMPLIFY_BONUS, MAX_DISTANCE);
+        int baseDistance = (int) config.getParam("blink", "base-distance", (double) BASE_DISTANCE);
+        int reachBonusPerLevel = (int) config.getParam("blink", "reach-bonus", (double) REACH_BONUS);
+        int maxDistance = (int) config.getParam("blink", "max-distance", (double) MAX_DISTANCE);
+        int distance = Math.min(baseDistance + context.getReachLevel() * reachBonusPerLevel, maxDistance);
+        boolean canPenetrate = context.getReachLevel() > 0;
         Vector direction = target.getLocation().getDirection();
 
-        RayTraceResult result = target.getWorld().rayTraceBlocks(
-            target.getEyeLocation(), direction, distance
-        );
-
         Location destination;
-        if (result != null && result.getHitBlock() != null) {
-            destination = result.getHitPosition().toLocation(target.getWorld());
-            destination.subtract(direction.clone().normalize().multiply(0.5));
+        if (canPenetrate) {
+            // 延伸付き: 透過ブロック（ガラス、フェンス等）を貫通してその先にテレポート
+            destination = findPenetratingDestination(target, direction, distance);
         } else {
-            destination = target.getLocation().add(direction.clone().multiply(distance));
+            RayTraceResult result = target.getWorld().rayTraceBlocks(
+                target.getEyeLocation(), direction, distance
+            );
+            if (result != null && result.getHitBlock() != null) {
+                destination = result.getHitPosition().toLocation(target.getWorld());
+                destination.subtract(direction.clone().normalize().multiply(0.5));
+            } else {
+                destination = target.getLocation().add(direction.clone().multiply(distance));
+            }
         }
 
         // 安全な着地点を探す: 下方スキャンで足場を見つける
         destination = findSafeLocation(destination);
         if (destination == null) {
-            // 安全な場所が見つからない場合はテレポートしない
             return;
         }
 
@@ -61,6 +70,38 @@ public class BlinkEffect implements SpellEffect {
         Location origin = target.getLocation().clone();
         target.teleport(destination);
         SpellFxUtil.spawnBlinkFx(origin, destination);
+    }
+
+    /**
+     * 透過ブロックを貫通してテレポート先を探す。
+     * 視線方向に1ブロックずつ進み、不透過ソリッドブロックに当たったら
+     * その先の空気スペースを探す。
+     */
+    private Location findPenetratingDestination(LivingEntity target, Vector direction, int maxDist) {
+        Location start = target.getEyeLocation().clone();
+        Vector step = direction.clone().normalize();
+        Location lastOpen = target.getLocation().clone();
+
+        for (int i = 1; i <= maxDist; i++) {
+            Location check = start.clone().add(step.clone().multiply(i));
+            Block block = check.getBlock();
+            if (block.isPassable() || isTransparentSolid(block)) {
+                lastOpen = check.clone().subtract(0, target.getEyeHeight() - 0.1, 0);
+            }
+        }
+        return lastOpen;
+    }
+
+    /**
+     * 透過可能なソリッドブロック（ガラス、フェンス、鉄柵等）かどうか。
+     */
+    private boolean isTransparentSolid(Block block) {
+        Material type = block.getType();
+        return type.name().contains("GLASS") || type.name().contains("FENCE")
+            || type.name().contains("BARS") || type.name().contains("WALL")
+            || type.name().contains("SLAB") || type.name().contains("STAIR")
+            || type.name().contains("LEAVES") || type == Material.ICE
+            || type == Material.COBWEB;
     }
 
     @Override

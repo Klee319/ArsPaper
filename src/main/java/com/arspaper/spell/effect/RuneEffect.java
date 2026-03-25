@@ -71,9 +71,9 @@ public class RuneEffect implements SpellEffect {
 
             @Override
             public void run() {
-                ticksElapsed++;
+                ticksElapsed += 4; // 4tickごとに実行
 
-                if (ticksElapsed % PARTICLE_INTERVAL == 0) {
+                if (ticksElapsed % PARTICLE_INTERVAL < 4) {
                     spawnRuneIdleFx(runeLoc);
                 }
 
@@ -111,7 +111,7 @@ public class RuneEffect implements SpellEffect {
                 }
             }
         };
-        detectRunnable.runTaskTimer(plugin, 1L, 1L);
+        detectRunnable.runTaskTimer(plugin, 1L, 4L); // 4tickごとにスキャン（パフォーマンス最適化）
 
         plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
             detectRunnable.cancel();
@@ -160,7 +160,11 @@ public class RuneEffect implements SpellEffect {
     }
 
     private void spawnRuneIdleFx(Location loc) {
-        loc.getWorld().spawnParticle(Particle.ENCHANT, loc, 5, 0.4, 0.1, 0.4, 0.3);
+        // 薄い持続パーティクル: 円形に配置
+        loc.getWorld().spawnParticle(Particle.ENCHANT, loc, 3, 0.4, 0.05, 0.4, 0.2);
+        loc.getWorld().spawnParticle(Particle.DUST,
+            loc.clone().add(0, 0.1, 0), 2, 0.3, 0.02, 0.3, 0,
+            new org.bukkit.Particle.DustOptions(org.bukkit.Color.fromRGB(180, 100, 255), 0.6f));
     }
 
     private void spawnRuneTriggerFx(Location loc) {
@@ -173,6 +177,9 @@ public class RuneEffect implements SpellEffect {
     private void spawnRuneFadeFx(Location loc) {
         loc.getWorld().spawnParticle(Particle.ENCHANT, loc, 10, 0.3, 0.1, 0.3, 0.3);
     }
+
+    @Override
+    public boolean allowsTraceRepeating() { return false; }
 
     @Override public NamespacedKey getId() { return id; }
     @Override public String getDisplayName() { return "ルーン"; }

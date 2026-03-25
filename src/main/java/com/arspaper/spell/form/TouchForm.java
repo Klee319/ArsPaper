@@ -35,7 +35,7 @@ public class TouchForm implements SpellForm {
             caster.getLocation().getDirection(),
             RANGE,
             org.bukkit.FluidCollisionMode.NEVER,
-            true,
+            false,
             0.5,
             entity -> entity instanceof LivingEntity && !entity.equals(caster)
         );

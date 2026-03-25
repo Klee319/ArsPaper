@@ -7,6 +7,7 @@ import com.arspaper.item.BaseCustomItem;
 import com.arspaper.item.ItemKeys;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Color;
 import org.bukkit.Material;
@@ -43,10 +44,33 @@ public class MageArmor extends BaseCustomItem {
     }
 
     @Override
+    public boolean hasEnchantGlow() { return false; }
+
+    @Override
     public Component getDisplayName() {
-        return Component.text(armorTier.getDisplayName() + "メイジ" + localizeSlot(armorSlot),
-                armorTier.getColor())
-            .decoration(TextDecoration.ITALIC, false);
+        return buildTieredArmorName(armorTier, armorSlot);
+    }
+
+    /**
+     * ティアに応じた華やかな防具名を生成する。
+     */
+    private static Component buildTieredArmorName(ArmorTier tier, ArmorSlot slot) {
+        String slotName = localizeSlot(slot);
+        return switch (tier) {
+            case NOVICE -> Component.text("初級メイジ" + slotName, TextColor.color(0xD4A0FF))
+                .decoration(TextDecoration.ITALIC, false);
+
+            case APPRENTICE -> Component.text("✦ ", TextColor.color(0x9966CC))
+                .append(Component.text("中級メイジ" + slotName, TextColor.color(0xAA55DD)))
+                .append(Component.text(" ✦", TextColor.color(0x9966CC)))
+                .decoration(TextDecoration.ITALIC, false);
+
+            case ARCHMAGE -> Component.text("✧✦ ", TextColor.color(0xFFD700))
+                .append(Component.text("上級メイジ" + slotName, TextColor.color(0xFFB800)))
+                .append(Component.text(" ✦✧", TextColor.color(0xFFD700)))
+                .decoration(TextDecoration.ITALIC, false)
+                .decoration(TextDecoration.BOLD, true);
+        };
     }
 
     @Override

@@ -26,6 +26,12 @@ public interface SpellEffect extends SpellComponent {
     default boolean handlesAoeInternally() { return false; }
 
     /**
+     * 軌跡モードで飛行経路上の各ブロックごとに発動すべきかどうか。
+     * falseの場合、軌跡モードでの経路上発動をスキップする（召喚系等）。
+     */
+    default boolean allowsTraceRepeating() { return true; }
+
+    /**
      * ブロックAOE展開モード。
      * FIXED: 常にXZ+Yの固定軸（デフォルト）
      * HIT_FACE_INWARD: ヒット面に沿って展開、垂直は奥行き方向（破壊系）

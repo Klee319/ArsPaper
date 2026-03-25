@@ -26,15 +26,19 @@ import java.util.Map;
  * Brewing Standベースのカスタムブロック。
  * 右クリックでアイテムの設置/取得を行う。
  *
- * 素材情報はTileState PDCに保存（Material名またはcustom:カスタムアイテムID）。
+ * アイテムはバイト配列としてシリアライズ保存し、
+ * エンチャント・PDCデータ等を完全に保持する。
  */
 public class Pedestal extends CustomBlock {
 
-    /** 台座に載っているアイテムのMaterial名 */
+    /** 台座に載っているアイテムのMaterial名（後方互換・RitualIngredient判定用） */
     private static final NamespacedKey PEDESTAL_ITEM_KEY = new NamespacedKey("arspaper", "pedestal_item");
 
-    /** 台座に載っているカスタムアイテムのID（カスタムアイテムの場合のみ） */
+    /** 台座に載っているカスタムアイテムのID（後方互換・RitualIngredient判定用） */
     private static final NamespacedKey PEDESTAL_CUSTOM_ID_KEY = new NamespacedKey("arspaper", "pedestal_custom_id");
+
+    /** 台座に載っているアイテムの完全なシリアライズデータ */
+    private static final NamespacedKey PEDESTAL_ITEM_DATA_KEY = new NamespacedKey("arspaper", "pedestal_item_data");
 
     public Pedestal(JavaPlugin plugin) {
         super(plugin, "pedestal");
@@ -86,14 +90,9 @@ public class Pedestal extends CustomBlock {
     @Override
     public void onBlockBroken(Player player, Block block, TileState tileState) {
         // 台座に載っているアイテムをドロップ
-        PersistentDataContainer pdc = tileState.getPersistentDataContainer();
-        String materialName = pdc.get(PEDESTAL_ITEM_KEY, PersistentDataType.STRING);
-        String customId = pdc.get(PEDESTAL_CUSTOM_ID_KEY, PersistentDataType.STRING);
-        if (materialName != null && !materialName.isEmpty()) {
-            ItemStack storedItem = resolveStoredItem(materialName, customId);
-            if (storedItem != null) {
-                block.getWorld().dropItemNaturally(block.getLocation(), storedItem);
-            }
+        ItemStack storedItem = restoreStoredItem(tileState.getPersistentDataContainer());
+        if (storedItem != null) {
+            block.getWorld().dropItemNaturally(block.getLocation(), storedItem);
         }
         // ItemFrameを除去
         ItemFrameHelper.removeDisplayFrame(block.getLocation());
@@ -104,12 +103,11 @@ public class Pedestal extends CustomBlock {
         PersistentDataContainer pdc = tileState.getPersistentDataContainer();
 
         String currentItem = pdc.get(PEDESTAL_ITEM_KEY, PersistentDataType.STRING);
-        String currentCustomId = pdc.get(PEDESTAL_CUSTOM_ID_KEY, PersistentDataType.STRING);
         ItemStack handItem = player.getInventory().getItemInMainHand();
 
         if (currentItem != null && !currentItem.isEmpty()) {
-            // 台座にアイテムがある → 取得
-            ItemStack returnItem = resolveStoredItem(currentItem, currentCustomId);
+            // 台座にアイテムがある → 取得（完全なデータを復元）
+            ItemStack returnItem = restoreStoredItem(pdc);
             if (returnItem != null) {
                 Map<Integer, ItemStack> overflow = player.getInventory().addItem(returnItem);
                 if (!overflow.isEmpty()) {
@@ -117,33 +115,24 @@ public class Pedestal extends CustomBlock {
                         player.getWorld().dropItemNaturally(player.getLocation(), item));
                 }
             }
-            pdc.remove(PEDESTAL_ITEM_KEY);
-            pdc.remove(PEDESTAL_CUSTOM_ID_KEY);
+            clearStoredItem(pdc);
             tileState.update();
             ItemFrameHelper.updateDisplayFrame(block.getLocation(), null);
             player.sendMessage(Component.text("台座からアイテムを回収しました", NamedTextColor.YELLOW));
         } else if (!handItem.isEmpty() && handItem.getType() != Material.AIR) {
-            // 手にアイテムがある → 台座に設置
-            String materialName = handItem.getType().name();
-            pdc.set(PEDESTAL_ITEM_KEY, PersistentDataType.STRING, materialName);
-
-            // カスタムアイテムの場合はカスタムIDも保存
-            String customId = handItem.getItemMeta() != null
-                ? handItem.getItemMeta().getPersistentDataContainer()
-                    .get(ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING)
-                : null;
-            if (customId != null) {
-                pdc.set(PEDESTAL_CUSTOM_ID_KEY, PersistentDataType.STRING, customId);
-            } else {
-                pdc.remove(PEDESTAL_CUSTOM_ID_KEY);
-            }
+            // 手にアイテムがある → 台座に設置（完全なデータを保存）
+            ItemStack toStore = handItem.asOne();
+            saveStoredItem(pdc, toStore);
             tileState.update();
 
-            Material displayMaterial = handItem.getType(); // 消費前にMaterialを保存
             handItem.setAmount(handItem.getAmount() - 1);
-            ItemFrameHelper.updateDisplayFrame(block.getLocation(), new ItemStack(displayMaterial));
+            ItemFrameHelper.updateDisplayFrame(block.getLocation(), toStore);
 
-            String displayName = customId != null ? "custom:" + customId : materialName;
+            String customId = toStore.getItemMeta() != null
+                ? toStore.getItemMeta().getPersistentDataContainer()
+                    .get(ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING)
+                : null;
+            String displayName = customId != null ? "custom:" + customId : toStore.getType().name();
             player.sendMessage(Component.text(displayName + " を台座に設置しました",
                 NamedTextColor.GREEN));
         } else {
@@ -152,9 +141,58 @@ public class Pedestal extends CustomBlock {
     }
 
     /**
-     * 保存されたアイテム情報からItemStackを復元する。
+     * アイテムをPDCに保存する（完全なシリアライズ + 後方互換キー）。
      */
-    private static ItemStack resolveStoredItem(String materialName, String customId) {
+    private static void saveStoredItem(PersistentDataContainer pdc, ItemStack item) {
+        // 完全なアイテムデータをバイト配列で保存
+        pdc.set(PEDESTAL_ITEM_DATA_KEY, PersistentDataType.BYTE_ARRAY, item.serializeAsBytes());
+        // 後方互換 + RitualIngredient判定用にMaterial名とカスタムIDも保存
+        pdc.set(PEDESTAL_ITEM_KEY, PersistentDataType.STRING, item.getType().name());
+        String customId = item.getItemMeta() != null
+            ? item.getItemMeta().getPersistentDataContainer()
+                .get(ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING)
+            : null;
+        if (customId != null) {
+            pdc.set(PEDESTAL_CUSTOM_ID_KEY, PersistentDataType.STRING, customId);
+        } else {
+            pdc.remove(PEDESTAL_CUSTOM_ID_KEY);
+        }
+    }
+
+    /**
+     * PDCからアイテムを復元する。
+     * バイト配列データがあれば完全復元、なければ後方互換で再生成。
+     */
+    private static ItemStack restoreStoredItem(PersistentDataContainer pdc) {
+        // 新形式: バイト配列から完全復元
+        byte[] data = pdc.get(PEDESTAL_ITEM_DATA_KEY, PersistentDataType.BYTE_ARRAY);
+        if (data != null) {
+            try {
+                return ItemStack.deserializeBytes(data);
+            } catch (Exception e) {
+                // デシリアライズ失敗時は後方互換にフォールバック
+            }
+        }
+        // 後方互換: Material名+カスタムIDから再生成
+        String materialName = pdc.get(PEDESTAL_ITEM_KEY, PersistentDataType.STRING);
+        String customId = pdc.get(PEDESTAL_CUSTOM_ID_KEY, PersistentDataType.STRING);
+        if (materialName == null || materialName.isEmpty()) return null;
+        return resolveFromLegacy(materialName, customId);
+    }
+
+    /**
+     * 保存データをクリアする。
+     */
+    private static void clearStoredItem(PersistentDataContainer pdc) {
+        pdc.remove(PEDESTAL_ITEM_DATA_KEY);
+        pdc.remove(PEDESTAL_ITEM_KEY);
+        pdc.remove(PEDESTAL_CUSTOM_ID_KEY);
+    }
+
+    /**
+     * 後方互換: Material名+カスタムIDからItemStackを再生成する。
+     */
+    private static ItemStack resolveFromLegacy(String materialName, String customId) {
         if (customId != null && !customId.isEmpty()) {
             return ArsPaper.getInstance().getItemRegistry()
                 .get(customId)
@@ -199,8 +237,7 @@ public class Pedestal extends CustomBlock {
      */
     public static void clearPedestalItem(TileState tileState) {
         PersistentDataContainer pdc = tileState.getPersistentDataContainer();
-        pdc.remove(PEDESTAL_ITEM_KEY);
-        pdc.remove(PEDESTAL_CUSTOM_ID_KEY);
+        clearStoredItem(pdc);
         tileState.update();
         // ItemFrame表示もクリア
         ItemFrameHelper.updateDisplayFrame(tileState.getLocation(), null);

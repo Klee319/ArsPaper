@@ -70,7 +70,9 @@ public class RotateEffect implements SpellEffect {
         // ExtendTime: 向きを一定時間固定（モブ: AI無効化、プレイヤー: 視点強制テレポ）
         int durationLevel = context.getDurationLevel();
         if (durationLevel > 0) {
-            int lockTicks = BASE_LOCK_TICKS + durationLevel * LOCK_BONUS_TICKS;
+            int baseLock = (int) config.getParam("rotate", "base-lock-ticks", BASE_LOCK_TICKS);
+            int lockBonus = (int) config.getParam("rotate", "lock-bonus-ticks", LOCK_BONUS_TICKS);
+            int lockTicks = baseLock + durationLevel * lockBonus;
             final float lockedYaw = yaw;
             final float lockedPitch = target.getLocation().getPitch();
 

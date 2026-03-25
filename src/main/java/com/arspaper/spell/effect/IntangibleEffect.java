@@ -50,17 +50,69 @@ public class IntangibleEffect implements SpellEffect {
         Player caster = context.getCaster();
         if (caster == null) return;
 
-        int duration = Math.max(1, BASE_DURATION + context.getDurationLevel() * DURATION_PER_LEVEL);
-        int amplifyLevel = Math.max(0, context.getAmplifyLevel());
+        int baseDuration = (int) config.getParam("intangible", "base-duration", (double) BASE_DURATION);
+        int durationPerLevel = (int) config.getParam("intangible", "duration-per-level", (double) DURATION_PER_LEVEL);
+        int duration = Math.max(1, baseDuration + context.getDurationLevel() * durationPerLevel);
 
-        // Amplifyで垂直方向のカラムを拡大（1 + amplifyLevel ブロック、最大MAX_COLUMN_HEIGHT）
-        int columnHeight = Math.min(1 + amplifyLevel, MAX_COLUMN_HEIGHT);
+        // 3軸AOE: 幅(左右), 上下(高さ), 奥行き(視線方向=破壊と同じ向き)
+        int width = context.getAoeLevel();
+        int height = context.getAoeHeight();
+        int depth = context.getAoeDepth();
 
-        for (int dy = 0; dy < columnHeight; dy++) {
-            Location targetLoc = blockLocation.clone().add(0, dy, 0);
-            makeIntangible(targetLoc, caster, duration);
+        if (width == 0 && height == 0 && depth == 0) {
+            // AOEなし: 単体ブロック
+            makeIntangible(blockLocation, caster, duration);
+            return;
+        }
+
+        // 視線方向から3軸座標系を構築（破壊グリフと同じロジック）
+        org.bukkit.block.BlockFace face = context.getHitFace();
+        if (face == null) face = org.bukkit.block.BlockFace.UP;
+
+        int ny = Math.abs(face.getDirection().getBlockY());
+        int nx = face.getDirection().getBlockX();
+        int nz = face.getDirection().getBlockZ();
+
+        if (ny > 0) {
+            // 床/天井ヒット: 奥行き=視線の水平方向
+            org.bukkit.util.Vector lookH = caster.getLocation().getDirection().setY(0);
+            if (lookH.lengthSquared() < 0.01) lookH = new org.bukkit.util.Vector(0, 0, 1);
+            boolean fwdZ = Math.abs(lookH.getZ()) >= Math.abs(lookH.getX());
+            int fX = fwdZ ? 0 : (lookH.getX() > 0 ? 1 : -1);
+            int fZ = fwdZ ? (lookH.getZ() > 0 ? 1 : -1) : 0;
+            int rX = fwdZ ? 1 : 0;
+            int rZ = fwdZ ? 0 : 1;
+            // 奥行き: 視線方向（壁の中に向かって、設置と逆）
+            int dY = -face.getDirection().getBlockY();
+
+            for (int w = -width; w <= width; w++) {
+                for (int h = -height; h <= height; h++) {
+                    for (int d = 0; d <= depth; d++) {
+                        int dx = rX * w + fX * h;
+                        int dz = rZ * w + fZ * h;
+                        int dy = dY * d;
+                        makeIntangible(blockLocation.clone().add(dx, dy, dz), caster, duration);
+                    }
+                }
+            }
+        } else {
+            // 壁ヒット: 幅=左右, 上下=Y, 奥行き=壁の中（法線の反対=視線の奥方向）
+            boolean isXFace = Math.abs(nx) > 0;
+            for (int w = -width; w <= width; w++) {
+                for (int h = -height; h <= height; h++) {
+                    for (int d = 0; d <= depth; d++) {
+                        int ddx = isXFace ? -nx * d : w;
+                        int ddy = h;
+                        int ddz = isXFace ? w : -nz * d;
+                        makeIntangible(blockLocation.clone().add(ddx, ddy, ddz), caster, duration);
+                    }
+                }
+            }
         }
     }
+
+    @Override
+    public boolean handlesAoeInternally() { return true; }
 
     /**
      * 指定位置のブロックを一時的にAIRに置換し、一定時間後に復元する。

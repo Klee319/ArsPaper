@@ -66,6 +66,12 @@ public class ScribingTable extends CustomBlock {
 
     @Override
     public void onBlockInteract(Player player, Block block, TileState tileState) {
+        // アニメーション進行中は筆記台を開けない（マナ増殖防止）
+        if (com.arspaper.gui.GlyphUnlockAnimation.isAnimating(player.getUniqueId())) {
+            player.sendMessage(Component.text(
+                "グリフ解放中です！完了までお待ちください。", NamedTextColor.YELLOW));
+            return;
+        }
         // グリフアンロックGUIを開く
         ScribingTableGui gui = new ScribingTableGui(
             ArsPaper.getInstance(),

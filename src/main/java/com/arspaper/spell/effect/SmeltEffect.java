@@ -40,6 +40,14 @@ public class SmeltEffect implements SpellEffect {
         SMELT_MAP.put(Material.COPPER_ORE,     Material.COPPER_INGOT);
         SMELT_MAP.put(Material.DEEPSLATE_COPPER_ORE, Material.COPPER_INGOT);
         SMELT_MAP.put(Material.ANCIENT_DEBRIS, Material.NETHERITE_SCRAP);
+        // 原石ブロック → 精錬ブロック
+        SMELT_MAP.put(Material.RAW_IRON_BLOCK,   Material.IRON_BLOCK);
+        SMELT_MAP.put(Material.RAW_GOLD_BLOCK,   Material.GOLD_BLOCK);
+        SMELT_MAP.put(Material.RAW_COPPER_BLOCK, Material.COPPER_BLOCK);
+        // 原石 → インゴット（ドロップアイテム精錬用）
+        SMELT_MAP.put(Material.RAW_IRON,   Material.IRON_INGOT);
+        SMELT_MAP.put(Material.RAW_GOLD,   Material.GOLD_INGOT);
+        SMELT_MAP.put(Material.RAW_COPPER, Material.COPPER_INGOT);
         // ブロック変換
         SMELT_MAP.put(Material.COBBLESTONE,    Material.STONE);
         SMELT_MAP.put(Material.COBBLED_DEEPSLATE, Material.DEEPSLATE);

@@ -21,7 +21,7 @@ import java.util.Set;
  * ハサミ使用をシミュレートするEffect。
  * エンティティ: 羊/キノコ牛などを刈る（Shearable mob）。
  * ブロック: 葉・ツタ・クモの巣・羊毛類をハサミで採取。
- * Amplify付き: 斧での伐採をシミュレート（原木の樹皮剥き）。
+ * AOE: 範囲カット。
  */
 public class CutEffect implements SpellEffect {
 
@@ -45,33 +45,6 @@ public class CutEffect implements SpellEffect {
         Material.BLACK_WOOL
     );
 
-    /** 斧で樹皮を剥けるログ→剥ぎ取り後のマッピング */
-    private static final java.util.Map<Material, Material> STRIP_LOG_MAP;
-    static {
-        var map = new java.util.EnumMap<Material, Material>(Material.class);
-        map.put(Material.OAK_LOG, Material.STRIPPED_OAK_LOG);
-        map.put(Material.SPRUCE_LOG, Material.STRIPPED_SPRUCE_LOG);
-        map.put(Material.BIRCH_LOG, Material.STRIPPED_BIRCH_LOG);
-        map.put(Material.JUNGLE_LOG, Material.STRIPPED_JUNGLE_LOG);
-        map.put(Material.ACACIA_LOG, Material.STRIPPED_ACACIA_LOG);
-        map.put(Material.DARK_OAK_LOG, Material.STRIPPED_DARK_OAK_LOG);
-        map.put(Material.MANGROVE_LOG, Material.STRIPPED_MANGROVE_LOG);
-        map.put(Material.CHERRY_LOG, Material.STRIPPED_CHERRY_LOG);
-        map.put(Material.CRIMSON_STEM, Material.STRIPPED_CRIMSON_STEM);
-        map.put(Material.WARPED_STEM, Material.STRIPPED_WARPED_STEM);
-        map.put(Material.OAK_WOOD, Material.STRIPPED_OAK_WOOD);
-        map.put(Material.SPRUCE_WOOD, Material.STRIPPED_SPRUCE_WOOD);
-        map.put(Material.BIRCH_WOOD, Material.STRIPPED_BIRCH_WOOD);
-        map.put(Material.JUNGLE_WOOD, Material.STRIPPED_JUNGLE_WOOD);
-        map.put(Material.ACACIA_WOOD, Material.STRIPPED_ACACIA_WOOD);
-        map.put(Material.DARK_OAK_WOOD, Material.STRIPPED_DARK_OAK_WOOD);
-        map.put(Material.MANGROVE_WOOD, Material.STRIPPED_MANGROVE_WOOD);
-        map.put(Material.CHERRY_WOOD, Material.STRIPPED_CHERRY_WOOD);
-        map.put(Material.CRIMSON_HYPHAE, Material.STRIPPED_CRIMSON_HYPHAE);
-        map.put(Material.WARPED_HYPHAE, Material.STRIPPED_WARPED_HYPHAE);
-        STRIP_LOG_MAP = java.util.Collections.unmodifiableMap(map);
-    }
-
     private final NamespacedKey id;
     private final GlyphConfig config;
 
@@ -86,7 +59,6 @@ public class CutEffect implements SpellEffect {
         if (target instanceof Sheep sheep) {
             if (!sheep.isSheared()) {
                 sheep.setSheared(true);
-                // 羊毛ドロップをシミュレート
                 target.getWorld().dropItemNaturally(
                     target.getLocation(),
                     new org.bukkit.inventory.ItemStack(getWoolMaterial(sheep.getColor()), 1)
@@ -117,20 +89,7 @@ public class CutEffect implements SpellEffect {
         Player caster = context.getCaster();
         if (caster == null) return;
 
-        // Amplify付き: 斧での樹皮剥き
-        if (context.getAmplifyLevel() > 0) {
-            Material stripped = STRIP_LOG_MAP.get(block.getType());
-            if (stripped != null) {
-                BlockBreakEvent event = new BlockBreakEvent(block, caster);
-                Bukkit.getPluginManager().callEvent(event);
-                if (!event.isCancelled()) {
-                    block.setType(stripped);
-                }
-            }
-            return;
-        }
-
-        // 通常: ハサミ採取可能ブロックを破壊してドロップ
+        // ハサミ採取可能ブロックを破壊してドロップ
         if (SHEAR_BLOCKS.contains(block.getType())) {
             BlockBreakEvent event = new BlockBreakEvent(block, caster);
             Bukkit.getPluginManager().callEvent(event);

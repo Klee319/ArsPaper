@@ -1,0 +1,253 @@
+# ============================================================
+# ArsPaper スレッド定義ファイル
+# ============================================================
+# 各スレッドの効果・重複設定・儀式レシピを一元管理する。
+#
+# display_name: スレッドアイテムの表示名
+# 効果パラメータ（スレッドタイプに応じて設定）:
+#   regen-bonus: マナ回復速度ボーナス（/tick）
+#   mana-bonus: 最大マナボーナス
+#   recovery: マナ回復量（被弾/攻撃時）
+#   cost-reduction: スペルコスト軽減率（%）
+#   slots: バックパックスロット数
+#
+# stackable: 同じ防具に同じスレッドを複数セットできるか
+#   true: 重複可能（maxで上限を指定可能）
+#   false: 1つの防具に1つまで
+#   ※ 仕様上重複が無意味なスレッド（飛行/耐火/暗視等）は設定不要（常に不可）
+# max: 1つの防具にセットできる最大数（stackable: trueの場合のみ有効、未設定=無制限）
+#
+# recipe: 儀式レシピ定義
+#   core-item: コアに置くアイテム
+#   pedestal-items: ペデスタル素材（順不同）
+#   source: 必要Source量
+# ============================================================
+
+threads:
+
+  # ============================================================
+  # 空スレッド（基本素材）
+  # ============================================================
+  empty:
+    display_name: "空のスレッド"
+    recipe:
+      core-item: WHITE_WOOL
+      pedestal-items:
+        - "custom:magebloom_fiber"
+        - "custom:source_gem"
+      source: 200
+
+  # ============================================================
+  # 効果付きスレッド - 重複可能（stackable）
+  # ============================================================
+
+  mana_regen:
+    display_name: "マナ回復速度上昇のスレッド"
+    regen-bonus: 2
+    stackable: true
+    max: 2
+    recipe:
+      core-item: "custom:thread_empty"
+      pedestal-items:
+        - GHAST_TEAR
+        - GHAST_TEAR
+        - "custom:source_gem"
+        - "custom:source_gem"
+        - "custom:magebloom_fiber"
+        - "custom:magebloom_fiber"
+      source: 1000
+
+  mana_boost:
+    display_name: "最大マナ上昇のスレッド"
+    mana-bonus: 20
+    stackable: true
+    max: 2
+    recipe:
+      core-item: "custom:thread_empty"
+      pedestal-items:
+        - DIAMOND_BLOCK
+        - DIAMOND_BLOCK
+        - "custom:source_gem"
+        - "custom:source_gem"
+        - "custom:magebloom_fiber"
+        - "custom:magebloom_fiber"
+      source: 1600
+
+  health_boost:
+    display_name: "体力増強のスレッド"
+    stackable: true
+    max: 2
+    recipe:
+      core-item: "custom:thread_empty"
+      pedestal-items:
+        - GOLDEN_APPLE
+        - GOLDEN_APPLE
+        - NETHERITE_INGOT
+        - "custom:source_gem"
+        - "custom:source_gem"
+      source: 1600
+
+  hit_mana_recovery:
+    display_name: "被弾マナ回復のスレッド"
+    recovery: 8
+    stackable: true
+    max: 8
+    recipe:
+      core-item: "custom:thread_empty"
+      pedestal-items:
+        - SHIELD
+        - "custom:source_gem"
+        - "custom:source_gem"
+        - "custom:magebloom_fiber"
+      source: 1200
+
+  damage_mana_recovery:
+    display_name: "攻撃マナ回復のスレッド"
+    recovery: 4
+    stackable: true
+    max: 8
+    recipe:
+      core-item: "custom:thread_empty"
+      pedestal-items:
+        - BLAZE_ROD
+        - BLAZE_ROD
+        - "custom:source_gem"
+        - "custom:source_gem"
+      source: 1200
+
+  # コスト軽減はプレイヤー全装備の合計が100%を超えないよう内部で制限されます。
+  # 1つあたりの軽減率(cost-reduction)やmax値を増やしすぎると、
+  # 全スペルのマナ消費が実質1（最低値）になる可能性があるため注意してください。
+  spell_cost_down:
+    display_name: "詠唱効率のスレッド"
+    cost-reduction: 8
+    stackable: true
+    max: 1
+    recipe:
+      core-item: "custom:thread_empty"
+      pedestal-items:
+        - NETHERITE_BLOCK
+        - GOLD_BLOCK
+        - EMERALD_BLOCK
+        - "custom:source_gem"
+        - "custom:source_gem"
+        - "custom:source_gem"
+      source: 3000
+
+  backpack:
+    display_name: "収納のスレッド"
+    slots: 27
+    stackable: true
+    max: 2
+    recipe:
+      core-item: "custom:thread_empty"
+      pedestal-items:
+        - CHEST
+        - ENDER_CHEST
+        - DIAMOND
+        - "custom:source_gem"
+        - "custom:source_gem"
+      source: 1000
+
+  # ============================================================
+  # 効果付きスレッド - 重複不可（仕様上1つで十分）
+  # ============================================================
+
+  speed:
+    display_name: "迅速のスレッド"
+    recipe:
+      core-item: "custom:thread_empty"
+      pedestal-items:
+        - SUGAR
+        - SUGAR
+        - RABBIT_FOOT
+        - "custom:source_gem"
+        - "custom:source_gem"
+      source: 1200
+
+  jump_boost:
+    display_name: "跳躍のスレッド"
+    recipe:
+      core-item: "custom:thread_empty"
+      pedestal-items:
+        - RABBIT_FOOT
+        - RABBIT_FOOT
+        - SLIME_BALL
+        - "custom:source_gem"
+        - "custom:source_gem"
+      source: 1200
+
+  night_vision:
+    display_name: "暗視のスレッド"
+    recipe:
+      core-item: "custom:thread_empty"
+      pedestal-items:
+        - GOLDEN_CARROT
+        - GOLDEN_CARROT
+        - GLOWSTONE_DUST
+        - "custom:source_gem"
+        - "custom:source_gem"
+      source: 1200
+
+  fire_resistance:
+    display_name: "耐火のスレッド"
+    recipe:
+      core-item: "custom:thread_empty"
+      pedestal-items:
+        - MAGMA_CREAM
+        - MAGMA_CREAM
+        - BLAZE_POWDER
+        - "custom:source_gem"
+        - "custom:source_gem"
+      source: 1600
+
+  dolphins_grace:
+    display_name: "水中移動のスレッド"
+    recipe:
+      core-item: "custom:thread_empty"
+      pedestal-items:
+        - PUFFERFISH
+        - PUFFERFISH
+        - SEA_LANTERN
+        - "custom:source_gem"
+        - "custom:source_gem"
+      source: 1200
+
+  conduit_power:
+    display_name: "コンジットのスレッド"
+    recipe:
+      core-item: "custom:thread_empty"
+      pedestal-items:
+        - NAUTILUS_SHELL
+        - NAUTILUS_SHELL
+        - HEART_OF_THE_SEA
+        - "custom:source_gem"
+        - "custom:source_gem"
+      source: 2000
+
+  hero_of_the_village:
+    display_name: "英雄のスレッド"
+    recipe:
+      core-item: "custom:thread_empty"
+      pedestal-items:
+        - EMERALD_BLOCK
+        - EMERALD_BLOCK
+        - EMERALD_BLOCK
+        - "custom:source_gem"
+        - "custom:source_gem"
+      source: 1600
+
+  flight:
+    display_name: "飛行のスレッド"
+    recipe:
+      core-item: "custom:thread_empty"
+      pedestal-items:
+        - FEATHER
+        - FEATHER
+        - PHANTOM_MEMBRANE
+        - PHANTOM_MEMBRANE
+        - ELYTRA
+        - NETHER_STAR
+        - "custom:source_gem"
+        - "custom:source_gem"
+      source: 6000

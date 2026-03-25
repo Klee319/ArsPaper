@@ -13,10 +13,10 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /**
- * 発動者にクラフトテーブルGUIを開くEffect。
- * Ars Nouveau Tier 2準拠:
- *   - 発動者自身にのみ作用（SelfForm/TouchFormと組み合わせて使う）
- *   - Paper API: caster.openWorkbench(null, true) を使用
+ * 対象プレイヤーにクラフトテーブルGUIを強制的に開くEffect。
+ * 対象がプレイヤーの場合、そのプレイヤーにGUIを開かせる。
+ * 対象がプレイヤー以外の場合、発動者にGUIを開く。
+ * 既にGUIを開いている場合は不発（処理干渉防止）。
  */
 public class CraftEffect implements SpellEffect {
 
@@ -30,24 +30,18 @@ public class CraftEffect implements SpellEffect {
 
     @Override
     public void applyToEntity(SpellContext context, LivingEntity target) {
-        Player caster = context.getCaster();
-        if (caster == null) return;
+        // プレイヤー対象のみ: 対象プレイヤーにGUIを開く
+        if (!(target instanceof Player opener)) return;
 
-        // クラフトテーブルGUIを開く（targetが発動者自身でも他エンティティでも発動者が開く）
-        caster.openWorkbench(null, true);
+        if (opener.getOpenInventory().getType() != org.bukkit.event.inventory.InventoryType.CRAFTING) return;
 
-        spawnCraftFx(caster.getLocation());
+        opener.openWorkbench(null, true);
+        spawnCraftFx(opener.getLocation());
     }
 
     @Override
     public void applyToBlock(SpellContext context, Location blockLocation) {
-        // ブロック対象: 発動者に対してクラフトGUIを開く
-        Player caster = context.getCaster();
-        if (caster == null) return;
-
-        caster.openWorkbench(null, true);
-
-        spawnCraftFx(blockLocation);
+        // ブロック着弾時はNoOp（プレイヤー対象のみ動作）
     }
 
     private void spawnCraftFx(Location loc) {

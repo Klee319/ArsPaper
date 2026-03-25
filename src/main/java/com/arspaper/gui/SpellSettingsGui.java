@@ -58,32 +58,18 @@ public class SpellSettingsGui extends BaseGui {
             )
         ));
 
-        // アイテムバインド
-        SpellRecipe recipe = getCurrentRecipe();
-        ItemStack offhand = viewer.getInventory().getItemInOffHand();
-        boolean offhandHasBind = offhand != null && offhand.hasItemMeta()
-            && offhand.getItemMeta().getPersistentDataContainer()
-                .has(ItemKeys.BOUND_BOOK_UUID, PersistentDataType.STRING);
-
-        List<Component> bindLore = new ArrayList<>();
-        if (recipe == null) {
-            bindLore.add(Component.text("スペルが未設定です", NamedTextColor.RED)
-                .decoration(TextDecoration.ITALIC, false));
-        } else if (offhand == null || offhand.getType().isAir()) {
-            bindLore.add(Component.text("オフハンドにアイテムを持ってください", NamedTextColor.GRAY)
-                .decoration(TextDecoration.ITALIC, false));
-        } else if (offhandHasBind) {
-            bindLore.add(Component.text("クリックでバインド解除", NamedTextColor.RED)
-                .decoration(TextDecoration.ITALIC, false));
-        } else {
-            bindLore.add(Component.text("クリックでオフハンドにバインド", NamedTextColor.GREEN)
-                .decoration(TextDecoration.ITALIC, false));
-        }
-
+        // アイテムバインド（状態に依存しない固定テキスト）
         inventory.setItem(SLOT_BIND, createButton(
             Material.STRING,
             Component.text("アイテムバインド", NamedTextColor.AQUA),
-            bindLore
+            List.of(
+                Component.text("クリックでバインド/アンバインド", NamedTextColor.GREEN)
+                    .decoration(TextDecoration.ITALIC, false),
+                Component.text("対象: オフハンド/ホットバー9番スロット", NamedTextColor.DARK_GRAY)
+                    .decoration(TextDecoration.ITALIC, false),
+                Component.text("バインド済みアイテムに再度使用で解除", NamedTextColor.GRAY)
+                    .decoration(TextDecoration.ITALIC, false)
+            )
         ));
 
         // 設定の初期化
@@ -129,17 +115,24 @@ public class SpellSettingsGui extends BaseGui {
     private void handleRename(Player player) {
         player.closeInventory();
         player.sendMessage(Component.text("チャットにスペル名を入力してください (キャンセル: 'cancel')", NamedTextColor.YELLOW));
+        player.sendMessage(Component.text("30秒以内に入力してください", NamedTextColor.GRAY));
+
+        final java.util.UUID playerUuid = player.getUniqueId();
 
         Listener chatListener = new Listener() {
+            private void cleanup() {
+                HandlerList.unregisterAll(this);
+            }
+
             @EventHandler
             public void onChat(io.papermc.paper.event.player.AsyncChatEvent event) {
-                if (!event.getPlayer().getUniqueId().equals(player.getUniqueId())) return;
+                if (!event.getPlayer().getUniqueId().equals(playerUuid)) return;
                 event.setCancelled(true);
 
                 String message = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
                     .plainText().serialize(event.message());
 
-                HandlerList.unregisterAll(this);
+                cleanup();
 
                 if (message.equalsIgnoreCase("cancel")) {
                     player.sendMessage(Component.text("名前変更をキャンセルしました", NamedTextColor.GRAY));
@@ -154,9 +147,25 @@ public class SpellSettingsGui extends BaseGui {
                     player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 0.5f, 1.5f);
                 });
             }
+
+            @EventHandler
+            public void onPlayerQuit(org.bukkit.event.player.PlayerQuitEvent event) {
+                if (event.getPlayer().getUniqueId().equals(playerUuid)) {
+                    cleanup();
+                }
+            }
         };
 
         plugin.getServer().getPluginManager().registerEvents(chatListener, plugin);
+
+        // 30秒タイムアウト: リスナーを自動解除
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            HandlerList.unregisterAll(chatListener);
+            Player p = plugin.getServer().getPlayer(playerUuid);
+            if (p != null && p.isOnline()) {
+                p.sendMessage(Component.text("スペル名変更がタイムアウトしました", NamedTextColor.GRAY));
+            }
+        }, 600L); // 30秒 = 600tick
     }
 
     private void handleBind(Player player) {
@@ -167,23 +176,65 @@ public class SpellSettingsGui extends BaseGui {
             return;
         }
 
-        ItemStack offhand = player.getInventory().getItemInOffHand();
-        if (offhand == null || offhand.getType().isAir()) {
-            player.sendMessage(Component.text("オフハンドにバインド先アイテムを持ってください", NamedTextColor.RED));
+        ItemStack target = findBindTarget(player);
+        if (target == null) {
+            // バインド先がない場合、アンバインド対象を探す（既バインド済みアイテム）
+            ItemStack unbindTarget = findUnbindTarget(player);
+            if (unbindTarget != null) {
+                SpellBindListener.unbindSpell(player, unbindTarget);
+                render();
+                return;
+            }
+            player.sendMessage(Component.text("バインド可能なアイテムがオフハンド/ホットバー9番スロットにありません", NamedTextColor.RED));
             player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
             return;
         }
 
-        // 既にバインド済みなら解除
-        boolean hasBind = offhand.hasItemMeta()
-            && offhand.getItemMeta().getPersistentDataContainer()
-                .has(ItemKeys.BOUND_BOOK_UUID, PersistentDataType.STRING);
-        if (hasBind) {
-            SpellBindListener.unbindSpell(player, offhand);
-        } else {
-            SpellBindListener.bindSpell(player, offhand, spellBookItem, spellSlot, recipe);
-        }
+        SpellBindListener.bindSpell(player, target, spellBookItem, spellSlot, recipe);
         render();
+    }
+
+    /**
+     * アンバインド対象を検索（既にバインド済みのアイテム）。
+     * 検索対象: オフハンド → ホットバースロット8(固定)
+     */
+    private static ItemStack findUnbindTarget(Player player) {
+        ItemStack offhand = player.getInventory().getItemInOffHand();
+        if (isBoundItem(offhand)) return offhand;
+        ItemStack slot8 = player.getInventory().getItem(8);
+        if (isBoundItem(slot8)) return slot8;
+        return null;
+    }
+
+    private static boolean isBoundItem(ItemStack item) {
+        if (item == null || item.getType().isAir() || !item.hasItemMeta()) return false;
+        return item.getItemMeta().getPersistentDataContainer()
+            .has(ItemKeys.BOUND_BOOK_UUID, org.bukkit.persistence.PersistentDataType.STRING);
+    }
+
+    /**
+     * バインド対象アイテムを検索する。
+     * 検索対象: オフハンド → ホットバースロット8(固定)
+     * スキップ対象: 空気、魔導書/ワンド、既に他のスペルがバインド済みのアイテム
+     */
+    private static ItemStack findBindTarget(Player player) {
+        ItemStack offhand = player.getInventory().getItemInOffHand();
+        if (isValidBindTarget(offhand)) return offhand;
+        ItemStack slot8 = player.getInventory().getItem(8);
+        if (isValidBindTarget(slot8)) return slot8;
+        return null;
+    }
+
+    private static boolean isValidBindTarget(ItemStack item) {
+        if (item == null || item.getType().isAir()) return false;
+        if (!item.hasItemMeta()) return true;
+        var pdc = item.getItemMeta().getPersistentDataContainer();
+        // 魔導書・ワンドはスキップ
+        String customId = pdc.get(ItemKeys.CUSTOM_ITEM_ID, org.bukkit.persistence.PersistentDataType.STRING);
+        if (customId != null && (customId.contains("spell_book") || customId.contains("wand"))) return false;
+        // 既にバインド済みのアイテムはスキップ
+        if (pdc.has(ItemKeys.BOUND_BOOK_UUID, org.bukkit.persistence.PersistentDataType.STRING)) return false;
+        return true;
     }
 
     private void handleReset(Player player) {

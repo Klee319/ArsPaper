@@ -12,12 +12,12 @@ import java.util.List;
 
 /**
  * ソースベリー - グロウベリーベースのカスタムアイテム。
- * 食べるとマナを25回復する。
+ * 食べるとマナを100回復する。
  * 儀式でグロウベリー + アメジストから作成。
  */
 public class SourceBerry extends BaseCustomItem {
 
-    public static final int MANA_RESTORE = 25;
+    public static final int MANA_RESTORE = 100;
 
     public SourceBerry(JavaPlugin plugin) {
         super(plugin, "source_berry");

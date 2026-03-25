@@ -60,7 +60,9 @@ public class AnimateEffect implements SpellEffect {
     private void spawnGolemAt(SpellContext context, Location spawnLoc) {
         Player caster = context.getCaster();
         int durationLevel = context.getDurationLevel();
-        int durationTicks = Math.max(1, BASE_DURATION_TICKS + durationLevel * DURATION_PER_LEVEL_TICKS);
+        int baseDuration = (int) config.getParam("animate", "base-duration-ticks", BASE_DURATION_TICKS);
+        int durationPerLevel = (int) config.getParam("animate", "duration-per-level-ticks", DURATION_PER_LEVEL_TICKS);
+        int durationTicks = Math.max(1, baseDuration + durationLevel * durationPerLevel);
         int spawnCount = context.getAoeRadiusLevel() + 1;
 
         for (int i = 0; i < spawnCount; i++) {
@@ -142,6 +144,9 @@ public class AnimateEffect implements SpellEffect {
         effectLoc.getWorld().playSound(effectLoc, Sound.ENTITY_IRON_GOLEM_HURT,
             SoundCategory.PLAYERS, 0.6f, 0.8f);
     }
+
+    @Override
+    public boolean allowsTraceRepeating() { return false; }
 
     @Override
     public NamespacedKey getId() { return id; }

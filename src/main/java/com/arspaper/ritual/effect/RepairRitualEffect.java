@@ -21,49 +21,41 @@ import org.bukkit.persistence.PersistentDataType;
 public class RepairRitualEffect implements RitualEffect {
 
     @Override
+    public boolean validate(Location coreLocation, Player player, RitualRecipe recipe) {
+        if (!(coreLocation.getBlock().getState() instanceof TileState tileState)) return false;
+
+        // コアにアイテムがあり、かつ耐久値を持つアイテムであることを検証
+        byte[] serialized = tileState.getPersistentDataContainer()
+            .get(new org.bukkit.NamespacedKey("arspaper", "core_item_data"), PersistentDataType.BYTE_ARRAY);
+        if (serialized == null) {
+            player.sendMessage(Component.text("コアに修復対象のアイテムを置いてください！", NamedTextColor.RED));
+            return false;
+        }
+
+        ItemStack item = ItemStack.deserializeBytes(serialized);
+        if (!(item.getItemMeta() instanceof Damageable damageable) || damageable.getDamage() <= 0) {
+            player.sendMessage(Component.text("このアイテムは修復の必要がありません！", NamedTextColor.RED));
+            return false;
+        }
+
+        return true;
+    }
+
+    @Override
     public void execute(Location coreLocation, Player player, RitualRecipe recipe) {
         if (!(coreLocation.getBlock().getState() instanceof TileState tileState)) return;
 
-        PersistentDataContainer corePdc = tileState.getPersistentDataContainer();
-        String materialName = corePdc.get(
-            new org.bukkit.NamespacedKey("arspaper", "core_item"), PersistentDataType.STRING
-        );
-        String customId = corePdc.get(
-            new org.bukkit.NamespacedKey("arspaper", "core_custom_id"), PersistentDataType.STRING
-        );
-
-        if (materialName == null) {
+        // コアからシリアライズ済みアイテムを復元
+        byte[] serialized = tileState.getPersistentDataContainer()
+            .get(new org.bukkit.NamespacedKey("arspaper", "core_item_data"), PersistentDataType.BYTE_ARRAY);
+        if (serialized == null) {
             player.sendMessage(Component.text("コアにアイテムを置いてください！", NamedTextColor.RED));
             return;
         }
 
-        // アイテムを復元
-        ItemStack item;
-        if (customId != null) {
-            item = com.arspaper.ArsPaper.getInstance().getItemRegistry()
-                .get(customId)
-                .map(ci -> ci.createItemStack())
-                .orElse(null);
-        } else {
-            org.bukkit.Material mat = org.bukkit.Material.matchMaterial(materialName);
-            if (mat == null) {
-                player.sendMessage(Component.text("アイテムの復元に失敗しました！", NamedTextColor.RED));
-                return;
-            }
-            item = new ItemStack(mat);
-        }
-
-        if (item == null) {
-            player.sendMessage(Component.text("アイテムの復元に失敗しました！", NamedTextColor.RED));
-            return;
-        }
+        ItemStack item = ItemStack.deserializeBytes(serialized);
 
         // 耐久値を回復
-        if (!(item.getItemMeta() instanceof Damageable)) {
-            player.sendMessage(Component.text("このアイテムには耐久値がありません！", NamedTextColor.RED));
-            return;
-        }
-
         item.editMeta(Damageable.class, damageable -> damageable.setDamage(0));
 
         // コアをクリアして修復済みアイテムを返却

@@ -52,4 +52,10 @@ public final class ItemKeys {
 
     /** バインド先スペルスロット番号（0-indexed） */
     public static final NamespacedKey BOUND_SPELL_SLOT = new NamespacedKey(NAMESPACE, "bound_spell_slot");
+
+    /** 設定ベース防具のセットID（armors.ymlの定義キー） */
+    public static final NamespacedKey ARMOR_SET_ID = new NamespacedKey(NAMESPACE, "armor_set_id");
+
+    /** スペルブックの所有者UUID */
+    public static final NamespacedKey SPELL_BOOK_OWNER = new NamespacedKey(NAMESPACE, "spell_book_owner");
 }

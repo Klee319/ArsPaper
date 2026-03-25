@@ -31,8 +31,10 @@ public class InvisibilityEffect implements SpellEffect {
 
     @Override
     public void applyToEntity(SpellContext context, LivingEntity target) {
+        int baseDuration = (int) config.getParam("invisibility", "base-duration-ticks", BASE_DURATION_TICKS);
+        int durationBonus = (int) config.getParam("invisibility", "duration-bonus-ticks", DURATION_BONUS_TICKS);
         int durationTicks = Math.max(1,
-            BASE_DURATION_TICKS + context.getDurationLevel() * DURATION_BONUS_TICKS);
+            baseDuration + context.getDurationLevel() * durationBonus);
 
         target.addPotionEffect(
             new PotionEffect(PotionEffectType.INVISIBILITY, durationTicks, 0, false, true, true));

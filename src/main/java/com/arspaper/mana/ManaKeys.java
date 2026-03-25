@@ -35,9 +35,6 @@ public final class ManaKeys {
     /** アンロック済みグリフIDのJSON配列 */
     public static final NamespacedKey UNLOCKED_GLYPHS = new NamespacedKey(NAMESPACE, "unlocked_glyphs");
 
-    /** 帰還ポイント（JSON: world, x, y, z, yaw, pitch） */
-    public static final NamespacedKey RECALL_POINT = new NamespacedKey(NAMESPACE, "recall_point");
-
     /** エンチャントによるマナボーナス */
     public static final NamespacedKey ENCHANT_MANA_BONUS = new NamespacedKey(NAMESPACE, "enchant_mana_bonus");
 
@@ -49,4 +46,22 @@ public final class ManaKeys {
 
     /** スレッドによるマナコスト削減（%） */
     public static final NamespacedKey THREAD_COST_REDUCTION = new NamespacedKey(NAMESPACE, "thread_cost_reduction");
+
+    /** 防具によるマナリジェンボーナス（config防具用） */
+    public static final NamespacedKey ARMOR_REGEN_BONUS = new NamespacedKey(NAMESPACE, "armor_regen_bonus");
+
+    /** 被ダメ時マナ回復量（config防具用） */
+    public static final NamespacedKey ARMOR_HIT_MANA_RECOVERY = new NamespacedKey(NAMESPACE, "armor_hit_mana_recovery");
+
+    /** 与ダメ時マナ回復量（config防具用） */
+    public static final NamespacedKey ARMOR_DAMAGE_MANA_RECOVERY = new NamespacedKey(NAMESPACE, "armor_damage_mana_recovery");
+
+    /** 飛行スレッドがアクティブかどうか */
+    public static final NamespacedKey THREAD_FLIGHT_ACTIVE = new NamespacedKey(NAMESPACE, "thread_flight_active");
+
+    /** 儀式飛行の終了時刻（エポックミリ秒） */
+    public static final NamespacedKey RITUAL_FLIGHT_END = new NamespacedKey(NAMESPACE, "ritual_flight_end");
+
+    /** 累計マナ消費量（統計用） */
+    public static final NamespacedKey TOTAL_MANA_CONSUMED = new NamespacedKey(NAMESPACE, "total_mana_consumed");
 }

@@ -27,16 +27,22 @@ import java.util.Map;
  * Lodestoneベースのカスタムブロック。
  * 中央アイテムを設置可能。スニーク+右クリックで儀式発動。
  * 素手で右クリックでアイテム設置/回収。
+ *
+ * アイテムはバイト配列としてシリアライズ保存し、
+ * エンチャント・スペルデータ等を完全に保持する。
  */
 public class RitualCore extends CustomBlock {
 
-    /** コアに載っているアイテムのMaterial名 */
+    /** コアに載っているアイテムのMaterial名（後方互換・RitualIngredient判定用） */
     private static final NamespacedKey CORE_ITEM_KEY = new NamespacedKey("arspaper", "core_item");
 
-    /** コアに載っているカスタムアイテムのID */
+    /** コアに載っているカスタムアイテムのID（後方互換・RitualIngredient判定用） */
     private static final NamespacedKey CORE_CUSTOM_ID_KEY = new NamespacedKey("arspaper", "core_custom_id");
 
-    /** コアに載っているスペルブックのスペルデータ（昇格時にデータ保持するため） */
+    /** コアに載っているアイテムの完全なシリアライズデータ */
+    private static final NamespacedKey CORE_ITEM_DATA_KEY = new NamespacedKey("arspaper", "core_item_data");
+
+    /** コアに載っているスペルブックのスペルデータ（後方互換・昇格時にデータ保持するため） */
     private static final NamespacedKey CORE_SPELL_SLOTS_KEY = new NamespacedKey("arspaper", "core_spell_slots");
     private static final NamespacedKey CORE_SPELL_SLOT_KEY = new NamespacedKey("arspaper", "core_spell_slot");
 
@@ -92,15 +98,10 @@ public class RitualCore extends CustomBlock {
 
     @Override
     public void onBlockBroken(Player player, Block block, TileState tileState) {
-        // コアに載っているアイテムをドロップ
-        PersistentDataContainer pdc = tileState.getPersistentDataContainer();
-        String materialName = pdc.get(CORE_ITEM_KEY, PersistentDataType.STRING);
-        String customId = pdc.get(CORE_CUSTOM_ID_KEY, PersistentDataType.STRING);
-        if (materialName != null && !materialName.isEmpty()) {
-            ItemStack storedItem = resolveStoredItemWithSpellData(materialName, customId, tileState);
-            if (storedItem != null) {
-                block.getWorld().dropItemNaturally(block.getLocation(), storedItem);
-            }
+        // コアに載っているアイテムをドロップ（完全なデータを復元）
+        ItemStack storedItem = restoreStoredItem(tileState.getPersistentDataContainer());
+        if (storedItem != null) {
+            block.getWorld().dropItemNaturally(block.getLocation(), storedItem);
         }
         ItemFrameHelper.removeHeadDisplay(block.getLocation());
     }
@@ -119,12 +120,11 @@ public class RitualCore extends CustomBlock {
         // 通常右クリック → アイテム設置/回収
         PersistentDataContainer pdc = tileState.getPersistentDataContainer();
         String currentItem = pdc.get(CORE_ITEM_KEY, PersistentDataType.STRING);
-        String currentCustomId = pdc.get(CORE_CUSTOM_ID_KEY, PersistentDataType.STRING);
         ItemStack handItem = player.getInventory().getItemInMainHand();
 
         if (currentItem != null && !currentItem.isEmpty()) {
-            // コアにアイテムがある → 回収（スペルデータ付き）
-            ItemStack returnItem = resolveStoredItemWithSpellData(currentItem, currentCustomId, tileState);
+            // コアにアイテムがある → 回収（完全なデータを復元）
+            ItemStack returnItem = restoreStoredItem(pdc);
             if (returnItem != null) {
                 Map<Integer, ItemStack> overflow = player.getInventory().addItem(returnItem);
                 if (!overflow.isEmpty()) {
@@ -132,48 +132,25 @@ public class RitualCore extends CustomBlock {
                         player.getWorld().dropItemNaturally(player.getLocation(), item));
                 }
             }
-            pdc.remove(CORE_ITEM_KEY);
-            pdc.remove(CORE_CUSTOM_ID_KEY);
+            clearStoredItemData(pdc);
             tileState.update();
             ItemFrameHelper.updateHeadDisplay(block.getLocation(), null);
             player.sendMessage(Component.text("コアからアイテムを回収しました", NamedTextColor.YELLOW));
         } else if (!handItem.isEmpty() && handItem.getType() != Material.AIR) {
-            // 手にアイテムがある → コアに設置
-            String materialName = handItem.getType().name();
-            pdc.set(CORE_ITEM_KEY, PersistentDataType.STRING, materialName);
-
-            String customId = handItem.getItemMeta() != null
-                ? handItem.getItemMeta().getPersistentDataContainer()
-                    .get(ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING)
-                : null;
-            if (customId != null) {
-                pdc.set(CORE_CUSTOM_ID_KEY, PersistentDataType.STRING, customId);
-            } else {
-                pdc.remove(CORE_CUSTOM_ID_KEY);
-            }
-
-            // スペルブック/ワンドの場合: スペルデータも保存（昇格時にデータ保持するため）
-            if (customId != null && (customId.startsWith("spell_book_") || customId.startsWith("wand_"))) {
-                PersistentDataContainer itemPdc = handItem.getItemMeta().getPersistentDataContainer();
-                String spellSlots = itemPdc.get(ItemKeys.SPELL_SLOTS, PersistentDataType.STRING);
-                Integer spellSlot = itemPdc.get(ItemKeys.SPELL_SLOT, PersistentDataType.INTEGER);
-                if (spellSlots != null) {
-                    pdc.set(CORE_SPELL_SLOTS_KEY, PersistentDataType.STRING, spellSlots);
-                }
-                if (spellSlot != null) {
-                    pdc.set(CORE_SPELL_SLOT_KEY, PersistentDataType.INTEGER, spellSlot);
-                }
-            } else {
-                pdc.remove(CORE_SPELL_SLOTS_KEY);
-                pdc.remove(CORE_SPELL_SLOT_KEY);
-            }
+            // 手にアイテムがある → コアに設置（完全なデータを保存）
+            ItemStack toStore = handItem.asOne();
+            saveStoredItem(pdc, toStore);
             tileState.update();
 
-            Material displayMaterial = handItem.getType(); // 消費前にMaterialを保存
             handItem.setAmount(handItem.getAmount() - 1);
-            ItemFrameHelper.updateHeadDisplay(block.getLocation(), new ItemStack(displayMaterial));
+            // 色付き防具等のデータを保持するためフルコピーを表示に使用
+            ItemFrameHelper.updateHeadDisplay(block.getLocation(), toStore);
 
-            String displayName = customId != null ? "custom:" + customId : materialName;
+            String customId = toStore.getItemMeta() != null
+                ? toStore.getItemMeta().getPersistentDataContainer()
+                    .get(ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING)
+                : null;
+            String displayName = customId != null ? "custom:" + customId : toStore.getType().name();
             player.sendMessage(Component.text(displayName + " をコアに設置しました",
                 NamedTextColor.GREEN));
         } else {
@@ -183,31 +160,64 @@ public class RitualCore extends CustomBlock {
     }
 
     /**
-     * 保存されたアイテム情報からItemStackを復元する。
+     * アイテムをPDCに保存する（完全なシリアライズ + 後方互換キー）。
      */
-    private static ItemStack resolveStoredItem(String materialName, String customId) {
-        if (customId != null && !customId.isEmpty()) {
-            return ArsPaper.getInstance().getItemRegistry()
-                .get(customId)
-                .map(item -> item.createItemStack())
-                .orElseGet(() -> {
-                    Material mat = Material.matchMaterial(materialName);
-                    return mat != null ? new ItemStack(mat, 1) : null;
-                });
+    private static void saveStoredItem(PersistentDataContainer pdc, ItemStack item) {
+        // 完全なアイテムデータをバイト配列で保存
+        pdc.set(CORE_ITEM_DATA_KEY, PersistentDataType.BYTE_ARRAY, item.serializeAsBytes());
+
+        // 後方互換 + RitualIngredient判定用
+        pdc.set(CORE_ITEM_KEY, PersistentDataType.STRING, item.getType().name());
+        String customId = item.getItemMeta() != null
+            ? item.getItemMeta().getPersistentDataContainer()
+                .get(ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING)
+            : null;
+        if (customId != null) {
+            pdc.set(CORE_CUSTOM_ID_KEY, PersistentDataType.STRING, customId);
+        } else {
+            pdc.remove(CORE_CUSTOM_ID_KEY);
         }
-        Material mat = Material.matchMaterial(materialName);
-        return mat != null ? new ItemStack(mat, 1) : null;
+
+        // スペルブック/ワンドのスペルデータも後方互換で保存（儀式昇格用）
+        if (customId != null && (customId.startsWith("spell_book_") || customId.startsWith("wand_"))) {
+            PersistentDataContainer itemPdc = item.getItemMeta().getPersistentDataContainer();
+            String spellSlots = itemPdc.get(ItemKeys.SPELL_SLOTS, PersistentDataType.STRING);
+            Integer spellSlot = itemPdc.get(ItemKeys.SPELL_SLOT, PersistentDataType.INTEGER);
+            if (spellSlots != null) {
+                pdc.set(CORE_SPELL_SLOTS_KEY, PersistentDataType.STRING, spellSlots);
+            }
+            if (spellSlot != null) {
+                pdc.set(CORE_SPELL_SLOT_KEY, PersistentDataType.INTEGER, spellSlot);
+            }
+        } else {
+            pdc.remove(CORE_SPELL_SLOTS_KEY);
+            pdc.remove(CORE_SPELL_SLOT_KEY);
+        }
     }
 
     /**
-     * 保存されたアイテムにスペルデータを復元する（スペルブック回収時）。
+     * PDCからアイテムを復元する。
+     * バイト配列データがあれば完全復元、なければ後方互換で再生成。
      */
-    private static ItemStack resolveStoredItemWithSpellData(String materialName, String customId, TileState tileState) {
-        ItemStack item = resolveStoredItem(materialName, customId);
+    private static ItemStack restoreStoredItem(PersistentDataContainer pdc) {
+        // 新形式: バイト配列から完全復元
+        byte[] data = pdc.get(CORE_ITEM_DATA_KEY, PersistentDataType.BYTE_ARRAY);
+        if (data != null) {
+            try {
+                return ItemStack.deserializeBytes(data);
+            } catch (Exception e) {
+                // デシリアライズ失敗時は後方互換にフォールバック
+            }
+        }
+        // 後方互換: Material名+カスタムID+スペルデータから再生成
+        String materialName = pdc.get(CORE_ITEM_KEY, PersistentDataType.STRING);
+        String customId = pdc.get(CORE_CUSTOM_ID_KEY, PersistentDataType.STRING);
+        if (materialName == null || materialName.isEmpty()) return null;
+
+        ItemStack item = resolveFromLegacy(materialName, customId);
         if (item != null && customId != null && (customId.startsWith("spell_book_") || customId.startsWith("wand_"))) {
-            PersistentDataContainer corePdc = tileState.getPersistentDataContainer();
-            String spellSlots = corePdc.get(CORE_SPELL_SLOTS_KEY, PersistentDataType.STRING);
-            Integer spellSlot = corePdc.get(CORE_SPELL_SLOT_KEY, PersistentDataType.INTEGER);
+            String spellSlots = pdc.get(CORE_SPELL_SLOTS_KEY, PersistentDataType.STRING);
+            Integer spellSlot = pdc.get(CORE_SPELL_SLOT_KEY, PersistentDataType.INTEGER);
             if (spellSlots != null || spellSlot != null) {
                 item.editMeta(meta -> {
                     PersistentDataContainer itemPdc = meta.getPersistentDataContainer();
@@ -221,6 +231,34 @@ public class RitualCore extends CustomBlock {
             }
         }
         return item;
+    }
+
+    /**
+     * 保存データをクリアする。
+     */
+    private static void clearStoredItemData(PersistentDataContainer pdc) {
+        pdc.remove(CORE_ITEM_DATA_KEY);
+        pdc.remove(CORE_ITEM_KEY);
+        pdc.remove(CORE_CUSTOM_ID_KEY);
+        pdc.remove(CORE_SPELL_SLOTS_KEY);
+        pdc.remove(CORE_SPELL_SLOT_KEY);
+    }
+
+    /**
+     * 後方互換: Material名+カスタムIDからItemStackを再生成する。
+     */
+    private static ItemStack resolveFromLegacy(String materialName, String customId) {
+        if (customId != null && !customId.isEmpty()) {
+            return ArsPaper.getInstance().getItemRegistry()
+                .get(customId)
+                .map(item -> item.createItemStack())
+                .orElseGet(() -> {
+                    Material mat = Material.matchMaterial(materialName);
+                    return mat != null ? new ItemStack(mat, 1) : null;
+                });
+        }
+        Material mat = Material.matchMaterial(materialName);
+        return mat != null ? new ItemStack(mat, 1) : null;
     }
 
     /**
@@ -242,11 +280,7 @@ public class RitualCore extends CustomBlock {
      * コアの素材をクリア（儀式完了時）。
      */
     public static void clearCoreItem(TileState tileState) {
-        PersistentDataContainer pdc = tileState.getPersistentDataContainer();
-        pdc.remove(CORE_ITEM_KEY);
-        pdc.remove(CORE_CUSTOM_ID_KEY);
-        pdc.remove(CORE_SPELL_SLOTS_KEY);
-        pdc.remove(CORE_SPELL_SLOT_KEY);
+        clearStoredItemData(tileState.getPersistentDataContainer());
         tileState.update();
         ItemFrameHelper.updateHeadDisplay(tileState.getLocation(), null);
     }
@@ -260,5 +294,13 @@ public class RitualCore extends CustomBlock {
 
     public static Integer getStoredSpellSlot(TileState tileState) {
         return tileState.getPersistentDataContainer().get(CORE_SPELL_SLOT_KEY, PersistentDataType.INTEGER);
+    }
+
+    /**
+     * コアに保存されたアイテムを完全復元して取得する（儀式昇格時のデータ転送用）。
+     * アイテムはクリアされない（読み取りのみ）。
+     */
+    public static ItemStack getStoredItem(TileState tileState) {
+        return restoreStoredItem(tileState.getPersistentDataContainer());
     }
 }

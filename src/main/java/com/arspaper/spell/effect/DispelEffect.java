@@ -72,7 +72,7 @@ public class DispelEffect implements SpellEffect {
     public String getDisplayName() { return "解呪"; }
 
     @Override
-    public String getDescription() { return "対象のポーション効果を全て除去する"; }
+    public String getDescription() { return "対象の悪いポーション効果を全て除去する"; }
 
     @Override
     public int getManaCost() { return config.getManaCost("dispel"); }

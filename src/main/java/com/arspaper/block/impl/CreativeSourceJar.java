@@ -28,7 +28,7 @@ public class CreativeSourceJar extends CustomBlock {
 
     @Override
     public Material getBlockMaterial() {
-        return Material.BARREL;
+        return Material.DECORATED_POT;
     }
 
     @Override
@@ -69,9 +69,15 @@ public class CreativeSourceJar extends CustomBlock {
         tileState.getPersistentDataContainer().set(
             BlockKeys.SOURCE_INFINITE, PersistentDataType.BYTE, (byte) 1
         );
-        // source_jarとして認識させるためcustom_block_idを上書き
+        // source_jarとして認識させるためcustom_block_idを上書き（Sourceシステム互換）
+        // ※ creative_source_jar IDはアイテムドロップ生成用に別途保持
         tileState.getPersistentDataContainer().set(
             BlockKeys.CUSTOM_BLOCK_ID, PersistentDataType.STRING, "source_jar"
+        );
+        // creative_source_jarのIDも保存（破壊時にCreativeSourceJarとしてドロップさせるため）
+        tileState.getPersistentDataContainer().set(
+            new org.bukkit.NamespacedKey("arspaper", "original_block_id"),
+            PersistentDataType.STRING, "creative_source_jar"
         );
         tileState.update();
     }

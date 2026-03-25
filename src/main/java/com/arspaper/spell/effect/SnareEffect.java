@@ -33,10 +33,9 @@ public class SnareEffect implements SpellEffect {
         int durationPerLevel = (int) config.getParam("snare", "duration-per-level", DEFAULT_DURATION_PER_LEVEL);
         int duration = baseDuration + context.getDurationLevel() * durationPerLevel;
 
-        // Slowness 127 = 移動速度を実質ゼロにする最大値
-        target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, duration, 127));
-        // Jump Boost amplifier -1 (内部値0だが負のmodifierでジャンプを封じる)
-        // Bukkit上ではamplifier 128が符号付きbyteで-128となりジャンプを阻害する
+        // Slowness 255 = 移動を完全停止
+        target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, duration, 255));
+        // Jump Boost amplifier 128 = signed byteで-128、ジャンプ高度を負にして跳ねさせない
         target.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, duration, 128));
         // Mining Fatigue: 採掘・攻撃速度も低下
         target.addPotionEffect(new PotionEffect(PotionEffectType.MINING_FATIGUE, duration, 3));

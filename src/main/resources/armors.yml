@@ -1,0 +1,313 @@
+# ArsPaper カスタム防具設定
+# サーバー管理者がカスタム防具セットを自由に定義できる
+#
+# display_name_prefix: 防具名のプレフィックス（部位名は自動追加）
+# name_color: 名前の色（&0-f またはHex #RRGGBB）
+# color: 革防具の色（Hex #RRGGBB、革素材のみ有効）
+# material: 見た目素材（LEATHER, IRON, DIAMOND, NETHERITE, CHAINMAIL, GOLD）
+# custom_model_data_base: CustomModelData基準値（+0=helmet,+1=chest,+2=legs,+3=boots）
+# enchant_glow: エンチャントオーラ表示
+# stats:
+#   mana_bonus: 最大マナ増加（部位ごと）
+#   mana_regen: マナリジェン（部位ごと/config参照の間隔）
+#   hit_mana_recovery: 被ダメ時マナ回復量
+#   damage_mana_recovery: 与ダメ時マナ回復量
+# thread_slots: スレッドスロット数
+# durability: 耐久値（0=バニラデフォルト）
+# enchantable: 金床エンチャント可能か
+# defense: 部位別防御力
+# toughness: 防具強度
+# lore: アイテム説明文（&色コード対応）
+
+armor_sets:
+
+  # ============================================================
+  # 守護メイジ (Guardian) - 防御特化
+  # ============================================================
+
+  # ----------------------------------------------------------
+  # 見習いの守護メイジ (Guardian Novice)
+  # ----------------------------------------------------------
+  mage_guardian_novice:
+    display_name_prefix: "見習いの守護"
+    name_color: "&d"
+    color: "#A0A0B0"
+    material: LEATHER
+    custom_model_data_base: 200001
+    enchant_glow: false
+    stats:
+      mana_bonus: 5
+      mana_regen: 1
+      hit_mana_recovery: 0
+      damage_mana_recovery: 0
+    thread_slots: 1
+    durability: 250
+    enchantable: true
+    defense:
+      helmet: 2
+      chestplate: 4
+      leggings: 3
+      boots: 2
+    toughness: 0.5
+    lore:
+      - "&7ティア: 見習い"
+      - "&7タイプ: 守護"
+      - "&bマナボーナス: +5"
+      - "&aマナリジェネ: +1"
+      - "&3スレッドスロット: 1"
+
+  # ----------------------------------------------------------
+  # 魔術師の守護メイジ (Guardian Apprentice)
+  # ----------------------------------------------------------
+  mage_guardian_apprentice:
+    display_name_prefix: "魔術師の守護"
+    name_color: "&5"
+    color: "#A0A0B0"
+    material: LEATHER
+    custom_model_data_base: 200011
+    enchant_glow: false
+    stats:
+      mana_bonus: 15
+      mana_regen: 3
+      hit_mana_recovery: 0
+      damage_mana_recovery: 0
+    thread_slots: 2
+    durability: 350
+    enchantable: true
+    defense:
+      helmet: 3
+      chestplate: 6
+      leggings: 5
+      boots: 3
+    toughness: 1.5
+    lore:
+      - "&7ティア: 魔術師"
+      - "&7タイプ: 守護"
+      - "&bマナボーナス: +15"
+      - "&aマナリジェネ: +3"
+      - "&3スレッドスロット: 2"
+
+  # ----------------------------------------------------------
+  # 大魔導士の守護メイジ (Guardian Archmage)
+  # ----------------------------------------------------------
+  mage_guardian_archmage:
+    display_name_prefix: "大魔導士の守護"
+    name_color: "&6"
+    color: "#A0A0B0"
+    material: LEATHER
+    custom_model_data_base: 200021
+    enchant_glow: false
+    stats:
+      mana_bonus: 25
+      mana_regen: 5
+      hit_mana_recovery: 0
+      damage_mana_recovery: 0
+    thread_slots: 3
+    durability: 550
+    enchantable: true
+    defense:
+      helmet: 4
+      chestplate: 8
+      leggings: 7
+      boots: 4
+    toughness: 3.0
+    lore:
+      - "&7ティア: 大魔導士"
+      - "&7タイプ: 守護"
+      - "&bマナボーナス: +30"
+      - "&aマナリジェネ: +5"
+      - "&3スレッドスロット: 3"
+
+  # ============================================================
+  # 魔導メイジ (Arcane) - エフェクト特化 (マナ/リジェン)
+  # ============================================================
+
+  # ----------------------------------------------------------
+  # 見習いの魔導メイジ (Arcane Novice)
+  # ----------------------------------------------------------
+  mage_arcane_novice:
+    display_name_prefix: "見習いの魔導"
+    name_color: "&d"
+    color: "#6B3FA0"
+    material: LEATHER
+    custom_model_data_base: 200031
+    enchant_glow: false
+    stats:
+      mana_bonus: 10
+      mana_regen: 2
+      hit_mana_recovery: 0
+      damage_mana_recovery: 0
+    thread_slots: 1
+    durability: 250
+    enchantable: true
+    defense:
+      helmet: 1
+      chestplate: 2
+      leggings: 2
+      boots: 1
+    toughness: 0.0
+    lore:
+      - "&7ティア: 見習い"
+      - "&7タイプ: 魔導"
+      - "&bマナボーナス: +10"
+      - "&aマナリジェネ: +2"
+      - "&3スレッドスロット: 1"
+
+  # ----------------------------------------------------------
+  # 魔術師の魔導メイジ (Arcane Apprentice)
+  # ----------------------------------------------------------
+  mage_arcane_apprentice:
+    display_name_prefix: "魔術師の魔導"
+    name_color: "&5"
+    color: "#6B3FA0"
+    material: LEATHER
+    custom_model_data_base: 200041
+    enchant_glow: false
+    stats:
+      mana_bonus: 30
+      mana_regen: 5
+      hit_mana_recovery: 0
+      damage_mana_recovery: 0
+    thread_slots: 2
+    durability: 350
+    enchantable: true
+    defense:
+      helmet: 2
+      chestplate: 4
+      leggings: 3
+      boots: 2
+    toughness: 0.0
+    lore:
+      - "&7ティア: 魔術師"
+      - "&7タイプ: 魔導"
+      - "&bマナボーナス: +30"
+      - "&aマナリジェネ: +5"
+      - "&3スレッドスロット: 2"
+
+  # ----------------------------------------------------------
+  # 大魔導士の魔導メイジ (Arcane Archmage)
+  # ----------------------------------------------------------
+  mage_arcane_archmage:
+    display_name_prefix: "大魔導士の魔導"
+    name_color: "&6"
+    color: "#6B3FA0"
+    material: LEATHER
+    custom_model_data_base: 200051
+    enchant_glow: false
+    stats:
+      mana_bonus: 50
+      mana_regen: 8
+      hit_mana_recovery: 0
+      damage_mana_recovery: 0
+    thread_slots: 3
+    durability: 550
+    enchantable: true
+    defense:
+      helmet: 3
+      chestplate: 6
+      leggings: 5
+      boots: 3
+    toughness: 1.0
+    lore:
+      - "&7ティア: 大魔導士"
+      - "&7タイプ: 魔導"
+      - "&bマナボーナス: +50"
+      - "&aマナリジェン: +8"
+      - "&3スレッドスロット: 3"
+
+  # ============================================================
+  # 魔織メイジ (Weaver) - スレッド特化
+  # ============================================================
+
+  # ----------------------------------------------------------
+  # 見習いの魔織メイジ (Weaver Novice)
+  # ----------------------------------------------------------
+  mage_weaver_novice:
+    display_name_prefix: "見習いの魔織"
+    name_color: "&d"
+    color: "#2ECC71"
+    material: LEATHER
+    custom_model_data_base: 200061
+    enchant_glow: false
+    stats:
+      mana_bonus: 5
+      mana_regen: 1
+      hit_mana_recovery: 0
+      damage_mana_recovery: 0
+    thread_slots: 3
+    durability: 250
+    enchantable: true
+    defense:
+      helmet: 1
+      chestplate: 2
+      leggings: 1
+      boots: 1
+    toughness: 0.0
+    lore:
+      - "&7ティア: 見習い"
+      - "&7タイプ: 魔織"
+      - "&bマナボーナス: +5"
+      - "&aマナリジェネ: +1"
+      - "&3スレッドスロット: 3"
+
+  # ----------------------------------------------------------
+  # 魔術師の魔織メイジ (Weaver Apprentice)
+  # ----------------------------------------------------------
+  mage_weaver_apprentice:
+    display_name_prefix: "魔術師の魔織"
+    name_color: "&5"
+    color: "#2ECC71"
+    material: LEATHER
+    custom_model_data_base: 200071
+    enchant_glow: false
+    stats:
+      mana_bonus: 15
+      mana_regen: 3
+      hit_mana_recovery: 0
+      damage_mana_recovery: 0
+    thread_slots: 4
+    durability: 350
+    enchantable: true
+    defense:
+      helmet: 1
+      chestplate: 3
+      leggings: 2
+      boots: 1
+    toughness: 0.0
+    lore:
+      - "&7ティア: 魔術師"
+      - "&7タイプ: 魔織"
+      - "&bマナボーナス: +15"
+      - "&aマナリジェネ: +3"
+      - "&3スレッドスロット: 4"
+
+  # ----------------------------------------------------------
+  # 大魔導士の魔織メイジ (Weaver Archmage)
+  # ----------------------------------------------------------
+  mage_weaver_archmage:
+    display_name_prefix: "大魔導士の魔織"
+    name_color: "&6"
+    color: "#2ECC71"
+    material: LEATHER
+    custom_model_data_base: 200081
+    enchant_glow: false
+    stats:
+      mana_bonus: 30
+      mana_regen: 5
+      hit_mana_recovery: 0
+      damage_mana_recovery: 0
+    thread_slots: 5
+    durability: 550
+    enchantable: true
+    defense:
+      helmet: 2
+      chestplate: 5
+      leggings: 4
+      boots: 2
+    toughness: 0.5
+    lore:
+      - "&7ティア: 大魔導士"
+      - "&7タイプ: 魔織"
+      - "&bマナボーナス: +30"
+      - "&aマナリジェネ: +5"
+      - "&3スレッドスロット: 5"

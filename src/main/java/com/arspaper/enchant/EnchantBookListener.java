@@ -5,7 +5,7 @@ import com.arspaper.item.ItemKeys;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
-import org.bukkit.NamespacedKey;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -14,17 +14,20 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.AnvilInventory;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.persistence.PersistentDataContainer;
+import org.bukkit.inventory.meta.EnchantmentStorageMeta;
 import org.bukkit.persistence.PersistentDataType;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 金床でエンチャント本をメイジアーマーに適用するリスナー。
- * スロット0: メイジアーマー、スロット1: エンチャント本 → 結果にエンチャント済み防具を表示。
+ * 金床でカスタムエンチャント本をメイジアーマー/スペルブックに適用するリスナー。
+ * Paper Registry APIで登録された正式なエンチャントを使用。
  */
 public class EnchantBookListener implements Listener {
+
+    /** 金床連打による二重消費を防止するクールダウン */
+    private final java.util.Set<java.util.UUID> anvilCooldown = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     /**
      * 金床にアイテムがセットされた時、結果スロットにプレビューを表示する。
@@ -32,43 +35,55 @@ public class EnchantBookListener implements Listener {
     @EventHandler
     public void onPrepareAnvil(PrepareAnvilEvent event) {
         AnvilInventory anvil = event.getInventory();
-        ItemStack armor = anvil.getItem(0);
+        ItemStack target = anvil.getItem(0);
         ItemStack book = anvil.getItem(1);
 
-        if (!isMageArmor(armor) || !isEnchantBook(book)) return;
+        if (!isEnchantBook(book)) return;
+        boolean isArmor = isMageArmor(target);
+        boolean isSpellBook = isSpellBook(target);
+        if (!isArmor && !isSpellBook) return;
 
-        PersistentDataContainer bookPdc = book.getItemMeta().getPersistentDataContainer();
+        // エンチャント本からエンチャントを読み取る
+        EnchantmentStorageMeta bookMeta = (EnchantmentStorageMeta) book.getItemMeta();
 
-        for (String enchantId : new String[]{"mana_regen", "mana_boost"}) {
-            NamespacedKey key = ArsEnchantments.getKeyFromId(enchantId);
-            if (key == null) continue;
-            int level = bookPdc.getOrDefault(key, PersistentDataType.INTEGER, 0);
+        for (String enchantId : new String[]{"mana_regen", "mana_boost", "share"}) {
+            if ("share".equals(enchantId) && !isSpellBook) continue;
+            if (!"share".equals(enchantId) && !isArmor) continue;
+
+            Enchantment enchant = ArsEnchantments.getFromId(enchantId);
+            if (enchant == null) continue;
+            int level = bookMeta.getStoredEnchantLevel(enchant);
             if (level <= 0) continue;
 
-            int existingLevel = armor.getItemMeta().getPersistentDataContainer()
-                .getOrDefault(key, PersistentDataType.INTEGER, 0);
+            if ("share".equals(enchantId)) level = 1;
 
+            int existingLevel = target.getEnchantmentLevel(enchant);
             if (existingLevel >= level) continue;
 
             // 結果アイテムを生成
-            ItemStack result = armor.clone();
+            ItemStack result = target.clone();
             String displayName = ArsEnchantments.getDisplayName(enchantId);
+            int finalLevel = level;
             result.editMeta(meta -> {
-                meta.getPersistentDataContainer().set(key, PersistentDataType.INTEGER, level);
+                // loreから旧エンチャント表示を除去
                 List<Component> lore = meta.lore() != null ? new ArrayList<>(meta.lore()) : new ArrayList<>();
                 lore.removeIf(line -> {
                     String plain = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
                         .plainText().serialize(line);
                     return plain.startsWith(displayName);
                 });
-                lore.add(Component.text(
-                    displayName + " " + ArsEnchantments.toRoman(level), NamedTextColor.LIGHT_PURPLE
-                ).decoration(TextDecoration.ITALIC, false));
+                String loreText = "share".equals(enchantId)
+                    ? displayName
+                    : displayName + " " + ArsEnchantments.toRoman(finalLevel);
+                lore.add(Component.text(loreText, NamedTextColor.LIGHT_PURPLE)
+                    .decoration(TextDecoration.ITALIC, false));
                 meta.lore(lore);
             });
+            // Bukkit Enchantment APIでエンチャント適用（MAX_LEVELを超えないよう制限）
+            result.addUnsafeEnchantment(enchant, Math.min(finalLevel, ArsEnchantments.MAX_LEVEL));
 
             event.setResult(result);
-            anvil.setRepairCost(1); // 経験値コスト1
+            anvil.setRepairCost(1);
             return;
         }
     }
@@ -83,35 +98,48 @@ public class EnchantBookListener implements Listener {
         if (!(event.getWhoClicked() instanceof Player player)) return;
 
         ItemStack result = event.getCurrentItem();
-        if (result == null || !isMageArmor(result)) return;
+        if (result == null || result.getType().isAir()) return;
+
+        // 連打防止
+        if (!anvilCooldown.add(player.getUniqueId())) return;
+        org.bukkit.Bukkit.getScheduler().runTaskLater(
+            com.arspaper.ArsPaper.getInstance(),
+            () -> anvilCooldown.remove(player.getUniqueId()), 5L);
+
+        boolean isArmor = isMageArmor(result);
+        boolean isBook = isSpellBook(result);
+        if (!isArmor && !isBook) return;
 
         ItemStack book = anvil.getItem(1);
         if (!isEnchantBook(book)) return;
 
-        // エンチャントが実際に適用されたか確認
-        PersistentDataContainer resultPdc = result.getItemMeta().getPersistentDataContainer();
-        PersistentDataContainer bookPdc = book.getItemMeta().getPersistentDataContainer();
-        boolean hasEnchant = false;
-        for (String enchantId : new String[]{"mana_regen", "mana_boost"}) {
-            NamespacedKey key = ArsEnchantments.getKeyFromId(enchantId);
-            if (key == null) continue;
-            int bookLevel = bookPdc.getOrDefault(key, PersistentDataType.INTEGER, 0);
-            int resultLevel = resultPdc.getOrDefault(key, PersistentDataType.INTEGER, 0);
-            if (bookLevel > 0 && resultLevel >= bookLevel) {
-                hasEnchant = true;
+        // カスタムエンチャントが実際に適用されたか確認
+        boolean hasCustomEnchant = false;
+        for (String enchantId : new String[]{"mana_regen", "mana_boost", "share"}) {
+            Enchantment enchant = ArsEnchantments.getFromId(enchantId);
+            if (enchant != null && result.getEnchantmentLevel(enchant) > 0) {
+                hasCustomEnchant = true;
                 break;
             }
         }
-        if (!hasEnchant) return;
+        if (!hasCustomEnchant) return;
 
-        // 取り出し後にボーナス再計算をスケジュール
-        org.bukkit.Bukkit.getScheduler().runTaskLater(
-            com.arspaper.ArsPaper.getInstance(), () -> {
-                if (player.isOnline()) {
-                    ArmorManaListener.recalculateArmorBonus(player);
-                }
-            }, 2L
-        );
+        // エンチャント本を消費
+        ItemStack bookSlot = anvil.getItem(1);
+        if (bookSlot != null) {
+            bookSlot.setAmount(bookSlot.getAmount() - 1);
+        }
+
+        // 取り出し後にボーナス再計算をスケジュール（防具の場合のみ）
+        if (isArmor) {
+            org.bukkit.Bukkit.getScheduler().runTaskLater(
+                com.arspaper.ArsPaper.getInstance(), () -> {
+                    if (player.isOnline()) {
+                        ArmorManaListener.recalculateArmorBonus(player);
+                    }
+                }, 2L
+            );
+        }
     }
 
     private boolean isEnchantBook(ItemStack item) {
@@ -125,6 +153,16 @@ public class EnchantBookListener implements Listener {
         if (item == null || !item.hasItemMeta()) return false;
         String customId = item.getItemMeta().getPersistentDataContainer()
             .get(ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING);
-        return customId != null && customId.startsWith("mage_");
+        if (customId != null && customId.startsWith("mage_")) return true;
+        // ConfigurableArmor
+        return item.getItemMeta().getPersistentDataContainer()
+            .has(ItemKeys.ARMOR_SET_ID, PersistentDataType.STRING);
+    }
+
+    private boolean isSpellBook(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return false;
+        String customId = item.getItemMeta().getPersistentDataContainer()
+            .get(ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING);
+        return customId != null && customId.startsWith("spell_book_");
     }
 }

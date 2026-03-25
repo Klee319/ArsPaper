@@ -2,6 +2,7 @@ package com.arspaper.command;
 
 import com.arspaper.ArsPaper;
 import com.arspaper.block.BlockKeys;
+import com.arspaper.gui.BackpackGui;
 import com.arspaper.item.BaseCustomItem;
 import com.arspaper.item.ItemKeys;
 import com.arspaper.mana.ManaKeys;
@@ -44,6 +45,12 @@ public final class ArsCommand {
                             plugin.getItemRegistry().getAll().forEach(item ->
                                 builder.suggest(item.getItemId())
                             );
+                            // エンチャント本のサジェスト
+                            for (String eid : new String[]{"mana_regen", "mana_boost", "share"}) {
+                                for (int lv = 1; lv <= 3; lv++) {
+                                    builder.suggest("enchant_book:" + eid + ":" + lv);
+                                }
+                            }
                             return builder.buildFuture();
                         })
                         .executes(ctx -> {
@@ -54,6 +61,10 @@ public final class ArsCommand {
                                 return 0;
                             }
                             String itemId = StringArgumentType.getString(ctx, "itemId");
+                            // エンチャント本コマンド: enchant_book:<enchantId>:<level>
+                            if (itemId.startsWith("enchant_book:")) {
+                                return executeGiveEnchantBook(player, itemId);
+                            }
                             return executeGive(plugin, player, itemId);
                         })
                     )
@@ -80,10 +91,53 @@ public final class ArsCommand {
                         })
                     )
                 )
+                .then(Commands.literal("fixmana")
+                    .requires(src -> src.getSender().hasPermission("arspaper.admin"))
+                    .executes(ctx -> {
+                        // 自分のマナを修正
+                        if (!(ctx.getSource().getSender() instanceof Player player)) return 0;
+                        return executeFixMana(plugin, ctx.getSource().getSender(), player);
+                    })
+                    .then(Commands.argument("player", StringArgumentType.word())
+                        .suggests((ctx, builder) -> {
+                            for (Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
+                                builder.suggest(p.getName());
+                            }
+                            return builder.buildFuture();
+                        })
+                        .executes(ctx -> {
+                            String name = StringArgumentType.getString(ctx, "player");
+                            Player target = org.bukkit.Bukkit.getPlayer(name);
+                            if (target == null) {
+                                ctx.getSource().getSender().sendMessage(
+                                    Component.text("プレイヤーが見つかりません: " + name, NamedTextColor.RED));
+                                return 0;
+                            }
+                            return executeFixMana(plugin, ctx.getSource().getSender(), target);
+                        })
+                    )
+                )
                 .then(Commands.literal("reload")
                     .requires(src -> src.getSender().hasPermission("arspaper.admin"))
                     .executes(ctx -> {
-                        return executeReload(plugin, ctx.getSource().getSender());
+                        return executeReload(plugin, ctx.getSource().getSender(), false);
+                    })
+                    .then(Commands.literal("reset")
+                        .executes(ctx -> {
+                            return executeReload(plugin, ctx.getSource().getSender(), true);
+                        })
+                    )
+                )
+                .then(Commands.literal("backpack")
+                    .executes(ctx -> {
+                        return executeBackpack(ctx.getSource().getSender());
+                    })
+                )
+                .then(Commands.literal("recipes")
+                    .executes(ctx -> {
+                        if (!(ctx.getSource().getSender() instanceof Player player)) return 0;
+                        new com.arspaper.gui.RecipeBrowserGui(player).open();
+                        return 1;
                     })
                 )
                 .then(Commands.literal("pvp")
@@ -113,6 +167,14 @@ public final class ArsCommand {
                             if (!(ctx.getSource().getSender() instanceof Player player)) return 0;
                             return executeGlyphLockAll(player);
                         })
+                    )
+                )
+                .then(Commands.literal("ranking")
+                    .then(Commands.literal("glyphs")
+                        .executes(ctx -> executeRankingGlyphs(plugin, ctx.getSource().getSender()))
+                    )
+                    .then(Commands.literal("mana")
+                        .executes(ctx -> executeRankingMana(plugin, ctx.getSource().getSender()))
                     )
                 )
                 .then(Commands.literal("spell")
@@ -154,6 +216,59 @@ public final class ArsCommand {
             "ArsPaper main command",
             List.of("arspaper")
         );
+    }
+
+    private static int executeGiveEnchantBook(Player player, String spec) {
+        // enchant_book:<enchantId>:<level>
+        String[] parts = spec.split(":");
+        if (parts.length < 3) {
+            player.sendMessage(Component.text(
+                "形式: enchant_book:<enchantId>:<level> (例: enchant_book:mana_regen:1)", NamedTextColor.RED));
+            return 0;
+        }
+        String enchantId = parts[1];
+        int level;
+        try {
+            level = Integer.parseInt(parts[2]);
+        } catch (NumberFormatException e) {
+            player.sendMessage(Component.text("レベルは数値で指定してください", NamedTextColor.RED));
+            return 0;
+        }
+
+        var enchant = com.arspaper.enchant.ArsEnchantments.getFromId(enchantId);
+        if (enchant == null) {
+            player.sendMessage(Component.text(
+                "不明なエンチャント: " + enchantId + " (mana_regen/mana_boost/share)", NamedTextColor.RED));
+            return 0;
+        }
+
+        level = Math.max(1, Math.min(level, com.arspaper.enchant.ArsEnchantments.MAX_LEVEL));
+        String displayName = com.arspaper.enchant.ArsEnchantments.getDisplayName(enchantId);
+        String roman = com.arspaper.enchant.ArsEnchantments.toRoman(level);
+
+        ItemStack book = new ItemStack(org.bukkit.Material.ENCHANTED_BOOK);
+        final int finalLevel = level;
+        book.editMeta(meta -> {
+            meta.displayName(Component.text(displayName + " " + roman, net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE)
+                .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+            meta.getPersistentDataContainer().set(
+                ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING, "enchant_book"
+            );
+            if (meta instanceof org.bukkit.inventory.meta.EnchantmentStorageMeta storageMeta) {
+                storageMeta.addStoredEnchant(enchant, finalLevel, true);
+            }
+            meta.lore(java.util.List.of(
+                Component.text(displayName + " " + roman, net.kyori.adventure.text.format.NamedTextColor.GRAY)
+                    .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false),
+                Component.empty(),
+                Component.text("金床でメイジアーマーに適用", net.kyori.adventure.text.format.NamedTextColor.DARK_GRAY)
+                    .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false)
+            ));
+        });
+
+        player.getInventory().addItem(book);
+        player.sendMessage(Component.text(displayName + " " + roman + " のエンチャント本を付与しました", NamedTextColor.GREEN));
+        return 1;
     }
 
     private static int executeGive(ArsPaper plugin, Player player, String itemId) {
@@ -198,8 +313,17 @@ public final class ArsCommand {
         return 1;
     }
 
-    private static int executeReload(ArsPaper plugin, CommandSender sender) {
+    private static int executeReload(ArsPaper plugin, CommandSender sender, boolean resetDefaults) {
         long start = System.currentTimeMillis();
+
+        // reset: 設定ファイルをデフォルトに上書き復元
+        if (resetDefaults) {
+            String[] ymlFiles = {"config.yml", "glyphs.yml", "items.yml", "materials.yml", "armors.yml", "threads.yml"};
+            for (String yml : ymlFiles) {
+                plugin.saveResource(yml, true); // true = 上書き
+            }
+            sender.sendMessage(Component.text("全設定ファイルをデフォルトにリセットしました", NamedTextColor.YELLOW));
+        }
 
         // config.yml リロード
         plugin.reloadConfig();
@@ -207,17 +331,51 @@ public final class ArsCommand {
         // glyphs.yml リロード（グリフのティア・コスト・係数）
         plugin.reloadGlyphConfig();
 
-        // rituals.yml リロード
-        plugin.getRitualRecipeRegistry().loadRecipes();
+        // materials.yml / armors.yml を先にリロード（レシピ解決に必要）
+        plugin.reloadMaterialConfig();
+        plugin.reloadArmorConfig();
 
-        // recipes.yml リロード
+        // 統合レシピリロード（items.yml, materials.yml, threads.yml）
+        com.arspaper.recipe.UnifiedRecipeLoader loader = new com.arspaper.recipe.UnifiedRecipeLoader(plugin);
+        loader.loadAll();
         plugin.getRecipeManager().unloadRecipes();
-        plugin.getRecipeManager().loadRecipes();
+        plugin.getRecipeManager().registerWorkbenchRecipes(loader.getWorkbenchRecipes());
+        plugin.getRitualRecipeRegistry().registerRecipes(loader.getRitualRecipes());
+
+        // 防具レシピ再登録（armorConfigリロード済み）
+        plugin.getRecipeManager().registerArmorRecipes(plugin.getArmorConfigManager());
+
+        // スレッド設定リロード
+        plugin.getThreadConfig().reload(plugin.getConfig());
+
+        // マナ設定リロード（regenIntervalの変更はサーバ再起動が必要）
+        com.arspaper.mana.ManaConfig newManaConfig = com.arspaper.mana.ManaConfig.fromConfig(plugin.getConfig());
+        plugin.getManaManager().reloadConfig(newManaConfig);
+
+        // ルートチェスト設定リロード
+        plugin.reloadLootConfig();
 
         long elapsed = System.currentTimeMillis() - start;
         sender.sendMessage(Component.text(
             "ArsPaper設定をリロードしました (" + elapsed + "ms)", NamedTextColor.GREEN));
         return 1;
+    }
+
+    private static int executeBackpack(CommandSender sender) {
+        if (!(sender instanceof org.bukkit.entity.Player player)) {
+            sender.sendMessage(Component.text("プレイヤーのみ使用可能", NamedTextColor.RED));
+            return 0;
+        }
+
+        // 装備中の防具からバックパックスレッドを検索
+        for (org.bukkit.inventory.ItemStack armor : player.getInventory().getArmorContents()) {
+            if (armor != null && BackpackGui.countBackpackThreads(armor) > 0) {
+                BackpackGui.open(player, armor);
+                return 1;
+            }
+        }
+        player.sendMessage(Component.text("バックパックスレッドが装備されていません", NamedTextColor.RED));
+        return 0;
     }
 
     private static int executePvpToggle(ArsPaper plugin, CommandSender sender, String state) {
@@ -235,6 +393,45 @@ public final class ArsCommand {
         sender.sendMessage(Component.text(
             "スペルPvP: " + (enabled ? "ON" : "OFF"),
             enabled ? NamedTextColor.GREEN : NamedTextColor.YELLOW));
+        return 1;
+    }
+
+    /**
+     * グリフ解放数からマナボーナスを再計算し、不正な値を修正する。
+     */
+    private static int executeFixMana(ArsPaper plugin, CommandSender sender, Player target) {
+        // 現在の解放済みグリフ数を取得
+        String json = target.getPersistentDataContainer()
+            .get(ManaKeys.UNLOCKED_GLYPHS, PersistentDataType.STRING);
+        int glyphCount = 0;
+        if (json != null) {
+            try {
+                JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
+                glyphCount = arr.size();
+            } catch (Exception ignored) {}
+        }
+
+        int perGlyphBonus = plugin.getConfig().getInt("mana.per-glyph-unlock-bonus", 5);
+        int correctBonus = glyphCount * perGlyphBonus;
+        int currentBonus = target.getPersistentDataContainer()
+            .getOrDefault(ManaKeys.GLYPH_MANA_BONUS, PersistentDataType.INTEGER, 0);
+
+        target.getPersistentDataContainer().set(
+            ManaKeys.GLYPH_MANA_BONUS, PersistentDataType.INTEGER, correctBonus);
+
+        // 現在マナが新上限を超えている場合はクランプ
+        int newMax = plugin.getManaManager().getMaxMana(target);
+        int currentMana = plugin.getManaManager().getCurrentMana(target);
+        if (currentMana > newMax) {
+            plugin.getManaManager().setCurrentMana(target, newMax);
+        }
+
+        int diff = currentBonus - correctBonus;
+        sender.sendMessage(Component.text(
+            target.getName() + " のマナボーナスを修正: " + currentBonus + " → " + correctBonus
+                + " (グリフ" + glyphCount + "個 × " + perGlyphBonus + ")"
+                + (diff > 0 ? " §c(-" + diff + " 修正)" : " §a(正常)"),
+            NamedTextColor.GREEN));
         return 1;
     }
 
@@ -263,10 +460,10 @@ public final class ArsCommand {
     }
 
     private static int executeSpellBind(ArsPaper plugin, Player player, int slot) {
-        // オフハンドのアイテムにバインド
-        ItemStack offhand = player.getInventory().getItemInOffHand();
-        if (offhand.getType().isAir()) {
-            player.sendMessage(Component.text("オフハンドにバインド先のアイテムを持ってください", NamedTextColor.RED));
+        // オフハンドまたはホットバー9番スロットからバインド対象を検索
+        ItemStack offhand = findBindTarget(player);
+        if (offhand == null) {
+            player.sendMessage(Component.text("オフハンドまたはホットバー9番スロットにバインド先のアイテムを持ってください", NamedTextColor.RED));
             return 0;
         }
 
@@ -300,6 +497,24 @@ public final class ArsCommand {
         com.arspaper.item.impl.SpellBook.getOrCreateUUID(mainHand);
         // mainHandはスペルブック、offhandがバインド先アイテム
         return com.arspaper.spell.SpellBindListener.bindSpell(player, offhand, mainHand, idx, slots.get(idx)) ? 1 : 0;
+    }
+
+    /**
+     * バインド対象アイテムを検索。オフハンド → ホットバースロット8(固定)。
+     */
+    private static ItemStack findBindTarget(Player player) {
+        ItemStack offhand = player.getInventory().getItemInOffHand();
+        if (!offhand.getType().isAir()) return offhand;
+        ItemStack slot8 = player.getInventory().getItem(8);
+        if (slot8 != null && !slot8.getType().isAir()) {
+            if (!slot8.hasItemMeta()) return slot8;
+            String customId = slot8.getItemMeta().getPersistentDataContainer()
+                .get(com.arspaper.item.ItemKeys.CUSTOM_ITEM_ID, org.bukkit.persistence.PersistentDataType.STRING);
+            if (customId == null || (!customId.contains("spell_book") && !customId.contains("wand"))) {
+                return slot8;
+            }
+        }
+        return null;
     }
 
     private static int executeSpellUnbind(Player player) {
@@ -339,6 +554,106 @@ public final class ArsCommand {
             )));
 
         return 1;
+    }
+
+    private static int executeRankingGlyphs(ArsPaper plugin, CommandSender sender) {
+        int totalGlyphs = plugin.getSpellRegistry().getAll().size();
+        record Entry(String name, int count, boolean online) {}
+        java.util.Map<String, Entry> entryMap = new java.util.LinkedHashMap<>();
+
+        // キャッシュからオフライン含む全プレイヤーを読み込み
+        for (var cached : plugin.getManaManager().getRankingCache().getAll().entrySet()) {
+            var data = cached.getValue();
+            entryMap.put(cached.getKey(), new Entry(data.name(), data.glyphCount(), false));
+        }
+
+        // オンラインプレイヤーの最新データで上書き
+        for (Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
+            String json = p.getPersistentDataContainer()
+                .get(ManaKeys.UNLOCKED_GLYPHS, PersistentDataType.STRING);
+            int count = 0;
+            if (json != null) {
+                try {
+                    JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
+                    count = arr.size();
+                } catch (Exception ignored) {}
+            }
+            entryMap.put(p.getUniqueId().toString(), new Entry(p.getName(), count, true));
+        }
+
+        List<Entry> entries = new ArrayList<>(entryMap.values());
+        entries.sort((a, b) -> Integer.compare(b.count(), a.count()));
+
+        sender.sendMessage(Component.text("=== グリフ解放数ランキング ===", NamedTextColor.GOLD));
+        int rank = 0;
+        for (Entry entry : entries) {
+            rank++;
+            if (rank > 10) break;
+            String medal = switch (rank) {
+                case 1 -> "§6①";
+                case 2 -> "§7②";
+                case 3 -> "§c③";
+                default -> "§8" + rank;
+            };
+            double pct = totalGlyphs > 0 ? (entry.count() * 100.0 / totalGlyphs) : 0;
+            String onlineMarker = entry.online() ? "" : " §8[OFF]";
+            sender.sendMessage(Component.text(
+                medal + " " + entry.name() + onlineMarker + " §f" + entry.count() + "/" + totalGlyphs
+                    + " §7(" + String.format("%.0f", pct) + "%)"
+            ));
+        }
+        if (entries.isEmpty()) {
+            sender.sendMessage(Component.text("データがありません", NamedTextColor.GRAY));
+        }
+        return 1;
+    }
+
+    private static int executeRankingMana(ArsPaper plugin, CommandSender sender) {
+        record Entry(String name, long consumed, boolean online) {}
+        java.util.Map<String, Entry> entryMap = new java.util.LinkedHashMap<>();
+
+        // キャッシュからオフライン含む全プレイヤーを読み込み
+        for (var cached : plugin.getManaManager().getRankingCache().getAll().entrySet()) {
+            var data = cached.getValue();
+            entryMap.put(cached.getKey(), new Entry(data.name(), data.manaConsumed(), false));
+        }
+
+        // オンラインプレイヤーの最新データで上書き
+        for (Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
+            long consumed = plugin.getManaManager().getTotalManaConsumed(p);
+            entryMap.put(p.getUniqueId().toString(), new Entry(p.getName(), consumed, true));
+        }
+
+        List<Entry> entries = new ArrayList<>(entryMap.values());
+        entries.sort((a, b) -> Long.compare(b.consumed(), a.consumed()));
+
+        sender.sendMessage(Component.text("=== マナ消費量ランキング ===", NamedTextColor.AQUA));
+        int rank = 0;
+        for (Entry entry : entries) {
+            rank++;
+            if (rank > 10) break;
+            String medal = switch (rank) {
+                case 1 -> "§6①";
+                case 2 -> "§7②";
+                case 3 -> "§c③";
+                default -> "§8" + rank;
+            };
+            String formatted = formatNumber(entry.consumed());
+            String onlineMarker = entry.online() ? "" : " §8[OFF]";
+            sender.sendMessage(Component.text(
+                medal + " " + entry.name() + onlineMarker + " §b" + formatted + " マナ"
+            ));
+        }
+        if (entries.isEmpty()) {
+            sender.sendMessage(Component.text("データがありません", NamedTextColor.GRAY));
+        }
+        return 1;
+    }
+
+    private static String formatNumber(long n) {
+        if (n >= 1_000_000) return String.format("%.1fM", n / 1_000_000.0);
+        if (n >= 1_000) return String.format("%.1fK", n / 1_000.0);
+        return String.valueOf(n);
     }
 
     private static int executeSpellSet(ArsPaper plugin, Player player, int slot, String spellDef) {

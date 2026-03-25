@@ -14,6 +14,12 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
+import com.arspaper.source.sourcelink.VitalicSourcelink;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.world.ChunkLoadEvent;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -25,7 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Source生成 → 隣接Source Jar供給を行うタスク。
  * 全チャンク走査ではなく、設置済み位置のSetで管理する。
  */
-public class SourcelinkTickTask {
+public class SourcelinkTickTask implements Listener {
 
     private static final int TICK_INTERVAL = 100; // 5秒
     private final JavaPlugin plugin;
@@ -46,6 +52,36 @@ public class SourcelinkTickTask {
         task = plugin.getServer().getScheduler().runTaskTimer(
             plugin, this::tick, TICK_INTERVAL, TICK_INTERVAL
         );
+        // ChunkLoadイベントでキャッシュに追加
+        plugin.getServer().getPluginManager().registerEvents(this, plugin);
+    }
+
+    /**
+     * チャンクロード時にSourcelinkをキャッシュに追加する。
+     * 新規生成チャンクはスキップ（Sourcelinkがあるはずがない）。
+     * メインスレッドへの負荷軽減のため1tick遅延で処理。
+     */
+    @EventHandler
+    public void onChunkLoad(ChunkLoadEvent event) {
+        if (event.isNewChunk()) return; // 新規生成チャンクにはSourcelinkなし
+        Chunk chunk = event.getChunk();
+        // 1tick遅延でチャンクの準備完了を待つ
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            if (!chunk.isLoaded()) return;
+            for (BlockState state : chunk.getTileEntities()) {
+                if (!(state instanceof TileState tileState)) continue;
+                String blockId = tileState.getPersistentDataContainer()
+                    .get(BlockKeys.CUSTOM_BLOCK_ID, PersistentDataType.STRING);
+                if (blockId == null) continue;
+                blockRegistry.get(blockId).ifPresent(cb -> {
+                    if (cb instanceof Sourcelink) {
+                        sourcelinkLocations
+                            .computeIfAbsent(blockId, k -> ConcurrentHashMap.newKeySet())
+                            .add(state.getLocation());
+                    }
+                });
+            }
+        }, 1L);
     }
 
     /**
@@ -98,6 +134,40 @@ public class SourcelinkTickTask {
     public void removeSourcelink(Location location) {
         Location blockLoc = location.getBlock().getLocation();
         sourcelinkLocations.values().forEach(locs -> locs.remove(blockLoc));
+    }
+
+    /**
+     * Vitalic Sourcelink: 近くでmobが死亡した際にボーナスSourceを隣接Jarに供給。
+     */
+    @EventHandler
+    public void onEntityDeath(EntityDeathEvent event) {
+        // プレイヤーの死亡は無視
+        if (event.getEntity() instanceof org.bukkit.entity.Player) return;
+
+        Location deathLoc = event.getEntity().getLocation();
+        World deathWorld = deathLoc.getWorld();
+        if (deathWorld == null) return;
+
+        Set<Location> vitalicLocs = sourcelinkLocations.get("vitalic_sourcelink");
+        if (vitalicLocs == null || vitalicLocs.isEmpty()) return;
+
+        int radiusSq = VitalicSourcelink.DETECTION_RADIUS * VitalicSourcelink.DETECTION_RADIUS;
+
+        // 防御的コピー: イテレーション中のConcurrentModificationを回避
+        for (Location loc : List.copyOf(vitalicLocs)) {
+            World locWorld = loc.getWorld();
+            if (locWorld == null || !deathWorld.equals(locWorld)) continue;
+            if (deathLoc.distanceSquared(loc) > radiusSq) continue;
+
+            Block block = loc.getBlock();
+            if (!(block.getState() instanceof TileState)) continue;
+
+            blockRegistry.get("vitalic_sourcelink").ifPresent(cb -> {
+                if (cb instanceof Sourcelink sourcelink) {
+                    sourcelink.supplyAdjacent(block, VitalicSourcelink.SOURCE_PER_KILL);
+                }
+            });
+        }
     }
 
     private void tick() {

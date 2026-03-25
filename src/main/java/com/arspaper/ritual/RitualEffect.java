@@ -17,4 +17,12 @@ public interface RitualEffect {
      * @param recipe       マッチした儀式レシピ
      */
     void execute(Location coreLocation, Player player, RitualRecipe recipe);
+
+    /**
+     * 素材消費前の事前検証。falseを返すと儀式を中止し素材を消費しない。
+     * デフォルトは常にtrue（検証なし）。
+     */
+    default boolean validate(Location coreLocation, Player player, RitualRecipe recipe) {
+        return true;
+    }
 }

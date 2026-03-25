@@ -26,6 +26,7 @@ import java.util.Random;
 public class FireworkEffect implements SpellEffect {
 
     private static final Random RANDOM = new Random();
+    private static final int DEFAULT_MAX_STARS = 5;
 
     private final NamespacedKey id;
     private final GlyphConfig config;
@@ -52,8 +53,9 @@ public class FireworkEffect implements SpellEffect {
         int amplifyLevel = Math.max(0, context.getAmplifyLevel());
         int durationLevel = context.getDurationLevel();
 
-        // スター数: 1 + amplifyLevel (上限5)
-        int starCount = Math.min(1 + amplifyLevel, 5);
+        // スター数: 1 + amplifyLevel (上限設定可能)
+        int maxStars = (int) config.getParam("firework", "max-stars", (double) DEFAULT_MAX_STARS);
+        int starCount = Math.min(1 + amplifyLevel, maxStars);
 
         // 飛翔距離: 1 + durationLevel (上限3)
         int flightPower = Math.min(1 + Math.max(0, durationLevel), 3);
@@ -91,6 +93,9 @@ public class FireworkEffect implements SpellEffect {
             .flicker(RANDOM.nextBoolean())
             .build();
     }
+
+    @Override
+    public boolean allowsTraceRepeating() { return false; }
 
     @Override
     public NamespacedKey getId() { return id; }

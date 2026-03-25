@@ -4,24 +4,21 @@ import com.arspaper.ArsPaper;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
-import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.RecipeChoice;
 import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.ShapelessRecipe;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.io.File;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 
 /**
- * recipes.ymlからクラフトレシピを読み込み、サーバーに登録する。
- * Shaped / Shapeless レシピをサポート。
- * 結果がカスタムアイテムの場合はCustomItemRegistry経由でItemStackを生成。
+ * 作業台レシピをサーバーに登録する。
+ * UnifiedRecipeLoaderから受け取ったレシピデータと、
+ * ArmorConfigManagerの防具レシピを登録する。
  */
 public class RecipeManager {
 
@@ -32,94 +29,86 @@ public class RecipeManager {
         this.plugin = plugin;
     }
 
-    public void loadRecipes() {
-        File file = new File(plugin.getDataFolder(), "recipes.yml");
-        if (!file.exists()) {
-            plugin.saveResource("recipes.yml", false);
-        }
-
-        YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
-        ConfigurationSection recipesSection = config.getConfigurationSection("recipes");
-        if (recipesSection == null) {
-            plugin.getLogger().info("No recipes found in recipes.yml");
-            return;
-        }
-
+    /**
+     * UnifiedRecipeLoaderから作業台レシピを登録する。
+     */
+    public void registerWorkbenchRecipes(List<UnifiedRecipeLoader.WorkbenchRecipeData> recipes) {
         int count = 0;
-        for (String key : recipesSection.getKeys(false)) {
-            ConfigurationSection recipeSection = recipesSection.getConfigurationSection(key);
-            if (recipeSection == null) continue;
-
+        for (UnifiedRecipeLoader.WorkbenchRecipeData data : recipes) {
             try {
-                // craft-method: workbench, ritual, or both (default: workbench)
-                String craftMethod = recipeSection.getString("craft-method", "workbench").toLowerCase();
-                if ("ritual".equals(craftMethod)) {
-                    // workbenchレシピとしては登録しない
-                    continue;
-                }
-
-                String type = recipeSection.getString("type", "shaped");
-                switch (type.toLowerCase()) {
-                    case "shaped" -> registerShaped(key, recipeSection);
-                    case "shapeless" -> registerShapeless(key, recipeSection);
-                    default -> plugin.getLogger().warning("Unknown recipe type: " + type + " for " + key);
+                switch (data.type().toLowerCase()) {
+                    case "shaped" -> registerShaped(data);
+                    case "shapeless" -> registerShapeless(data);
+                    default -> plugin.getLogger().warning("Unknown recipe type: " + data.type() + " for " + data.id());
                 }
                 count++;
             } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "Failed to load recipe: " + key, e);
+                plugin.getLogger().log(Level.WARNING, "Failed to load recipe: " + data.id(), e);
             }
         }
-        plugin.getLogger().info("Loaded " + count + " recipes from recipes.yml");
+        plugin.getLogger().info("Loaded " + count + " workbench recipes");
     }
 
-    private void registerShaped(String key, ConfigurationSection section) {
-        ItemStack result = resolveResult(section);
-        if (result == null) return;
-
-        int amount = section.getInt("amount", 1);
-        result.setAmount(amount);
-
-        NamespacedKey nsKey = new NamespacedKey(plugin, key);
-        ShapedRecipe recipe = new ShapedRecipe(nsKey, result);
-
-        List<String> shape = section.getStringList("shape");
-        if (shape.isEmpty()) {
-            plugin.getLogger().warning("Recipe " + key + " has no shape defined");
+    private void registerShaped(UnifiedRecipeLoader.WorkbenchRecipeData data) {
+        ItemStack result = resolveResult(data.result());
+        if (result == null) {
+            plugin.getLogger().warning("Skipping shaped recipe " + data.id() + ": result not found (" + data.result() + ")");
             return;
         }
-        recipe.shape(shape.toArray(new String[0]));
+        result.setAmount(data.amount());
 
-        ConfigurationSection ingredients = section.getConfigurationSection("ingredients");
-        if (ingredients != null) {
-            for (String symbol : ingredients.getKeys(false)) {
-                String materialName = ingredients.getString(symbol);
-                RecipeChoice choice = resolveIngredient(materialName, key);
-                if (choice != null) {
-                    recipe.setIngredient(symbol.charAt(0), choice);
-                }
+        NamespacedKey nsKey = new NamespacedKey(plugin, data.id());
+
+        // 全素材を事前解決（1つでも失敗したらレシピ登録をスキップ）
+        Map<Character, RecipeChoice> resolvedIngredients = new HashMap<>();
+        boolean allResolved = true;
+        for (Map.Entry<String, String> entry : data.ingredients().entrySet()) {
+            RecipeChoice choice = resolveIngredient(entry.getValue(), data.id());
+            if (choice == null) {
+                plugin.getLogger().warning("Skipping shaped recipe " + data.id()
+                    + ": ingredient '" + entry.getKey() + "'=" + entry.getValue() + " not found");
+                allResolved = false;
+            } else {
+                resolvedIngredients.put(entry.getKey().charAt(0), choice);
             }
+        }
+        if (!allResolved) return;
+
+        // reload時の重複防止
+        if (registeredRecipes.containsKey(nsKey)) {
+            Bukkit.removeRecipe(nsKey);
+        }
+
+        ShapedRecipe recipe = new ShapedRecipe(nsKey, result);
+        recipe.shape(data.shape().toArray(new String[0]));
+        for (Map.Entry<Character, RecipeChoice> entry : resolvedIngredients.entrySet()) {
+            recipe.setIngredient(entry.getKey(), entry.getValue());
         }
 
         Bukkit.addRecipe(recipe);
         registeredRecipes.put(nsKey, recipe);
     }
 
-    private void registerShapeless(String key, ConfigurationSection section) {
-        ItemStack result = resolveResult(section);
-        if (result == null) return;
+    private void registerShapeless(UnifiedRecipeLoader.WorkbenchRecipeData data) {
+        ItemStack result = resolveResult(data.result());
+        if (result == null) {
+            plugin.getLogger().warning("Skipping shapeless recipe " + data.id() + ": result not found (" + data.result() + ")");
+            return;
+        }
+        result.setAmount(data.amount());
 
-        int amount = section.getInt("amount", 1);
-        result.setAmount(amount);
+        NamespacedKey nsKey = new NamespacedKey(plugin, data.id());
 
-        NamespacedKey nsKey = new NamespacedKey(plugin, key);
+        // reload時の重複防止
+        if (registeredRecipes.containsKey(nsKey)) {
+            Bukkit.removeRecipe(nsKey);
+        }
+
         ShapelessRecipe recipe = new ShapelessRecipe(nsKey, result);
 
-        List<String> ingredientNames = section.getStringList("ingredients");
-        for (String ingredientName : ingredientNames) {
-            RecipeChoice choice = resolveIngredient(ingredientName, key);
-            if (choice != null) {
-                recipe.addIngredient(choice);
-            }
+        for (String ing : data.ingredients().values()) {
+            RecipeChoice choice = resolveIngredient(ing, data.id());
+            if (choice != null) recipe.addIngredient(choice);
         }
 
         Bukkit.addRecipe(recipe);
@@ -127,9 +116,63 @@ public class RecipeManager {
     }
 
     /**
+     * armors.ymlで定義された防具レシピを登録する。
+     */
+    public void registerArmorRecipes(com.arspaper.item.ArmorConfigManager armorConfig) {
+        int count = 0;
+        for (com.arspaper.item.ArmorSetConfig set : armorConfig.getAll()) {
+            for (Map.Entry<String, com.arspaper.item.RecipeDefinition> entry : set.getRecipes().entrySet()) {
+                String slot = entry.getKey();
+                com.arspaper.item.RecipeDefinition def = entry.getValue();
+                String recipeKey = "armor_" + set.getItemId(slot);
+
+                try {
+                    ItemStack result = ArsPaper.getInstance().getItemRegistry()
+                        .get(set.getItemId(slot))
+                        .map(item -> item.createItemStack())
+                        .orElse(null);
+                    if (result == null) {
+                        plugin.getLogger().warning("Armor item not found: " + set.getItemId(slot));
+                        continue;
+                    }
+
+                    NamespacedKey nsKey = new NamespacedKey(plugin, recipeKey);
+                    if (registeredRecipes.containsKey(nsKey)) {
+                        Bukkit.removeRecipe(nsKey);
+                    }
+                    if ("shaped".equalsIgnoreCase(def.type())) {
+                        ShapedRecipe recipe = new ShapedRecipe(nsKey, result);
+                        recipe.shape(def.shape().toArray(new String[0]));
+                        for (Map.Entry<String, String> ing : def.ingredients().entrySet()) {
+                            RecipeChoice choice = resolveIngredient(ing.getValue(), recipeKey);
+                            if (choice != null) {
+                                recipe.setIngredient(ing.getKey().charAt(0), choice);
+                            }
+                        }
+                        Bukkit.addRecipe(recipe);
+                        registeredRecipes.put(nsKey, recipe);
+                    } else if ("shapeless".equalsIgnoreCase(def.type())) {
+                        ShapelessRecipe recipe = new ShapelessRecipe(nsKey, result);
+                        for (String ing : def.ingredients().values()) {
+                            RecipeChoice choice = resolveIngredient(ing, recipeKey);
+                            if (choice != null) recipe.addIngredient(choice);
+                        }
+                        Bukkit.addRecipe(recipe);
+                        registeredRecipes.put(nsKey, recipe);
+                    }
+                    count++;
+                } catch (Exception e) {
+                    plugin.getLogger().warning("Failed to register armor recipe: " + recipeKey + " - " + e.getMessage());
+                }
+            }
+        }
+        plugin.getLogger().info("Loaded " + count + " armor recipes from armors.yml");
+    }
+
+    /**
      * 素材文字列をRecipeChoiceに変換。"custom:item_id"形式ならExactChoice。
      */
-    private RecipeChoice resolveIngredient(String ingredientName, String recipeKey) {
+    RecipeChoice resolveIngredient(String ingredientName, String recipeKey) {
         if (ingredientName == null) return null;
 
         if (ingredientName.startsWith("custom:")) {
@@ -153,15 +196,8 @@ public class RecipeManager {
         return null;
     }
 
-    /**
-     * resultフィールドを解決。"custom:item_id"形式ならカスタムアイテム。
-     */
-    private ItemStack resolveResult(ConfigurationSection section) {
-        String resultStr = section.getString("result");
-        if (resultStr == null) {
-            plugin.getLogger().warning("Recipe has no result defined");
-            return null;
-        }
+    private ItemStack resolveResult(String resultStr) {
+        if (resultStr == null) return null;
 
         if (resultStr.startsWith("custom:")) {
             String customId = resultStr.substring("custom:".length());
@@ -191,5 +227,12 @@ public class RecipeManager {
 
     public int getRecipeCount() {
         return registeredRecipes.size();
+    }
+
+    /**
+     * 登録済みレシピのマップを返す。
+     */
+    public Map<NamespacedKey, Object> getRegisteredRecipes() {
+        return registeredRecipes;
     }
 }

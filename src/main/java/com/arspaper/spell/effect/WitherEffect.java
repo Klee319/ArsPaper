@@ -33,8 +33,11 @@ public class WitherEffect implements SpellEffect {
 
     @Override
     public void applyToEntity(SpellContext context, LivingEntity target) {
-        int duration = BASE_DURATION + context.getDurationLevel() * DURATION_PER_LEVEL;
-        int amplifier = Math.min(Math.max(0, context.getAmplifyLevel()), MAX_AMPLIFIER);
+        int baseDuration = (int) config.getParam("wither", "base-duration", (double) BASE_DURATION);
+        int durationPerLevel = (int) config.getParam("wither", "duration-per-level", (double) DURATION_PER_LEVEL);
+        int duration = baseDuration + context.getDurationLevel() * durationPerLevel;
+        int maxAmp = (int) config.getParam("wither", "max-amplifier", (double) MAX_AMPLIFIER);
+        int amplifier = Math.min(Math.max(0, context.getAmplifyLevel()), maxAmp);
 
         target.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, duration, amplifier));
 

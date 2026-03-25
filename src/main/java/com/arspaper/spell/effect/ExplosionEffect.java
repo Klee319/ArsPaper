@@ -7,6 +7,9 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.Particle;
+import org.bukkit.Sound;
+import org.bukkit.SoundCategory;
 import org.bukkit.block.Block;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -15,19 +18,22 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 /**
  * 対象位置で爆発を起こすEffect。
- * Ars Nouveau準拠:
- *   power = 0.75 + 0.5 × amp + 1.5 × aoe  (AOEで爆発範囲を大幅拡大)
- *   damage = 6.0 + 2.5 × amp
- *   setFire=false, breakBlocks=false (安全な爆発)
- *   Extract付き: 対象ブロックのアイテムドロップを有効化
+ * createExplosion()を使用。半径増加(aoe_radius)のみでpowerをスケール。
+ * 増幅(amplify)は非互換 — 威力調整はglyphs.ymlの定数で行う。
+ *
+ * params:
+ *   base-power: 基本爆発power (デフォルト: 1.5)
+ *   aoe-power-bonus: 半径増加1段あたりのpower増加 (デフォルト: 0.8)
+ *   max-power: 爆発power上限 (デフォルト: 6.0)
+ *
+ * Extract付き: 範囲内ブロックをドロップさせる。
+ * breakBlocks=false, setFire=false（安全な爆発）。
  */
 public class ExplosionEffect implements SpellEffect {
 
-    private static final double DEFAULT_BASE_POWER = 0.5;
-    private static final double DEFAULT_AMPLIFY_POWER_BONUS = 0.3;
-    private static final double DEFAULT_AOE_POWER_BONUS = 1.0;
-    private static final double DEFAULT_BASE_DAMAGE = 3.0;
-    private static final double DEFAULT_AMPLIFY_DAMAGE_BONUS = 1.5;
+    private static final double DEFAULT_BASE_POWER = 1.5;
+    private static final double DEFAULT_AOE_POWER_BONUS = 0.8;
+    private static final double DEFAULT_MAX_POWER = 6.0;
     private final NamespacedKey id;
     private final GlyphConfig config;
 
@@ -38,58 +44,64 @@ public class ExplosionEffect implements SpellEffect {
 
     @Override
     public void applyToEntity(SpellContext context, LivingEntity target) {
-        int amplifyLevel = context.getAmplifyLevel();
-        int aoeLevel = context.getAoeRadiusLevel();
-
-        float power = (float)(config.getParam("explosion", "base-power", DEFAULT_BASE_POWER)
-            + amplifyLevel * config.getParam("explosion", "amplify-power-bonus", DEFAULT_AMPLIFY_POWER_BONUS)
-            + aoeLevel * config.getParam("explosion", "aoe-power-bonus", DEFAULT_AOE_POWER_BONUS));
-
-        // 爆発エフェクト（ブロック破壊なし・着火なし）
-        // createExplosion()が爆発範囲内のエンティティに自動でダメージを与えるため、
-        // 別途target.damage()を呼ぶと二重ダメージになる
-        target.getWorld().createExplosion(
-            target.getLocation(), power, false, false, context.getCaster());
+        float power = calcPower(context);
+        Location loc = target.getLocation();
+        loc.getWorld().createExplosion(loc, power, false, false, context.getCaster());
+        spawnExplosionFx(loc, power);
     }
 
     @Override
     public void applyToBlock(SpellContext context, Location blockLocation) {
-        int amplifyLevel = context.getAmplifyLevel();
-        int aoeLevel = context.getAoeRadiusLevel();
+        float power = calcPower(context);
         boolean hasExtract = context.getExtractCount() > 0;
-
-        float power = (float)(config.getParam("explosion", "base-power", DEFAULT_BASE_POWER)
-            + amplifyLevel * config.getParam("explosion", "amplify-power-bonus", DEFAULT_AMPLIFY_POWER_BONUS)
-            + aoeLevel * config.getParam("explosion", "aoe-power-bonus", DEFAULT_AOE_POWER_BONUS));
 
         if (hasExtract) {
             Player caster = context.getCaster();
-            // Extract付き: 爆発範囲のブロックをドロップさせる
-            int radius = (int) Math.ceil(power);
-            for (int dx = -radius; dx <= radius; dx++) {
-                for (int dy = -radius; dy <= radius; dy++) {
-                    for (int dz = -radius; dz <= radius; dz++) {
+            int r = (int) Math.ceil(power);
+            for (int dx = -r; dx <= r; dx++) {
+                for (int dy = -r; dy <= r; dy++) {
+                    for (int dz = -r; dz <= r; dz++) {
                         Location loc = blockLocation.clone().add(dx, dy, dz);
-                        if (loc.distanceSquared(blockLocation) <= power * power) {
-                            Block block = loc.getBlock();
-                            if (!block.getType().isAir() && block.getType() != Material.BEDROCK) {
-                                if (caster != null) {
-                                    BlockBreakEvent evt = new BlockBreakEvent(block, caster);
-                                    Bukkit.getPluginManager().callEvent(evt);
-                                    if (evt.isCancelled()) continue;
-                                }
-                                block.breakNaturally();
+                        if (loc.distanceSquared(blockLocation) > power * power) continue;
+                        Block block = loc.getBlock();
+                        if (!block.getType().isAir() && block.getType() != Material.BEDROCK) {
+                            if (caster != null) {
+                                BlockBreakEvent evt = new BlockBreakEvent(block, caster);
+                                Bukkit.getPluginManager().callEvent(evt);
+                                if (evt.isCancelled()) continue;
                             }
+                            block.breakNaturally();
                         }
                     }
                 }
             }
         }
 
-        // 爆発エフェクト（ブロック破壊なし・着火なし）
         blockLocation.getWorld().createExplosion(
             blockLocation, power, false, false, context.getCaster());
+        spawnExplosionFx(blockLocation, power);
     }
+
+    /** power = base + aoe_radius × bonus, maxで上限 */
+    private float calcPower(SpellContext context) {
+        double base = config.getParam("explosion", "base-power", DEFAULT_BASE_POWER);
+        double bonus = config.getParam("explosion", "aoe-power-bonus", DEFAULT_AOE_POWER_BONUS);
+        double max = config.getParam("explosion", "max-power", DEFAULT_MAX_POWER);
+        return (float) Math.min(base + context.getAoeRadiusLevel() * bonus, max);
+    }
+
+    private void spawnExplosionFx(Location loc, float power) {
+        int particleCount = (int)(8 + power * 4);
+        double spread = 0.3 + power * 0.15;
+        loc.getWorld().spawnParticle(Particle.EXPLOSION, loc, Math.min(particleCount, 25),
+            spread, spread, spread, 0.05);
+        loc.getWorld().spawnParticle(Particle.EXPLOSION_EMITTER, loc, 1, 0, 0, 0, 0);
+        loc.getWorld().spawnParticle(Particle.SMOKE, loc, particleCount,
+            spread, spread, spread, 0.03);
+    }
+
+    @Override
+    public boolean allowsTraceRepeating() { return false; }
 
     @Override
     public NamespacedKey getId() { return id; }

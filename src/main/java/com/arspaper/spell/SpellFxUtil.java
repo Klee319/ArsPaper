@@ -28,9 +28,9 @@ public final class SpellFxUtil {
             Sound.ENTITY_EVOKER_CAST_SPELL, SoundCategory.PLAYERS, 0.8f, 1.2f);
     }
 
-    /** Projectile軌跡パーティクル */
+    /** Projectile軌跡パーティクル（軽量） */
     public static void spawnProjectileTrail(Location loc) {
-        loc.getWorld().spawnParticle(Particle.ENCHANT, loc, 3, 0.1, 0.1, 0.1, 0.5);
+        loc.getWorld().spawnParticle(Particle.ENCHANT, loc, 1, 0.05, 0.05, 0.05, 0.3);
     }
 
     /** 着弾バースト（Projectile/Touch共通） */
@@ -239,27 +239,4 @@ public final class SpellFxUtil {
      * 指定ブロック位置にエンティティが存在するか（設置キャンセル判定用）。
      * バニラと同様、エンティティのバウンディングボックスとブロック位置が重なる場合true。
      */
-    /**
-     * 指定位置に特定のプレイヤーが存在するか判定。
-     */
-    public static boolean isPlayerOccupying(Location blockLocation, Player player) {
-        if (player == null) return false;
-        Block block = blockLocation.getBlock();
-        BoundingBox blockBox = BoundingBox.of(block);
-        return player.getBoundingBox().overlaps(blockBox);
-    }
-
-    /**
-     * 後方互換: 任意のLivingEntityがいるか（非推奨）
-     */
-    public static boolean isEntityOccupying(Location blockLocation) {
-        Block block = blockLocation.getBlock();
-        BoundingBox blockBox = BoundingBox.of(block);
-        for (Entity entity : block.getWorld().getNearbyEntities(blockBox)) {
-            if (entity instanceof LivingEntity) {
-                return true;
-            }
-        }
-        return false;
-    }
 }

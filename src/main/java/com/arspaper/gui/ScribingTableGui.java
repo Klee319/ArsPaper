@@ -37,6 +37,8 @@ public class ScribingTableGui extends BaseGui {
     private final Location tableLocation;
     private final List<SpellComponent> displayedGlyphs = new ArrayList<>();
     private int currentPage = 0;
+    /** アンロックアニメーション進行中フラグ（同一GUI内での二重クリック防止） */
+    private boolean unlocking = false;
 
     public ScribingTableGui(ArsPaper plugin, Player player, Location tableLocation) {
         super(player, 6, Component.text("筆記台", NamedTextColor.DARK_AQUA));
@@ -115,22 +117,42 @@ public class ScribingTableGui extends BaseGui {
             return true;
         }
 
+        // 二重クリック防止（アニメーション進行中は拒否）
+        if (unlocking) return true;
+
         if (!checkUnlockCost(clicker, component)) {
             return true;
         }
 
-        // 経験値レベルを先に消費（アニメーション中断時も返却しない仕様）
+        unlocking = true;
+
+        // 経験値レベルはアニメーション完了後に消費（中断時のXPロスを防止）
         GlyphConfig glyphConfig = plugin.getGlyphConfig();
         String glyphKey = component.getId().getKey();
         int levelCost = glyphConfig.getUnlockLevel(glyphKey);
         java.util.Map<Material, Integer> materials = glyphConfig.getUnlockMaterials(glyphKey);
-        clicker.setLevel(clicker.getLevel() - levelCost);
 
-        // アンロックアニメーション開始（GUI閉じ→素材消費→軌道演出→アンロック完了）
+        // アンロックアニメーション開始（GUI閉じ→素材消費→軌道演出→XP消費→アンロック完了）
         GlyphUnlockAnimation.play(
             plugin, clicker, component, tableLocation,
             materials, levelCost, unlocked,
-            () -> saveUnlockedGlyphs(unlocked)
+            () -> {
+                // アニメーション完了後にXPを再検証（TOCTOU防止）
+                if (clicker.getLevel() < levelCost) {
+                    clicker.sendMessage(Component.text(
+                        "経験値レベルが不足しています！アンロックに失敗しました。", NamedTextColor.RED));
+                    // 素材は既に消費済みのため返還（インベントリ満杯時は足元にドロップ）
+                    for (var entry : materials.entrySet()) {
+                        java.util.Map<Integer, ItemStack> overflow =
+                            clicker.getInventory().addItem(new ItemStack(entry.getKey(), entry.getValue()));
+                        overflow.values().forEach(item ->
+                            clicker.getWorld().dropItemNaturally(clicker.getLocation(), item));
+                    }
+                    return;
+                }
+                clicker.setLevel(clicker.getLevel() - levelCost);
+                saveUnlockedGlyphs(unlocked);
+            }
         );
         return true;
     }
@@ -164,8 +186,16 @@ public class ScribingTableGui extends BaseGui {
             lore.add(Component.empty());
             lore.add(Component.text("クリックで解放！", NamedTextColor.GOLD)
                 .decoration(TextDecoration.ITALIC, false));
-            lore.add(Component.text("必要: " + getUnlockCostDescription(component), NamedTextColor.DARK_GRAY)
+            // 解放コストを箇条書きで表示
+            String glyphKey = component.getId().getKey();
+            GlyphConfig gc = plugin.getGlyphConfig();
+            lore.add(Component.text("必要レベル: " + gc.getUnlockLevel(glyphKey), NamedTextColor.DARK_GRAY)
                 .decoration(TextDecoration.ITALIC, false));
+            for (var entry : gc.getUnlockMaterials(glyphKey).entrySet()) {
+                String name = gc.localizeMatNamePublic(entry.getKey());
+                lore.add(Component.text("  " + name + " ×" + entry.getValue(), NamedTextColor.DARK_GRAY)
+                    .decoration(TextDecoration.ITALIC, false));
+            }
         }
 
         return createButton(material,

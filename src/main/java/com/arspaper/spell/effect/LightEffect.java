@@ -36,10 +36,10 @@ public class LightEffect implements SpellEffect {
 
     @Override
     public void applyToEntity(SpellContext context, LivingEntity target) {
-        int duration = BASE_DURATION_TICKS + context.getDurationTicks();
-        int amplifier = Math.max(0, context.getAmplifyLevel());
-        target.addPotionEffect(new PotionEffect(PotionEffectType.NIGHT_VISION, duration, amplifier));
-        target.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, duration, amplifier));
+        int baseDuration = (int) config.getParam("light", "base-duration-ticks", BASE_DURATION_TICKS);
+        int duration = baseDuration + context.getDurationTicks();
+        target.addPotionEffect(new PotionEffect(PotionEffectType.NIGHT_VISION, duration, 0));
+        target.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, duration, 0));
         SpellFxUtil.spawnLightFx(target.getLocation());
     }
 
@@ -54,15 +54,23 @@ public class LightEffect implements SpellEffect {
             if (tryPlaceTorchAt(block, caster)) return;
         }
 
-        // 対象がソリッドブロック → 隣接の空気ブロックに松明設置を試みる
+        // 対象がソリッドブロック → ヒット面側の空気ブロックに松明設置を試みる
         if (block.getType().isSolid()) {
-            // 上面を優先
+            // ヒット面があればそちらを最優先
+            org.bukkit.block.BlockFace hitFace = context.getHitFace();
+            if (hitFace != null) {
+                Block hitSide = block.getRelative(hitFace);
+                if (hitSide.getType().isAir() && tryPlaceTorchAt(hitSide, caster)) return;
+            }
+
+            // 上面を次に試行
             Block above = block.getRelative(BlockFace.UP);
             if (above.getType().isAir() && tryPlaceTorchAt(above, caster)) return;
 
-            // 側面を試行
+            // 残りの側面を試行
             for (BlockFace face : new BlockFace[]{
                     BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST}) {
+                if (face == hitFace) continue; // 既に試行済み
                 Block adj = block.getRelative(face);
                 if (adj.getType().isAir() && tryPlaceTorchAt(adj, caster)) return;
             }
@@ -108,9 +116,10 @@ public class LightEffect implements SpellEffect {
     }
 
     private boolean placeWallTorch(Block block, BlockFace attachedFace, org.bukkit.entity.Player caster) {
+        // WALL_TORCHはアイテムとして存在しないため、TORCHでイベント発火
         BlockPlaceEvent event = new BlockPlaceEvent(
             block, block.getState(), block.getRelative(attachedFace),
-            new ItemStack(Material.WALL_TORCH), caster, true, EquipmentSlot.HAND);
+            new ItemStack(Material.TORCH), caster, true, EquipmentSlot.HAND);
         Bukkit.getPluginManager().callEvent(event);
         if (event.isCancelled()) return false;
         block.setType(Material.WALL_TORCH);

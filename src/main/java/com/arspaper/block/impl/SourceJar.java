@@ -35,7 +35,7 @@ public class SourceJar extends CustomBlock {
 
     @Override
     public Material getBlockMaterial() {
-        return Material.BARREL;
+        return Material.DECORATED_POT;
     }
 
     @Override
@@ -76,12 +76,20 @@ public class SourceJar extends CustomBlock {
     @Override
     public void onBlockPlaced(Player player, Block block, TileState tileState) {
         // 設置に使ったアイテムからSource量を復元
-        ItemStack handItem = player.getInventory().getItemInMainHand();
+        // BlockPlaceEvent時点ではアイテムが既に消費されている場合があるため、
+        // 両手をチェックし、ITEM_SOURCE_KEYを持つアイテムを探す
         int restoredSource = 0;
-        if (handItem.hasItemMeta()) {
-            Integer stored = handItem.getItemMeta().getPersistentDataContainer()
-                .get(ITEM_SOURCE_KEY, PersistentDataType.INTEGER);
-            if (stored != null) restoredSource = stored;
+        for (ItemStack hand : new ItemStack[]{
+                player.getInventory().getItemInMainHand(),
+                player.getInventory().getItemInOffHand()}) {
+            if (hand != null && hand.hasItemMeta()) {
+                Integer stored = hand.getItemMeta().getPersistentDataContainer()
+                    .get(ITEM_SOURCE_KEY, PersistentDataType.INTEGER);
+                if (stored != null && stored > 0) {
+                    restoredSource = stored;
+                    break;
+                }
+            }
         }
         tileState.getPersistentDataContainer().set(
             BlockKeys.SOURCE_AMOUNT, PersistentDataType.INTEGER, restoredSource
@@ -109,8 +117,39 @@ public class SourceJar extends CustomBlock {
         return drop;
     }
 
+    /** ソースベリー1個あたりのSource追加量 */
+    public static final int SOURCE_PER_BERRY = 100;
+
     @Override
     public void onBlockInteract(Player player, Block block, TileState tileState) {
+        // ソースベリーを持っている場合: Source追加
+        ItemStack hand = player.getInventory().getItemInMainHand();
+        if (hand.hasItemMeta()) {
+            String customId = hand.getItemMeta().getPersistentDataContainer()
+                .get(ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING);
+            if ("source_berry".equals(customId) && !isInfinite(tileState)) {
+                int currentSource = getSourceAmount(tileState);
+                if (currentSource >= MAX_SOURCE) {
+                    player.sendMessage(Component.text("ソースジャーは満タンです", NamedTextColor.YELLOW));
+                    return;
+                }
+
+                // ベリー消費 + Source追加
+                hand.setAmount(hand.getAmount() - 1);
+                int added = setSourceAmount(tileState, currentSource + SOURCE_PER_BERRY) - currentSource;
+                player.sendMessage(Component.text(
+                    "ソースを" + added + "追加しました (" + getSourceAmount(tileState) + "/" + MAX_SOURCE + ")",
+                    NamedTextColor.AQUA));
+                player.playSound(player.getLocation(),
+                    org.bukkit.Sound.BLOCK_BREWING_STAND_BREW,
+                    org.bukkit.SoundCategory.BLOCKS, 0.5f, 1.5f);
+                player.getWorld().spawnParticle(org.bukkit.Particle.END_ROD,
+                    block.getLocation().add(0.5, 1.0, 0.5), 8, 0.2, 0.3, 0.2, 0.03);
+                return;
+            }
+        }
+
+        // 通常の右クリック: 貯蔵量表示
         if (isInfinite(tileState)) {
             player.sendMessage(Component.text(
                 "ソース: \u221E (無限)", NamedTextColor.LIGHT_PURPLE

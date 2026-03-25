@@ -5,35 +5,23 @@ import com.arspaper.spell.SpellContext;
 import com.arspaper.spell.SpellEffect;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.block.Block;
-import org.bukkit.block.data.Bisected;
-import org.bukkit.block.data.BlockData;
-import org.bukkit.block.data.Openable;
-import org.bukkit.block.data.Powerable;
+import org.bukkit.block.BlockFace;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Player;
+import org.bukkit.event.block.Action;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.util.Set;
-
 /**
- * 右クリック操作をシミュレートするEffect。
- * ブロック: ドア・ボタン・レバー・トラップドア・門を操作する。
- * ExtendTime: ボタンの押下持続時間を延長（長押し扱い）。
+ * 対象ブロックに対してプレイヤーの右クリック操作をシミュレートするEffect。
+ * PlayerInteractEvent(RIGHT_CLICK_BLOCK)を発火させるため、
+ * 他プラグインとの互換性を保ちつつ全ての右クリック対応ブロックが動作する。
  */
 public class InteractEffect implements SpellEffect {
-
-    private static final Set<Material> BUTTON_MATERIALS = Set.of(
-        Material.OAK_BUTTON, Material.SPRUCE_BUTTON, Material.BIRCH_BUTTON,
-        Material.JUNGLE_BUTTON, Material.ACACIA_BUTTON, Material.DARK_OAK_BUTTON,
-        Material.MANGROVE_BUTTON, Material.CHERRY_BUTTON, Material.CRIMSON_BUTTON,
-        Material.WARPED_BUTTON, Material.STONE_BUTTON, Material.POLISHED_BLACKSTONE_BUTTON,
-        Material.BAMBOO_BUTTON
-    );
-
-    private static final int BASE_BUTTON_TICKS = 30;        // 1.5秒
-    private static final int DURATION_BONUS_TICKS = 20;      // ExtendTimeあたり+1秒
 
     private final JavaPlugin plugin;
     private final NamespacedKey id;
@@ -47,7 +35,8 @@ public class InteractEffect implements SpellEffect {
 
     @Override
     public void applyToEntity(SpellContext context, LivingEntity target) {
-        // エンティティへの操作はNoOp
+        // エンティティの足元ブロックに右クリック
+        applyToBlock(context, target.getLocation());
     }
 
     @Override
@@ -55,87 +44,109 @@ public class InteractEffect implements SpellEffect {
         Block block = blockLocation.getBlock();
         if (block.getType().isAir()) return;
 
-        BlockData data = block.getBlockData();
-        int durationLevel = context.getDurationLevel();
+        Player caster = context.getCaster();
+        if (caster == null) return;
 
-        // ドア・トラップドア・門: 開閉トグル
-        if (data instanceof Openable openable) {
+        // PlayerInteractEvent(RIGHT_CLICK_BLOCK)を発火（保護プラグイン互換）
+        // 素手として発火することで、スペルブック側のキャンセル処理を回避
+        BlockFace face = context.getHitFace() != null ? context.getHitFace() : BlockFace.UP;
+        PlayerInteractEvent interactEvent = new PlayerInteractEvent(
+            caster, Action.RIGHT_CLICK_BLOCK, null,
+            block, face, EquipmentSlot.HAND
+        );
+        Bukkit.getPluginManager().callEvent(interactEvent);
+
+        // useInteractedBlockがDENYの場合のみ中止（保護プラグインによるブロック）
+        if (interactEvent.useInteractedBlock() == org.bukkit.event.Event.Result.DENY) return;
+
+        // バニラの右クリック操作をシミュレート
+        // interactBlock は内部的にブロックの interact を呼ぶ
+        // Paper APIではブロック操作の直接シミュレートが限定的なため、
+        // 主要ブロックは明示的に処理する
+        simulateRightClick(caster, block);
+    }
+
+    /**
+     * バニラの右クリック操作を再現する。
+     * PlayerInteractEventで保護チェック済みの前提。
+     */
+    private void simulateRightClick(Player caster, Block block) {
+        var data = block.getBlockData();
+
+        // Openable: ドア・トラップドア・門
+        if (data instanceof org.bukkit.block.data.Openable openable) {
             openable.setOpen(!openable.isOpen());
             block.setBlockData(openable);
-            playDoorSound(block, openable.isOpen());
+            // ドアの上下連動
             if (data instanceof org.bukkit.block.data.type.Door door) {
-                toggleDoubleDoor(block, door);
+                Block otherHalf = door.getHalf() == org.bukkit.block.data.Bisected.Half.BOTTOM
+                    ? block.getRelative(0, 1, 0) : block.getRelative(0, -1, 0);
+                if (otherHalf.getType() == block.getType()
+                        && otherHalf.getBlockData() instanceof org.bukkit.block.data.Openable other) {
+                    other.setOpen(openable.isOpen());
+                    otherHalf.setBlockData(other);
+                }
             }
             return;
         }
 
-        // ボタン: 押下（ExtendTimeで長押し持続延長）
-        if (BUTTON_MATERIALS.contains(block.getType()) && data instanceof Powerable powerable) {
-            powerable.setPowered(true);
-            block.setBlockData(powerable);
-            block.getWorld().playSound(block.getLocation(),
-                org.bukkit.Sound.BLOCK_STONE_BUTTON_CLICK_ON,
-                org.bukkit.SoundCategory.BLOCKS, 0.6f, 1.0f);
-
-            int holdTicks = Math.max(1, BASE_BUTTON_TICKS + durationLevel * DURATION_BONUS_TICKS);
-            Location savedLoc = block.getLocation();
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                Block current = savedLoc.getBlock();
-                BlockData currentData = current.getBlockData();
-                if (currentData instanceof Powerable p) {
-                    p.setPowered(false);
-                    current.setBlockData(p);
-                    current.getWorld().playSound(current.getLocation(),
-                        org.bukkit.Sound.BLOCK_STONE_BUTTON_CLICK_OFF,
-                        org.bukkit.SoundCategory.BLOCKS, 0.6f, 1.0f);
-                }
-            }, holdTicks);
+        // Powerable: ボタン・レバー
+        if (data instanceof org.bukkit.block.data.Powerable powerable) {
+            if (block.getType().name().contains("BUTTON")) {
+                // ボタン: 一時的にON
+                powerable.setPowered(true);
+                block.setBlockData(powerable);
+                Location savedLoc = block.getLocation();
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    Block current = savedLoc.getBlock();
+                    if (current.getBlockData() instanceof org.bukkit.block.data.Powerable p) {
+                        p.setPowered(false);
+                        current.setBlockData(p);
+                    }
+                }, 30L);
+            } else {
+                // レバー等: トグル
+                powerable.setPowered(!powerable.isPowered());
+                block.setBlockData(powerable);
+            }
             return;
         }
 
-        // レバー: オン/オフトグル
-        if (block.getType() == Material.LEVER && data instanceof Powerable powerable) {
-            powerable.setPowered(!powerable.isPowered());
-            block.setBlockData(powerable);
+        // コンテナ系: チェスト・ホッパー・かまど等
+        if (block.getState() instanceof org.bukkit.block.Container container) {
+            caster.openInventory(container.getInventory());
+            return;
+        }
+
+        // 作業台・エンチャント台・金床等
+        var type = block.getType();
+        if (type == org.bukkit.Material.CRAFTING_TABLE) {
+            caster.openWorkbench(block.getLocation(), true);
+        } else if (type == org.bukkit.Material.ENCHANTING_TABLE) {
+            caster.openEnchanting(block.getLocation(), true);
+        } else if (type.name().contains("ANVIL")) {
+            // 金床: 遠隔オープン（通常/欠け/大きく欠けた金床）
+            caster.openInventory(org.bukkit.Bukkit.createInventory(caster,
+                org.bukkit.event.inventory.InventoryType.ANVIL));
+        } else if (type == org.bukkit.Material.ENDER_CHEST) {
+            caster.openInventory(caster.getEnderChest());
+        } else if (data instanceof org.bukkit.block.data.type.NoteBlock noteBlock) {
             block.getWorld().playSound(block.getLocation(),
-                org.bukkit.Sound.BLOCK_LEVER_CLICK,
-                org.bukkit.SoundCategory.BLOCKS, 0.6f, 1.0f);
+                noteBlock.getInstrument().getSound(),
+                org.bukkit.SoundCategory.RECORDS, 3.0f, noteBlock.getNote().getPitch());
+        } else if (data instanceof org.bukkit.block.data.type.Repeater repeater) {
+            int newDelay = (repeater.getDelay() % 4) + 1;
+            repeater.setDelay(newDelay);
+            block.setBlockData(repeater);
+        } else if (data instanceof org.bukkit.block.data.type.Comparator comparator) {
+            comparator.setMode(comparator.getMode() == org.bukkit.block.data.type.Comparator.Mode.COMPARE
+                ? org.bukkit.block.data.type.Comparator.Mode.SUBTRACT
+                : org.bukkit.block.data.type.Comparator.Mode.COMPARE);
+            block.setBlockData(comparator);
+        } else if (data instanceof org.bukkit.block.data.type.DaylightDetector daylight) {
+            daylight.setInverted(!daylight.isInverted());
+            block.setBlockData(daylight);
         }
-    }
-
-    private void toggleDoubleDoor(Block block, org.bukkit.block.data.type.Door door) {
-        Block otherHalf = door.getHalf() == Bisected.Half.BOTTOM
-            ? block.getRelative(0, 1, 0)
-            : block.getRelative(0, -1, 0);
-
-        if (otherHalf.getType() != block.getType()) return;
-        BlockData otherData = otherHalf.getBlockData();
-        if (!(otherData instanceof Openable otherOpenable)) return;
-        otherOpenable.setOpen(door.isOpen());
-        otherHalf.setBlockData(otherOpenable);
-    }
-
-    private void playDoorSound(Block block, boolean opening) {
-        Material type = block.getType();
-        org.bukkit.Sound sound;
-        if (type.name().contains("IRON")) {
-            sound = opening
-                ? org.bukkit.Sound.BLOCK_IRON_DOOR_OPEN
-                : org.bukkit.Sound.BLOCK_IRON_DOOR_CLOSE;
-        } else if (type.name().contains("TRAPDOOR")) {
-            sound = opening
-                ? org.bukkit.Sound.BLOCK_WOODEN_TRAPDOOR_OPEN
-                : org.bukkit.Sound.BLOCK_WOODEN_TRAPDOOR_CLOSE;
-        } else if (type.name().contains("GATE")) {
-            sound = opening
-                ? org.bukkit.Sound.BLOCK_FENCE_GATE_OPEN
-                : org.bukkit.Sound.BLOCK_FENCE_GATE_CLOSE;
-        } else {
-            sound = opening
-                ? org.bukkit.Sound.BLOCK_WOODEN_DOOR_OPEN
-                : org.bukkit.Sound.BLOCK_WOODEN_DOOR_CLOSE;
-        }
-        block.getWorld().playSound(block.getLocation(), sound, org.bukkit.SoundCategory.BLOCKS, 0.8f, 1.0f);
     }
 
     @Override

@@ -40,8 +40,16 @@ public class KnockbackEffect implements SpellEffect {
         Player caster = context.getCaster();
         Vector direction;
 
-        if (caster != null) {
-            // Extract > 0 または通常: 術者 → 対象方向（押し出し）
+        if (caster != null && caster.equals(target)) {
+            // 自己対象: 視線と反対方向に飛び出す
+            Vector backward = caster.getLocation().getDirection().multiply(-1).normalize();
+            backward.setY(Math.max(backward.getY(), 0.3));
+            backward.normalize().multiply(Math.min(force, maxForce));
+            target.setVelocity(backward);
+            SpellFxUtil.spawnKnockbackFx(target.getLocation());
+            return;
+        } else if (caster != null) {
+            // 他者対象: 術者 → 対象方向（押し出し）
             direction = target.getLocation().toVector()
                 .subtract(caster.getLocation().toVector());
         } else {
@@ -49,7 +57,7 @@ public class KnockbackEffect implements SpellEffect {
             direction = target.getLocation().getDirection().multiply(-1);
         }
 
-        // ゼロベクトル防止（同一座標の場合は真上にノックバック）
+        // ゼロベクトル防止
         if (direction.lengthSquared() < 0.001) {
             direction = new Vector(0, 1, 0);
         } else {
@@ -64,7 +72,15 @@ public class KnockbackEffect implements SpellEffect {
 
     @Override
     public void applyToBlock(SpellContext context, Location blockLocation) {
-        // ブロック対象はNoOp
+        // ブロック着弾: 付近のエンティティをノックバック
+        Player caster = context.getCaster();
+        if (caster == null) return;
+
+        double radius = 2.0 + context.getAoeRadiusLevel();
+        Location center = blockLocation.clone().add(0.5, 0.5, 0.5);
+        center.getNearbyLivingEntities(radius).stream()
+            .filter(e -> !e.equals(caster))
+            .forEach(e -> applyToEntity(context, e));
     }
 
     @Override

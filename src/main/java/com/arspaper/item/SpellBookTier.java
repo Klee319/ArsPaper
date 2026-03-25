@@ -8,9 +8,9 @@ import net.kyori.adventure.text.format.NamedTextColor;
  */
 public enum SpellBookTier {
 
-    NOVICE(1, "初級", 3, 1, 100001, NamedTextColor.LIGHT_PURPLE),
-    APPRENTICE(2, "中級", 6, 2, 100002, NamedTextColor.DARK_PURPLE),
-    ARCHMAGE(3, "上級", 10, 3, 100003, NamedTextColor.GOLD);
+    NOVICE(1, "見習いの魔法書", 3, 1, 100001, NamedTextColor.LIGHT_PURPLE),
+    APPRENTICE(2, "魔術師の魔術書", 6, 2, 100002, NamedTextColor.DARK_PURPLE),
+    ARCHMAGE(3, "大魔導士の魔導書", 10, 3, 100003, NamedTextColor.GOLD);
 
     private final int tier;
     private final String displayName;

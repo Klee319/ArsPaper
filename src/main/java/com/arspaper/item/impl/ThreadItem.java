@@ -29,7 +29,7 @@ public class ThreadItem extends BaseCustomItem {
 
     @Override
     public Material getBaseMaterial() {
-        return Material.STRING;
+        return threadType.getBaseMaterial();
     }
 
     @Override
@@ -53,7 +53,7 @@ public class ThreadItem extends BaseCustomItem {
 
             List<Component> lore = new ArrayList<>();
             if (threadType.hasEffect()) {
-                lore.addAll(threadType.getEffectLore());
+                lore.addAll(com.arspaper.ArsPaper.getInstance().getThreadConfig().getEffectLore(threadType));
             } else {
                 lore.add(Component.text("儀式で効果付きスレッドに変換できます", NamedTextColor.GRAY)
                     .decoration(TextDecoration.ITALIC, false));

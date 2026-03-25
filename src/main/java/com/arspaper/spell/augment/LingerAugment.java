@@ -32,7 +32,7 @@ public class LingerAugment implements SpellAugment {
     public String getDisplayName() { return "残留"; }
 
     @Override
-    public String getDescription() { return "効果を持続領域として展開する"; }
+    public String getDescription() { return "命中範囲に効果を持続的に再発動するエリアを生成"; }
 
     @Override
     public int getManaCost() { return config.getManaCost("linger"); }

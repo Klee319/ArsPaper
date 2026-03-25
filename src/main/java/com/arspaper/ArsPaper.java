@@ -11,13 +11,11 @@ import com.arspaper.block.impl.SourceJar;
 import com.arspaper.command.ArsCommand;
 import com.arspaper.gui.GuiListener;
 import com.arspaper.item.*;
+import com.arspaper.item.impl.ConfigurableArmor;
 import com.arspaper.item.impl.MageArmor;
-import com.arspaper.item.impl.MagebloomFiber;
 import com.arspaper.item.impl.SourceBerry;
-import com.arspaper.item.impl.SourceGem;
-import com.arspaper.item.impl.Sourcestone;
 import com.arspaper.item.impl.SpellBook;
-import com.arspaper.item.impl.SpellWand;
+// SpellWand は廃止（アイテムバインドで代替）
 import com.arspaper.item.impl.ThreadItem;
 import com.arspaper.item.impl.Wand;
 import com.arspaper.mana.ManaConfig;
@@ -30,7 +28,9 @@ import com.arspaper.ritual.effect.*;
 
 import com.arspaper.source.SourceNetwork;
 import com.arspaper.source.SourcelinkTickTask;
+import com.arspaper.source.sourcelink.AlchemicalSourcelink;
 import com.arspaper.source.sourcelink.MycelialSourcelink;
+import com.arspaper.source.sourcelink.VitalicSourcelink;
 import com.arspaper.source.sourcelink.VolcanicSourcelink;
 import com.arspaper.spell.GlyphConfig;
 import com.arspaper.spell.PhantomBlockListener;
@@ -40,6 +40,7 @@ import com.arspaper.spell.SpellRegistry;
 import com.arspaper.spell.SummonedMobListener;
 import com.arspaper.spell.augment.*;
 import com.arspaper.spell.augment.LingerAugment;
+import com.arspaper.spell.augment.PropagateAugment;
 import com.arspaper.spell.augment.TrailAugment;
 import com.arspaper.spell.effect.*;
 import com.arspaper.spell.effect.LingerEffect;
@@ -67,37 +68,47 @@ public class ArsPaper extends JavaPlugin {
     private BlockParticleTask blockParticleTask;
     private GlyphConfig glyphConfig;
     private SpellCaster spellCaster;
+    private ArmorConfigManager armorConfigManager;
+    private MaterialConfigManager materialConfigManager;
+    private ArmorManaListener armorManaListener;
+    private ThreadConfig threadConfig;
+    private com.arspaper.loot.LootTableListener lootTableListener;
 
     @Override
     public void onEnable() {
         instance = this;
+        updateResourceFiles();
         saveDefaultConfig();
 
         initRegistries();
         registerListeners();
         registerCommands();
 
-        // レシピ読み込み（アイテム登録後）
+        // 統合レシピ読み込み（アイテム登録後）
+        com.arspaper.recipe.UnifiedRecipeLoader recipeLoader = new com.arspaper.recipe.UnifiedRecipeLoader(this);
+        recipeLoader.loadAll();
+
         recipeManager = new RecipeManager(this);
-        recipeManager.loadRecipes();
+        recipeManager.registerWorkbenchRecipes(recipeLoader.getWorkbenchRecipes());
+        recipeManager.registerArmorRecipes(armorConfigManager);
 
         // 儀式エフェクトレジストリ
         ritualEffectRegistry = new RitualEffectRegistry();
-        ritualEffectRegistry.register("growth", new GrowthRitualEffect());
         ritualEffectRegistry.register("weather", new WeatherRitualEffect());
         ritualEffectRegistry.register("thread", new ThreadRitualEffect());
-        ritualEffectRegistry.register("flight", new FlightRitualEffect());
+        FlightRitualEffect flightEffect = new FlightRitualEffect();
+        getServer().getPluginManager().registerEvents(flightEffect, this);
+        ritualEffectRegistry.register("flight", flightEffect);
         ritualEffectRegistry.register("moonfall", new MoonfallRitualEffect());
         ritualEffectRegistry.register("sunrise", new SunriseRitualEffect());
         ritualEffectRegistry.register("repair", new RepairRitualEffect());
-        ritualEffectRegistry.register("recall", new RecallRitualEffect());
-        ritualEffectRegistry.register("containment", new ContainmentRitualEffect());
         ritualEffectRegistry.register("animal_summon", new AnimalSummonRitualEffect());
+        ritualEffectRegistry.register("mob_summon", new MobSummonRitualEffect());
         ritualEffectRegistry.register("enchant_book", new EnchantBookRitualEffect());
 
-        // 儀式レシピ読み込み
+        // 儀式レシピ読み込み（UnifiedRecipeLoaderから）
         ritualRecipeRegistry = new RitualRecipeRegistry(this);
-        ritualRecipeRegistry.loadRecipes();
+        ritualRecipeRegistry.registerRecipes(recipeLoader.getRitualRecipes());
         ritualManager = new RitualManager(ritualRecipeRegistry, ritualEffectRegistry);
 
         getLogger().info("ArsPaper enabled!");
@@ -123,13 +134,56 @@ public class ArsPaper extends JavaPlugin {
         if (ritualManager != null) {
             ritualManager.shutdown();
         }
+        // 飛行スレッドタスクをクリーンアップ
+        ArmorManaListener.cleanupFlightThread();
+        // IgniteEffectの火炎タスクをクリーンアップ
+        IgniteEffect.cleanupAll();
         // 一時的なスペル効果をクリーンアップ
         PhantomBlockEffect.cleanupAll();
         LingerEffect.cleanupAll();
         BeamForm.cleanupAll();
         RotateEffect.cleanupAll();
-        ContainmentRitualEffect.cleanupAll();
+        GlideEffect.restoreAll();
+        BounceEffect.cleanupAll();
         getLogger().info("ArsPaper disabled!");
+    }
+
+    /**
+     * プラグインバージョンが変わったらリソースYMLを再抽出する。
+     * ユーザーのカスタマイズは .bak にバックアップ。
+     */
+    private void updateResourceFiles() {
+        java.io.File versionFile = new java.io.File(getDataFolder(), ".version");
+        String currentVersion = getPluginMeta().getVersion();
+        String savedVersion = "";
+
+        if (versionFile.exists()) {
+            try {
+                savedVersion = java.nio.file.Files.readString(versionFile.toPath()).trim();
+            } catch (Exception ignored) {}
+        }
+
+        if (!currentVersion.equals(savedVersion)) {
+            String[] resourceFiles = {"glyphs.yml", "items.yml", "materials.yml", "threads.yml", "armors.yml"};
+            for (String name : resourceFiles) {
+                java.io.File existing = new java.io.File(getDataFolder(), name);
+                if (existing.exists()) {
+                    java.io.File backup = new java.io.File(getDataFolder(), name + ".bak");
+                    if (backup.exists()) backup.delete();
+                    existing.renameTo(backup);
+                    getLogger().info("Backed up " + name + " → " + name + ".bak");
+                }
+                saveResource(name, false);
+            }
+            // config.ymlは上書きしない（ユーザー設定を保持）
+
+            try {
+                java.nio.file.Files.writeString(versionFile.toPath(), currentVersion);
+            } catch (Exception e) {
+                getLogger().warning("Failed to write version file: " + e.getMessage());
+            }
+            getLogger().info("Resource files updated to version " + currentVersion);
+        }
     }
 
     private void initRegistries() {
@@ -146,6 +200,15 @@ public class ArsPaper extends JavaPlugin {
 
         // スペルキャスター（シングルトン）
         spellCaster = new SpellCaster(manaManager);
+
+        // 防具設定マネージャー
+        armorConfigManager = new ArmorConfigManager(this);
+
+        // 素材設定マネージャー
+        materialConfigManager = new MaterialConfigManager(this);
+
+        // スレッド設定
+        threadConfig = new ThreadConfig(this);
 
         // カスタムアイテムレジストリ
         itemRegistry = new CustomItemRegistry();
@@ -194,7 +257,7 @@ public class ArsPaper extends JavaPlugin {
         // RedstoneSignalEffect は削除済み
         spellRegistry.register(new PhantomBlockEffect(this, glyphConfig));
         spellRegistry.register(new PlaceBlockEffect(this, glyphConfig));
-        spellRegistry.register(new TossEffect(this, glyphConfig));
+        // TossEffect は廃止（アイテムバインドで代替）
         spellRegistry.register(new LaunchEffect(this, glyphConfig));
         spellRegistry.register(new LeapEffect(this, glyphConfig));
         spellRegistry.register(new BounceEffect(this, glyphConfig));
@@ -215,8 +278,9 @@ public class ArsPaper extends JavaPlugin {
         spellRegistry.register(new ExchangeEffect(this, glyphConfig));
         spellRegistry.register(new SmeltEffect(this, glyphConfig));
         spellRegistry.register(new CrushEffect(this, glyphConfig));
+        spellRegistry.register(new CrushWaveEffect(this, glyphConfig));
+        spellRegistry.register(new ScorchEffect(this, glyphConfig));
         spellRegistry.register(new ColdSnapEffect(this, glyphConfig));
-        spellRegistry.register(new FlareEffect(this, glyphConfig));
         spellRegistry.register(new WindshearEffect(this, glyphConfig));
         spellRegistry.register(new ConjureWaterEffect(this, glyphConfig));
         spellRegistry.register(new SlowfallEffect(this, glyphConfig));
@@ -264,9 +328,10 @@ public class ArsPaper extends JavaPlugin {
         spellRegistry.register(new DelayAugment(this, glyphConfig));
         // WallAugment は廃止
         spellRegistry.register(new LingerAugment(this, glyphConfig));
-        spellRegistry.register(new ResetAugment(this, glyphConfig));
         spellRegistry.register(new TrailAugment(this, glyphConfig));
         spellRegistry.register(new TraceAugment(this, glyphConfig));
+        spellRegistry.register(new PropagateAugment(this, glyphConfig));
+        spellRegistry.register(new com.arspaper.spell.augment.ExtendReachAugment(this, glyphConfig));
     }
 
     private void registerDefaultItems() {
@@ -277,19 +342,18 @@ public class ArsPaper extends JavaPlugin {
 
         itemRegistry.register(new Wand(this));
 
-        // Spell Wands (3 tiers)
-        for (WandTier wandTier : WandTier.values()) {
-            itemRegistry.register(new SpellWand(this, spellRegistry, wandTier));
-        }
+        // SpellWand は廃止（アイテムバインドで代替）
         itemRegistry.register(new SourceBerry(this));
-        itemRegistry.register(new SourceGem(this));
-        itemRegistry.register(new MagebloomFiber(this));
-        itemRegistry.register(new Sourcestone(this));
 
-        // Mage Armor (3 tiers × 4 slots)
-        for (ArmorTier armorTier : ArmorTier.values()) {
-            for (ArmorSlot armorSlot : ArmorSlot.values()) {
-                itemRegistry.register(new MageArmor(this, armorTier, armorSlot));
+        // 設定ベース素材（materials.ymlから動的登録）
+        for (MaterialConfig mat : materialConfigManager.getAll()) {
+            itemRegistry.register(new com.arspaper.item.impl.ConfigurableMaterial(this, mat));
+        }
+
+        // 設定ベース防具（armors.ymlから動的登録）
+        for (ArmorSetConfig armorSet : armorConfigManager.getAll()) {
+            for (String slot : ArmorSetConfig.getSlotNames()) {
+                itemRegistry.register(new ConfigurableArmor(this, armorSet, slot));
             }
         }
 
@@ -304,6 +368,8 @@ public class ArsPaper extends JavaPlugin {
         SourceJar sourceJar = new SourceJar(this);
         VolcanicSourcelink volcanicSourcelink = new VolcanicSourcelink(this);
         MycelialSourcelink mycelialSourcelink = new MycelialSourcelink(this);
+        AlchemicalSourcelink alchemicalSourcelink = new AlchemicalSourcelink(this);
+        VitalicSourcelink vitalicSourcelink = new VitalicSourcelink(this);
         RitualCore ritualCore = new RitualCore(this);
         Pedestal pedestal = new Pedestal(this);
 
@@ -314,6 +380,8 @@ public class ArsPaper extends JavaPlugin {
         blockRegistry.register(creativeSourceJar);
         blockRegistry.register(volcanicSourcelink);
         blockRegistry.register(mycelialSourcelink);
+        blockRegistry.register(alchemicalSourcelink);
+        blockRegistry.register(vitalicSourcelink);
         blockRegistry.register(ritualCore);
         blockRegistry.register(pedestal);
 
@@ -323,6 +391,8 @@ public class ArsPaper extends JavaPlugin {
         itemRegistry.register(creativeSourceJar);
         itemRegistry.register(volcanicSourcelink);
         itemRegistry.register(mycelialSourcelink);
+        itemRegistry.register(alchemicalSourcelink);
+        itemRegistry.register(vitalicSourcelink);
         itemRegistry.register(ritualCore);
         itemRegistry.register(pedestal);
     }
@@ -334,12 +404,22 @@ public class ArsPaper extends JavaPlugin {
         pluginManager.registerEvents(new ProjectileHitListener(), this);
         pluginManager.registerEvents(new GuiListener(), this);
         pluginManager.registerEvents(manaManager, this);
-        pluginManager.registerEvents(new ArmorManaListener(this), this);
+        armorManaListener = new ArmorManaListener(this);
+        pluginManager.registerEvents(armorManaListener, this);
         pluginManager.registerEvents(new SourceBerryListener(this), this);
         pluginManager.registerEvents(new PhantomBlockListener(), this);
         pluginManager.registerEvents(new SummonedMobListener(this), this);
         pluginManager.registerEvents(new com.arspaper.enchant.EnchantBookListener(), this);
         pluginManager.registerEvents(new com.arspaper.spell.SpellBindListener(), this);
+        lootTableListener = new com.arspaper.loot.LootTableListener(this);
+        pluginManager.registerEvents(lootTableListener, this);
+
+        // SpellEffectリスナー登録（Listener実装のEffectのみ）
+        for (var component : spellRegistry.getAll()) {
+            if (component instanceof org.bukkit.event.Listener listener) {
+                pluginManager.registerEvents(listener, this);
+            }
+        }
     }
 
     @SuppressWarnings("UnstableApiUsage")
@@ -398,13 +478,50 @@ public class ArsPaper extends JavaPlugin {
         return spellCaster;
     }
 
+    public ArmorConfigManager getArmorConfigManager() {
+        return armorConfigManager;
+    }
+
+    public ThreadConfig getThreadConfig() {
+        return threadConfig;
+    }
+
+    public SourcelinkTickTask getSourcelinkTickTask() {
+        return sourcelinkTickTask;
+    }
+
+    public ArmorManaListener getArmorManaListener() {
+        return armorManaListener;
+    }
+
     /**
-     * glyphs.ymlを再読み込みする。
-     * 同一GlyphConfigインスタンスをreloadするため、
-     * 既存のSpellComponentが保持する参照はそのまま有効。
-     * ティア・コスト・係数(params)が即座に反映される。
+     * 設定ファイルを再読み込みする。
      */
     public void reloadGlyphConfig() {
         glyphConfig.reload();
+    }
+
+    public void reloadMaterialConfig() {
+        materialConfigManager.reload();
+        // 素材アイテムを登録/更新（既存IDも最新設定で再登録）
+        for (MaterialConfig mat : materialConfigManager.getAll()) {
+            itemRegistry.register(new com.arspaper.item.impl.ConfigurableMaterial(this, mat));
+        }
+    }
+
+    public void reloadArmorConfig() {
+        armorConfigManager.reload();
+        // 防具アイテムを登録/更新（既存IDも最新設定で再登録）
+        for (ArmorSetConfig armorSet : armorConfigManager.getAll()) {
+            for (String slot : ArmorSetConfig.getSlotNames()) {
+                itemRegistry.register(new ConfigurableArmor(this, armorSet, slot));
+            }
+        }
+    }
+
+    public void reloadLootConfig() {
+        if (lootTableListener != null) {
+            lootTableListener.reloadConfig();
+        }
     }
 }

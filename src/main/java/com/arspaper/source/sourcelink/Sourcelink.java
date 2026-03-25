@@ -54,19 +54,11 @@ public abstract class Sourcelink extends CustomBlock {
                 .get(BlockKeys.CUSTOM_BLOCK_ID, PersistentDataType.STRING);
             if (!"source_jar".equals(blockId)) continue;
 
-            int current = tile.getPersistentDataContainer()
-                .getOrDefault(BlockKeys.SOURCE_AMOUNT, PersistentDataType.INTEGER, 0);
-            int max = 10000;
-            int space = max - current;
-            int transfer = Math.min(remaining, space);
+            // 無限ソースジャーはスキップ（書き込み不要）
+            if (com.arspaper.block.impl.SourceJar.isInfinite(tile)) continue;
 
-            if (transfer > 0) {
-                tile.getPersistentDataContainer().set(
-                    BlockKeys.SOURCE_AMOUNT, PersistentDataType.INTEGER, current + transfer
-                );
-                tile.update();
-                remaining -= transfer;
-            }
+            int added = com.arspaper.block.impl.SourceJar.addSource(tile, remaining);
+            remaining -= added;
         }
     }
 }

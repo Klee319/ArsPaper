@@ -22,7 +22,7 @@ public class AoeVerticalAugment implements SpellAugment {
 
     @Override
     public void modify(SpellContext context) {
-        context.setAoeDepth(context.getAoeDepth() + 1);
+        context.setAoeDepth(context.getAoeDepth() + 2);
     }
 
     @Override

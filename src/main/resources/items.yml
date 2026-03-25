@@ -1,0 +1,1047 @@
+# ============================================================
+# items.yml - アイテムレシピ & 儀式エフェクト定義
+# ============================================================
+# items:          アイテムを生成するレシピ（作業台 or 儀式）
+# ritual_effects: ワールドエフェクト儀式（アイテム結果なし）
+#
+# レシピ記法:
+#   method: workbench  - 作業台クラフト (type, shape, ingredients, amount)
+#   method: ritual     - 儀式クラフト (core-item, pedestal-items, source, result)
+#
+# custom: プレフィックスは本プラグインのカスタムアイテムを参照する。
+# "x2" 等の記法はアイテム数量を示す。
+# ============================================================
+
+# ============================================================
+# アイテムレシピ
+# ============================================================
+items:
+
+  # ==========================================================
+  # 作業台レシピ
+  # ==========================================================
+
+  # ----------------------------------------------------------
+  # 見習いの魔法書
+  # ----------------------------------------------------------
+  spell_book_novice:
+    recipe:
+      method: workbench
+      type: shaped
+      shape:
+        - " S "
+        - "PBA"
+        - " V "
+      ingredients:
+        S: IRON_SWORD
+        P: IRON_PICKAXE
+        B: BOOK
+        A: IRON_AXE
+        V: IRON_SHOVEL
+
+  # ----------------------------------------------------------
+  # ドミニオンワンド
+  # ----------------------------------------------------------
+  dominion_wand:
+    recipe:
+      method: workbench
+      type: shaped
+      shape:
+        - "  G"
+        - " S "
+        - "S  "
+      ingredients:
+        G: GOLD_INGOT
+        S: STICK
+
+  # ----------------------------------------------------------
+  # 刻印台
+  # ----------------------------------------------------------
+  scribing_table:
+    recipe:
+      method: workbench
+      type: shaped
+      shape:
+        - "LGL"
+        - " B "
+        - " B "
+      ingredients:
+        L: LAPIS_LAZULI
+        G: "custom:source_gem"
+        B: BOOKSHELF
+
+  # ----------------------------------------------------------
+  # ソースジャー
+  # ----------------------------------------------------------
+  source_jar:
+    recipe:
+      method: workbench
+      type: shaped
+      shape:
+        - "GGG"
+        - "GSG"
+        - "GGG"
+      ingredients:
+        G: BRICK
+        S: "custom:source_berry"
+
+  # ----------------------------------------------------------
+  # 台座 (x2)
+  # ----------------------------------------------------------
+  pedestal:
+    recipe:
+      method: workbench
+      type: shaped
+      shape:
+        - " G "
+        - " S "
+        - "SSS"
+      ingredients:
+        G: GOLD_INGOT
+        S: "custom:sourcestone"
+      amount: 2
+
+  # ----------------------------------------------------------
+  # ソースジェムブロック (圧縮: gem×9 → block×1)
+  # ----------------------------------------------------------
+  source_gem_block:
+    recipe:
+      method: workbench
+      type: shaped
+      shape:
+        - "GGG"
+        - "GGG"
+        - "GGG"
+      ingredients:
+        G: "custom:source_gem"
+
+  # ----------------------------------------------------------
+  # ソースジェムブロック展開 (展開: block×1 → gem×9)
+  # ----------------------------------------------------------
+  source_gem_from_block:
+    recipe:
+      method: workbench
+      type: shapeless
+      shape: []
+      ingredients:
+        B: "custom:source_gem_block"
+      result: "custom:source_gem"
+      amount: 9
+
+  # ----------------------------------------------------------
+  # ソースストーン (ソースベリー + 焼き石)
+  # ----------------------------------------------------------
+  sourcestone:
+    recipe:
+      method: workbench
+      type: shapeless
+      shape: []
+      ingredients:
+        A: "custom:source_berry"
+        B: STONE
+      result: "custom:sourcestone"
+
+  # ==========================================================
+  # 儀式レシピ - ソースジェムブロック（一括クラフト）
+  # ==========================================================
+
+  # ----------------------------------------------------------
+  # ソースジェムブロック（一括儀式）
+  # 7アメジストブロック(28シャード) + 2ラピスブロック(18ラピス) → ジェムブロック1個(=9ジェム)
+  # 個別より少しお得な代わりにSource消費が多い
+  # ----------------------------------------------------------
+  source_gem_block_ritual:
+    recipe:
+      method: ritual
+      core-item: AMETHYST_BLOCK
+      pedestal-items:
+        - "AMETHYST_BLOCK x6"
+        - "LAPIS_BLOCK x2"
+      source: 2500
+      result: "custom:source_gem_block"
+
+  # ==========================================================
+  # 儀式レシピ - 中間素材（一括クラフト）
+  # ==========================================================
+
+  # ----------------------------------------------------------
+  # マジックファイバー×3（一括儀式）
+  # ----------------------------------------------------------
+  magebloom_fiber_bulk:
+    recipe:
+      method: ritual
+      core-item: STRING
+      pedestal-items:
+        - "STRING x2"
+        - "WHEAT_SEEDS x3"
+        - "custom:source_gem x3"
+      source: 300
+      result: "custom:magebloom_fiber"
+      result-amount: 3
+
+  # ----------------------------------------------------------
+  # 空のスレッド×3（一括儀式）
+  # ----------------------------------------------------------
+  thread_empty_bulk:
+    recipe:
+      method: ritual
+      core-item: WHITE_WOOL
+      pedestal-items:
+        - "WHITE_WOOL x2"
+        - "custom:magebloom_fiber x3"
+        - "custom:source_gem x3"
+      source: 600
+      result: "custom:thread_empty"
+      result-amount: 3
+
+  # ==========================================================
+  # 儀式レシピ - スペルブック
+  # ==========================================================
+
+  # ----------------------------------------------------------
+  # 魔術師の魔術書 (アップグレード)
+  # ----------------------------------------------------------
+  upgrade_spell_book_apprentice:
+    recipe:
+      method: ritual
+      core-item: "custom:spell_book_novice"
+      pedestal-items:
+        - "DIAMOND_BLOCK x1"
+        - "EMERALD_BLOCK x1"
+        - "LAPIS_BLOCK x1"
+        - "REDSTONE_BLOCK x1"
+        - "GOLD_BLOCK x1"
+        - "QUARTZ_BLOCK x1"
+        - "BLAZE_ROD x1"
+        - "custom:source_gem_block"
+      source: 1000
+      result: "custom:spell_book_apprentice"
+
+  # ----------------------------------------------------------
+  # 大魔導士の魔導書 (アップグレード)
+  # ----------------------------------------------------------
+  upgrade_spell_book_archmage:
+    recipe:
+      method: ritual
+      core-item: "custom:spell_book_apprentice"
+      pedestal-items:
+        - "NETHER_STAR"
+        - "NETHERITE_BLOCK"
+        - "CRYING_OBSIDIAN"
+        - "ECHO_SHARD"
+        - "END_CRYSTAL"
+        - "ENDER_EYE"
+        - "TOTEM_OF_UNDYING"
+        - "custom:source_gem_block"
+      source: 5000
+      result: "custom:spell_book_archmage"
+
+  # ==========================================================
+  # 儀式レシピ - ブロック・機械
+  # ==========================================================
+
+  # ----------------------------------------------------------
+  # 儀式コア（作業台クラフト - 儀式なしで作成可能）
+  # ----------------------------------------------------------
+  ritual_core:
+    recipe:
+      method: workbench
+      type: shaped
+      shape:
+        - "ODO"
+        - "DLD"
+        - "ODO"
+      ingredients:
+        O: OBSIDIAN
+        D: DIAMOND
+        L: LODESTONE
+
+  # ----------------------------------------------------------
+  # ヴォルケーニックソースリンク
+  # ----------------------------------------------------------
+  volcanic_sourcelink_craft:
+    recipe:
+      method: ritual
+      core-item: FURNACE
+      pedestal-items:
+        - "NETHERRACK x2"
+        - "MAGMA_BLOCK x2"
+        - "BLAZE_POWDER x2"
+        - "custom:source_gem"
+      source: 300
+      result: "custom:volcanic_sourcelink"
+
+  # ----------------------------------------------------------
+  # マイセリアルソースリンク
+  # ----------------------------------------------------------
+  mycelial_sourcelink_craft:
+    recipe:
+      method: ritual
+      core-item: SMOKER
+      pedestal-items:
+        - "MYCELIUM x2"
+        - "BROWN_MUSHROOM"
+        - "RED_MUSHROOM"
+        - "BONE_MEAL"
+        - "custom:source_gem x2"
+      source: 300
+      result: "custom:mycelial_sourcelink"
+
+  # ----------------------------------------------------------
+  # アルケミカルソースリンク
+  # ----------------------------------------------------------
+  alchemical_sourcelink_craft:
+    recipe:
+      method: ritual
+      core-item: BREWING_STAND
+      pedestal-items:
+        - "GLASS_BOTTLE x2"
+        - "NETHER_WART x2"
+        - "BLAZE_POWDER x2"
+        - "custom:source_gem x2"
+      source: 400
+      result: "custom:alchemical_sourcelink"
+
+  # ----------------------------------------------------------
+  # バイタリックソースリンク
+  # ----------------------------------------------------------
+  vitalic_sourcelink_craft:
+    recipe:
+      method: ritual
+      core-item: BARREL
+      pedestal-items:
+        - "BONE x2"
+        - "ROTTEN_FLESH x2"
+        - "GOLDEN_APPLE"
+        - "custom:source_gem x2"
+      source: 400
+      result: "custom:vitalic_sourcelink"
+
+  # ==========================================================
+  # 儀式レシピ - 消耗品
+  # ==========================================================
+
+  # ----------------------------------------------------------
+  # ソースベリー (グロウベリー + アメジストの欠片)
+  # ----------------------------------------------------------
+  source_berry:
+    recipe:
+      method: workbench
+      type: shapeless
+      shape: []
+      ingredients:
+        A: GLOW_BERRIES
+        B: AMETHYST_SHARD
+      result: "custom:source_berry"
+
+  # ==========================================================
+  # 儀式レシピ - 守護メイジアーマー (Guardian)
+  # ==========================================================
+
+  # ----------------------------------------------------------
+  # 守護メイジ T1 (Novice) - バニラ革防具から作成
+  # ----------------------------------------------------------
+  mage_guardian_novice_helmet:
+    recipe:
+      method: ritual
+      core-item: LEATHER_HELMET
+      pedestal-items:
+        - "custom:source_gem x2"
+        - "IRON_INGOT x4"
+      source: 500
+      result: "custom:mage_guardian_novice_helmet"
+
+  mage_guardian_novice_chestplate:
+    recipe:
+      method: ritual
+      core-item: LEATHER_CHESTPLATE
+      pedestal-items:
+        - "custom:source_gem x2"
+        - "IRON_INGOT x4"
+      source: 500
+      result: "custom:mage_guardian_novice_chestplate"
+
+  mage_guardian_novice_leggings:
+    recipe:
+      method: ritual
+      core-item: LEATHER_LEGGINGS
+      pedestal-items:
+        - "custom:source_gem x2"
+        - "IRON_INGOT x4"
+      source: 500
+      result: "custom:mage_guardian_novice_leggings"
+
+  mage_guardian_novice_boots:
+    recipe:
+      method: ritual
+      core-item: LEATHER_BOOTS
+      pedestal-items:
+        - "custom:source_gem x2"
+        - "IRON_INGOT x4"
+      source: 500
+      result: "custom:mage_guardian_novice_boots"
+
+  # ----------------------------------------------------------
+  # 守護メイジ T2 (Apprentice) - T1からアップグレード
+  # ----------------------------------------------------------
+  mage_guardian_apprentice_helmet:
+    recipe:
+      method: ritual
+      core-item: "custom:mage_guardian_novice_helmet"
+      pedestal-items:
+        - "custom:source_gem x4"
+        - "DIAMOND x2"
+        - "IRON_BLOCK"
+        - "GOLD_BLOCK"
+      source: 2000
+      result: "custom:mage_guardian_apprentice_helmet"
+
+  mage_guardian_apprentice_chestplate:
+    recipe:
+      method: ritual
+      core-item: "custom:mage_guardian_novice_chestplate"
+      pedestal-items:
+        - "custom:source_gem x4"
+        - "DIAMOND x2"
+        - "IRON_BLOCK"
+        - "GOLD_BLOCK"
+      source: 2000
+      result: "custom:mage_guardian_apprentice_chestplate"
+
+  mage_guardian_apprentice_leggings:
+    recipe:
+      method: ritual
+      core-item: "custom:mage_guardian_novice_leggings"
+      pedestal-items:
+        - "custom:source_gem x4"
+        - "DIAMOND x2"
+        - "IRON_BLOCK"
+        - "GOLD_BLOCK"
+      source: 2000
+      result: "custom:mage_guardian_apprentice_leggings"
+
+  mage_guardian_apprentice_boots:
+    recipe:
+      method: ritual
+      core-item: "custom:mage_guardian_novice_boots"
+      pedestal-items:
+        - "custom:source_gem x4"
+        - "DIAMOND x2"
+        - "IRON_BLOCK"
+        - "GOLD_BLOCK"
+      source: 2000
+      result: "custom:mage_guardian_apprentice_boots"
+
+  # ----------------------------------------------------------
+  # 守護メイジ T3 (Archmage) - T2からアップグレード
+  # ----------------------------------------------------------
+  mage_guardian_archmage_helmet:
+    recipe:
+      method: ritual
+      core-item: "custom:mage_guardian_apprentice_helmet"
+      pedestal-items:
+        - "custom:source_gem_block x2"
+        - "NETHERITE_INGOT x4"
+        - "DIAMOND_BLOCK"
+        - "EMERALD_BLOCK"
+      source: 5000
+      result: "custom:mage_guardian_archmage_helmet"
+
+  mage_guardian_archmage_chestplate:
+    recipe:
+      method: ritual
+      core-item: "custom:mage_guardian_apprentice_chestplate"
+      pedestal-items:
+        - "custom:source_gem_block x2"
+        - "NETHERITE_INGOT x4"
+        - "DIAMOND_BLOCK"
+        - "EMERALD_BLOCK"
+      source: 5000
+      result: "custom:mage_guardian_archmage_chestplate"
+
+  mage_guardian_archmage_leggings:
+    recipe:
+      method: ritual
+      core-item: "custom:mage_guardian_apprentice_leggings"
+      pedestal-items:
+        - "custom:source_gem_block x2"
+        - "NETHERITE_INGOT x4"
+        - "DIAMOND_BLOCK"
+        - "EMERALD_BLOCK"
+      source: 5000
+      result: "custom:mage_guardian_archmage_leggings"
+
+  mage_guardian_archmage_boots:
+    recipe:
+      method: ritual
+      core-item: "custom:mage_guardian_apprentice_boots"
+      pedestal-items:
+        - "custom:source_gem_block x2"
+        - "NETHERITE_INGOT x4"
+        - "DIAMOND_BLOCK"
+        - "EMERALD_BLOCK"
+      source: 5000
+      result: "custom:mage_guardian_archmage_boots"
+
+  # ==========================================================
+  # 儀式レシピ - 魔導メイジアーマー (Arcane)
+  # ==========================================================
+
+  # ----------------------------------------------------------
+  # 魔導メイジ T1 (Novice) - バニラ革防具から作成
+  # ----------------------------------------------------------
+  mage_arcane_novice_helmet:
+    recipe:
+      method: ritual
+      core-item: LEATHER_HELMET
+      pedestal-items:
+        - "custom:source_gem x2"
+        - "AMETHYST_SHARD x4"
+        - "LAPIS_LAZULI x2"
+      source: 600
+      result: "custom:mage_arcane_novice_helmet"
+
+  mage_arcane_novice_chestplate:
+    recipe:
+      method: ritual
+      core-item: LEATHER_CHESTPLATE
+      pedestal-items:
+        - "custom:source_gem x2"
+        - "AMETHYST_SHARD x4"
+        - "LAPIS_LAZULI x2"
+      source: 600
+      result: "custom:mage_arcane_novice_chestplate"
+
+  mage_arcane_novice_leggings:
+    recipe:
+      method: ritual
+      core-item: LEATHER_LEGGINGS
+      pedestal-items:
+        - "custom:source_gem x2"
+        - "AMETHYST_SHARD x4"
+        - "LAPIS_LAZULI x2"
+      source: 600
+      result: "custom:mage_arcane_novice_leggings"
+
+  mage_arcane_novice_boots:
+    recipe:
+      method: ritual
+      core-item: LEATHER_BOOTS
+      pedestal-items:
+        - "custom:source_gem x2"
+        - "AMETHYST_SHARD x4"
+        - "LAPIS_LAZULI x2"
+      source: 600
+      result: "custom:mage_arcane_novice_boots"
+
+  # ----------------------------------------------------------
+  # 魔導メイジ T2 (Apprentice) - T1からアップグレード
+  # ----------------------------------------------------------
+  mage_arcane_apprentice_helmet:
+    recipe:
+      method: ritual
+      core-item: "custom:mage_arcane_novice_helmet"
+      pedestal-items:
+        - "custom:source_gem x4"
+        - "BLAZE_ROD x2"
+        - "GHAST_TEAR x2"
+      source: 2500
+      result: "custom:mage_arcane_apprentice_helmet"
+
+  mage_arcane_apprentice_chestplate:
+    recipe:
+      method: ritual
+      core-item: "custom:mage_arcane_novice_chestplate"
+      pedestal-items:
+        - "custom:source_gem x4"
+        - "BLAZE_ROD x2"
+        - "GHAST_TEAR x2"
+      source: 2500
+      result: "custom:mage_arcane_apprentice_chestplate"
+
+  mage_arcane_apprentice_leggings:
+    recipe:
+      method: ritual
+      core-item: "custom:mage_arcane_novice_leggings"
+      pedestal-items:
+        - "custom:source_gem x4"
+        - "BLAZE_ROD x2"
+        - "GHAST_TEAR x2"
+      source: 2500
+      result: "custom:mage_arcane_apprentice_leggings"
+
+  mage_arcane_apprentice_boots:
+    recipe:
+      method: ritual
+      core-item: "custom:mage_arcane_novice_boots"
+      pedestal-items:
+        - "custom:source_gem x4"
+        - "BLAZE_ROD x2"
+        - "GHAST_TEAR x2"
+      source: 2500
+      result: "custom:mage_arcane_apprentice_boots"
+
+  # ----------------------------------------------------------
+  # 魔導メイジ T3 (Archmage) - T2からアップグレード
+  # ----------------------------------------------------------
+  mage_arcane_archmage_helmet:
+    recipe:
+      method: ritual
+      core-item: "custom:mage_arcane_apprentice_helmet"
+      pedestal-items:
+        - "custom:source_gem_block x2"
+        - "TOTEM_OF_UNDYING"
+        - "BREEZE_ROD"
+        - "ECHO_SHARD x2"
+        - "DIAMOND_BLOCK"
+        - "EMERALD_BLOCK"
+      source: 6000
+      result: "custom:mage_arcane_archmage_helmet"
+
+  mage_arcane_archmage_chestplate:
+    recipe:
+      method: ritual
+      core-item: "custom:mage_arcane_apprentice_chestplate"
+      pedestal-items:
+        - "custom:source_gem_block x2"
+        - "TOTEM_OF_UNDYING"
+        - "BREEZE_ROD"
+        - "ECHO_SHARD x2"
+        - "DIAMOND_BLOCK"
+        - "EMERALD_BLOCK"
+      source: 6000
+      result: "custom:mage_arcane_archmage_chestplate"
+
+  mage_arcane_archmage_leggings:
+    recipe:
+      method: ritual
+      core-item: "custom:mage_arcane_apprentice_leggings"
+      pedestal-items:
+        - "custom:source_gem_block x2"
+        - "TOTEM_OF_UNDYING"
+        - "BREEZE_ROD"
+        - "ECHO_SHARD x2"
+        - "DIAMOND_BLOCK"
+        - "EMERALD_BLOCK"
+      source: 6000
+      result: "custom:mage_arcane_archmage_leggings"
+
+  mage_arcane_archmage_boots:
+    recipe:
+      method: ritual
+      core-item: "custom:mage_arcane_apprentice_boots"
+      pedestal-items:
+        - "custom:source_gem_block x2"
+        - "TOTEM_OF_UNDYING"
+        - "BREEZE_ROD"
+        - "ECHO_SHARD x2"
+        - "DIAMOND_BLOCK"
+        - "EMERALD_BLOCK"
+      source: 6000
+      result: "custom:mage_arcane_archmage_boots"
+
+  # ==========================================================
+  # 儀式レシピ - 魔織メイジアーマー (Weaver)
+  # ==========================================================
+
+  # ----------------------------------------------------------
+  # 魔織メイジ T1 (Novice) - バニラ革防具から作成
+  # ----------------------------------------------------------
+  mage_weaver_novice_helmet:
+    recipe:
+      method: ritual
+      core-item: LEATHER_HELMET
+      pedestal-items:
+        - "custom:magebloom_fiber x2"
+        - "custom:source_gem x2"
+        - "STRING x4"
+      source: 500
+      result: "custom:mage_weaver_novice_helmet"
+
+  mage_weaver_novice_chestplate:
+    recipe:
+      method: ritual
+      core-item: LEATHER_CHESTPLATE
+      pedestal-items:
+        - "custom:magebloom_fiber x2"
+        - "custom:source_gem x2"
+        - "STRING x4"
+      source: 500
+      result: "custom:mage_weaver_novice_chestplate"
+
+  mage_weaver_novice_leggings:
+    recipe:
+      method: ritual
+      core-item: LEATHER_LEGGINGS
+      pedestal-items:
+        - "custom:magebloom_fiber x2"
+        - "custom:source_gem x2"
+        - "STRING x4"
+      source: 500
+      result: "custom:mage_weaver_novice_leggings"
+
+  mage_weaver_novice_boots:
+    recipe:
+      method: ritual
+      core-item: LEATHER_BOOTS
+      pedestal-items:
+        - "custom:magebloom_fiber x2"
+        - "custom:source_gem x2"
+        - "STRING x4"
+      source: 500
+      result: "custom:mage_weaver_novice_boots"
+
+  # ----------------------------------------------------------
+  # 魔織メイジ T2 (Apprentice) - T1からアップグレード
+  # ----------------------------------------------------------
+  mage_weaver_apprentice_helmet:
+    recipe:
+      method: ritual
+      core-item: "custom:mage_weaver_novice_helmet"
+      pedestal-items:
+        - "custom:magebloom_fiber x4"
+        - "custom:source_gem x2"
+        - "ENDER_EYE x2"
+      source: 2000
+      result: "custom:mage_weaver_apprentice_helmet"
+
+  mage_weaver_apprentice_chestplate:
+    recipe:
+      method: ritual
+      core-item: "custom:mage_weaver_novice_chestplate"
+      pedestal-items:
+        - "custom:magebloom_fiber x4"
+        - "custom:source_gem x2"
+        - "ENDER_EYE x2"
+      source: 2000
+      result: "custom:mage_weaver_apprentice_chestplate"
+
+  mage_weaver_apprentice_leggings:
+    recipe:
+      method: ritual
+      core-item: "custom:mage_weaver_novice_leggings"
+      pedestal-items:
+        - "custom:magebloom_fiber x4"
+        - "custom:source_gem x2"
+        - "ENDER_EYE x2"
+      source: 2000
+      result: "custom:mage_weaver_apprentice_leggings"
+
+  mage_weaver_apprentice_boots:
+    recipe:
+      method: ritual
+      core-item: "custom:mage_weaver_novice_boots"
+      pedestal-items:
+        - "custom:magebloom_fiber x4"
+        - "custom:source_gem x2"
+        - "ENDER_EYE x2"
+      source: 2000
+      result: "custom:mage_weaver_apprentice_boots"
+
+  # ----------------------------------------------------------
+  # 魔織メイジ T3 (Archmage) - T2からアップグレード
+  # ----------------------------------------------------------
+  mage_weaver_archmage_helmet:
+    recipe:
+      method: ritual
+      core-item: "custom:mage_weaver_apprentice_helmet"
+      pedestal-items:
+        - "custom:magebloom_fiber x4"
+        - "custom:source_gem_block x2"
+        - "DIAMOND_BLOCK"
+        - "NETHER_STAR"
+      source: 5000
+      result: "custom:mage_weaver_archmage_helmet"
+
+  mage_weaver_archmage_chestplate:
+    recipe:
+      method: ritual
+      core-item: "custom:mage_weaver_apprentice_chestplate"
+      pedestal-items:
+        - "custom:magebloom_fiber x4"
+        - "custom:source_gem_block x2"
+        - "DIAMOND_BLOCK"
+        - "NETHER_STAR"
+      source: 5000
+      result: "custom:mage_weaver_archmage_chestplate"
+
+  mage_weaver_archmage_leggings:
+    recipe:
+      method: ritual
+      core-item: "custom:mage_weaver_apprentice_leggings"
+      pedestal-items:
+        - "custom:magebloom_fiber x4"
+        - "custom:source_gem_block x2"
+        - "DIAMOND_BLOCK"
+        - "NETHER_STAR"
+      source: 5000
+      result: "custom:mage_weaver_archmage_leggings"
+
+  mage_weaver_archmage_boots:
+    recipe:
+      method: ritual
+      core-item: "custom:mage_weaver_apprentice_boots"
+      pedestal-items:
+        - "custom:magebloom_fiber x4"
+        - "custom:source_gem_block x2"
+        - "DIAMOND_BLOCK"
+        - "NETHER_STAR"
+      source: 5000
+      result: "custom:mage_weaver_archmage_boots"
+
+# ============================================================
+# 儀式エフェクト (ワールドエフェクト - アイテム結果なし)
+# ============================================================
+ritual_effects:
+
+  # ==========================================================
+  # 自然・環境エフェクト
+  # ==========================================================
+
+  # ----------------------------------------------------------
+  # 天候操作 - 晴れ（コア: ひまわり）
+  # ----------------------------------------------------------
+  weather_clear:
+    name: "晴天の儀式"
+    effect-type: weather
+    effect-params:
+      mode: clear
+    core-item: "SUNFLOWER"
+    pedestal-items:
+      - "PRISMARINE_SHARD x2"
+      - "custom:source_gem x2"
+    source: 500
+
+  # ----------------------------------------------------------
+  # 天候操作 - 雨（コア: 水入りバケツ）
+  # ----------------------------------------------------------
+  weather_rain:
+    name: "降雨の儀式"
+    effect-type: weather
+    effect-params:
+      mode: rain
+    core-item: "WATER_BUCKET"
+    pedestal-items:
+      - "PRISMARINE_SHARD x2"
+      - "custom:source_gem x2"
+    source: 500
+
+  # ----------------------------------------------------------
+  # 天候操作 - 雷雨（コア: 避雷針）
+  # ----------------------------------------------------------
+  weather_thunder:
+    name: "雷雨の儀式"
+    effect-type: weather
+    effect-params:
+      mode: thunder
+    core-item: "LIGHTNING_ROD"
+    pedestal-items:
+      - "PRISMARINE_SHARD x2"
+      - "custom:source_gem x2"
+    source: 1000
+
+  # ----------------------------------------------------------
+  # 飛行の儀式 - 一時的な飛行能力を付与
+  # ----------------------------------------------------------
+  flight:
+    name: "飛行 儀式レシピ"
+    effect-type: flight
+    effect-params:
+      duration: 300
+    pedestal-items:
+      - "FEATHER x4"
+      - "PHANTOM_MEMBRANE x2"
+      - "custom:source_gem x2"
+    source: 2000
+
+  # ==========================================================
+  # 時間操作エフェクト
+  # ==========================================================
+
+  # ----------------------------------------------------------
+  # 月落とし - 時間を夜に変更
+  # ----------------------------------------------------------
+  moonfall:
+    name: "月落とし 儀式レシピ"
+    effect-type: moonfall
+    effect-params: {}
+    pedestal-items:
+      - "CLOCK"
+      - "GLOWSTONE_DUST x2"
+      - "custom:source_gem"
+    source: 500
+
+  # ----------------------------------------------------------
+  # 日の出 - 時間を朝に変更
+  # ----------------------------------------------------------
+  sunrise:
+    name: "日の出 儀式レシピ"
+    effect-type: sunrise
+    effect-params: {}
+    pedestal-items:
+      - "CLOCK"
+      - "SUNFLOWER x2"
+      - "custom:source_gem"
+    source: 500
+
+  # ==========================================================
+  # ユーティリティエフェクト
+  # ==========================================================
+
+  # ----------------------------------------------------------
+  # 修復の儀式 - 装備を修復
+  # ----------------------------------------------------------
+  repair:
+    name: "修復 儀式レシピ"
+    effect-type: repair
+    effect-params: {}
+    pedestal-items:
+      - "IRON_INGOT x2"
+      - "DIAMOND"
+      - "custom:source_gem x2"
+    source: 800
+
+  # ----------------------------------------------------------
+  # 動物召喚の儀式
+  # ----------------------------------------------------------
+  animal_summon:
+    name: "動物召喚 儀式レシピ"
+    effect-type: animal_summon
+    effect-params:
+      count: 5
+    pedestal-items:
+      - "WHEAT x2"
+      - "CARROT x2"
+      - "custom:source_gem"
+    source: 400
+
+  # ----------------------------------------------------------
+  # 敵モブ召喚の儀式
+  # ----------------------------------------------------------
+  mob_summon:
+    name: "敵モブ召喚 儀式レシピ"
+    effect-type: mob_summon
+    effect-params:
+      count: 3
+    pedestal-items:
+      - "ROTTEN_FLESH x2"
+      - "BONE x2"
+      - "custom:source_gem x2"
+    source: 800
+
+  # ==========================================================
+  # エンチャント本の儀式
+  # ==========================================================
+
+  # ----------------------------------------------------------
+  # マナ再生エンチャント本 Lv.1
+  # ----------------------------------------------------------
+  enchant_book_mana_regen_1:
+    name: "マナ再生I 儀式レシピ"
+    effect-type: enchant_book
+    effect-params:
+      enchantment: mana_regen
+      level: 1
+    core-item: BOOK
+    pedestal-items:
+      - "custom:source_gem x2"
+      - "GHAST_TEAR"
+      - "LAPIS_LAZULI x2"
+    source: 500
+
+  # ----------------------------------------------------------
+  # マナ再生エンチャント本 Lv.2
+  # ----------------------------------------------------------
+  enchant_book_mana_regen_2:
+    name: "マナ再生II 儀式レシピ"
+    effect-type: enchant_book
+    effect-params:
+      enchantment: mana_regen
+      level: 2
+    core-item: BOOK
+    pedestal-items:
+      - "custom:source_gem x3"
+      - "GHAST_TEAR x2"
+      - "DIAMOND_BLOCK"
+    source: 1000
+
+  # ----------------------------------------------------------
+  # マナ再生エンチャント本 Lv.3
+  # ----------------------------------------------------------
+  enchant_book_mana_regen_3:
+    name: "マナ再生III 儀式レシピ"
+    effect-type: enchant_book
+    effect-params:
+      enchantment: mana_regen
+      level: 3
+    core-item: BOOK
+    pedestal-items:
+      - "custom:source_gem x4"
+      - "GHAST_TEAR x2"
+      - "NETHER_STAR"
+    source: 2000
+
+  # ----------------------------------------------------------
+  # マナ上昇エンチャント本 Lv.1
+  # ----------------------------------------------------------
+  enchant_book_mana_boost_1:
+    name: "マナ上昇I 儀式レシピ"
+    effect-type: enchant_book
+    effect-params:
+      enchantment: mana_boost
+      level: 1
+    core-item: BOOK
+    pedestal-items:
+      - "custom:source_gem x2"
+      - "ECHO_SHARD"
+      - "LAPIS_LAZULI x2"
+    source: 500
+
+  # ----------------------------------------------------------
+  # マナ上昇エンチャント本 Lv.2
+  # ----------------------------------------------------------
+  enchant_book_mana_boost_2:
+    name: "マナ上昇II 儀式レシピ"
+    effect-type: enchant_book
+    effect-params:
+      enchantment: mana_boost
+      level: 2
+    core-item: BOOK
+    pedestal-items:
+      - "custom:source_gem x3"
+      - "ECHO_SHARD"
+      - "DIAMOND_BLOCK"
+    source: 1000
+
+  # ----------------------------------------------------------
+  # マナ上昇エンチャント本 Lv.3
+  # ----------------------------------------------------------
+  enchant_book_mana_boost_3:
+    name: "マナ上昇III 儀式レシピ"
+    effect-type: enchant_book
+    effect-params:
+      enchantment: mana_boost
+      level: 3
+    core-item: BOOK
+    pedestal-items:
+      - "custom:source_gem x4"
+      - "ECHO_SHARD"
+      - "NETHER_STAR"
+    source: 2000
+
+  # ----------------------------------------------------------
+  # 共有エンチャント本
+  # ----------------------------------------------------------
+  enchant_book_share:
+    name: "共有エンチャント 儀式レシピ"
+    effect-type: enchant_book
+    effect-params:
+      enchantment: share
+      level: 1
+    core-item: BOOK
+    pedestal-items:
+      - "custom:source_gem_block x2"
+      - "ENDER_EYE x4"
+      - "NETHER_STAR"
+      - "DIAMOND_BLOCK"
+    source: 3000

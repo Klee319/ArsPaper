@@ -81,10 +81,13 @@ public class SummonDecoyEffect implements SpellEffect {
             z.setAI(true);
             z.setCanPickupItems(false);
 
-            // 召喚モブマーカー
+            // 召喚モブマーカー + 召喚者UUID
             z.getPersistentDataContainer().set(
                 new NamespacedKey(plugin, "summoned"),
                 PersistentDataType.BYTE, (byte) 1);
+            z.getPersistentDataContainer().set(
+                new NamespacedKey(plugin, "summoner_uuid"),
+                PersistentDataType.STRING, finalCaster.getUniqueId().toString());
 
             // HPをAmplifyで強化
             var maxHpAttr = z.getAttribute(Attribute.MAX_HEALTH);
@@ -195,6 +198,9 @@ public class SummonDecoyEffect implements SpellEffect {
 
     @Override
     public boolean handlesAoeInternally() { return true; }
+
+    @Override
+    public boolean allowsTraceRepeating() { return false; }
 
     @Override
     public NamespacedKey getId() { return id; }

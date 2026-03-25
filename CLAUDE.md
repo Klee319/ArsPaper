@@ -55,16 +55,16 @@ com.arspaper/
 | wand_novice/apprentice/archmage | BLAZE_ROD | スペルワンド（1スロット、右クリック発動、スニーク+右でGUI） |
 | dominion_wand | STICK | Source接続ツール |
 | scribing_table | LECTERN | グリフアンロック台 |
-| source_jar | BARREL | Source貯蔵（最大10,000） |
-| creative_source_jar | BARREL | 無限Source（クリエイティブ用） |
+| source_jar | DECORATED_POT | Source貯蔵（最大10,000） |
+| creative_source_jar | DECORATED_POT | 無限Source（クリエイティブ用） |
 | volcanic_sourcelink | FURNACE | 燃料消費でSource生成 |
 | mycelial_sourcelink | SMOKER | 食料消費でSource生成 |
-| ritual_core | LODESTONE | 儀式の中心ブロック |
+| ritual_core | ENCHANTING_TABLE | 儀式の中心ブロック |
 | pedestal | BREWING_STAND | 儀式の素材台座 |
 | source_gem / magebloom_fiber / sourcestone | 各種 | 中間素材 |
 | source_berry | GLOW_BERRIES | マナ25即時回復 |
 | mage_<tier>_<slot> | LEATHER_* | メイジアーマー（3ティア×4部位） |
-| thread_empty/mana_regen/mana_boost/speed/... | STRING | スレッドアイテム（10種） |
+| thread_empty/mana_regen/mana_boost/speed/... | STRING | スレッドアイテム（16種） |
 
 ## スペルシステム
 - Form 7種: projectile, touch, self, underfoot, orbit, beam, wall
@@ -72,9 +72,9 @@ com.arspaper/
 - Augment 18種: amplify, dampen, aoe(XZ), aoe_vertical(Y), extend_time, delay, ...
 
 ## 防具スレッドシステム
-- ティアに応じたスロット数: Novice=1, Apprentice=2, Archmage=3
+- スロット数はarmors.yml依存（設定ベース防具のthread_slotsで定義）
 - 防具手持ちスニーク+右クリックでThreadGui
-- 10種: mana_regen, mana_boost, speed, jump_boost, night_vision, fire_resistance, water_breathing, spell_power, spell_cost_down
+- 16種: mana_regen, mana_boost, health_boost, hit_mana_recovery, damage_mana_recovery, spell_cost_down, backpack, speed, jump_boost, night_vision, fire_resistance, dolphins_grace, conduit_power, hero_of_the_village, flight, empty
 
 ## PDCキー (namespace: arspaper)
 - `custom_item_id` - カスタムアイテム識別子

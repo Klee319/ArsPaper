@@ -79,7 +79,9 @@ public class PhantomBlockEffect implements SpellEffect {
 
         if (context.getAmplifyLevel() <= 0) {
             // 一時ブロック: 一定時間後に除去
-            int removalTicks = BASE_REMOVAL_TICKS + context.getDurationLevel() * DURATION_BONUS_TICKS;
+            int baseRemoval = (int) config.getParam("phantom_block", "base-removal-ticks", BASE_REMOVAL_TICKS);
+            int durationBonus = (int) config.getParam("phantom_block", "duration-bonus-ticks", DURATION_BONUS_TICKS);
+            int removalTicks = baseRemoval + context.getDurationLevel() * durationBonus;
             activePhantomBlocks.add(savedLocation);
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 removePhantomBlock(savedLocation);

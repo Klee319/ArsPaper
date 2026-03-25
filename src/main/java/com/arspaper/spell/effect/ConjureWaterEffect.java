@@ -20,12 +20,18 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import java.util.HashSet;
+import java.util.Set;
+
 /**
  * 水を生成し、炎を消し、エンティティにSoaked（Slowness I）を付与するEffect。Ars Nouveau準拠。
  * ブロック: 対象位置に水を生成し、隣接する炎ブロックを消す。
  * エンティティ: 炎を消火してSlowness I（Soaked）を付与する。
  *   - 基本持続: 60tick (3秒)
  *   - ExtendTimeで増加: +80tick/level
+ *
+ * 水は一定時間後に自動消滅する。消滅時、無限水源メカニクスで生成された
+ * 隣接水源ブロックも合わせて除去する。
  */
 public class ConjureWaterEffect implements SpellEffect {
 
@@ -33,6 +39,9 @@ public class ConjureWaterEffect implements SpellEffect {
     private static final int DURATION_BONUS_TICKS = 80;
     private static final int BASE_WATER_LIFETIME = 200;  // 10秒
     private static final int WATER_LIFETIME_PER_DURATION = 100; // +5秒/level
+    private static final BlockFace[] HORIZONTAL_FACES = {
+        BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST
+    };
 
     private final NamespacedKey id;
     private final GlyphConfig config;
@@ -50,8 +59,10 @@ public class ConjureWaterEffect implements SpellEffect {
         target.setFireTicks(0);
 
         // Soaked (Slowness I) を付与
-        int durationTicks = Math.max(BASE_SOAKED_TICKS,
-            BASE_SOAKED_TICKS + context.getDurationLevel() * DURATION_BONUS_TICKS);
+        int baseSoaked = (int) config.getParam("conjure_water", "base-soaked-ticks", BASE_SOAKED_TICKS);
+        int durationBonus = (int) config.getParam("conjure_water", "duration-bonus-ticks", DURATION_BONUS_TICKS);
+        int durationTicks = Math.max(baseSoaked,
+            baseSoaked + context.getDurationLevel() * durationBonus);
         target.addPotionEffect(
             new PotionEffect(PotionEffectType.SLOWNESS, durationTicks, 0, false, true, true));
 
@@ -80,11 +91,21 @@ public class ConjureWaterEffect implements SpellEffect {
             );
             Bukkit.getPluginManager().callEvent(placeEvent);
             if (!placeEvent.isCancelled()) {
+                // 設置前に隣接ブロックの既存水源を記録（無限水源対策）
+                Set<BlockFace> preExistingWater = new HashSet<>();
+                for (BlockFace face : HORIZONTAL_FACES) {
+                    if (block.getRelative(face).getType() == Material.WATER) {
+                        preExistingWater.add(face);
+                    }
+                }
+
                 block.setType(Material.WATER);
                 spawnWaterFx(blockLocation);
 
                 // 一定時間後に水を消滅させる
-                int waterLifetime = BASE_WATER_LIFETIME + context.getDurationLevel() * WATER_LIFETIME_PER_DURATION;
+                int baseLifetime = (int) config.getParam("conjure_water", "base-water-lifetime", BASE_WATER_LIFETIME);
+                int lifetimePerDuration = (int) config.getParam("conjure_water", "water-lifetime-per-duration", WATER_LIFETIME_PER_DURATION);
+                int waterLifetime = baseLifetime + context.getDurationLevel() * lifetimePerDuration;
                 Location waterLoc = block.getLocation();
                 new BukkitRunnable() {
                     @Override
@@ -92,6 +113,16 @@ public class ConjureWaterEffect implements SpellEffect {
                         Block b = waterLoc.getBlock();
                         if (b.getType() == Material.WATER) {
                             b.setType(Material.AIR);
+                            // 無限水源メカニクスで生成された隣接水源を除去
+                            // （設置前に既に存在していた水源は保持）
+                            for (BlockFace face : HORIZONTAL_FACES) {
+                                if (!preExistingWater.contains(face)) {
+                                    Block adj = b.getRelative(face);
+                                    if (adj.getType() == Material.WATER) {
+                                        adj.setType(Material.AIR);
+                                    }
+                                }
+                            }
                             spawnWaterFx(waterLoc);
                         }
                     }
@@ -150,4 +181,7 @@ public class ConjureWaterEffect implements SpellEffect {
 
     @Override
     public int getTier() { return config.getTier("conjure_water"); }
+
+    @Override
+    public AoeMode getAoeMode() { return AoeMode.HIT_FACE_OUTWARD; }
 }

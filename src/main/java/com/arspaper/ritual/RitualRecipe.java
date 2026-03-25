@@ -19,6 +19,7 @@ import java.util.Map;
  * @param resultMaterial  バニラアイテムの場合のMaterial（nullならカスタム）
  * @param effectType      儀式タイプ（"craft"=通常, "world_effect"=ワールド効果, "thread"=スレッド適用）
  * @param effectParams    エフェクトパラメータ（effect-typeごとの追加パラメータ）
+ * @param resultAmount    結果アイテムの数量（1以上）
  */
 public record RitualRecipe(
     String id,
@@ -29,8 +30,19 @@ public record RitualRecipe(
     String resultId,
     Material resultMaterial,
     String effectType,
-    Map<String, String> effectParams
+    Map<String, String> effectParams,
+    int resultAmount
 ) {
+
+    /**
+     * 後方互換コンストラクタ（resultAmount=1）。
+     */
+    public RitualRecipe(String id, String name, RitualIngredient coreItem,
+                        List<RitualIngredient> pedestalItems, int sourceRequired,
+                        String resultId, Material resultMaterial,
+                        String effectType, Map<String, String> effectParams) {
+        this(id, name, coreItem, pedestalItems, sourceRequired, resultId, resultMaterial, effectType, effectParams, 1);
+    }
 
     /**
      * 後方互換コンストラクタ（effectType/effectParamsなし）。
@@ -38,7 +50,7 @@ public record RitualRecipe(
     public RitualRecipe(String id, String name, RitualIngredient coreItem,
                         List<RitualIngredient> pedestalItems, int sourceRequired,
                         String resultId, Material resultMaterial) {
-        this(id, name, coreItem, pedestalItems, sourceRequired, resultId, resultMaterial, "craft", Map.of());
+        this(id, name, coreItem, pedestalItems, sourceRequired, resultId, resultMaterial, "craft", Map.of(), 1);
     }
 
     /**

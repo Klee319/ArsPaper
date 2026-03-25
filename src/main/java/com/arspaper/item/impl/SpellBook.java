@@ -8,6 +8,7 @@ import com.arspaper.item.SpellBookTier;
 import com.arspaper.spell.*;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -43,8 +44,40 @@ public class SpellBook extends BaseCustomItem {
 
     @Override
     public Component getDisplayName() {
-        return Component.text(bookTier.getDisplayName() + "スペルブック", bookTier.getColor())
-            .decoration(TextDecoration.ITALIC, false);
+        return buildTieredBookName(bookTier);
+    }
+
+    /**
+     * ティアに応じた華やかな魔導書名を生成する。
+     * Novice: シンプルな薄紫
+     * Apprentice: 装飾付き濃紫グラデーション
+     * Archmage: 金→黄グラデーション + ボールド + 装飾シンボル
+     */
+    private static Component buildTieredBookName(SpellBookTier tier) {
+        return switch (tier) {
+            case NOVICE -> Component.text("見習いの魔法書", TextColor.color(0xD4A0FF))
+                .decoration(TextDecoration.ITALIC, false);
+
+            case APPRENTICE -> Component.text("✦ ", TextColor.color(0x9966CC))
+                .append(Component.text("魔術師", TextColor.color(0xAA55DD)))
+                .append(Component.text("の", TextColor.color(0x9944CC)))
+                .append(Component.text("魔術書", TextColor.color(0x8833BB)))
+                .append(Component.text(" ✦", TextColor.color(0x9966CC)))
+                .decoration(TextDecoration.ITALIC, false);
+
+            case ARCHMAGE -> Component.text("✧✦ ", TextColor.color(0xFFD700))
+                .append(Component.text("大", TextColor.color(0xFFD700)))
+                .append(Component.text("魔", TextColor.color(0xFFCC00)))
+                .append(Component.text("導", TextColor.color(0xFFC200)))
+                .append(Component.text("士", TextColor.color(0xFFB800)))
+                .append(Component.text("の", TextColor.color(0xFFAE00)))
+                .append(Component.text("魔", TextColor.color(0xFFA400)))
+                .append(Component.text("導", TextColor.color(0xFF9A00)))
+                .append(Component.text("書", TextColor.color(0xFF9000)))
+                .append(Component.text(" ✦✧", TextColor.color(0xFFD700)))
+                .decoration(TextDecoration.ITALIC, false)
+                .decoration(TextDecoration.BOLD, true);
+        };
     }
 
     @Override
@@ -110,6 +143,8 @@ public class SpellBook extends BaseCustomItem {
 
         // UUID未設定の既存ブックに対してUUIDを付与
         getOrCreateUUID(item);
+        // 初回使用時に所有者を設定
+        getOrCreateOwner(item, player);
 
         if (player.isSneaking()) {
             switchSlot(player, item);
@@ -126,6 +161,12 @@ public class SpellBook extends BaseCustomItem {
         if (item == null) return;
 
         if (player.isSneaking()) {
+            // 所有者チェック: 所有者以外はGUIを開けない
+            if (!isOwner(item, player)) {
+                player.sendMessage(Component.text("この魔導書の所有者ではありません", NamedTextColor.RED));
+                return;
+            }
+
             int slot = item.getItemMeta().getPersistentDataContainer()
                 .getOrDefault(ItemKeys.SPELL_SLOT, PersistentDataType.INTEGER, 0);
             int tier = item.getItemMeta().getPersistentDataContainer()
@@ -136,6 +177,38 @@ public class SpellBook extends BaseCustomItem {
             );
             gui.open();
         }
+    }
+
+    /**
+     * スペルブックの所有者を取得または初回設定する。
+     * 所有者が未設定の場合、操作したプレイヤーを所有者として記録する。
+     */
+    public static String getOrCreateOwner(ItemStack item, Player player) {
+        if (!item.hasItemMeta()) return null;
+        String owner = item.getItemMeta().getPersistentDataContainer()
+            .get(ItemKeys.SPELL_BOOK_OWNER, PersistentDataType.STRING);
+        if (owner == null) {
+            owner = player.getUniqueId().toString();
+            String finalOwner = owner;
+            item.editMeta(meta ->
+                meta.getPersistentDataContainer().set(
+                    ItemKeys.SPELL_BOOK_OWNER, PersistentDataType.STRING, finalOwner
+                )
+            );
+        }
+        return owner;
+    }
+
+    /**
+     * プレイヤーがこのスペルブックの所有者かどうか判定する。
+     */
+    public static boolean isOwner(ItemStack item, Player player) {
+        if (!item.hasItemMeta()) return false;
+        String owner = item.getItemMeta().getPersistentDataContainer()
+            .get(ItemKeys.SPELL_BOOK_OWNER, PersistentDataType.STRING);
+        // 所有者未設定の場合は誰でもOK（後方互換）
+        if (owner == null) return true;
+        return owner.equals(player.getUniqueId().toString());
     }
 
     private void castCurrentSpell(Player player, ItemStack item) {
@@ -167,14 +240,8 @@ public class SpellBook extends BaseCustomItem {
         int current = item.getItemMeta().getPersistentDataContainer()
             .getOrDefault(ItemKeys.SPELL_SLOT, PersistentDataType.INTEGER, 0);
 
-        // ジャンプ中なら逆方向にスロット切替
-        boolean jumping = player.getVelocity().getY() > 0.1;
-        int next;
-        if (jumping) {
-            next = (current - 1 + maxSlots) % maxSlots;
-        } else {
-            next = (current + 1) % maxSlots;
-        }
+        // 通常: 次のスロットへ（前ロールはスニーク+ドロップキーで別途処理）
+        int next = (current + 1) % maxSlots;
 
         item.editMeta(meta ->
             meta.getPersistentDataContainer().set(
@@ -188,7 +255,7 @@ public class SpellBook extends BaseCustomItem {
         );
     }
 
-    private String getSlotSpellName(ItemStack item, int slot) {
+    public String getSlotSpellName(ItemStack item, int slot) {
         String slotsJson = item.getItemMeta().getPersistentDataContainer()
             .get(ItemKeys.SPELL_SLOTS, PersistentDataType.STRING);
         if (slotsJson == null) return "空";

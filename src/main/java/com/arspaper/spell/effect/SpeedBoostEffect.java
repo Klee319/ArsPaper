@@ -49,9 +49,13 @@ public class SpeedBoostEffect implements SpellEffect {
         Player caster = context.getCaster();
         if (caster == null) return;
 
+        double baseSpeed = config.getParam("speed_boost", "base-speed", BASE_SPEED);
+        double amplifyBonus = config.getParam("speed_boost", "amplify-bonus", AMPLIFY_BONUS);
+        double maxSpeed = config.getParam("speed_boost", "max-speed", MAX_SPEED);
+        double baseAimRange = config.getParam("speed_boost", "base-aim-range", BASE_AIM_RANGE);
         double speed = Math.min(
-            BASE_SPEED + context.getAmplifyLevel() * AMPLIFY_BONUS,
-            MAX_SPEED
+            baseSpeed + context.getAmplifyLevel() * amplifyBonus,
+            maxSpeed
         );
         speed = Math.max(0.3, speed);
 
@@ -65,8 +69,9 @@ public class SpeedBoostEffect implements SpellEffect {
             direction = caster.getLocation().getDirection();
         } else {
             // 他エンティティ使用: キャスターの視線先の方向にブースト
+            double aimRangePerDuration = config.getParam("speed_boost", "aim-range-per-duration", AIM_RANGE_PER_DURATION);
             double aimRange = Math.max(5.0,
-                BASE_AIM_RANGE + context.getDurationLevel() * AIM_RANGE_PER_DURATION);
+                baseAimRange + context.getDurationLevel() * aimRangePerDuration);
             direction = getAimDirection(caster, aimRange);
         }
 

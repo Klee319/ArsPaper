@@ -151,7 +151,7 @@ public class WololoEffect implements SpellEffect {
     public NamespacedKey getId() { return id; }
 
     @Override
-    public String getDisplayName() { return "ウォロロ"; }
+    public String getDisplayName() { return "色彩"; }
 
     @Override
     public String getDescription() { return "ブロックや羊の色を変える"; }

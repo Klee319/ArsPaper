@@ -38,7 +38,7 @@ public final class ItemFrameHelper {
             frame.setFixed(true);
             frame.setInvulnerable(true);
             frame.setSilent(true);
-            frame.setItem(displayItem != null ? displayItem : new ItemStack(Material.AIR));
+            frame.setItem(displayItem != null ? displayItem : ItemStack.empty());
             frame.setRotation(Rotation.NONE);
             frame.addScoreboardTag(MARKER_TAG);
         });
@@ -63,7 +63,7 @@ public final class ItemFrameHelper {
         Location center = blockLoc.clone().add(0.5, 1.0, 0.5);
         for (Entity entity : center.getWorld().getNearbyEntities(center, 0.5, 0.5, 0.5)) {
             if (entity instanceof ItemFrame frame && frame.getScoreboardTags().contains(MARKER_TAG)) {
-                frame.setItem(newItem != null ? newItem : new ItemStack(Material.AIR));
+                frame.setItem(newItem != null ? newItem : ItemStack.empty());
                 return;
             }
         }

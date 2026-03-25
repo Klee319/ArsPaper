@@ -1,11 +1,31 @@
+# ============================================================
 # ArsPaper Configuration
+# ============================================================
+# プラグインの基本設定ファイル。
+# スレッドの設定は threads.yml で管理する。
+# グリフの設定は glyphs.yml で管理する。
+# ============================================================
 
 mana:
-  # 初期マナ上限
+  # 初期マナ上限（装備/スレッド/エンチャント/グリフ解放で増加）
   default-max: 100
-  # 毎tick回復量
-  default-regen-rate: 2
-  # 回復間隔（tick, 20 = 1秒）
+  # 初期常時マナ回復量（装備/スレッド/エンチャントで増加）
+  default-regen-rate: 5
+  # 回復間隔（tick単位, 20tick = 1秒）
   regen-interval-ticks: 20
-  # グリフアンロック時のマナボーナス
+  # グリフ1つ解放ごとのマナ上限ボーナス
   per-glyph-unlock-bonus: 5
+
+# Geyser (統合版) 互換設定
+geyser:
+  # trueにするとCustomModelDataを設定しない（統合版でアイテムが透明になる問題を回避）
+  # リソースパック未使用のGeyserサーバーではtrueにすること
+  disable-custom-model-data: true
+
+# ルートチェスト設定
+loot:
+  enabled: true
+  # カスタムエンチャント本がチェストに出現する確率(0.0-1.0)
+  enchant-book-chance: 0.05
+  # エンチャント金リンゴがチェストに出現する確率(0.0-1.0)
+  enchanted-golden-apple-chance: 0.01

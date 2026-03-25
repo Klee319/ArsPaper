@@ -42,7 +42,8 @@ public class FangsEffect implements SpellEffect {
         Player caster = context.getCaster();
         int amplifyLevel = Math.max(0, context.getAmplifyLevel());
         int aoeLevel = context.getAoeRadiusLevel();
-        int fangCount = Math.min(BASE_FANG_COUNT_ENTITY + amplifyLevel * AMPLIFY_BONUS, MAX_FANGS);
+        int maxFangs = (int) config.getParam("fangs", "max-fangs", (double) MAX_FANGS);
+        int fangCount = Math.min(BASE_FANG_COUNT_ENTITY + amplifyLevel * AMPLIFY_BONUS, maxFangs);
 
         Location targetLoc = target.getLocation();
 
@@ -69,7 +70,8 @@ public class FangsEffect implements SpellEffect {
 
         int amplifyLevel = Math.max(0, context.getAmplifyLevel());
         int aoeLevel = context.getAoeRadiusLevel();
-        int fangCount = Math.min(BASE_FANG_COUNT_BLOCK + amplifyLevel * AMPLIFY_BONUS, MAX_FANGS);
+        int maxFangs = (int) config.getParam("fangs", "max-fangs", (double) MAX_FANGS);
+        int fangCount = Math.min(BASE_FANG_COUNT_BLOCK + amplifyLevel * AMPLIFY_BONUS, maxFangs);
 
         // ブロック対象の場合、牙はブロックの上面に生成する
         Location spawnLoc = blockLocation.clone().add(0, 1, 0);
@@ -129,6 +131,9 @@ public class FangsEffect implements SpellEffect {
         loc.getWorld().playSound(loc, Sound.ENTITY_EVOKER_FANGS_ATTACK,
             SoundCategory.PLAYERS, 0.8f, 1.0f);
     }
+
+    @Override
+    public boolean allowsTraceRepeating() { return false; }
 
     @Override
     public NamespacedKey getId() { return id; }

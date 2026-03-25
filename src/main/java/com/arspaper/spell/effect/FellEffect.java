@@ -72,7 +72,9 @@ public class FellEffect implements SpellEffect {
         Player caster = context.getCaster();
         if (caster == null) return;
 
-        int maxBlocks = BASE_MAX_BLOCKS + context.getAoeRadiusLevel() * AOE_BONUS_BLOCKS;
+        int baseMax = (int) config.getParam("fell", "base-max-blocks", BASE_MAX_BLOCKS);
+        int aoeBonus = (int) config.getParam("fell", "aoe-bonus-blocks", AOE_BONUS_BLOCKS);
+        int maxBlocks = baseMax + context.getAoeRadiusLevel() * aoeBonus;
 
         // BFSで接続された木のブロックを収集
         List<Block> toBreak = new ArrayList<>();

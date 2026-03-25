@@ -46,7 +46,8 @@ public class PickupEffect implements SpellEffect {
         Player caster = context.getCaster();
         if (caster == null) return;
 
-        double radius = BASE_RADIUS + context.getAoeRadiusLevel();
+        double baseRadius = config.getParam("pickup", "base-radius", BASE_RADIUS);
+        double radius = baseRadius + context.getAoeRadiusLevel();
         Collection<Item> items = center.getWorld().getNearbyEntitiesByType(
             Item.class, center, radius
         );

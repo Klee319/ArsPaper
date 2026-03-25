@@ -4,9 +4,11 @@ import com.arspaper.spell.GlyphConfig;
 import com.arspaper.spell.SpellContext;
 import com.arspaper.spell.SpellEffect;
 import com.arspaper.spell.SpellFxUtil;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Mob;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.util.Vector;
 
@@ -18,8 +20,10 @@ public class LeapEffect implements SpellEffect {
 
     private final NamespacedKey id;
     private final GlyphConfig config;
+    private final JavaPlugin plugin;
 
     public LeapEffect(JavaPlugin plugin, GlyphConfig config) {
+        this.plugin = plugin;
         this.id = new NamespacedKey(plugin, "leap");
         this.config = config;
     }
@@ -35,7 +39,24 @@ public class LeapEffect implements SpellEffect {
         if (direction.getY() < 0.2) {
             direction.setY(0.2);
         }
-        target.setVelocity(direction);
+
+        if (target instanceof Mob mob) {
+            // MobのAIがvelocityを即上書きするため、AI一時無効化
+            mob.setAI(false);
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (mob.isValid() && !mob.isDead()) {
+                    mob.setVelocity(direction);
+                    Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                        if (mob.isValid() && !mob.isDead()) {
+                            mob.setAI(true);
+                        }
+                    }, 15L);
+                }
+            }, 1L);
+        } else {
+            target.setVelocity(direction);
+        }
+
         SpellFxUtil.spawnLeapFx(target.getLocation());
     }
 

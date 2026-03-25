@@ -43,10 +43,13 @@ public class ColdSnapEffect implements SpellEffect {
             return;
         }
 
-        int clampedAmp = Math.min(Math.max(0, context.getAmplifyLevel()), MAX_AMP);
-        double damage = Math.max(0, BASE_DAMAGE + clampedAmp * AMPLIFY_BONUS);
+        double baseDamage = config.getParam("cold_snap", "base-damage", BASE_DAMAGE);
+        int maxAmp = (int) config.getParam("cold_snap", "max-amp", (double) MAX_AMP);
+        int clampedAmp = Math.min(Math.max(0, context.getAmplifyLevel()), maxAmp);
+        double damage = Math.max(0, baseDamage + clampedAmp * AMPLIFY_BONUS);
 
         Player caster = context.getCaster();
+        damage = context.calculateSpellDamage(damage, target);
         target.damage(damage, caster);
 
         spawnColdSnapFx(target.getLocation());

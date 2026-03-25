@@ -5,6 +5,7 @@ import com.arspaper.spell.SpellForm;
 import com.arspaper.spell.SpellFxUtil;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
+import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Snowball;
 import org.bukkit.metadata.FixedMetadataValue;
@@ -36,7 +37,8 @@ public class ProjectileForm implements SpellForm {
     public void cast(Player caster, SpellContext context) {
         SpellFxUtil.playCastSound(caster);
 
-        double speed = 2.0 * Math.min(context.getProjectileSpeedMultiplier(), 4.0);
+        double speed = 2.0 * Math.min(context.getProjectileSpeedMultiplier(), 4.0)
+            + context.getReachLevel() * 0.5; // 延伸: 射程延長（速度加算）
         int totalProjectiles = 1 + Math.min(context.getSplitCount(), 8);
 
         Vector baseDirection = caster.getLocation().getDirection();
@@ -52,8 +54,13 @@ public class ProjectileForm implements SpellForm {
             // 各プロジェクタイルに独立したSpellContextコピーを渡す
             SpellContext projectileContext = context.copy();
 
-            // Velocity をアトミックに設定（launch後のsetVelocityによるレースを回避）
-            Snowball projectile = caster.launchProjectile(Snowball.class, direction.multiply(speed));
+            // 手元から発射（目線位置から-0.4Y下）
+            Location handPos = caster.getEyeLocation().clone().add(0, -0.4, 0);
+            final Vector finalDir = direction.clone().multiply(speed);
+            Snowball projectile = caster.getWorld().spawn(handPos, Snowball.class, s -> {
+                s.setShooter(caster);
+                s.setVelocity(finalDir);
+            });
             projectile.setMetadata("ars_spell_context", new FixedMetadataValue(plugin, projectileContext));
             projectile.setGlowing(true);
 
@@ -70,14 +77,16 @@ public class ProjectileForm implements SpellForm {
                         cancel();
                         return;
                     }
-                    SpellFxUtil.spawnProjectileTrail(projectile.getLocation());
+                    if (ticks % 2 == 0) {
+                        SpellFxUtil.spawnProjectileTrail(projectile.getLocation());
+                    }
 
-                    // 軌跡モード: 飛行経路上のブロックにも効果適用
+                    // 軌跡モード: 飛行経路上のブロックにも効果適用（召喚系等はスキップ）
                     if (traceMode) {
                         Location blockLoc = projectile.getLocation().getBlock().getLocation();
                         if (processedBlocks.add(blockLoc)) {
                             SpellContext trailCtx = projectileContext.copy();
-                            trailCtx.resolveOnBlockNoAoe(blockLoc);
+                            trailCtx.resolveOnBlockTrace(blockLoc);
                         }
                     }
                 }

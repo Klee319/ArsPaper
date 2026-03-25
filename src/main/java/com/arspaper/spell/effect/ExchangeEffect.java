@@ -19,7 +19,6 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * 対象ブロックをリスト内の次のブロックに変更するEffect。
@@ -35,59 +34,11 @@ public class ExchangeEffect implements SpellEffect {
     private final GlyphConfig config;
 
     /**
-     * ブロックのティアリスト。Amplifyで上位ティアから選択できる。
-     * 同一ティア内ではサイクル（次のブロックに変換）する。
+     * ブロックのティアリストをglyphs.ymlから取得する。
      */
-    private static final List<List<Material>> BLOCK_TIERS = List.of(
-        // Tier 0: 基本ブロック
-        List.of(Material.DIRT, Material.COARSE_DIRT, Material.ROOTED_DIRT, Material.MUD),
-        // Tier 1: 石系
-        List.of(Material.STONE, Material.COBBLESTONE, Material.MOSSY_COBBLESTONE),
-        // Tier 2: 変成岩
-        List.of(Material.ANDESITE, Material.DIORITE, Material.GRANITE),
-        // Tier 3: 砂系
-        List.of(Material.SAND, Material.RED_SAND, Material.GRAVEL, Material.CLAY),
-        // Tier 4: レンガ系
-        List.of(Material.STONE_BRICKS, Material.MOSSY_STONE_BRICKS, Material.CRACKED_STONE_BRICKS),
-        // Tier 5: 木材
-        List.of(Material.OAK_PLANKS, Material.SPRUCE_PLANKS, Material.BIRCH_PLANKS,
-                Material.JUNGLE_PLANKS, Material.ACACIA_PLANKS, Material.DARK_OAK_PLANKS,
-                Material.MANGROVE_PLANKS, Material.CHERRY_PLANKS, Material.BAMBOO_PLANKS,
-                Material.CRIMSON_PLANKS, Material.WARPED_PLANKS),
-        // Tier 6: 原木
-        List.of(Material.OAK_LOG, Material.SPRUCE_LOG, Material.BIRCH_LOG,
-                Material.JUNGLE_LOG, Material.ACACIA_LOG, Material.DARK_OAK_LOG,
-                Material.MANGROVE_LOG, Material.CHERRY_LOG),
-        // Tier 7: ウール
-        List.of(Material.WHITE_WOOL, Material.ORANGE_WOOL, Material.MAGENTA_WOOL,
-                Material.LIGHT_BLUE_WOOL, Material.YELLOW_WOOL, Material.LIME_WOOL,
-                Material.PINK_WOOL, Material.GRAY_WOOL, Material.LIGHT_GRAY_WOOL,
-                Material.CYAN_WOOL, Material.PURPLE_WOOL, Material.BLUE_WOOL,
-                Material.BROWN_WOOL, Material.GREEN_WOOL, Material.RED_WOOL, Material.BLACK_WOOL),
-        // Tier 8: テラコッタ
-        List.of(Material.WHITE_TERRACOTTA, Material.ORANGE_TERRACOTTA, Material.MAGENTA_TERRACOTTA,
-                Material.LIGHT_BLUE_TERRACOTTA, Material.YELLOW_TERRACOTTA, Material.LIME_TERRACOTTA,
-                Material.PINK_TERRACOTTA, Material.GRAY_TERRACOTTA, Material.LIGHT_GRAY_TERRACOTTA,
-                Material.CYAN_TERRACOTTA, Material.PURPLE_TERRACOTTA, Material.BLUE_TERRACOTTA,
-                Material.BROWN_TERRACOTTA, Material.GREEN_TERRACOTTA, Material.RED_TERRACOTTA,
-                Material.BLACK_TERRACOTTA),
-        // Tier 9: コンクリート
-        List.of(Material.WHITE_CONCRETE, Material.ORANGE_CONCRETE, Material.MAGENTA_CONCRETE,
-                Material.LIGHT_BLUE_CONCRETE, Material.YELLOW_CONCRETE, Material.LIME_CONCRETE,
-                Material.PINK_CONCRETE, Material.GRAY_CONCRETE, Material.LIGHT_GRAY_CONCRETE,
-                Material.CYAN_CONCRETE, Material.PURPLE_CONCRETE, Material.BLUE_CONCRETE,
-                Material.BROWN_CONCRETE, Material.GREEN_CONCRETE, Material.RED_CONCRETE,
-                Material.BLACK_CONCRETE),
-        // Tier 10: ガラス
-        List.of(Material.GLASS, Material.WHITE_STAINED_GLASS, Material.ORANGE_STAINED_GLASS,
-                Material.MAGENTA_STAINED_GLASS, Material.LIGHT_BLUE_STAINED_GLASS,
-                Material.YELLOW_STAINED_GLASS, Material.LIME_STAINED_GLASS,
-                Material.PINK_STAINED_GLASS, Material.GRAY_STAINED_GLASS,
-                Material.LIGHT_GRAY_STAINED_GLASS, Material.CYAN_STAINED_GLASS,
-                Material.PURPLE_STAINED_GLASS, Material.BLUE_STAINED_GLASS,
-                Material.BROWN_STAINED_GLASS, Material.GREEN_STAINED_GLASS,
-                Material.RED_STAINED_GLASS, Material.BLACK_STAINED_GLASS)
-    );
+    private List<List<Material>> getBlockTiers() {
+        return config.getExchangeTiers();
+    }
 
     public ExchangeEffect(JavaPlugin plugin, GlyphConfig config) {
         this.id = new NamespacedKey(plugin, "exchange");
@@ -169,13 +120,14 @@ public class ExchangeEffect implements SpellEffect {
      * リストに見つからない場合はnullを返す。
      */
     private Material findNextBlock(Material current, int amplify) {
-        for (int tierIndex = 0; tierIndex < BLOCK_TIERS.size(); tierIndex++) {
-            List<Material> tier = BLOCK_TIERS.get(tierIndex);
+        List<List<Material>> blockTiers = getBlockTiers();
+        for (int tierIndex = 0; tierIndex < blockTiers.size(); tierIndex++) {
+            List<Material> tier = blockTiers.get(tierIndex);
             int currentIndex = tier.indexOf(current);
             if (currentIndex >= 0) {
                 // amplifyでティアアップ
-                int targetTier = Math.min(tierIndex + amplify, BLOCK_TIERS.size() - 1);
-                List<Material> targetList = BLOCK_TIERS.get(targetTier);
+                int targetTier = Math.min(tierIndex + amplify, blockTiers.size() - 1);
+                List<Material> targetList = blockTiers.get(targetTier);
 
                 if (targetTier == tierIndex) {
                     // 同一ティア内でサイクル

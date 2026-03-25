@@ -29,6 +29,14 @@ public class GlyphUnlockAnimation {
     private static final double ORBIT_Y_OFFSET = 1.2;
     private static final int SOUND_INTERVAL = 10;
 
+    /** アニメーション進行中のプレイヤーUUID（二重解放防止） */
+    private static final Set<java.util.UUID> animatingPlayers = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /** 指定プレイヤーがアニメーション中かどうか */
+    public static boolean isAnimating(java.util.UUID playerUuid) {
+        return animatingPlayers.contains(playerUuid);
+    }
+
     private GlyphUnlockAnimation() {}
 
     /**
@@ -54,12 +62,20 @@ public class GlyphUnlockAnimation {
             Set<String> unlocked,
             Runnable saveCallback
     ) {
+        // 二重解放防止: アニメーション中は拒否
+        if (!animatingPlayers.add(player.getUniqueId())) {
+            player.sendMessage(net.kyori.adventure.text.Component.text(
+                "グリフ解放中です！完了までお待ちください。",
+                net.kyori.adventure.text.format.NamedTextColor.YELLOW));
+            return;
+        }
+
         // GUI を閉じる
         player.closeInventory();
 
-        // 素材をインベントリから消費（検証済みなので安全）
+        // 素材をインベントリから消費（耐久値が減ったアイテムも対象）
         for (var entry : materials.entrySet()) {
-            player.getInventory().removeItem(new ItemStack(entry.getKey(), entry.getValue()));
+            removeMaterialFromInventory(player, entry.getKey(), entry.getValue());
         }
 
         // アニメーション中心点（ブロック中央、少し上）
@@ -108,8 +124,27 @@ public class GlyphUnlockAnimation {
 
             @Override
             public void run() {
-                // エッジケース: プレイヤーがオフラインまたは遠すぎる
+                // エッジケース: プレイヤーがオフラインまたは遠すぎる → 素材返還
                 if (!player.isOnline() || player.getLocation().distanceSquared(center) > 400) {
+                    // オンラインなら素材をインベントリ/足元に返還
+                    if (player.isOnline()) {
+                        for (var entry : materials.entrySet()) {
+                            java.util.Map<Integer, ItemStack> overflow =
+                                player.getInventory().addItem(new ItemStack(entry.getKey(), entry.getValue()));
+                            overflow.values().forEach(item ->
+                                player.getWorld().dropItemNaturally(player.getLocation(), item));
+                        }
+                        player.sendMessage(net.kyori.adventure.text.Component.text(
+                            "アンロックが中断されました。素材を返還しました。",
+                            net.kyori.adventure.text.format.NamedTextColor.YELLOW));
+                    }
+                    // オフラインの場合は筆記台の場所に素材をドロップ
+                    else {
+                        for (var entry : materials.entrySet()) {
+                            world.dropItemNaturally(center, new ItemStack(entry.getKey(), entry.getValue()));
+                        }
+                    }
+                    animatingPlayers.remove(player.getUniqueId());
                     cleanup(stands);
                     cancel();
                     return;
@@ -124,6 +159,7 @@ public class GlyphUnlockAnimation {
                     }
                     player.sendMessage(Component.text(
                             "筆記台が壊されたためアンロックが中断されました。", NamedTextColor.RED));
+                    animatingPlayers.remove(player.getUniqueId());
                     cleanup(stands);
                     cancel();
                     return;
@@ -146,6 +182,7 @@ public class GlyphUnlockAnimation {
                     // グリフアンロック実行
                     completeUnlock(plugin, player, component, unlocked, saveCallback);
 
+                    animatingPlayers.remove(player.getUniqueId());
                     cancel();
                     return;
                 }
@@ -214,6 +251,21 @@ public class GlyphUnlockAnimation {
     }
 
     /**
+     * Material型一致でインベントリからアイテムを消費する。
+     * 耐久値が減ったツール類（火打石と打ち金等）も正しく消費される。
+     */
+    private static void removeMaterialFromInventory(Player player, Material material, int amount) {
+        int remaining = amount;
+        for (int i = 0; i < player.getInventory().getSize() && remaining > 0; i++) {
+            ItemStack slot = player.getInventory().getItem(i);
+            if (slot == null || slot.getType() != material) continue;
+            int take = Math.min(remaining, slot.getAmount());
+            slot.setAmount(slot.getAmount() - take);
+            remaining -= take;
+        }
+    }
+
+    /**
      * アンロック完了処理。アニメーション終了後に呼ばれる。
      */
     private static void completeUnlock(
@@ -228,6 +280,11 @@ public class GlyphUnlockAnimation {
         // グリフをアンロック済みに追加
         unlocked.add(component.getId().toString());
         saveCallback.run();
+
+        // グリフキャッシュを即時無効化（古いキャッシュで発動拒否されるのを防止）
+        if (plugin.getSpellCaster() != null) {
+            plugin.getSpellCaster().invalidateGlyphCache(player.getUniqueId());
+        }
 
         // マナボーナス付与
         int currentBonus = player.getPersistentDataContainer()
