@@ -424,8 +424,7 @@ public class RecipeBrowserGui extends BaseGui {
             entry.isRitual = false;
 
             if (recipeObj instanceof ShapedRecipe shaped) {
-                entry.displayName = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
-                    .plainText().serialize(shaped.getResult().displayName());
+                entry.displayName = cleanDisplayName(shaped.getResult());
                 entry.iconItem = shaped.getResult().clone();
                 entry.icon = shaped.getResult().getType();
                 entry.amount = shaped.getResult().getAmount();
@@ -437,8 +436,7 @@ public class RecipeBrowserGui extends BaseGui {
                 }
                 entry.ingredientMap = ingMap;
             } else if (recipeObj instanceof ShapelessRecipe shapeless) {
-                entry.displayName = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
-                    .plainText().serialize(shapeless.getResult().displayName());
+                entry.displayName = cleanDisplayName(shapeless.getResult());
                 entry.iconItem = shapeless.getResult().clone();
                 entry.icon = shapeless.getResult().getType();
                 entry.amount = shapeless.getResult().getAmount();
@@ -655,25 +653,20 @@ public class RecipeBrowserGui extends BaseGui {
     }
 
     /**
-     * Material名を日本語化する。GlyphConfigのlocalizeMatNamePublicを使い、
-     * カバーされていない素材はバニラのtranslationKeyに基づく表示名で返す。
+     * ItemStackの表示名を取得する。カスタム名があればそれを使い、
+     * なければMaterialから日本語名を取得。[brackets]を除去する。
      */
-    private String localizeMaterial(Material mat) {
-        String name = ArsPaper.getInstance().getGlyphConfig().localizeMatNamePublic(mat);
-        // GlyphConfigのdefaultケースを検出（英語小文字→先頭大文字の自動変換結果と一致したら未翻訳）
-        String autoName = mat.name().toLowerCase().replace('_', ' ');
-        autoName = autoName.substring(0, 1).toUpperCase() + autoName.substring(1);
-        if (name.equals(autoName)) {
-            // 未翻訳: Material名を読みやすく整形（アンダースコア→スペース、各単語先頭大文字）
-            String[] words = mat.name().toLowerCase().split("_");
-            StringBuilder sb = new StringBuilder();
-            for (String word : words) {
-                if (!sb.isEmpty()) sb.append(" ");
-                sb.append(word.substring(0, 1).toUpperCase()).append(word.substring(1));
-            }
-            return sb.toString();
+    private String cleanDisplayName(ItemStack item) {
+        if (item.hasItemMeta() && item.getItemMeta().hasDisplayName()) {
+            String name = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
+                .plainText().serialize(item.getItemMeta().displayName());
+            return name.replaceAll("^\\[|\\]$", "");
         }
-        return name;
+        return com.arspaper.util.JaTranslations.translate(item.getType());
+    }
+
+    private String localizeMaterial(Material mat) {
+        return com.arspaper.util.JaTranslations.translate(mat);
     }
 
     private String describeChoice(org.bukkit.inventory.RecipeChoice choice) {

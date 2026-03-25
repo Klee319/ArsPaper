@@ -81,6 +81,7 @@ public class ArsPaper extends JavaPlugin {
         instance = this;
         updateResourceFiles();
         saveDefaultConfig();
+        com.arspaper.util.JaTranslations.load(getLogger());
 
         initRegistries();
         registerListeners();
