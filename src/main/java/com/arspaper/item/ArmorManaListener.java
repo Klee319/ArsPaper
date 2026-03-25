@@ -323,11 +323,14 @@ public class ArmorManaListener implements Listener {
                     if (p.isGliding()) {
                         p.setFallDistance(0f);
                     }
-                    // allowFlightを常に維持（クリエイティブ飛行はToggleFlightでキャンセル）
-                    if (!p.getAllowFlight()
-                            && p.getGameMode() != org.bukkit.GameMode.CREATIVE
+                    // 空中時のみallowFlight有効化（地上では通常ジャンプを維持）
+                    if (p.getGameMode() != org.bukkit.GameMode.CREATIVE
                             && p.getGameMode() != org.bukkit.GameMode.SPECTATOR) {
-                        p.setAllowFlight(true);
+                        if (!p.isOnGround() && !p.getAllowFlight()) {
+                            p.setAllowFlight(true);
+                        } else if (p.isOnGround() && p.getAllowFlight() && !p.isGliding()) {
+                            p.setAllowFlight(false);
+                        }
                     }
                 }
             }, 0L, 1L);
