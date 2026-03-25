@@ -391,7 +391,15 @@ public class RecipeBrowserGui extends BaseGui {
                                 default -> Material.SUNFLOWER;
                             };
                         }
-                        case "mob_summon" -> Material.WITHER_SKELETON_SKULL;
+                        case "mob_summon" -> {
+                            String g = entry.effectParams != null ? entry.effectParams.get("group") : null;
+                            yield switch (g != null ? g : "default") {
+                                case "raid" -> Material.CROSSBOW;
+                                case "nether" -> Material.BLAZE_POWDER;
+                                case "variant" -> Material.FERMENTED_SPIDER_EYE;
+                                default -> Material.WITHER_SKELETON_SKULL;
+                            };
+                        }
                         case "animal_summon" -> Material.WHEAT;
                         case "flight" -> Material.FEATHER;
                         case "repair" -> Material.ANVIL;
@@ -558,7 +566,14 @@ public class RecipeBrowserGui extends BaseGui {
                         try { count = Integer.parseInt(c); } catch (NumberFormatException ignored) {}
                     }
                 }
-                yield "コア周囲に敵モブを" + count + "体召喚";
+                String group = entry.effectParams != null ? entry.effectParams.get("group") : null;
+                String groupName = switch (group != null ? group : "default") {
+                    case "raid" -> "襲撃";
+                    case "nether" -> "ネザー";
+                    case "variant" -> "変異";
+                    default -> "敵";
+                };
+                yield "コア周囲に" + groupName + "モブを" + count + "体召喚";
             }
             case "enchant_book" -> "コアの本をカスタムエンチャント本に変換";
             default -> null;

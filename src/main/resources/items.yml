@@ -923,11 +923,66 @@ ritual_effects:
     effect-type: mob_summon
     effect-params:
       count: 3
+      group: default
     pedestal-items:
       - "ROTTEN_FLESH x2"
       - "BONE x2"
       - "custom:source_gem x2"
     source: 800
+
+  # ----------------------------------------------------------
+  # 襲撃モブ召喚の儀式（ヴィンディケーター、ピリジャー、ヴェックス等）
+  # コアアイテム: 不吉な旗
+  # ----------------------------------------------------------
+  mob_summon_raid:
+    name: "襲撃モブ召喚 儀式レシピ"
+    effect-type: mob_summon
+    effect-params:
+      count: 3
+      group: raid
+    core-item: WHITE_BANNER
+    pedestal-items:
+      - "EMERALD_BLOCK x2"
+      - "CROSSBOW"
+      - "IRON_AXE"
+      - "custom:source_gem x4"
+    source: 1500
+
+  # ----------------------------------------------------------
+  # ネザーモブ召喚の儀式（ブレイズ、ガスト、ウィザスケ等）
+  # コアアイテム: ネザースター
+  # ----------------------------------------------------------
+  mob_summon_nether:
+    name: "ネザーモブ召喚 儀式レシピ"
+    effect-type: mob_summon
+    effect-params:
+      count: 3
+      group: nether
+    core-item: NETHER_STAR
+    pedestal-items:
+      - "BLAZE_ROD x4"
+      - "GHAST_TEAR x2"
+      - "NETHER_WART x4"
+      - "custom:source_gem_block"
+    source: 2500
+
+  # ----------------------------------------------------------
+  # 変異モブ召喚の儀式（ストレイ、ハスク、ドラウンド等）
+  # コアアイテム: 醸造台
+  # ----------------------------------------------------------
+  mob_summon_variant:
+    name: "変異モブ召喚 儀式レシピ"
+    effect-type: mob_summon
+    effect-params:
+      count: 4
+      group: variant
+    core-item: BREWING_STAND
+    pedestal-items:
+      - "FERMENTED_SPIDER_EYE x2"
+      - "PHANTOM_MEMBRANE x2"
+      - "PRISMARINE_SHARD x2"
+      - "custom:source_gem x3"
+    source: 1200
 
   # ==========================================================
   # エンチャント本の儀式
