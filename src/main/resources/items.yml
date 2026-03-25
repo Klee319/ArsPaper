@@ -958,13 +958,12 @@ ritual_effects:
     effect-params:
       count: 3
       group: nether
-    core-item: NETHER_STAR
+    core-item: MAGMA_CREAM
     pedestal-items:
-      - "BLAZE_ROD x4"
-      - "GHAST_TEAR x2"
-      - "NETHER_WART x4"
-      - "custom:source_gem_block"
-    source: 2500
+      - "BLAZE_ROD x2"
+      - "NETHER_WART x2"
+      - "custom:source_gem x4"
+    source: 1800
 
   # ----------------------------------------------------------
   # 変異モブ召喚の儀式（ストレイ、ハスク、ドラウンド等）
