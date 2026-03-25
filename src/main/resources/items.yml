@@ -293,7 +293,7 @@ items:
   alchemical_sourcelink_craft:
     recipe:
       method: ritual
-      core-item: BREWING_STAND
+      core-item: BLAST_FURNACE
       pedestal-items:
         - "GLASS_BOTTLE x2"
         - "NETHER_WART x2"
@@ -316,6 +316,38 @@ items:
         - "custom:source_gem x2"
       source: 400
       result: "custom:vitalic_sourcelink"
+
+  # ==========================================================
+  # 儀式レシピ - テレポートシステム
+  # ==========================================================
+
+  # ----------------------------------------------------------
+  # ウェイストーン (ダイヤモンドブロックの上に設置するテレポート地点)
+  # ----------------------------------------------------------
+  waystone_craft:
+    recipe:
+      method: ritual
+      core-item: LODESTONE
+      pedestal-items:
+        - "ENDER_PEARL x4"
+        - "custom:source_gem x4"
+        - "DIAMOND x2"
+      source: 1000
+      result: "custom:waystone"
+
+  # ----------------------------------------------------------
+  # テレポートコンパス (ウェイストーンにリンクしてテレポート)
+  # ----------------------------------------------------------
+  teleport_compass_craft:
+    recipe:
+      method: ritual
+      core-item: COMPASS
+      pedestal-items:
+        - "ENDER_EYE x2"
+        - "custom:source_gem x2"
+        - "AMETHYST_SHARD x4"
+      source: 600
+      result: "custom:teleport_compass"
 
   # ==========================================================
   # 儀式レシピ - 消耗品

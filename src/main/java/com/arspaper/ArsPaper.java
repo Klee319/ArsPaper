@@ -8,6 +8,7 @@ import com.arspaper.block.impl.Pedestal;
 import com.arspaper.block.impl.RitualCore;
 import com.arspaper.block.impl.ScribingTable;
 import com.arspaper.block.impl.SourceJar;
+import com.arspaper.block.impl.Waystone;
 import com.arspaper.command.ArsCommand;
 import com.arspaper.gui.GuiListener;
 import com.arspaper.item.*;
@@ -17,6 +18,7 @@ import com.arspaper.item.impl.SourceBerry;
 import com.arspaper.item.impl.SpellBook;
 // SpellWand は廃止（アイテムバインドで代替）
 import com.arspaper.item.impl.ThreadItem;
+import com.arspaper.item.impl.TeleportCompass;
 import com.arspaper.item.impl.Wand;
 import com.arspaper.mana.ManaConfig;
 import com.arspaper.mana.ManaManager;
@@ -374,6 +376,7 @@ public class ArsPaper extends JavaPlugin {
         Pedestal pedestal = new Pedestal(this);
 
         CreativeSourceJar creativeSourceJar = new CreativeSourceJar(this);
+        Waystone waystone = new Waystone(this);
 
         blockRegistry.register(scribingTable);
         blockRegistry.register(sourceJar);
@@ -384,6 +387,7 @@ public class ArsPaper extends JavaPlugin {
         blockRegistry.register(vitalicSourcelink);
         blockRegistry.register(ritualCore);
         blockRegistry.register(pedestal);
+        blockRegistry.register(waystone);
 
         // カスタムブロックもアイテムとして取得できるようにする
         itemRegistry.register(scribingTable);
@@ -395,6 +399,11 @@ public class ArsPaper extends JavaPlugin {
         itemRegistry.register(vitalicSourcelink);
         itemRegistry.register(ritualCore);
         itemRegistry.register(pedestal);
+        itemRegistry.register(waystone);
+        getServer().getPluginManager().registerEvents(waystone, this);
+
+        // テレポートコンパス
+        itemRegistry.register(new TeleportCompass(this));
     }
 
     private void registerListeners() {

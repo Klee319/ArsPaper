@@ -16,7 +16,7 @@ import java.util.List;
 
 /**
  * Alchemical Sourcelink - 醸造の力でSourceを生成。
- * バニラのBREWING_STAND（醸造台）をベースに使用。
+ * バニラのBLAST_FURNACE（溶鉱炉）をベースに使用。
  *
  * 定期的にSourceを生成し、隣接するSource Jarに自動供給。
  */
@@ -30,7 +30,7 @@ public class AlchemicalSourcelink extends Sourcelink {
 
     @Override
     public Material getBlockMaterial() {
-        return Material.BREWING_STAND;
+        return Material.BLAST_FURNACE;
     }
 
     @Override
