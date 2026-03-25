@@ -342,7 +342,7 @@ public class ArmorManaListener implements Listener {
                             && p.getGameMode() != org.bukkit.GameMode.SPECTATOR) {
                         // 滑空中は2tick後に再有効化（即座に設定すると滑空が解除される）
                         if (p.isGliding()) {
-                            UUID uid = p.getUniqueId();
+                            java.util.UUID uid = p.getUniqueId();
                             glideCooldown.add(uid);
                             org.bukkit.Bukkit.getScheduler().runTaskLater(
                                 ArsPaper.getInstance(), () -> {
