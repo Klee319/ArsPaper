@@ -33,7 +33,6 @@ public class RecipeManager {
      * UnifiedRecipeLoaderから作業台レシピを登録する。
      */
     public void registerWorkbenchRecipes(List<UnifiedRecipeLoader.WorkbenchRecipeData> recipes) {
-        int count = 0;
         for (UnifiedRecipeLoader.WorkbenchRecipeData data : recipes) {
             try {
                 switch (data.type().toLowerCase()) {
@@ -41,12 +40,11 @@ public class RecipeManager {
                     case "shapeless" -> registerShapeless(data);
                     default -> plugin.getLogger().warning("Unknown recipe type: " + data.type() + " for " + data.id());
                 }
-                count++;
             } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "Failed to load recipe: " + data.id(), e);
+                plugin.getLogger().log(Level.WARNING, "Failed to register workbench recipe: " + data.id(), e);
             }
         }
-        plugin.getLogger().info("Loaded " + count + " workbench recipes");
+        plugin.getLogger().info("Registered " + registeredRecipes.size() + " workbench recipes");
     }
 
     private void registerShaped(UnifiedRecipeLoader.WorkbenchRecipeData data) {
@@ -85,8 +83,13 @@ public class RecipeManager {
             recipe.setIngredient(entry.getKey(), entry.getValue());
         }
 
-        Bukkit.addRecipe(recipe);
-        registeredRecipes.put(nsKey, recipe);
+        boolean added = Bukkit.addRecipe(recipe);
+        if (added) {
+            registeredRecipes.put(nsKey, recipe);
+        } else {
+            plugin.getLogger().warning("Bukkit.addRecipe returned false for: " + data.id()
+                + " (result=" + data.result() + ", shape=" + data.shape() + ")");
+        }
     }
 
     private void registerShapeless(UnifiedRecipeLoader.WorkbenchRecipeData data) {
@@ -111,8 +114,12 @@ public class RecipeManager {
             if (choice != null) recipe.addIngredient(choice);
         }
 
-        Bukkit.addRecipe(recipe);
-        registeredRecipes.put(nsKey, recipe);
+        boolean added = Bukkit.addRecipe(recipe);
+        if (added) {
+            registeredRecipes.put(nsKey, recipe);
+        } else {
+            plugin.getLogger().warning("Bukkit.addRecipe returned false for: " + data.id());
+        }
     }
 
     /**
