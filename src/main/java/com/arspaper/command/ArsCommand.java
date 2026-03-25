@@ -45,7 +45,6 @@ public final class ArsCommand {
                             plugin.getItemRegistry().getAll().forEach(item ->
                                 builder.suggest(item.getItemId())
                             );
-                            // エンチャント本のサジェスト
                             for (String eid : new String[]{"mana_regen", "mana_boost", "share"}) {
                                 for (int lv = 1; lv <= 3; lv++) {
                                     builder.suggest("enchant_book:" + eid + ":" + lv);
@@ -53,20 +52,53 @@ public final class ArsCommand {
                             }
                             return builder.buildFuture();
                         })
+                        // /ars give <itemId> (自分に1個)
                         .executes(ctx -> {
                             if (!(ctx.getSource().getSender() instanceof Player player)) {
                                 ctx.getSource().getSender().sendMessage(
-                                    Component.text("プレイヤー専用コマンドです！", NamedTextColor.RED)
-                                );
+                                    Component.text("プレイヤー専用コマンドです！", NamedTextColor.RED));
                                 return 0;
                             }
                             String itemId = StringArgumentType.getString(ctx, "itemId");
-                            // エンチャント本コマンド: enchant_book:<enchantId>:<level>
-                            if (itemId.startsWith("enchant_book:")) {
-                                return executeGiveEnchantBook(player, itemId);
-                            }
-                            return executeGive(plugin, player, itemId);
+                            if (itemId.startsWith("enchant_book:")) return executeGiveEnchantBook(player, itemId);
+                            return executeGive(plugin, player, itemId, 1);
                         })
+                        // /ars give <itemId> <count>
+                        .then(Commands.argument("count", IntegerArgumentType.integer(1, 64))
+                            .executes(ctx -> {
+                                if (!(ctx.getSource().getSender() instanceof Player player)) {
+                                    ctx.getSource().getSender().sendMessage(
+                                        Component.text("プレイヤー専用コマンドです！", NamedTextColor.RED));
+                                    return 0;
+                                }
+                                String itemId = StringArgumentType.getString(ctx, "itemId");
+                                int count = IntegerArgumentType.getInteger(ctx, "count");
+                                if (itemId.startsWith("enchant_book:")) return executeGiveEnchantBook(player, itemId);
+                                return executeGive(plugin, player, itemId, count);
+                            })
+                            // /ars give <itemId> <count> <player>
+                            .then(Commands.argument("target", StringArgumentType.word())
+                                .suggests((ctx, builder) -> {
+                                    for (Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
+                                        builder.suggest(p.getName());
+                                    }
+                                    return builder.buildFuture();
+                                })
+                                .executes(ctx -> {
+                                    String itemId = StringArgumentType.getString(ctx, "itemId");
+                                    int count = IntegerArgumentType.getInteger(ctx, "count");
+                                    String targetName = StringArgumentType.getString(ctx, "target");
+                                    Player target = org.bukkit.Bukkit.getPlayer(targetName);
+                                    if (target == null) {
+                                        ctx.getSource().getSender().sendMessage(
+                                            Component.text("プレイヤーが見つかりません: " + targetName, NamedTextColor.RED));
+                                        return 0;
+                                    }
+                                    if (itemId.startsWith("enchant_book:")) return executeGiveEnchantBook(target, itemId);
+                                    return executeGive(plugin, target, itemId, count);
+                                })
+                            )
+                        )
                     )
                 )
                 .then(Commands.literal("mana")
@@ -271,15 +303,20 @@ public final class ArsCommand {
         return 1;
     }
 
-    private static int executeGive(ArsPaper plugin, Player player, String itemId) {
+    private static int executeGive(ArsPaper plugin, Player player, String itemId, int count) {
         var optItem = plugin.getItemRegistry().get(itemId);
         if (optItem.isEmpty()) {
             player.sendMessage(Component.text("不明なアイテム: " + itemId, NamedTextColor.RED));
             return 0;
         }
-        ItemStack stack = optItem.get().createItemStack();
-        player.getInventory().addItem(stack);
-        player.sendMessage(Component.text(itemId + " を付与しました", NamedTextColor.GREEN));
+        for (int i = 0; i < count; i++) {
+            ItemStack stack = optItem.get().createItemStack();
+            player.getInventory().addItem(stack);
+        }
+        String msg = count > 1
+            ? itemId + " x" + count + " を " + player.getName() + " に付与しました"
+            : itemId + " を " + player.getName() + " に付与しました";
+        player.sendMessage(Component.text(msg, NamedTextColor.GREEN));
         return 1;
     }
 

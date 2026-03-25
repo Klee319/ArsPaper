@@ -18,7 +18,6 @@ import org.bukkit.Sound;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.TileState;
-import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -85,25 +84,18 @@ public class Waystone extends CustomBlock implements Listener {
     }
 
     @Override
-    public void onBlockPlaced(Player player, Block block, TileState tileState) {
+    public boolean validatePlacement(Player player, Block block) {
         Block below = block.getRelative(BlockFace.DOWN);
         if (below.getType() != Material.DIAMOND_BLOCK) {
-            // ダイヤモンドブロック上以外は設置不可
-            block.setType(Material.AIR);
-            block.getWorld().getNearbyEntities(
-                block.getLocation().add(0.5, 0, 0.5), 1, 2, 1
-            ).forEach(entity -> {
-                if (entity instanceof ArmorStand stand
-                        && stand.getPersistentDataContainer().has(BlockKeys.DISPLAY_MARKER)) {
-                    stand.remove();
-                }
-            });
-            player.getInventory().addItem(createItemStack());
             player.sendMessage(Component.text(
                 "ウェイストーンはダイヤモンドブロックの上にのみ設置できます", NamedTextColor.RED));
-            return;
+            return false;
         }
+        return true;
+    }
 
+    @Override
+    public void onBlockPlaced(Player player, Block block, TileState tileState) {
         tileState.getPersistentDataContainer().set(
             WAYSTONE_NAME, PersistentDataType.STRING, "無名のウェイストーン");
         tileState.update();

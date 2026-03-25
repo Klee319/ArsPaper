@@ -164,16 +164,9 @@ public class LaunchEffect implements SpellEffect {
             return true;
         }
 
-        // TileState/Container を持つブロックはデータ消失・複製を防ぐためスキップ
+        // TileState（Container含む）を持つブロックはデータ消失を防ぐためスキップ
         BlockState state = block.getState();
-        if (state instanceof Container) return true;
-        if (state instanceof TileState tileState) {
-            // ArsPaperカスタムブロック（source_jar, pedestal等）のチェック
-            if (tileState.getPersistentDataContainer()
-                    .has(BlockKeys.CUSTOM_BLOCK_ID, PersistentDataType.STRING)) {
-                return true;
-            }
-        }
+        if (state instanceof TileState) return true;
 
         // 保護チェック
         if (caster != null) {

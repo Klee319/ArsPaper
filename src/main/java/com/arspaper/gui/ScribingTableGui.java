@@ -236,9 +236,10 @@ public class ScribingTableGui extends BaseGui {
             return false;
         }
 
-        // 全素材の在庫チェック
+        // 全素材の在庫チェック（カスタムアイテムを除外してカウント）
         for (var entry : materials.entrySet()) {
-            if (!player.getInventory().contains(entry.getKey(), entry.getValue())) {
+            int count = countVanillaItems(player, entry.getKey());
+            if (count < entry.getValue()) {
                 player.sendMessage(Component.text(
                     "素材が不足しています！必要: " + glyphConfig.getUnlockCostDescription(glyphKey),
                     NamedTextColor.RED
@@ -259,6 +260,20 @@ public class ScribingTableGui extends BaseGui {
         Set<String> result = new HashSet<>();
         arr.forEach(el -> result.add(el.getAsString()));
         return result;
+    }
+
+    /**
+     * カスタムアイテムを除外して、指定Materialのバニラアイテム数をカウントする。
+     */
+    private static int countVanillaItems(Player player, Material material) {
+        int count = 0;
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (item == null || item.getType() != material) continue;
+            if (item.hasItemMeta() && item.getItemMeta().getPersistentDataContainer()
+                    .has(com.arspaper.item.ItemKeys.CUSTOM_ITEM_ID)) continue;
+            count += item.getAmount();
+        }
+        return count;
     }
 
     private void saveUnlockedGlyphs(Set<String> glyphs) {

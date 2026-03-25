@@ -16,7 +16,6 @@
 # アイテムレシピ
 # ============================================================
 items:
-
   # ==========================================================
   # 作業台レシピ
   # ==========================================================
@@ -102,6 +101,22 @@ items:
       amount: 2
 
   # ----------------------------------------------------------
+  # 儀式コア（作業台クラフト - 儀式なしで作成可能）
+  # ----------------------------------------------------------
+  ritual_core:
+    recipe:
+      method: workbench
+      type: shaped
+      shape:
+        - "ODO"
+        - "DLD"
+        - "ODO"
+      ingredients:
+        O: OBSIDIAN
+        D: DIAMOND
+        L: LODESTONE
+
+  # ----------------------------------------------------------
   # ソースジェムブロック (圧縮: gem×9 → block×1)
   # ----------------------------------------------------------
   source_gem_block:
@@ -141,8 +156,41 @@ items:
         B: STONE
       result: "custom:sourcestone"
 
+  # ----------------------------------------------------------
+  # ソースベリー (グロウベリー + アメジストの欠片)
+  # ----------------------------------------------------------
+  source_berry:
+    recipe:
+      method: workbench
+      type: shapeless
+      shape: []
+      ingredients:
+        A: GLOW_BERRIES
+        B: AMETHYST_SHARD
+      result: "custom:source_berry"
+
   # ==========================================================
-  # 儀式レシピ - ソースジェムブロック（一括クラフト）
+  # 既存アイテムクラフトレシピの追加
+  # 必要に応じてコメントアウトしてください
+  # ==========================================================
+  trident:
+    recipe:
+      method: workbench
+      type: shaped
+      shape:
+        - " CP"
+        - " AC"
+        - "D  "
+      ingredients:
+        P: PRISMARINE_SHARD
+        C: PRISMARINE_CRYSTAL
+        D: DIAMOND_BLOCK
+        A: COPPER_BLOCK
+
+
+
+  # ==========================================================
+  # 儀式レシピ - 中間素材（一括クラフト）
   # ==========================================================
 
   # ----------------------------------------------------------
@@ -159,11 +207,6 @@ items:
         - "LAPIS_BLOCK x2"
       source: 2500
       result: "custom:source_gem_block"
-
-  # ==========================================================
-  # 儀式レシピ - 中間素材（一括クラフト）
-  # ==========================================================
-
   # ----------------------------------------------------------
   # マジックファイバー×3（一括儀式）
   # ----------------------------------------------------------
@@ -241,22 +284,6 @@ items:
   # ==========================================================
 
   # ----------------------------------------------------------
-  # 儀式コア（作業台クラフト - 儀式なしで作成可能）
-  # ----------------------------------------------------------
-  ritual_core:
-    recipe:
-      method: workbench
-      type: shaped
-      shape:
-        - "ODO"
-        - "DLD"
-        - "ODO"
-      ingredients:
-        O: OBSIDIAN
-        D: DIAMOND
-        L: LODESTONE
-
-  # ----------------------------------------------------------
   # ヴォルケーニックソースリンク
   # ----------------------------------------------------------
   volcanic_sourcelink_craft:
@@ -317,10 +344,6 @@ items:
       source: 400
       result: "custom:vitalic_sourcelink"
 
-  # ==========================================================
-  # 儀式レシピ - テレポートシステム
-  # ==========================================================
-
   # ----------------------------------------------------------
   # ウェイストーン (ダイヤモンドブロックの上に設置するテレポート地点)
   # ----------------------------------------------------------
@@ -329,9 +352,10 @@ items:
       method: ritual
       core-item: LODESTONE
       pedestal-items:
-        - "ENDER_PEARL x4"
-        - "custom:source_gem x4"
-        - "DIAMOND x2"
+        - "ENDER_EYE x2"
+        - "custom:source_gem x2"
+        - "CHORUS_FLOWER x2"
+        - "DIAMOND_BLOCK x2"
       source: 1000
       result: "custom:waystone"
 
@@ -343,28 +367,30 @@ items:
       method: ritual
       core-item: COMPASS
       pedestal-items:
-        - "ENDER_EYE x2"
+        - "ENDER_PEARL x2"
         - "custom:source_gem x2"
-        - "AMETHYST_SHARD x4"
+        - "CHORUS_FLUIT x2"
+        - "LAPIS_BLOCK x2"
       source: 600
       result: "custom:teleport_compass"
 
   # ==========================================================
-  # 儀式レシピ - 消耗品
+  # 既存アイテム儀式レシピの追加
+  # 必要に応じてコメントアウトしてください
   # ==========================================================
-
-  # ----------------------------------------------------------
-  # ソースベリー (グロウベリー + アメジストの欠片)
-  # ----------------------------------------------------------
-  source_berry:
+  enchanted_golden_apple:
     recipe:
-      method: workbench
-      type: shapeless
-      shape: []
-      ingredients:
-        A: GLOW_BERRIES
-        B: AMETHYST_SHARD
-      result: "custom:source_berry"
+      method: ritual
+      core-item: "APPLE"
+      pedestal-items:
+        - "GOLD_BLOCK x4"
+        - "TOTEM_OF_UNDYING x2"
+        - "NETHERITE_INGOT x2"
+      source: 3000
+      result: "ENCHNTED_GOLDEN_APPLE"
+
+
+
 
   # ==========================================================
   # 儀式レシピ - 守護メイジアーマー (Guardian)
@@ -876,7 +902,7 @@ ritual_effects:
   # 飛行の儀式 - 一時的な飛行能力を付与
   # ----------------------------------------------------------
   flight:
-    name: "飛行 儀式レシピ"
+    name: "飛行の儀式"
     effect-type: flight
     effect-params:
       duration: 300
@@ -894,7 +920,7 @@ ritual_effects:
   # 月落とし - 時間を夜に変更
   # ----------------------------------------------------------
   moonfall:
-    name: "月落とし 儀式レシピ"
+    name: "月落としの儀式"
     effect-type: moonfall
     effect-params: {}
     pedestal-items:
@@ -907,7 +933,7 @@ ritual_effects:
   # 日の出 - 時間を朝に変更
   # ----------------------------------------------------------
   sunrise:
-    name: "日の出 儀式レシピ"
+    name: "日の出の儀式"
     effect-type: sunrise
     effect-params: {}
     pedestal-items:
@@ -924,7 +950,7 @@ ritual_effects:
   # 修復の儀式 - 装備を修復
   # ----------------------------------------------------------
   repair:
-    name: "修復 儀式レシピ"
+    name: "修復の儀式"
     effect-type: repair
     effect-params: {}
     pedestal-items:
@@ -937,10 +963,10 @@ ritual_effects:
   # 動物召喚の儀式
   # ----------------------------------------------------------
   animal_summon:
-    name: "動物召喚 儀式レシピ"
+    name: "動物召喚の儀式"
     effect-type: animal_summon
     effect-params:
-      count: 5
+      count: 8
     pedestal-items:
       - "WHEAT x2"
       - "CARROT x2"
@@ -951,10 +977,10 @@ ritual_effects:
   # 敵モブ召喚の儀式
   # ----------------------------------------------------------
   mob_summon:
-    name: "敵モブ召喚 儀式レシピ"
+    name: "敵モブ召喚の儀式"
     effect-type: mob_summon
     effect-params:
-      count: 3
+      count: 8
       group: default
     pedestal-items:
       - "ROTTEN_FLESH x2"
@@ -967,10 +993,10 @@ ritual_effects:
   # コアアイテム: 不吉な旗
   # ----------------------------------------------------------
   mob_summon_raid:
-    name: "襲撃モブ召喚 儀式レシピ"
+    name: "襲撃モブ召喚の儀式"
     effect-type: mob_summon
     effect-params:
-      count: 3
+      count: 8
       group: raid
     core-item: WHITE_BANNER
     pedestal-items:
@@ -985,10 +1011,10 @@ ritual_effects:
   # コアアイテム: ネザースター
   # ----------------------------------------------------------
   mob_summon_nether:
-    name: "ネザーモブ召喚 儀式レシピ"
+    name: "ネザーモブ召喚の儀式"
     effect-type: mob_summon
     effect-params:
-      count: 3
+      count: 8
       group: nether
     core-item: MAGMA_CREAM
     pedestal-items:
@@ -1002,10 +1028,10 @@ ritual_effects:
   # コアアイテム: 醸造台
   # ----------------------------------------------------------
   mob_summon_variant:
-    name: "変異モブ召喚 儀式レシピ"
+    name: "変異モブ召喚の儀式"
     effect-type: mob_summon
     effect-params:
-      count: 4
+      count: 8
       group: variant
     core-item: BREWING_STAND
     pedestal-items:
@@ -1131,3 +1157,5 @@ ritual_effects:
       - "NETHER_STAR"
       - "DIAMOND_BLOCK"
     source: 3000
+
+

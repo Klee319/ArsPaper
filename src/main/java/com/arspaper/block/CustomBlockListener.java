@@ -7,6 +7,7 @@ import org.bukkit.block.Block;
 import org.bukkit.block.TileState;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.ItemFrame;
 import org.bukkit.entity.Player;
@@ -67,6 +68,12 @@ public class CustomBlockListener implements Listener {
         if (!(block.getState() instanceof TileState tileState)) return;
 
         CustomBlock cb = customBlock.get();
+
+        // 設置前バリデーション
+        if (!cb.validatePlacement(event.getPlayer(), block)) {
+            event.setCancelled(true);
+            return;
+        }
 
         // ItemStack PDC → TileState PDC 転送
         cb.writeToTileState(tileState, item);
@@ -129,6 +136,38 @@ public class CustomBlockListener implements Listener {
         // TileState PDC → ドロップItemStack PDC 復元
         ItemStack drop = dropCb.createDropWithData(tileState);
         block.getWorld().dropItemNaturally(block.getLocation(), drop);
+
+        // 支持ブロック連動: 上にウェイストーンがある場合は連動破壊
+        checkDependentBlocks(block, event.getPlayer());
+    }
+
+    /**
+     * 支持ブロック（ダイヤモンドブロック等）の破壊時、上に依存カスタムブロックがあれば連動破壊。
+     */
+    private void checkDependentBlocks(Block broken, Player player) {
+        if (broken.getType() != Material.DIAMOND_BLOCK) return;
+        Block above = broken.getRelative(org.bukkit.block.BlockFace.UP);
+        if (!(above.getState() instanceof TileState ts)) return;
+        String aboveId = ts.getPersistentDataContainer()
+            .get(BlockKeys.CUSTOM_BLOCK_ID, PersistentDataType.STRING);
+        if ("waystone".equals(aboveId)) {
+            // ウェイストーンを連動破壊（BlockBreakEventを発火）
+            BlockBreakEvent breakEvent = new BlockBreakEvent(above, player);
+            org.bukkit.Bukkit.getPluginManager().callEvent(breakEvent);
+            if (!breakEvent.isCancelled()) {
+                // onBlockBreakが処理するため、ここではブロック除去のみ
+                above.setType(Material.AIR);
+                // ArmorStand表示除去
+                above.getWorld().getNearbyEntities(
+                    above.getLocation().add(0.5, 0, 0.5), 1, 2, 1
+                ).forEach(entity -> {
+                    if (entity instanceof org.bukkit.entity.ArmorStand stand
+                            && stand.getPersistentDataContainer().has(BlockKeys.DISPLAY_MARKER)) {
+                        stand.remove();
+                    }
+                });
+            }
+        }
     }
 
     /**

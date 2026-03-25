@@ -36,7 +36,7 @@ import java.util.Set;
 public class ArmorManaListener implements Listener {
 
     private static final Gson GSON = new Gson();
-    private static final int POTION_DURATION = Integer.MAX_VALUE;
+    private static final int POTION_DURATION = -1; // Paper 1.20+: 無限持続
     private final JavaPlugin plugin;
 
     private static final PotionEffectType[] THREAD_POTION_TYPES = {
@@ -255,7 +255,8 @@ public class ArmorManaListener implements Listener {
                 ));
             } else {
                 PotionEffect existing = player.getPotionEffect(type);
-                if (existing != null && existing.getDuration() >= POTION_DURATION - 100) {
+                if (existing != null && (existing.isInfinite()
+                        || existing.getDuration() >= Integer.MAX_VALUE - 100)) {
                     player.removePotionEffect(type);
                 }
             }

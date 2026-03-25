@@ -38,6 +38,13 @@ public abstract class CustomBlock extends BaseCustomItem {
     public abstract ItemStack getDisplayHeadItem();
 
     /**
+     * 設置前のバリデーション。falseを返すとBlockPlaceEventがキャンセルされる。
+     */
+    public boolean validatePlacement(Player player, Block block) {
+        return true;
+    }
+
+    /**
      * ブロック設置時の追加初期化処理。
      * TileState PDCへのカスタムデータ書き込み後に呼ばれる。
      */

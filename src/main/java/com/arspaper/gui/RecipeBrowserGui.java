@@ -348,7 +348,10 @@ public class RecipeBrowserGui extends BaseGui {
             if (!seenIds.add(recipe.id())) continue; // 重複排除
             RecipeEntry entry = new RecipeEntry();
             entry.id = recipe.id();
-            entry.displayName = recipe.name();
+            entry.displayName = recipe.resultAmount() > 1
+                ? recipe.name() + " ×" + recipe.resultAmount()
+                : recipe.name();
+            entry.amount = recipe.resultAmount();
             entry.isRitual = true;
             entry.coreItem = recipe.coreItem() != null
                 ? (recipe.coreItem().isCustom() ? "custom:" + recipe.coreItem().materialOrCustomId() : recipe.coreItem().materialOrCustomId())

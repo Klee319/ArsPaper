@@ -259,6 +259,9 @@ public class GlyphUnlockAnimation {
         for (int i = 0; i < player.getInventory().getSize() && remaining > 0; i++) {
             ItemStack slot = player.getInventory().getItem(i);
             if (slot == null || slot.getType() != material) continue;
+            // カスタムアイテムは素材として消費しない
+            if (slot.hasItemMeta() && slot.getItemMeta().getPersistentDataContainer()
+                    .has(com.arspaper.item.ItemKeys.CUSTOM_ITEM_ID)) continue;
             int take = Math.min(remaining, slot.getAmount());
             slot.setAmount(slot.getAmount() - take);
             remaining -= take;

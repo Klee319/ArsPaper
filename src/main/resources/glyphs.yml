@@ -1162,7 +1162,6 @@ glyphs:
       materials:
         PHANTOM_MEMBRANE: 8
         FEATHER: 16
-        AMETHYST_SHARD: 8
 
   # 説明: 耐性+吸収効果のシールドを展開する
   shield:

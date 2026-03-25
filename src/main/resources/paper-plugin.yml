@@ -1,5 +1,5 @@
 name: ArsPaper
-version: "${version}"
+version: "0.1.0-SNAPSHOT"
 main: com.arspaper.ArsPaper
 bootstrapper: com.arspaper.enchant.ArsBootstrap
 description: Ars Nouveau-inspired magic plugin for Paper servers
