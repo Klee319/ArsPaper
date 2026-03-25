@@ -255,29 +255,45 @@ public class RitualManager {
                                     });
                                 }
                             } else if (rid.startsWith("mage_")) {
-                                // 防具: スレッド・エンチャントを転送
+                                // 防具アップグレード: 旧アイテムの全PDCデータ+エンチャントを転送
                                 ItemStack oldItem = RitualCore.getStoredItem(revalidateCore);
                                 if (oldItem != null && oldItem.hasItemMeta()) {
                                     var oldMeta = oldItem.getItemMeta();
                                     var oldPdc = oldMeta.getPersistentDataContainer();
 
-                                    // スレッドスロット転送
-                                    String threadSlots = oldPdc.get(ItemKeys.THREAD_SLOTS, PersistentDataType.STRING);
+                                    // 転送対象のPDCキー
+                                    org.bukkit.NamespacedKey[] transferKeys = {
+                                        ItemKeys.THREAD_SLOTS,
+                                        com.arspaper.mana.ManaKeys.THREAD_MANA_BONUS,
+                                        com.arspaper.mana.ManaKeys.THREAD_REGEN_BONUS,
+                                        com.arspaper.mana.ManaKeys.THREAD_COST_REDUCTION,
+                                    };
 
                                     // エンチャント転送（バニラ + カスタム両方）
                                     var enchants = oldMeta.getEnchants();
 
-                                    if (threadSlots != null || !enchants.isEmpty()) {
-                                        result.editMeta(meta -> {
-                                            if (threadSlots != null) {
-                                                meta.getPersistentDataContainer().set(
-                                                    ItemKeys.THREAD_SLOTS, PersistentDataType.STRING, threadSlots);
+                                    result.editMeta(meta -> {
+                                        var dstPdc = meta.getPersistentDataContainer();
+                                        // PDCキー転送
+                                        for (var key : transferKeys) {
+                                            // String型
+                                            String strVal = oldPdc.get(key, PersistentDataType.STRING);
+                                            if (strVal != null) {
+                                                dstPdc.set(key, PersistentDataType.STRING, strVal);
+                                                continue;
                                             }
-                                            for (var entry : enchants.entrySet()) {
-                                                meta.addEnchant(entry.getKey(), entry.getValue(), true);
+                                            // Integer型
+                                            Integer intVal = oldPdc.get(key, PersistentDataType.INTEGER);
+                                            if (intVal != null) {
+                                                dstPdc.set(key, PersistentDataType.INTEGER, intVal);
                                             }
-                                        });
-                                    }
+                                        }
+                                        // エンチャント転送
+                                        for (var entry : enchants.entrySet()) {
+                                            meta.addEnchant(entry.getKey(), entry.getValue(), true);
+                                        }
+                                        // loreは次回ThreadGui表示時に再生成される
+                                    });
                                 }
                             }
                         }
