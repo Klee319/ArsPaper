@@ -388,7 +388,7 @@ items:
         - "TOTEM_OF_UNDYING x2"
         - "NETHERITE_INGOT x2"
       source: 3000
-      result: "ENCHNTED_GOLDEN_APPLE"
+      result: "ENCHANTED_GOLDEN_APPLE"
 
 
 
