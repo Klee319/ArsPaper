@@ -82,20 +82,20 @@ public class LightEffect implements SpellEffect {
      * 下にソリッドがあれば通常松明、隣接にソリッドがあれば壁松明。
      */
     private boolean tryPlaceTorchAt(Block airBlock, org.bukkit.entity.Player caster) {
-        // 下にソリッドがあれば通常の松明
+        // 下のブロックの上面が松明を支えられるか（階段・ハーフブロック等を正しく判定）
         Block below = airBlock.getRelative(BlockFace.DOWN);
-        if (below.getType().isSolid()) {
+        if (canSupportTorch(below, BlockFace.UP)) {
             if (placeTorch(airBlock, below, caster)) {
                 SpellFxUtil.spawnLightFx(airBlock.getLocation());
                 return true;
             }
         }
 
-        // 隣接にソリッドブロックがあれば壁松明
+        // 隣接ブロックの側面が壁松明を支えられるか
         for (BlockFace face : new BlockFace[]{
                 BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST}) {
             Block adjacent = airBlock.getRelative(face);
-            if (adjacent.getType().isSolid()) {
+            if (canSupportTorch(adjacent, face)) {
                 if (placeWallTorch(airBlock, face, caster)) {
                     SpellFxUtil.spawnLightFx(airBlock.getLocation());
                     return true;
@@ -103,6 +103,38 @@ public class LightEffect implements SpellEffect {
             }
         }
         return false;
+    }
+
+    /**
+     * 指定ブロックの指定面が松明を支えられるかチェック。
+     * バニラ準拠: フルブロックか、上面が平坦なハーフブロック(top)等のみ許可。
+     */
+    private boolean canSupportTorch(Block block, BlockFace face) {
+        if (block.getType().isAir()) return false;
+        var blockData = block.getBlockData();
+        // ハーフブロック: top半分のみ上面で松明を支えられる
+        if (blockData instanceof org.bukkit.block.data.type.Slab slab) {
+            if (face == BlockFace.UP) {
+                return slab.getType() == org.bukkit.block.data.type.Slab.Type.TOP
+                    || slab.getType() == org.bukkit.block.data.type.Slab.Type.DOUBLE;
+            }
+            return false; // ハーフブロック側面は壁松明不可
+        }
+        // 階段: 上面は上付き階段のみ、側面は背面のみ
+        if (blockData instanceof org.bukkit.block.data.type.Stairs stairs) {
+            if (face == BlockFace.UP) {
+                return stairs.getHalf() == org.bukkit.block.data.Bisected.Half.TOP;
+            }
+            return false; // 階段側面は壁松明不可（バニラ準拠）
+        }
+        // フェンス・壁・ガラス板等の細いブロックは支えられない
+        if (blockData instanceof org.bukkit.block.data.type.Fence
+            || blockData instanceof org.bukkit.block.data.type.Wall
+            || blockData instanceof org.bukkit.block.data.type.GlassPane) {
+            return false;
+        }
+        // それ以外のソリッドブロック
+        return block.getType().isSolid();
     }
 
     private boolean placeTorch(Block block, Block support, org.bukkit.entity.Player caster) {
