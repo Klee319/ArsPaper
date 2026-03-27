@@ -3,6 +3,7 @@ package com.arspaper.item;
 import com.arspaper.item.impl.SpellBook;
 import com.arspaper.util.PdcHelper;
 import net.kyori.adventure.text.Component;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -11,12 +12,16 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.inventory.CraftItemEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.PrepareAnvilEvent;
+import org.bukkit.event.inventory.PrepareItemCraftEvent;
 import org.bukkit.event.inventory.PrepareSmithingEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.MerchantInventory;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ArmorMeta;
+import org.bukkit.inventory.meta.LeatherArmorMeta;
+import org.bukkit.inventory.meta.trim.ArmorTrim;
 import org.bukkit.persistence.PersistentDataType;
 
 import java.util.Optional;
@@ -120,7 +125,7 @@ public class CustomItemListener implements Listener {
 
     /**
      * カスタムアイテムをバニラクラフトの素材として使用するのを防止する。
-     * ただしプラグイン登録レシピ（arspaper namespace）は許可する。
+     * ただしプラグイン登録レシピ（arspaper namespace）と革防具染色は許可する。
      */
     @EventHandler
     public void onCraftItem(CraftItemEvent event) {
@@ -129,6 +134,10 @@ public class CustomItemListener implements Listener {
             if ("arspaper".equals(keyed.getKey().getNamespace())) {
                 return;
             }
+        }
+        // カスタム革防具の染色は許可
+        if (isDyeingCustomArmor(event.getInventory().getMatrix())) {
+            return;
         }
         for (ItemStack item : event.getInventory().getMatrix()) {
             if (item != null && PdcHelper.getCustomItemId(item).isPresent()) {
@@ -139,14 +148,73 @@ public class CustomItemListener implements Listener {
     }
 
     /**
-     * カスタム鍛冶型を鍛冶台で使用するのを防止する。
+     * 染色プレビュー: カスタム革防具をクラフトテーブルで染色する際、
+     * 元の防具のPDCデータ・表示名・ロア等を保全した結果を生成する。
+     */
+    @EventHandler
+    public void onPrepareCraft(PrepareItemCraftEvent event) {
+        ItemStack[] matrix = event.getInventory().getMatrix();
+        if (!isDyeingCustomArmor(matrix)) return;
+
+        ItemStack vanillaResult = event.getInventory().getResult();
+        if (vanillaResult == null || vanillaResult.getType().isAir()) return;
+
+        // クラフトマトリクスからカスタム防具を探す
+        ItemStack customArmor = null;
+        for (ItemStack item : matrix) {
+            if (item != null && !item.getType().isAir() && isMageArmor(item)) {
+                customArmor = item;
+                break;
+            }
+        }
+        if (customArmor == null) return;
+
+        // 元の防具をクローンし、バニラ結果から染色色のみ適用
+        ItemStack result = customArmor.clone();
+        if (vanillaResult.getItemMeta() instanceof LeatherArmorMeta vanillaMeta
+                && result.getItemMeta() instanceof LeatherArmorMeta) {
+            org.bukkit.Color newColor = vanillaMeta.getColor();
+            result.editMeta(LeatherArmorMeta.class, meta -> meta.setColor(newColor));
+        }
+        event.getInventory().setResult(result);
+    }
+
+    /**
+     * 鍛冶台でのカスタムアイテム使用を制御する。
+     * カスタム防具は鍛冶型（アーマートリム）の適用を許可し、PDCデータを保全する。
+     * それ以外のカスタムアイテムはブロック。
      */
     @EventHandler
     public void onPrepareSmithing(PrepareSmithingEvent event) {
+        ItemStack customArmorInput = null;
+
         for (ItemStack item : event.getInventory().getContents()) {
-            if (item != null && PdcHelper.getCustomItemId(item).isPresent()) {
+            if (item == null || item.getType().isAir()) continue;
+            if (PdcHelper.getCustomItemId(item).isEmpty()) continue;
+
+            if (isMageArmor(item)) {
+                customArmorInput = item;
+            } else {
+                // 防具以外のカスタムアイテム → ブロック
                 event.setResult(null);
                 return;
+            }
+        }
+
+        // カスタム防具がある場合、元の防具をクローンしてトリムだけ適用する
+        // これによりPDC・エンチャント・耐久・スレッド等すべてのデータが完全に保全される
+        if (customArmorInput != null) {
+            ItemStack vanillaResult = event.getResult();
+            if (vanillaResult != null && !vanillaResult.getType().isAir()) {
+                ItemStack result = customArmorInput.clone();
+                // バニラ結果からアーマートリムを取得して適用
+                if (vanillaResult.getItemMeta() instanceof ArmorMeta vanillaArmorMeta) {
+                    ArmorTrim trim = vanillaArmorMeta.getTrim();
+                    if (trim != null) {
+                        result.editMeta(ArmorMeta.class, meta -> meta.setTrim(trim));
+                    }
+                }
+                event.setResult(result);
             }
         }
     }
@@ -185,6 +253,7 @@ public class CustomItemListener implements Listener {
             if (id.isPresent()
                 && !id.get().startsWith("mage_")
                 && !id.get().startsWith("spell_book_")
+                && !"enchant_book".equals(id.get())
                 && !item.getItemMeta().getPersistentDataContainer().has(ItemKeys.ARMOR_SET_ID, org.bukkit.persistence.PersistentDataType.STRING)) {
                 event.setResult(null);
                 return;
@@ -227,8 +296,32 @@ public class CustomItemListener implements Listener {
     private boolean isMageArmor(ItemStack item) {
         if (item == null || item.getType().isAir() || !item.hasItemMeta()) return false;
         var pdc = item.getItemMeta().getPersistentDataContainer();
-        String customId = pdc.get(ItemKeys.CUSTOM_ITEM_ID, org.bukkit.persistence.PersistentDataType.STRING);
+        String customId = pdc.get(ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING);
         if (customId != null && customId.startsWith("mage_")) return true;
-        return pdc.has(ItemKeys.ARMOR_SET_ID, org.bukkit.persistence.PersistentDataType.STRING);
+        return pdc.has(ItemKeys.ARMOR_SET_ID, PersistentDataType.STRING);
     }
+
+    /**
+     * クラフトマトリクスにカスタム防具+染料が含まれるかを判定する。
+     */
+    private boolean isDyeingCustomArmor(ItemStack[] matrix) {
+        boolean hasCustomArmor = false;
+        boolean hasDye = false;
+        for (ItemStack item : matrix) {
+            if (item == null || item.getType().isAir()) continue;
+            if (isMageArmor(item) && isLeatherArmor(item.getType())) hasCustomArmor = true;
+            if (isDye(item.getType())) hasDye = true;
+        }
+        return hasCustomArmor && hasDye;
+    }
+
+    private static boolean isDye(Material mat) {
+        return mat.name().endsWith("_DYE");
+    }
+
+    private static boolean isLeatherArmor(Material mat) {
+        return mat == Material.LEATHER_HELMET || mat == Material.LEATHER_CHESTPLATE
+            || mat == Material.LEATHER_LEGGINGS || mat == Material.LEATHER_BOOTS;
+    }
+
 }

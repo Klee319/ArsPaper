@@ -157,7 +157,8 @@ public class BlockParticleTask extends BukkitRunnable implements Listener {
             case "mycelial_sourcelink" ->
                 world.spawnParticle(Particle.SPORE_BLOSSOM_AIR, center, 2, 0.3, 0.2, 0.3, 0);
             case "ritual_core" ->
-                world.spawnParticle(Particle.WITCH, center, 2, 0.3, 0.2, 0.3, 0.02);
+                world.spawnParticle(Particle.DUST, center, 1, 0.3, 0.2, 0.3, 0,
+                    new Particle.DustOptions(Color.fromRGB(140, 0, 50), 0.7f));
             case "pedestal" ->
                 world.spawnParticle(Particle.DUST, center, 2, 0.2, 0.2, 0.2, 0,
                     new Particle.DustOptions(Color.fromRGB(128, 0, 255), 0.8f));

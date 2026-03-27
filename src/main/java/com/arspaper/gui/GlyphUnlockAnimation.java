@@ -252,7 +252,7 @@ public class GlyphUnlockAnimation {
 
     /**
      * Material型一致でインベントリからアイテムを消費する。
-     * 耐久値が減ったツール類（火打石と打ち金等）も正しく消費される。
+     * 耐久値が減ったツール類（火打石と打ち金等）や非スタックアイテム（トライデント等）も正しく消費される。
      */
     private static void removeMaterialFromInventory(Player player, Material material, int amount) {
         int remaining = amount;
@@ -263,7 +263,12 @@ public class GlyphUnlockAnimation {
             if (slot.hasItemMeta() && slot.getItemMeta().getPersistentDataContainer()
                     .has(com.arspaper.item.ItemKeys.CUSTOM_ITEM_ID)) continue;
             int take = Math.min(remaining, slot.getAmount());
-            slot.setAmount(slot.getAmount() - take);
+            if (slot.getAmount() - take <= 0) {
+                // 非スタックアイテム（トライデント等）でも確実にスロットをクリア
+                player.getInventory().setItem(i, null);
+            } else {
+                slot.setAmount(slot.getAmount() - take);
+            }
             remaining -= take;
         }
     }

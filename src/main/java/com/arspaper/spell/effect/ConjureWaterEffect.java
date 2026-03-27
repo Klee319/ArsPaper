@@ -75,6 +75,12 @@ public class ConjureWaterEffect implements SpellEffect {
         Player caster = context.getCaster();
         if (caster == null) return;
 
+        // ネザーでは水を生成できない（バニラ準拠）
+        if (block.getWorld().getEnvironment() == org.bukkit.World.Environment.NETHER) {
+            spawnEvaporateFx(blockLocation);
+            return;
+        }
+
         // エンティティチェックはSpellContext側で一括実施
         if (block.getType().isAir() || block.getType() == Material.FIRE
                 || block.getType() == Material.SOUL_FIRE) {
@@ -154,6 +160,14 @@ public class ConjureWaterEffect implements SpellEffect {
                 }
             }
         }
+    }
+
+    private void spawnEvaporateFx(Location loc) {
+        loc.getWorld().spawnParticle(
+            org.bukkit.Particle.SMOKE, loc.clone().add(0.5, 0.5, 0.5),
+            20, 0.3, 0.3, 0.3, 0.05);
+        loc.getWorld().playSound(loc,
+            org.bukkit.Sound.BLOCK_FIRE_EXTINGUISH, org.bukkit.SoundCategory.PLAYERS, 0.8f, 1.5f);
     }
 
     private void spawnWaterFx(Location loc) {

@@ -17,7 +17,7 @@ public final class ArsEnchantments {
 
     private ArsEnchantments() {}
 
-    /** マナ加速のレベルごとのリジェンボーナス */
+    /** マナ再生のレベルごとのリジェンボーナス */
     public static final int[] REGEN_PER_LEVEL = { 0, 1, 3, 6 };
 
     /** マナ上昇のレベルごとのマナボーナス */
@@ -78,7 +78,7 @@ public final class ArsEnchantments {
         return MANA_BOOST_PER_LEVEL[level];
     }
 
-    /** アイテムからマナ加速レベルを取得 */
+    /** アイテムからマナ再生レベルを取得 */
     public static int getManaRegenLevel(ItemStack item) {
         if (item == null || !item.hasItemMeta()) return 0;
         return item.getEnchantmentLevel(getManaRegen());
@@ -109,7 +109,7 @@ public final class ArsEnchantments {
     /** エンチャントIDから表示名を取得 */
     public static String getDisplayName(String enchantId) {
         return switch (enchantId) {
-            case "mana_regen" -> "マナ加速";
+            case "mana_regen" -> "マナ再生";
             case "mana_boost" -> "マナ上昇";
             case "share" -> "共有";
             default -> "不明";

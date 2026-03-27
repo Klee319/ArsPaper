@@ -60,6 +60,12 @@ public class SmeltEffect implements SpellEffect {
         SMELT_MAP.put(Material.CLAY,           Material.TERRACOTTA);
         SMELT_MAP.put(Material.NETHERRACK,     Material.NETHER_BRICK);
         SMELT_MAP.put(Material.BASALT,         Material.SMOOTH_BASALT);
+        // ひび割れたブロック（かまど精錬に準拠）
+        SMELT_MAP.put(Material.STONE_BRICKS,           Material.CRACKED_STONE_BRICKS);
+        SMELT_MAP.put(Material.DEEPSLATE_BRICKS,       Material.CRACKED_DEEPSLATE_BRICKS);
+        SMELT_MAP.put(Material.DEEPSLATE_TILES,        Material.CRACKED_DEEPSLATE_TILES);
+        SMELT_MAP.put(Material.NETHER_BRICKS,          Material.CRACKED_NETHER_BRICKS);
+        SMELT_MAP.put(Material.POLISHED_BLACKSTONE_BRICKS, Material.CRACKED_POLISHED_BLACKSTONE_BRICKS);
         SMELT_MAP.put(Material.CACTUS,         Material.GREEN_DYE);
         // 食料（調理）
         SMELT_MAP.put(Material.BEEF,           Material.COOKED_BEEF);
@@ -70,6 +76,7 @@ public class SmeltEffect implements SpellEffect {
         SMELT_MAP.put(Material.COD,            Material.COOKED_COD);
         SMELT_MAP.put(Material.SALMON,         Material.COOKED_SALMON);
         SMELT_MAP.put(Material.POTATO,         Material.BAKED_POTATO);
+        SMELT_MAP.put(Material.KELP,           Material.DRIED_KELP);
         // 木材 → 木炭
         SMELT_MAP.put(Material.OAK_LOG,        Material.CHARCOAL);
         SMELT_MAP.put(Material.SPRUCE_LOG,     Material.CHARCOAL);

@@ -31,7 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class FlightRitualEffect implements RitualEffect, Listener {
 
-    private static final int DEFAULT_DURATION_SECONDS = 300;
+    private static final int DEFAULT_DURATION_SECONDS = 600;
 
     /** アクティブな飛行タスクのキャンセル用 (UUID → taskIdリスト) */
     private static final Map<UUID, List<Integer>> activeFlightTasks = new ConcurrentHashMap<>();

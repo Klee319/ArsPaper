@@ -1,6 +1,5 @@
 package com.arspaper.ritual.effect;
 
-import com.arspaper.block.impl.RitualCore;
 import com.arspaper.enchant.ArsEnchantments;
 import com.arspaper.item.ItemKeys;
 import com.arspaper.ritual.RitualEffect;
@@ -10,15 +9,12 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
-import org.bukkit.block.TileState;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.EnchantmentStorageMeta;
-import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 
 import java.util.List;
@@ -53,19 +49,6 @@ public class EnchantBookRitualEffect implements RitualEffect {
         }
         final int level = Math.min(parsedLevel, ArsEnchantments.MAX_LEVEL);
 
-        // コアに本が置かれているか確認
-        if (!(coreLocation.getBlock().getState() instanceof TileState tileState)) return;
-
-        PersistentDataContainer corePdc = tileState.getPersistentDataContainer();
-        String materialName = corePdc.get(
-            new NamespacedKey("arspaper", "core_item"), PersistentDataType.STRING
-        );
-
-        if (!"BOOK".equals(materialName)) {
-            player.sendMessage(Component.text("コアに本を置いてください！", NamedTextColor.RED));
-            return;
-        }
-
         String displayName = ArsEnchantments.getDisplayName(enchantId);
         String roman = ArsEnchantments.toRoman(level);
 
@@ -92,8 +75,7 @@ public class EnchantBookRitualEffect implements RitualEffect {
             ));
         });
 
-        // コアをクリアして返却
-        RitualCore.clearCoreItem(tileState);
+        // コアアイテムはRitualManagerが既に消費済み
         coreLocation.getWorld().dropItemNaturally(
             coreLocation.clone().add(0.5, 1.5, 0.5), enchantedBook
         );

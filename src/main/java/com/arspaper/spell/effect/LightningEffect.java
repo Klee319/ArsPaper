@@ -37,35 +37,50 @@ public class LightningEffect implements SpellEffect {
 
     @Override
     public void applyToEntity(SpellContext context, LivingEntity target) {
-        // 本物の雷を落とす（火災・帯電クリーパー変化等の副作用込み）
-        target.getWorld().strikeLightning(target.getLocation());
-
-        // ダメージ計算（Amplifyは最大2スタックまで）
+        // ダメージ計算（Amplifyは最大2スタック、Dampenで減少・0以下で演出雷）
         double baseDamage = config.getParam("lightning", "base-damage", BASE_DAMAGE);
         int maxAmplify = (int) config.getParam("lightning", "max-amplify", (double) MAX_AMPLIFY);
         int amp = Math.min(context.getAmplifyLevel(), maxAmplify);
         double amplifyBonus = config.getParam("lightning", "amplify-bonus", AMPLIFY_BONUS);
         double damage = baseDamage + amp * amplifyBonus;
 
-        // 濡れ判定（水中 or 雨中）
-        double wetBonus = config.getParam("lightning", "wet-bonus-damage", WET_BONUS_DAMAGE);
-        if (isWet(target)) {
-            damage += wetBonus;
+        if (damage <= 0) {
+            // 演出雷: ���メージ・火災なし（strikeLightningEffect）
+            target.getWorld().strikeLightningEffect(target.getLocation());
+        } else {
+            // 本物の雷（火災・帯電クリーパー変化等の副作用込み）
+            target.getWorld().strikeLightning(target.getLocation());
+
+            // 濡れ判定（水中 or 雨中）
+            double wetBonus = config.getParam("lightning", "wet-bonus-damage", WET_BONUS_DAMAGE);
+            if (isWet(target)) {
+                damage += wetBonus;
+            }
+
+            damage = context.calculateSpellDamage(damage, target);
+            target.damage(damage, context.getCaster());
+
+            // Shockedステータス: Slowness I を付与
+            int shockedBase = (int) config.getParam("lightning", "shocked-base-ticks", (double) SHOCKED_BASE_TICKS);
+            int shockedPerLevel = (int) config.getParam("lightning", "shocked-per-level", (double) SHOCKED_PER_LEVEL);
+            int shockedDuration = shockedBase + context.getDurationLevel() * shockedPerLevel;
+            target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, shockedDuration, 0));
         }
-
-        damage = context.calculateSpellDamage(damage, target);
-        target.damage(damage, context.getCaster());
-
-        // Shockedステータス: Slowness I を付与
-        int shockedBase = (int) config.getParam("lightning", "shocked-base-ticks", (double) SHOCKED_BASE_TICKS);
-        int shockedPerLevel = (int) config.getParam("lightning", "shocked-per-level", (double) SHOCKED_PER_LEVEL);
-        int shockedDuration = shockedBase + context.getDurationLevel() * shockedPerLevel;
-        target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, shockedDuration, 0));
     }
 
     @Override
     public void applyToBlock(SpellContext context, Location blockLocation) {
-        blockLocation.getWorld().strikeLightning(blockLocation);
+        double baseDamage = config.getParam("lightning", "base-damage", BASE_DAMAGE);
+        int maxAmplify = (int) config.getParam("lightning", "max-amplify", (double) MAX_AMPLIFY);
+        int amp = Math.min(context.getAmplifyLevel(), maxAmplify);
+        double amplifyBonus = config.getParam("lightning", "amplify-bonus", AMPLIFY_BONUS);
+        double damage = baseDamage + amp * amplifyBonus;
+
+        if (damage <= 0) {
+            blockLocation.getWorld().strikeLightningEffect(blockLocation);
+        } else {
+            blockLocation.getWorld().strikeLightning(blockLocation);
+        }
     }
 
     /** エンティティが水中または雨に濡れているか判定する */

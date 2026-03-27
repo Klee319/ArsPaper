@@ -148,7 +148,10 @@ public class ArmorManaListener implements Listener {
                 if (boostLevel > 0) {
                     totalEnchantMana += ArsEnchantments.getManaBoostForLevel(boostLevel);
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                ArsPaper.getInstance().getLogger().warning(
+                    "Failed to read enchantment from armor: " + e.getMessage());
+            }
 
             // 設定ベース防具（ARMOR_SET_ID優先）
             String armorSetId = pdc.get(ItemKeys.ARMOR_SET_ID, PersistentDataType.STRING);
@@ -323,13 +326,19 @@ public class ArmorManaListener implements Listener {
                     if (p.isGliding()) {
                         p.setFallDistance(0f);
                     }
-                    // 空中時のみallowFlight有効化（地上では通常ジャンプを維持）
+                    // allowFlightを常時true維持（クライアントのダブルタップタイマーリセットを防止）
                     if (p.getGameMode() != org.bukkit.GameMode.CREATIVE
                             && p.getGameMode() != org.bukkit.GameMode.SPECTATOR) {
-                        if (!p.isOnGround() && !p.getAllowFlight()) {
+                        if (!p.getAllowFlight()) {
                             p.setAllowFlight(true);
-                        } else if (p.isOnGround() && p.getAllowFlight() && !p.isGliding()) {
-                            p.setAllowFlight(false);
+                        }
+                        // flying状態の検出（ダブルタップによる飛行開始を即座にグライドに変換）
+                        if (p.isFlying()) {
+                            p.setFlying(false);
+                            if (!p.isOnGround() && !p.isGliding()) {
+                                p.setGliding(true);
+                                p.setFallDistance(0f);
+                            }
                         }
                     }
                 }

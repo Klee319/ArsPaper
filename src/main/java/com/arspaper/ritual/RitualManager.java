@@ -26,7 +26,8 @@ import java.util.*;
  */
 public class RitualManager {
 
-    private static final int SEARCH_RADIUS = 3;
+    /** 台座の検索距離: コアから1ブロック空けた正方形リング (max(|x|,|z|)==2, 計16マス) */
+    private static final int PEDESTAL_DISTANCE = 2;
     private final RitualRecipeRegistry recipeRegistry;
     private final RitualEffectRegistry effectRegistry;
     private final Set<Location> activatingRituals = new HashSet<>();
@@ -210,11 +211,9 @@ public class RitualManager {
                     // world_effect / thread タイプ
                     Optional<RitualEffect> effectOpt = effectRegistry.get(recipe.effectType());
                     if (effectOpt.isPresent()) {
-                        // thread/enchant_book以外ではコアアイテムを消費
-                        // enchant_bookはエフェクト内で本の存在確認後に自身でクリアする
+                        // thread以外ではコアアイテムを消費
                         if (recipe.coreItem() != null
-                                && !"thread".equals(recipe.effectType())
-                                && !"enchant_book".equals(recipe.effectType())) {
+                                && !"thread".equals(recipe.effectType())) {
                             RitualCore.clearCoreItem(revalidateCore);
                         }
                         effectOpt.get().execute(coreLocation, player, recipe);
@@ -338,13 +337,20 @@ public class RitualManager {
         world.spawnParticle(Particle.ENCHANT, particleLoc, 2, 0.1, 0.1, 0.1, 0.5);
     }
 
+    /**
+     * コアから1ブロック空けた正方形リング上の台座を検索する。
+     * XZ平面で max(|x|,|z|) == PEDESTAL_DISTANCE の16マス、Y方向は±1を許容。
+     */
     private List<PedestalInfo> findNearbyPedestals(Location center) {
         List<PedestalInfo> pedestals = new ArrayList<>();
+        int d = PEDESTAL_DISTANCE;
 
-        for (int x = -SEARCH_RADIUS; x <= SEARCH_RADIUS; x++) {
+        for (int x = -d; x <= d; x++) {
             for (int y = -1; y <= 1; y++) {
-                for (int z = -SEARCH_RADIUS; z <= SEARCH_RADIUS; z++) {
-                    if (x == 0 && y == 0 && z == 0) continue;
+                for (int z = -d; z <= d; z++) {
+                    // 正方形リングの外周のみ（内側を除外）
+                    if (Math.abs(x) < d && Math.abs(z) < d) continue;
+
                     Block block = center.getBlock().getRelative(x, y, z);
                     if (block.getType() != Material.BREWING_STAND) continue;
                     if (!(block.getState() instanceof TileState tileState)) continue;

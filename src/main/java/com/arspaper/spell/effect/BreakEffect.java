@@ -200,8 +200,8 @@ public class BreakEffect implements SpellEffect {
         Player caster = context.getCaster();
         if (caster == null) return;
 
-        // Dampen: ユーティリティモード
-        if (context.getAmplifyLevel() < 0) {
+        // Dampen: ユーティリティモード（減衰1個でON）
+        if (context.hasDampen() && context.getAmplifyLevel() <= 0) {
             applyUtility(block, caster, blockLocation);
             return;
         }
@@ -236,15 +236,35 @@ public class BreakEffect implements SpellEffect {
         Location dropLoc = blockLocation.clone().add(0.5, 0.5, 0.5);
         BlockState state = block.getState();
 
-        // コンテナブロック（チェスト、樽等）の中身をドロップ
+        // コンテナブロック（チェスト、樽等）: 中身をドロップしてからブロック自体も破壊
         // シュルカーボックスはドロップアイテム自体に中身を保持するためスキップ
         if (!isShulkerBox(blockType) && state instanceof Container container) {
+            // ルートテーブル（トレジャーチェスト等）が未生成の場合、先に中身を生成
+            if (container instanceof org.bukkit.loot.Lootable lootable
+                    && lootable.getLootTable() != null) {
+                org.bukkit.loot.LootTable lootTable = lootable.getLootTable();
+                long seed = lootable.getSeed();
+                org.bukkit.loot.LootContext ctx = new org.bukkit.loot.LootContext.Builder(blockLocation)
+                    .killer(caster)
+                    .build();
+                lootTable.fillInventory(container.getInventory(),
+                    new java.util.Random(seed != 0 ? seed : System.nanoTime()), ctx);
+                lootable.setLootTable(null);
+                container.update();
+            }
+
             for (ItemStack item : container.getInventory().getContents()) {
                 if (item != null && !item.getType().isAir()) {
                     block.getWorld().dropItemNaturally(dropLoc, item);
                 }
             }
             container.getInventory().clear();
+            // ブロック自体も破壊してドロップ（バニラと同じ挙動）
+            Collection<ItemStack> drops = block.getDrops(tool);
+            block.setType(Material.AIR);
+            for (ItemStack drop : drops) {
+                block.getWorld().dropItemNaturally(dropLoc, drop);
+            }
         }
 
         // 他プラグインのカスタムデータ(PDC)を持つTileStateブロック:

@@ -142,19 +142,6 @@ public class SpellCraftingGui extends BaseGui {
         return -1;
     }
 
-    /** 配列のnullギャップを詰めて連続化する。増強スタックバイパスを防止。 */
-    private void compactCompositionArray() {
-        int write = 0;
-        for (int read = 0; read < MAX_GLYPHS; read++) {
-            if (composition[read] != null) {
-                composition[write++] = composition[read];
-            }
-        }
-        for (int i = write; i < MAX_GLYPHS; i++) {
-            composition[i] = null;
-        }
-    }
-
     /** 最後の非nullスロットのインデックスを返す。空なら-1。 */
     private int lastOccupiedSlot() {
         for (int i = MAX_GLYPHS - 1; i >= 0; i--) {
@@ -380,13 +367,30 @@ public class SpellCraftingGui extends BaseGui {
 
     @Override
     public boolean onClick(int slot, Player clicker, InventoryClickEvent event) {
-        // 構成エリアクリック → グリフ除去（スロットを空けたまま保持）
+        // 構成エリアクリック → グリフ除去（種類別の削除ルール）
         if (slot >= COMPOSITION_START && slot <= COMPOSITION_END) {
             int index = slot - COMPOSITION_START;
             if (index < MAX_GLYPHS && composition[index] != null) {
-                composition[index] = null;
-                // nullギャップを詰める（増強スタックバイパス防止）
-                compactCompositionArray();
+                SpellComponent removed = composition[index];
+                switch (removed.getType()) {
+                    case FORM -> {
+                        // 形態削除 → 全てクリア
+                        Arrays.fill(composition, null);
+                    }
+                    case EFFECT -> {
+                        // 効果削除 → それ以降の効果・増強を全削除
+                        for (int i = index; i < MAX_GLYPHS; i++) {
+                            if (composition[i] != null
+                                    && composition[i].getType() != SpellComponent.ComponentType.FORM) {
+                                composition[i] = null;
+                            }
+                        }
+                    }
+                    case AUGMENT -> {
+                        // 増強削除 → その枠だけ空ける（左詰めしない）
+                        composition[index] = null;
+                    }
+                }
                 render();
             }
             return true;
@@ -551,7 +555,7 @@ public class SpellCraftingGui extends BaseGui {
         // 互換性チェック
         String compatError = validateCompatibility();
         if (compatError != null) {
-            clicker.sendMessage(Component.text(compatError, NamedTextColor.RED));
+            clicker.sendMessage(Component.text("互換のないスペル: " + compatError, NamedTextColor.RED));
             clicker.playSound(clicker.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
             return;
         }

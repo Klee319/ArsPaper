@@ -116,12 +116,10 @@ public final class ArsCommand {
                 )
                 .then(Commands.literal("debug")
                     .requires(src -> src.getSender().hasPermission("arspaper.admin"))
-                    .then(Commands.literal("mana")
-                        .executes(ctx -> {
-                            if (!(ctx.getSource().getSender() instanceof Player player)) return 0;
-                            return executeDebugMana(plugin, player);
-                        })
-                    )
+                    .executes(ctx -> {
+                        if (!(ctx.getSource().getSender() instanceof Player player)) return 0;
+                        return executeDebug(plugin, player);
+                    })
                 )
                 .then(Commands.literal("fixmana")
                     .requires(src -> src.getSender().hasPermission("arspaper.admin"))
@@ -407,12 +405,12 @@ public final class ArsCommand {
         return 1;
     }
 
-    private static int executeDebugMana(ArsPaper plugin, Player player) {
+    private static int executeDebug(ArsPaper plugin, Player player) {
         boolean enabled = plugin.getManaManager().toggleInfiniteMana(player);
         if (enabled) {
-            player.sendMessage(Component.text("マナ無限モード: ON", NamedTextColor.GREEN));
+            player.sendMessage(Component.text("デバッグモード: ON（マナ無限）", NamedTextColor.GREEN));
         } else {
-            player.sendMessage(Component.text("マナ無限モード: OFF", NamedTextColor.YELLOW));
+            player.sendMessage(Component.text("デバッグモード: OFF", NamedTextColor.YELLOW));
         }
         return 1;
     }

@@ -153,6 +153,7 @@ glyphs:
     # 延長:毒の持続延長(+3秒/段) | 短縮:毒の持続短縮
     max-augments:
       amplify: 5
+      dampen: 4   # 2個でamp-1(=2.0HP), 4個でamp-2(=0に近い)。これ以上積んでも変化なし
       aoe_radius: 7
       extend_time: 7
       duration_down: 7
@@ -182,6 +183,7 @@ glyphs:
     # 火炎耐性が有効（DamageType.ON_FIRE使用）
     max-augments:
       amplify: 5
+      dampen: 2   # 2個でamp-1(=最低ダメージ0.5)。これ以上積んでも変化なし
       aoe_radius: 7
       extend_time: 7
       duration_down: 7
@@ -225,6 +227,7 @@ glyphs:
     # 増幅:吹き飛ばし力↑(+1.0/段) | 減少:吹き飛ばし力↓ | 半径増加:範囲吹き飛ばし
     max-augments:
       amplify: 5
+      dampen: 2   # 2個でamp-1(=力0.5)。これ以上積んでも変化なし
       aoe_radius: 7
     # params (設定可能な定数):
     #   base-force: 1.5
@@ -232,7 +235,7 @@ glyphs:
     #   max-force: 5.0 (吹き飛ばし力上限。大きすぎると制御不能)
     params :
       base-force: 1.5
-      amplify-bonus: 1.0 
+      amplify-bonus: 1.0
       max-force: 6.5
     unlock-cost:
       level: 20
@@ -247,6 +250,7 @@ glyphs:
     # 増幅:引き寄せ力↑(+0.5/段) | 減少:引き寄せ力↓ | 半径増加:範囲引き寄せ
     max-augments:
       amplify: 5
+      dampen: 2   # 2個でamp-1(=力0.5)。これ以上積んでも変化なし
       aoe_radius: 7
     # params (設定可能な定数):
     #   base-force: 0.8
@@ -255,7 +259,7 @@ glyphs:
     #   min-y: 0.15
     params:
       base-force: 1.0
-      amplify-bonus: 0.5 
+      amplify-bonus: 0.5
       max-force: 3.5
       min-y: 0.15
     unlock-cost:
@@ -371,10 +375,11 @@ glyphs:
   rotate:
     tier: 2
     mana-cost: 25
-    # 増幅:回転角度↑ | 減少:回転角度↓ | 半径増加:範囲回転
+    # 増幅:回転角度↑ | 減少:逆回転 | 半径増加:範囲回転
     # 延長:継続回転 | 短縮:回転短縮
     max-augments:
       amplify: 3
+      dampen: 2   # 2個でamp-1(=逆回転90°)。方向反転のみなのでこれ以上不要
       aoe_radius: 7
       extend_time: 7
     # params (設定可能な定数):
@@ -446,6 +451,7 @@ glyphs:
     # 増幅:打ち上げ力↑(+0.8/段) | 減少:打ち上げ力↓ | 半径増加:AOE打ち上げ範囲
     max-augments:
       amplify: 5
+      dampen: 2   # 2個でamp-1(=速度0.2)。これ以上積んでも変化なし
       aoe_radius: 7
     # params (設定可能な定数):
     #   base-velocity: 1.5
@@ -468,6 +474,7 @@ glyphs:
     # 増幅:前方跳躍力↑(+0.3/段) | 減少:跳躍力↓
     max-augments:
       amplify: 5
+      dampen: 2   # 2個でamp-1(=速度0.7)。これ以上積んでも変化なし
     # params (設定可能な定数):
     #   base-velocity: 1.0
     #   amplify-bonus: 0.3 (/段、増幅1段あたり+0.3)
@@ -683,6 +690,7 @@ glyphs:
     # アンデッドにはダメージを与える
     max-augments:
       amplify: 5
+      dampen: 2   # 2個でamp-1(=最低回復1HP)。これ以上積んでも変化なし
       aoe_radius: 7
     # params (設定可能な定数):
     #   base-heal: 3.0 (HP、基本回復量)
@@ -779,6 +787,7 @@ glyphs:
     # 水に触れている敵に2倍ダメージ
     max-augments:
       amplify: 5
+      dampen: 4   # 2個でamp-1(=2.0HP), 4個でamp-2(=0に近い)。これ以上変化なし
       aoe_radius: 7
     # params (設定可能な定数):
     #   base-damage: 3.0 (HP、基本ダメージ)
@@ -800,6 +809,7 @@ glyphs:
     # 炎上中の敵に1.5倍ダメージ
     max-augments:
       amplify: 5
+      dampen: 4   # 2個でamp-1(=3.0HP), 4個でamp-2(=1.0HP)。これ以上変化なし
       aoe_radius: 7
     # params (設定可能な定数):
     #   base-damage: 3.0 (HP、基本ダメージ)
@@ -840,6 +850,7 @@ glyphs:
     # 増幅:風ダメージ↑ | 減少:風ダメージ↓ | 半径増加:範囲風ダメージ
     max-augments:
       amplify: 5
+      dampen: 4   # 高度ボーナスがあるため幅を持たせる。4個以上は変化なし
       aoe_radius: 7
     # params (設定可能な定数):
     #   base-damage: 5.0 (HP、基本風ダメージ)
@@ -990,6 +1001,7 @@ glyphs:
     # 増幅:吹き飛ばし力↑(+0.5/段) | 減少:力↓ | 半径増加:範囲吹き飛ばし
     max-augments:
       amplify: 5
+      dampen: 2   # 2個でamp-1(=力0.5)。これ以上積んでも変化なし
       aoe_radius: 7
     # params (設定可能な定数):
     #   base-radius: 3.0 (ブロック)
@@ -1014,6 +1026,7 @@ glyphs:
     # 無作為:ランダム方向にブースト
     max-augments:
       amplify: 5
+      dampen: 2   # 2個でamp-1(=速度0.7)。4個以上は最低速度0.3でクランプされ変化なし
       aoe_radius: 7
       extend_time: 7
       duration_down: 7
@@ -1077,10 +1090,11 @@ glyphs:
   lightning:
     tier: 3
     mana-cost: 100
-    # 増幅:落雷ダメージ↑(最大2段) | 減少:ダメージ↓ | 半径増加:範囲落雷
+    # 増幅:落雷ダメージ↑(最大2段) | 減少:ダメージ↓(0以下で演出雷) | 半径増加:範囲落雷
     # 延長:連続落雷回数↑ | 短縮:連続落雷回数↓
     max-augments:
       amplify: 5  # コード上限: MAX_AMPLIFY=2
+      dampen: 4   # 2個でamp-1(=2.0HP), 4個でamp-2(=演出雷:ダメージなし)。これ以上変化なし
       aoe_radius: 7
       extend_time: 7
       duration_down: 7

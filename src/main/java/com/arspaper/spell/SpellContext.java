@@ -107,6 +107,11 @@ public class SpellContext {
         }
     }
 
+    /** 減衰が1回以上適用されているか（ユーティリティモード判定用） */
+    public boolean hasDampen() {
+        return dampenAccum > 0;
+    }
+
     // === AOE 視線基準3軸 ===
     // 横: 視線に対して左右
     public int getAoeWidth() { return aoeLevel; }

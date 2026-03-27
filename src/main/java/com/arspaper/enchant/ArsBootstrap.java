@@ -25,7 +25,7 @@ public class ArsBootstrap implements PluginBootstrap {
             RegistryEvents.ENCHANTMENT.compose().newHandler(event -> {
                 event.registry().register(
                     TypedKey.create(RegistryKey.ENCHANTMENT, Key.key("arspaper", "mana_regen")),
-                    b -> b.description(Component.text("マナ加速"))
+                    b -> b.description(Component.text("マナ再生"))
                         .supportedItems(event.getOrCreateTag(ItemTypeTagKeys.ENCHANTABLE_ARMOR))
                         .weight(1)        // エンチャント台には出ない（weight最小）
                         .maxLevel(3)

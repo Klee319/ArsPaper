@@ -23,6 +23,7 @@ import org.bukkit.event.block.BlockPistonRetractEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
+import org.bukkit.event.inventory.InventoryMoveItemEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
@@ -32,6 +33,9 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * カスタムブロックの設置・破壊・インタラクションイベントを処理するリスナー。
@@ -46,6 +50,12 @@ public class CustomBlockListener implements Listener {
     private final CustomBlockRegistry registry;
     private final BlockParticleTask particleTask;
     private final SourcelinkTickTask sourcelinkTickTask;
+
+    /**
+     * カスタムブロック設置直後の短い猶予期間中、実績クライテリアの付与を抑制するためのセット。
+     * UUIDが含まれている間は PlayerAdvancementCriterionGrantEvent をキャンセルする。
+     */
+    private final Set<UUID> advancementBlockedPlayers = ConcurrentHashMap.newKeySet();
 
     public CustomBlockListener(JavaPlugin plugin, CustomBlockRegistry registry,
                                BlockParticleTask particleTask, SourcelinkTickTask sourcelinkTickTask) {
@@ -88,6 +98,25 @@ public class CustomBlockListener implements Listener {
 
         // カスタムブロック固有の初期化
         cb.onBlockPlaced(event.getPlayer(), block, tileState);
+
+        // カスタムブロック設置による実績付与を短期間ブロック
+        UUID playerId = event.getPlayer().getUniqueId();
+        advancementBlockedPlayers.add(playerId);
+        plugin.getServer().getScheduler().runTaskLater(plugin,
+            () -> advancementBlockedPlayers.remove(playerId), 5L);
+    }
+
+    /**
+     * カスタムブロック設置直後の実績クライテリア付与をキャンセルする。
+     * バニラブロック素材（BEACON等）を使用するカスタムブロックが
+     * 実績を解除してしまう問題を防止する。
+     */
+    @EventHandler
+    public void onAdvancementCriterion(
+            com.destroystokyo.paper.event.player.PlayerAdvancementCriterionGrantEvent event) {
+        if (advancementBlockedPlayers.contains(event.getPlayer().getUniqueId())) {
+            event.setCancelled(true);
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -328,5 +357,46 @@ public class CustomBlockListener implements Listener {
         event.setCancelled(true);
 
         customBlock.get().onBlockInteract(event.getPlayer(), block, tileState);
+    }
+
+    /**
+     * ホッパーからソースリンクへのアイテム移動を検知し、ソース変換を行う。
+     * バニラ炉のインベントリにアイテムが消えるのを防止する。
+     */
+    @EventHandler(ignoreCancelled = true)
+    public void onInventoryMoveItem(InventoryMoveItemEvent event) {
+        // 移動先がブロックインベントリか確認
+        if (!(event.getDestination().getHolder() instanceof org.bukkit.block.BlockState destState)) return;
+        if (!(destState instanceof TileState destTile)) return;
+
+        String blockId = destTile.getPersistentDataContainer()
+            .get(BlockKeys.CUSTOM_BLOCK_ID, PersistentDataType.STRING);
+        if (blockId == null) return;
+
+        Optional<CustomBlock> customBlock = registry.get(blockId);
+        if (customBlock.isEmpty() || !(customBlock.get() instanceof Sourcelink sourcelink)) return;
+
+        // ソースリンクへの移動 → アイテムをソース変換
+        ItemStack item = event.getItem();
+        int sourceValue = sourcelink.getSourceValueForItem(item);
+        if (sourceValue > 0) {
+            // ホッパーは1個ずつ移動するためそのまま消費してバッファに追加
+            sourcelink.addToBuffer(destState.getBlock(), sourceValue);
+            event.setCancelled(true);
+            // ホッパー側のアイテムを1個減らす（次tickで反映）
+            Material itemType = item.getType();
+            org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+                for (int i = 0; i < event.getSource().getSize(); i++) {
+                    ItemStack slot = event.getSource().getItem(i);
+                    if (slot != null && slot.getType() == itemType) {
+                        slot.setAmount(slot.getAmount() - 1);
+                        break;
+                    }
+                }
+            });
+        } else {
+            // 対応しないアイテム → ソースリンクに入れさせない
+            event.setCancelled(true);
+        }
     }
 }

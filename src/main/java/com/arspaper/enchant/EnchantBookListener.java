@@ -38,6 +38,12 @@ public class EnchantBookListener implements Listener {
         ItemStack target = anvil.getItem(0);
         ItemStack book = anvil.getItem(1);
 
+        // エンチャント本同士の合成をブロック（レベル加算防止）
+        if (isEnchantBook(target) && isEnchantBook(book)) {
+            event.setResult(null);
+            return;
+        }
+
         if (!isEnchantBook(book)) return;
         boolean isArmor = isMageArmor(target);
         boolean isSpellBook = isSpellBook(target);

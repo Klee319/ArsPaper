@@ -3,6 +3,7 @@ package com.arspaper.mana;
 import com.arspaper.ArsPaper;
 import com.arspaper.item.impl.Wand;
 import net.kyori.adventure.bossbar.BossBar;
+import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -13,8 +14,6 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
-import java.util.HashSet;
-import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -27,7 +26,7 @@ public class ManaManager implements Listener {
     private volatile ManaConfig config;
     private final ManaBarDisplay barDisplay;
     private final BukkitTask regenTask;
-    private final Set<UUID> infiniteManaPlayers = new HashSet<>();
+    private static final NamespacedKey DEBUG_MODE_KEY = new NamespacedKey("arspaper", "debug_mode");
     private final RankingCache rankingCache;
 
     /** 累計マナ消費量のインメモリバッファ（PDC書き込み頻度を削減） */
@@ -101,7 +100,7 @@ public class ManaManager implements Listener {
     }
 
     public boolean consumeMana(Player player, int amount) {
-        if (infiniteManaPlayers.contains(player.getUniqueId())) return true;
+        if (isInfiniteMana(player)) return true;
         int current = getCurrentMana(player);
         if (current < amount) return false;
         setCurrentMana(player, current - amount);
@@ -113,24 +112,24 @@ public class ManaManager implements Listener {
     }
 
     /**
-     * マナ無限モードをトグルする。
-     * @return トグル後の状態（true=無限ON）
+     * デバッグモード（マナ無限）をトグルする。PDCに永続化されるため再参加・再起動後も維持される。
+     * @return トグル後の状態（true=ON）
      */
     public boolean toggleInfiniteMana(Player player) {
-        UUID uuid = player.getUniqueId();
-        if (infiniteManaPlayers.contains(uuid)) {
-            infiniteManaPlayers.remove(uuid);
-            plugin.getLogger().info("[Debug] Infinite mana OFF for " + player.getName());
+        boolean current = isInfiniteMana(player);
+        if (current) {
+            player.getPersistentDataContainer().remove(DEBUG_MODE_KEY);
+            plugin.getLogger().info("[Debug] Debug mode OFF for " + player.getName());
             return false;
         } else {
-            infiniteManaPlayers.add(uuid);
-            plugin.getLogger().info("[Debug] Infinite mana ON for " + player.getName());
+            player.getPersistentDataContainer().set(DEBUG_MODE_KEY, PersistentDataType.BYTE, (byte) 1);
+            plugin.getLogger().info("[Debug] Debug mode ON for " + player.getName());
             return true;
         }
     }
 
     public boolean isInfiniteMana(Player player) {
-        return infiniteManaPlayers.contains(player.getUniqueId());
+        return player.getPersistentDataContainer().has(DEBUG_MODE_KEY);
     }
 
     public void addMana(Player player, int amount) {
@@ -190,7 +189,6 @@ public class ManaManager implements Listener {
             player.hideBossBar(bar);
         }
         barDisplay.remove(player.getUniqueId());
-        infiniteManaPlayers.remove(player.getUniqueId());
 
         // SpellCasterのクールダウンをクリーンアップ
         ArsPaper.getInstance().getSpellCaster().clearCooldown(player.getUniqueId());

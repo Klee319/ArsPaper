@@ -55,6 +55,13 @@ public class ExplosionEffect implements SpellEffect {
         float power = calcPower(context);
         boolean hasExtract = context.getExtractCount() > 0;
 
+        // 爆発を先に実行（演出＋エンティティダメージ。breakBlocks=false）
+        blockLocation.getWorld().createExplosion(
+            blockLocation, power, false, false, context.getCaster());
+        spawnExplosionFx(blockLocation, power);
+
+        // 抽出付き: 爆発後に範囲内ブロックをドロップ回収
+        // 爆発後に行うことで、ドロップアイテムが爆発に巻き込まれて消失するのを防ぐ
         if (hasExtract) {
             Player caster = context.getCaster();
             int r = (int) Math.ceil(power);
@@ -76,10 +83,6 @@ public class ExplosionEffect implements SpellEffect {
                 }
             }
         }
-
-        blockLocation.getWorld().createExplosion(
-            blockLocation, power, false, false, context.getCaster());
-        spawnExplosionFx(blockLocation, power);
     }
 
     /** power = base + aoe_radius × bonus, maxで上限 */

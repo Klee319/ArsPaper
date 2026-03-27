@@ -85,7 +85,7 @@ public class ThreadGui extends BaseGui {
 
     @Override
     public void render() {
-        fillBorder(Material.GRAY_STAINED_GLASS_PANE);
+        fillBorder(Material.BLACK_STAINED_GLASS_PANE);
 
         inventory.setItem(ARMOR_INFO_SLOT, createArmorInfoButton());
 
@@ -267,8 +267,8 @@ public class ThreadGui extends BaseGui {
 
     private ItemStack createThreadSlotButton(int index, String threadId) {
         if (threadId == null) {
-            return createButton(Material.LIGHT_GRAY_STAINED_GLASS_PANE,
-                Component.text("空きスロット " + (index + 1), NamedTextColor.GRAY),
+            return createButton(Material.LIME_STAINED_GLASS_PANE,
+                Component.text("空きスロット " + (index + 1), NamedTextColor.GREEN),
                 List.of(Component.text("クリックでスレッドをセット", NamedTextColor.DARK_GRAY)
                     .decoration(TextDecoration.ITALIC, false)));
         }
@@ -336,6 +336,10 @@ public class ThreadGui extends BaseGui {
             pdc.set(ItemKeys.THREAD_SLOTS, PersistentDataType.STRING, GSON.toJson(threadSlots));
             pdc.remove(ItemKeys.THREAD_TYPE);
             meta.lore(buildArmorLore());
+            // エンチャントオーラを明示的に保持（editMetaでオーラが消失する問題の対策）
+            if (meta.hasEnchants()) {
+                meta.setEnchantmentGlintOverride(true);
+            }
         });
     }
 
