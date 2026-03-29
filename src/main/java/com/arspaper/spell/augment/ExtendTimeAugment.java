@@ -23,7 +23,8 @@ public class ExtendTimeAugment implements SpellAugment {
 
     @Override
     public void modify(SpellContext context) {
-        context.setDurationLevel(context.getDurationLevel() + 1);
+        int bonus = (int) config.getParam("extend_time", "per-stack", 1.0);
+        context.setDurationLevel(context.getDurationLevel() + bonus);
     }
 
     @Override

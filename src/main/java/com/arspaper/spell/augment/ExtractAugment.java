@@ -22,7 +22,8 @@ public class ExtractAugment implements SpellAugment {
 
     @Override
     public void modify(SpellContext context) {
-        context.setExtractCount(context.getExtractCount() + 1);
+        int bonus = (int) config.getParam("extract", "per-stack", 1.0);
+        context.setExtractCount(context.getExtractCount() + bonus);
         // Fortuneと排他: Extractが有効ならFortuneを無効化
         if (context.getFortuneLevel() > 0) {
             context.setFortuneLevel(0);

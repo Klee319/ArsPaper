@@ -23,7 +23,8 @@ public class SplitAugment implements SpellAugment {
 
     @Override
     public void modify(SpellContext context) {
-        context.setSplitCount(context.getSplitCount() + 1);
+        int bonus = (int) config.getParam("split", "per-stack", 1.0);
+        context.setSplitCount(context.getSplitCount() + bonus);
     }
 
     @Override

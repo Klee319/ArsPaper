@@ -77,7 +77,8 @@ public class SolarEffect implements SpellEffect {
         int durPerLevel = (int) config.getParam("solar", "duration-per-level", DURATION_PER_LEVEL);
         int durationTicks = baseDur + context.getDurationLevel() * durPerLevel;
         int shotsPerVolley = 1 + context.getSplitCount();
-        int fireInterval = Math.max(5, BASE_FIRE_INTERVAL / Math.max(1, shotsPerVolley));
+        int cfgFireInterval = (int) config.getParam("solar", "base-fire-interval", (double) BASE_FIRE_INTERVAL);
+        int fireInterval = Math.max(5, cfgFireInterval / Math.max(1, shotsPerVolley));
 
         // 召喚音
         center.getWorld().playSound(center, Sound.ITEM_FIRECHARGE_USE,
@@ -139,7 +140,8 @@ public class SolarEffect implements SpellEffect {
         if (finalHP <= 0) return;
 
         // 炎上
-        target.setFireTicks(Math.max(target.getFireTicks(), FIRE_TICKS));
+        int fireTicks = (int) config.getParam("solar", "fire-ticks", (double) FIRE_TICKS);
+        target.setFireTicks(Math.max(target.getFireTicks(), fireTicks));
 
         // ヒット演出
         target.getWorld().spawnParticle(Particle.LAVA, targetLoc, 5, 0.2, 0.2, 0.2, 0);

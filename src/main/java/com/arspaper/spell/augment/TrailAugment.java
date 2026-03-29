@@ -23,7 +23,8 @@ public class TrailAugment implements SpellAugment {
 
     @Override
     public void modify(SpellContext context) {
-        context.setRapidFireLevel(context.getRapidFireLevel() + 1);
+        int bonus = (int) config.getParam("rapid_fire", "per-stack", 1.0);
+        context.setRapidFireLevel(context.getRapidFireLevel() + bonus);
     }
 
     @Override

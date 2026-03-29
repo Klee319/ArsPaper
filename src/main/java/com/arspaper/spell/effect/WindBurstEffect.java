@@ -160,13 +160,33 @@ public class WindBurstEffect implements SpellEffect {
     }
 
     private void spawnBarrierParticles(Location center, double radius) {
-        int points = 12;
+        double time = System.currentTimeMillis() / 400.0;
+        int points = 16;
+
+        // 外周の風の渦（中心から外に流れる）
         for (int i = 0; i < points; i++) {
-            double angle = 2 * Math.PI * i / points;
+            double angle = 2 * Math.PI * i / points + time;
+            double r = radius * 0.6 + (i % 2) * radius * 0.4; // 内外交互
             Location point = center.clone().add(
-                Math.cos(angle) * radius, 0.5, Math.sin(angle) * radius);
-            center.getWorld().spawnParticle(Particle.CLOUD, point, 1, 0.1, 0.1, 0.1, 0.01);
+                Math.cos(angle) * r, 0.3 + Math.sin(angle * 2) * 0.4, Math.sin(angle) * r);
+
+            // 外向きの速度ベクトル（吹き飛ばし方向を示す）
+            Vector outward = point.toVector().subtract(center.toVector()).normalize().multiply(0.15);
+            center.getWorld().spawnParticle(Particle.CLOUD, point,
+                0, outward.getX(), 0.02, outward.getZ(), 0.1);
         }
+
+        // 内側の渦巻き風（SWEEP_ATTACKで視認性UP）
+        for (int i = 0; i < 4; i++) {
+            double angle = 2 * Math.PI * i / 4 + time * 1.5;
+            Location sweepPoint = center.clone().add(
+                Math.cos(angle) * radius * 0.5, 0.5, Math.sin(angle) * radius * 0.5);
+            center.getWorld().spawnParticle(Particle.SWEEP_ATTACK, sweepPoint, 1, 0, 0, 0, 0);
+        }
+
+        // 地面の砂塵
+        center.getWorld().spawnParticle(Particle.CAMPFIRE_COSY_SMOKE, center.clone().add(0, 0.1, 0),
+            3, radius * 0.4, 0.05, radius * 0.4, 0.01);
     }
 
     @Override

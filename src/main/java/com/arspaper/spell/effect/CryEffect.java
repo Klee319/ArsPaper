@@ -58,8 +58,11 @@ public class CryEffect implements SpellEffect {
         ThreadLocalRandom rand = ThreadLocalRandom.current();
 
         // 音量: 基本1.0 + 増幅0.5/段 + 半径増加1.0/段（遠距離可聴）
+        double baseVolume = config.getParam("cry", "base-volume", 1.0);
+        double amplifyVolumeBonus = config.getParam("cry", "amplify-volume-bonus", 0.5);
+        double aoeRadiusVolumeBonus = config.getParam("cry", "aoe-radius-volume-bonus", 1.0);
         float volume = Math.max(0.1f,
-            1.0f + context.getAmplifyLevel() * 0.5f + context.getAoeRadiusLevel() * 1.0f);
+            (float) (baseVolume + context.getAmplifyLevel() * amplifyVolumeBonus + context.getAoeRadiusLevel() * aoeRadiusVolumeBonus));
         float pitch = 0.5f + rand.nextFloat() * 1.5f; // 0.5 ~ 2.0
 
         Sound sound = RANDOM_SOUNDS[rand.nextInt(RANDOM_SOUNDS.length)];

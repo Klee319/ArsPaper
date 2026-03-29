@@ -21,7 +21,8 @@ public class AoeHeightAugment implements SpellAugment {
 
     @Override
     public void modify(SpellContext context) {
-        context.setAoeHeight(context.getAoeHeight() + 1);
+        int bonus = (int) config.getParam("aoe_height", "per-stack", 1.0);
+        context.setAoeHeight(context.getAoeHeight() + bonus);
     }
 
     @Override

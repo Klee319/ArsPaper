@@ -22,7 +22,8 @@ public class PropagateAugment implements SpellAugment {
 
     @Override
     public void modify(SpellContext context) {
-        context.addPropagateChain(); // +3体/スタック
+        int targets = (int) config.getParam("propagate", "targets-per-stack", 3.0);
+        context.setPropagateChainCount(context.getPropagateChainCount() + targets);
     }
 
     @Override

@@ -80,7 +80,8 @@ public class LunarEffect implements SpellEffect {
         int durPerLevel = (int) config.getParam("lunar", "duration-per-level", DURATION_PER_LEVEL);
         int durationTicks = baseDur + context.getDurationLevel() * durPerLevel;
         int shotsPerVolley = 1 + context.getSplitCount();
-        int fireInterval = Math.max(5, BASE_FIRE_INTERVAL / Math.max(1, shotsPerVolley));
+        int cfgFireInterval = (int) config.getParam("lunar", "base-fire-interval", (double) BASE_FIRE_INTERVAL);
+        int fireInterval = Math.max(5, cfgFireInterval / Math.max(1, shotsPerVolley));
 
         // 召喚音
         center.getWorld().playSound(center, Sound.BLOCK_RESPAWN_ANCHOR_DEPLETE,
@@ -142,8 +143,10 @@ public class LunarEffect implements SpellEffect {
         if (finalHP <= 0) return;
 
         // 凍結 + 拘束
-        target.setFreezeTicks(Math.max(target.getFreezeTicks(), FREEZE_TICKS));
-        target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, SNARE_DURATION, 2));
+        int freezeTicks = (int) config.getParam("lunar", "freeze-ticks", (double) FREEZE_TICKS);
+        int snareDuration = (int) config.getParam("lunar", "snare-duration", (double) SNARE_DURATION);
+        target.setFreezeTicks(Math.max(target.getFreezeTicks(), freezeTicks));
+        target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, snareDuration, 2));
 
         // ヒット演出
         target.getWorld().spawnParticle(Particle.BLOCK_CRUMBLE, targetLoc,

@@ -64,17 +64,20 @@ public class BeamForm implements SpellForm {
     }
 
     private void fireSingleBeam(Player caster, SpellContext context) {
-        double range = Math.max(5.0, BASE_RANGE + context.getAcceleration() * RANGE_PER_ACCEL
-            + context.getReachLevel() * RANGE_PER_REACH);
+        double baseRange = config.getParam("beam", "base-range", BASE_RANGE);
+        double rangePerReach = config.getParam("beam", "range-per-reach", RANGE_PER_REACH);
+        double range = Math.max(5.0, baseRange + context.getReachLevel() * rangePerReach);
         int totalBeams = 1 + Math.min(context.getSplitCount(), 8);
-        double beamRadius = context.getAoeRadiusLevel(); // 1個につき半径+1
+        double beamRadiusPerAoe = config.getParam("beam", "radius-per-aoe", 1.0);
+        double beamRadius = context.getAoeRadiusLevel() * beamRadiusPerAoe;
 
         Vector baseDirection = caster.getLocation().getDirection();
 
         for (int i = 0; i < totalBeams; i++) {
             Vector direction = baseDirection.clone();
             if (totalBeams > 1) {
-                double angle = (i - (totalBeams - 1) / 2.0) * SPREAD_ANGLE_STEP;
+                double spreadAngleStep = config.getParam("beam", "spread-angle-step", SPREAD_ANGLE_STEP);
+                double angle = (i - (totalBeams - 1) / 2.0) * spreadAngleStep;
                 direction.rotateAroundY(angle);
             }
 
@@ -100,7 +103,7 @@ public class BeamForm implements SpellForm {
             Color.fromRGB(255, 40, 40), Color.fromRGB(10, 0, 0), dustSize);
 
         // ブロック貫通スキャン: 透明ブロックは自動貫通、pierceでソリッドブロックも貫通
-        int blockPierceCharges = 2 * context.getPierceCount(); // pierce増強によるソリッド貫通回数
+        int blockPierceCharges = context.getPierceCount(); // pierce増強によるソリッド貫通回数（1個=1ブロック）
         double effectiveRange = range;
         Block lastSolidBlock = null;
         {

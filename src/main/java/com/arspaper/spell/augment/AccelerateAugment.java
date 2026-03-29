@@ -22,9 +22,10 @@ public class AccelerateAugment implements SpellAugment {
 
     @Override
     public void modify(SpellContext context) {
-        context.setAcceleration(context.getAcceleration() + 1.0);
+        double bonus = config.getParam("accelerate", "per-stack", 1.0);
+        context.setAcceleration(context.getAcceleration() + bonus);
         // Form-augmentとしても使用: 飛び道具速度倍率
-        context.setProjectileSpeedMultiplier(context.getProjectileSpeedMultiplier() + 1.0);
+        context.setProjectileSpeedMultiplier(context.getProjectileSpeedMultiplier() + bonus);
     }
 
     @Override

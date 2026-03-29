@@ -24,7 +24,8 @@ public class FortuneAugment implements SpellAugment {
     public void modify(SpellContext context) {
         // Extractと排他: Extractが有効ならFortuneは適用しない
         if (context.getExtractCount() > 0) return;
-        context.setFortuneLevel(context.getFortuneLevel() + 1);
+        int bonus = (int) config.getParam("fortune", "per-stack", 1.0);
+        context.setFortuneLevel(context.getFortuneLevel() + bonus);
     }
 
     @Override

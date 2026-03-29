@@ -24,7 +24,9 @@ public class DelayAugment implements SpellAugment {
 
     @Override
     public void modify(SpellContext context) {
-        int delay = BASE_DELAY_TICKS + context.getDurationLevel() * DURATION_BONUS_TICKS;
+        int baseDelay = (int) config.getParam("delay", "base-ticks", (double) BASE_DELAY_TICKS);
+        int durationBonus = (int) config.getParam("delay", "ticks-per-duration-level", (double) DURATION_BONUS_TICKS);
+        int delay = baseDelay + context.getDurationLevel() * durationBonus;
         if (context.isRandomizing()) {
             double variation = 1.0 + (Math.random() * 0.5 - 0.25);
             delay = (int) (delay * variation);

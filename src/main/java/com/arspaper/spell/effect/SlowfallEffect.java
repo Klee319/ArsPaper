@@ -34,10 +34,12 @@ public class SlowfallEffect implements SpellEffect {
     public void applyToEntity(SpellContext context, LivingEntity target) {
         int level = context.getDurationLevel();
         int baseDurationTicks = (int) config.getParam("slowfall", "base-duration-ticks", (double) BASE_DURATION_TICKS);
-        int durationTicks = baseDurationTicks + level * DURATION_BONUS_TICKS;
-        // レベル5以上: 追加ボーナス（高スタック報酬）
-        if (level >= HIGH_LEVEL_THRESHOLD) {
-            durationTicks += (level - HIGH_LEVEL_THRESHOLD + 1) * DURATION_BONUS_TICKS;
+        int durationBonusTicks = (int) config.getParam("slowfall", "duration-bonus-ticks", (double) DURATION_BONUS_TICKS);
+        int highLevelThreshold = (int) config.getParam("slowfall", "high-level-threshold", (double) HIGH_LEVEL_THRESHOLD);
+        int durationTicks = baseDurationTicks + level * durationBonusTicks;
+        // 高レベル: 追加ボーナス（高スタック報酬）
+        if (level >= highLevelThreshold) {
+            durationTicks += (level - highLevelThreshold + 1) * durationBonusTicks;
         }
         durationTicks = Math.max(1, durationTicks);
 

@@ -77,14 +77,18 @@ public class LingerForm implements SpellForm {
      */
     public void startLingerZone(Player caster, SpellContext context, Location center) {
         int durationLevel = context.getDurationLevel();
-        int totalDuration = Math.max(1, BASE_DURATION_TICKS + durationLevel * DURATION_BONUS_PER_LEVEL);
+        int baseDurationTicks = (int) config.getParam("linger", "base-duration-ticks", (double) BASE_DURATION_TICKS);
+        int durationBonusPerLevel = (int) config.getParam("linger", "duration-bonus-per-level", (double) DURATION_BONUS_PER_LEVEL);
+        int zoneTickInterval = (int) config.getParam("linger", "zone-tick-interval", (double) ZONE_TICK_INTERVAL);
+        double zoneRadius = config.getParam("linger", "zone-radius", ZONE_RADIUS);
+        int totalDuration = Math.max(1, baseDurationTicks + durationLevel * durationBonusPerLevel);
 
         new BukkitRunnable() {
             private int elapsed = 0;
 
             @Override
             public void run() {
-                elapsed += ZONE_TICK_INTERVAL;
+                elapsed += zoneTickInterval;
 
                 if (elapsed > totalDuration || !caster.isOnline()) {
                     cancel();
@@ -92,11 +96,11 @@ public class LingerForm implements SpellForm {
                 }
 
                 // 領域パーティクル: リング状のWITCH + 中心にENCHANTED_HIT
-                spawnZoneParticles(center);
+                spawnZoneParticles(center, zoneRadius);
 
                 // 領域内エンティティに効果適用（PvPチェック）
                 // 本家準拠: キャスター自身にも効果を適用する（回復系Lingerで自己回復可能）
-                for (LivingEntity entity : center.getWorld().getNearbyLivingEntities(center, ZONE_RADIUS)) {
+                for (LivingEntity entity : center.getWorld().getNearbyLivingEntities(center, zoneRadius)) {
                     if (!entity.equals(caster) && !context.isValidAoeTarget(entity, caster)) continue;
                     SpellContext tickContext = context.copy();
                     tickContext.resolveOnEntityNoAoe(entity);
@@ -106,19 +110,19 @@ public class LingerForm implements SpellForm {
                 SpellContext blockContext = context.copy();
                 blockContext.resolveOnBlock(center.getBlock().getLocation());
             }
-        }.runTaskTimer(plugin, 0L, ZONE_TICK_INTERVAL);
+        }.runTaskTimer(plugin, 0L, zoneTickInterval);
     }
 
     /**
      * 領域のリング状パーティクルを描画する。
      */
-    private static void spawnZoneParticles(Location center) {
+    private static void spawnZoneParticles(Location center, double zoneRadius) {
         center.getWorld().spawnParticle(Particle.ENCHANTED_HIT, center, 5, 0.2, 0.2, 0.2, 0.3);
 
         for (int i = 0; i < RING_PARTICLE_COUNT; i++) {
             double angle = (2.0 * Math.PI / RING_PARTICLE_COUNT) * i;
-            double x = Math.cos(angle) * ZONE_RADIUS;
-            double z = Math.sin(angle) * ZONE_RADIUS;
+            double x = Math.cos(angle) * zoneRadius;
+            double z = Math.sin(angle) * zoneRadius;
             Location ringPoint = center.clone().add(x, 0.2, z);
             ringPoint.getWorld().spawnParticle(Particle.WITCH, ringPoint, 1, 0.05, 0.05, 0.05, 0.01);
         }

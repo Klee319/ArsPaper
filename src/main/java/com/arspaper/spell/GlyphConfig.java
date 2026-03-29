@@ -171,7 +171,7 @@ public class GlyphConfig {
      */
     private static final Map<String, Set<String>> AUGMENT_COMPAT = Map.ofEntries(
         // === Forms ===
-        Map.entry("projectile", Set.of("accelerate", "decelerate", "pierce", "split", "rapid_fire", "trace", "extend_reach", "shrink_reach")),
+        Map.entry("projectile", Set.of("accelerate", "decelerate", "pierce", "split", "rapid_fire", "trace")),
         Map.entry("touch",      Set.of("rapid_fire")),
         Map.entry("self",       Set.of("rapid_fire")),
         Map.entry("underfoot",  Set.of("rapid_fire")),
@@ -179,8 +179,8 @@ public class GlyphConfig {
         Map.entry("orbit",      Set.of("accelerate", "decelerate", "split", "extend_time", "duration_down", "rapid_fire", "aoe_radius")),
         // wall は未登録（廃止済み）
         // beam: エンティティは全貫通（INT_MAX）、pierceはソリッドブロック貫通用
-        Map.entry("beam",       Set.of("accelerate", "decelerate", "split", "aoe_radius", "rapid_fire", "trace", "extend_reach", "shrink_reach", "pierce")),
-        Map.entry("burst",      Set.of("accelerate", "decelerate", "pierce", "split", "aoe_radius", "extend_reach", "shrink_reach")),
+        Map.entry("beam",       Set.of("split", "aoe_radius", "rapid_fire", "trace", "extend_reach", "shrink_reach", "pierce")),
+        Map.entry("burst",      Set.of("pierce", "split", "aoe_radius", "extend_reach", "shrink_reach", "extend_time", "duration_down")),
         // === Effects - Tier 1 ===
         // aoe = 範囲[水平]/[垂直]（方向性あり: 破壊/設置系）
         // aoe_radius = 半径増加（エリア系エフェクト用。伝播と排他）

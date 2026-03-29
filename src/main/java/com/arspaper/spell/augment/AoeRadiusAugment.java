@@ -23,7 +23,8 @@ public class AoeRadiusAugment implements SpellAugment {
 
     @Override
     public void modify(SpellContext context) {
-        context.setAoeRadiusLevel(context.getAoeRadiusLevel() + 1);
+        int bonus = (int) config.getParam("aoe_radius", "per-stack", 1.0);
+        context.setAoeRadiusLevel(context.getAoeRadiusLevel() + bonus);
     }
 
     @Override

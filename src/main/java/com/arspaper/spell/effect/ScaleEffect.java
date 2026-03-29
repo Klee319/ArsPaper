@@ -67,7 +67,9 @@ public class ScaleEffect implements SpellEffect {
         int level = context.getAmplifyLevel();
         // level>0: 大きく、level<0: 小さく、level=0: 基本倍率
         double scaleFactor = 1.0 + level * scalePerLevel;
-        scaleFactor = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scaleFactor));
+        double minScale = config.getParam("scale", "min-scale", MIN_SCALE);
+        double maxScale = config.getParam("scale", "max-scale", MAX_SCALE);
+        scaleFactor = Math.max(minScale, Math.min(maxScale, scaleFactor));
 
         // 修飾子を適用（乗算ベース）
         UUID entityUUID = target.getUniqueId();

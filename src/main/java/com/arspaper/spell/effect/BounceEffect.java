@@ -77,13 +77,20 @@ public class BounceEffect implements SpellEffect, Listener {
                 // 着地検出: 前tickで落下中 + 今tickで地面
                 if (data.lastYVelocity < -0.1 && entity.isOnGround()) {
                     // バウンス力計算: 落下速度に比例
-                    double bounceMultiplier = 0.7 + data.amplifyLevel * 0.1;
-                    bounceMultiplier = Math.min(bounceMultiplier, 1.2);
+                    double multiplierBase = config.getParam("bounce", "multiplier-base", 0.7);
+                    double multiplierPerAmplify = config.getParam("bounce", "multiplier-per-amplify", 0.1);
+                    double multiplierMax = config.getParam("bounce", "multiplier-max", 1.2);
+                    double minSpeed = config.getParam("bounce", "min-speed", 0.35);
+                    double maxSpeed = config.getParam("bounce", "max-speed", 4.0);
+                    double horizontalFriction = config.getParam("bounce", "horizontal-friction", 0.9);
+
+                    double bounceMultiplier = multiplierBase + data.amplifyLevel * multiplierPerAmplify;
+                    bounceMultiplier = Math.min(bounceMultiplier, multiplierMax);
                     double bounceSpeed = Math.abs(data.lastYVelocity) * bounceMultiplier;
-                    bounceSpeed = Math.max(0.35, Math.min(bounceSpeed, 4.0));
+                    bounceSpeed = Math.max(minSpeed, Math.min(bounceSpeed, maxSpeed));
 
                     Vector vel = entity.getVelocity();
-                    entity.setVelocity(new Vector(vel.getX() * 0.9, bounceSpeed, vel.getZ() * 0.9));
+                    entity.setVelocity(new Vector(vel.getX() * horizontalFriction, bounceSpeed, vel.getZ() * horizontalFriction));
                     entity.setFallDistance(0f);
 
                     // バウンスエフェクト

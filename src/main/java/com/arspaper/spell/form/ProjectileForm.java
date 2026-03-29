@@ -37,8 +37,10 @@ public class ProjectileForm implements SpellForm {
     public void cast(Player caster, SpellContext context) {
         SpellFxUtil.playCastSound(caster);
 
-        double speed = 2.0 * Math.min(context.getProjectileSpeedMultiplier(), 4.0)
-            + context.getReachLevel() * 0.5; // 延伸: 射程延長（速度加算）
+        int maxTrailTicks = (int) config.getParam("projectile", "max-trail-ticks", (double) MAX_TRAIL_TICKS);
+        double spreadAngleStep = config.getParam("projectile", "spread-angle-step", SPREAD_ANGLE_STEP);
+
+        double speed = 2.0 * Math.min(context.getProjectileSpeedMultiplier(), 4.0);
         int totalProjectiles = 1 + Math.min(context.getSplitCount(), 8);
 
         Vector baseDirection = caster.getLocation().getDirection();
@@ -47,7 +49,7 @@ public class ProjectileForm implements SpellForm {
             Vector direction = baseDirection.clone();
             if (totalProjectiles > 1) {
                 // 対称的な扇形スプレッド: 中心を基準に均等配置
-                double angle = (i - (totalProjectiles - 1) / 2.0) * SPREAD_ANGLE_STEP;
+                double angle = (i - (totalProjectiles - 1) / 2.0) * spreadAngleStep;
                 direction.rotateAroundY(angle);
             }
 
@@ -73,7 +75,7 @@ public class ProjectileForm implements SpellForm {
                 @Override
                 public void run() {
                     ticks++;
-                    if (ticks > MAX_TRAIL_TICKS || projectile.isDead() || !projectile.isValid()) {
+                    if (ticks > maxTrailTicks || projectile.isDead() || !projectile.isValid()) {
                         cancel();
                         return;
                     }

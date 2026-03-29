@@ -22,7 +22,8 @@ public class AmplifyAugment implements SpellAugment {
 
     @Override
     public void modify(SpellContext context) {
-        context.setAmplifyLevel(context.getAmplifyLevel() + 1);
+        int bonus = (int) config.getParam("amplify", "per-stack", 1.0);
+        context.setAmplifyLevel(context.getAmplifyLevel() + bonus);
     }
 
     @Override

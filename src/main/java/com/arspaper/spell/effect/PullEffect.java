@@ -160,17 +160,34 @@ public class PullEffect implements SpellEffect {
     }
 
     private void spawnPullParticles(Location center, double radius) {
-        // 外周から中心に向かう吸引パーティクル
-        int points = 12;
+        double time = System.currentTimeMillis() / 400.0;
+        int points = 16;
+
+        // 外周から中心に向かう渦巻き風（吸い込み方向を示す）
         for (int i = 0; i < points; i++) {
-            double angle = 2 * Math.PI * i / points;
+            double angle = 2 * Math.PI * i / points - time; // 逆回転（吸引感）
+            double r = radius * (0.4 + (i % 3) * 0.3); // 複数リングで奥行き
             Location outerPoint = center.clone().add(
-                Math.cos(angle) * radius, 0.5, Math.sin(angle) * radius);
-            // PORTAL パーティクルは速度ベクトルで中心に向かう
-            Vector toCenter = center.toVector().subtract(outerPoint.toVector()).normalize().multiply(0.5);
-            center.getWorld().spawnParticle(Particle.PORTAL, outerPoint,
-                1, toCenter.getX(), toCenter.getY(), toCenter.getZ(), 1.0);
+                Math.cos(angle) * r, 0.3 + Math.sin(angle * 2) * 0.4, Math.sin(angle) * r);
+
+            // 中心向きの速度ベクトル（吸い込み方向）
+            Vector toCenter = center.toVector().subtract(outerPoint.toVector()).normalize().multiply(0.2);
+            center.getWorld().spawnParticle(Particle.CLOUD, outerPoint,
+                0, toCenter.getX(), 0.01, toCenter.getZ(), 0.1);
         }
+
+        // 中心の渦（吸引の目）
+        for (int i = 0; i < 4; i++) {
+            double angle = 2 * Math.PI * i / 4 - time * 2;
+            Location vortexPoint = center.clone().add(
+                Math.cos(angle) * 0.4, 0.5, Math.sin(angle) * 0.4);
+            center.getWorld().spawnParticle(Particle.ENCHANT, vortexPoint,
+                2, 0.1, 0.2, 0.1, 0.5);
+        }
+
+        // 地面の砂塵（中心に集まる）
+        center.getWorld().spawnParticle(Particle.CAMPFIRE_COSY_SMOKE, center.clone().add(0, 0.1, 0),
+            2, radius * 0.3, 0.05, radius * 0.3, 0.005);
     }
 
     @Override

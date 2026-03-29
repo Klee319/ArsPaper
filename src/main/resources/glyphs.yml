@@ -47,7 +47,15 @@ glyphs:
     mana-cost: 10
     # 加速:弾速↑ | 減速:弾速↓ | 貫通:対象を貫通 | 分裂:弾が複数化
     # 軌跡:飛行経路上にも効果 | 延伸:射程延長
-    # effects空=全効果互換
+    params:
+      max-trail-ticks: 200          # 弾の最大飛行時間(tick)
+      spread-angle-step: 0.15       # 分裂時の弾の拡散角度(rad)
+    max-augments:
+      accelerate: 6
+      decelerate: 6
+      pierce: 4
+      split: 4
+      rapid_fire: 4
     unlock-cost:
       level: 5
       materials:
@@ -59,6 +67,8 @@ glyphs:
     tier: 1
     mana-cost: 10
     # effects空=全効果互換（投擲のみコード側で除外）
+    max-augments:
+      rapid_fire: 4
     unlock-cost:
       level: 5
       materials:
@@ -69,6 +79,8 @@ glyphs:
   self:
     tier: 1
     mana-cost: 10
+    max-augments:
+      rapid_fire: 4
     unlock-cost:
       level: 5
       materials:
@@ -79,6 +91,8 @@ glyphs:
   underfoot:
     tier: 1
     mana-cost: 10
+    max-augments:
+      rapid_fire: 4
     unlock-cost:
       level: 5
       materials:
@@ -89,6 +103,8 @@ glyphs:
   overhead:
     tier: 1
     mana-cost: 5
+    max-augments:
+      rapid_fire: 4
     unlock-cost:
       level: 5
       materials:
@@ -101,12 +117,55 @@ glyphs:
     mana-cost: 80
     # 加速:回転速度↑ | 減速:回転速度↓ | 分裂:軌道数増加
     # 延長:旋回持続+3秒/段 | 短縮:旋回持続-3秒/段 | 半径増加:軌道半径↑
+    params:
+      orbit-radius: 2.0             # 旋回半径(ブロック)
+      radius-per-aoe: 1.0           # 半径増加1段あたりの旋回半径増加(ブロック)
+      base-orbs: 2                  # 基本軌道数(分裂で加算)
+      max-orbs: 6                   # 最大軌道数
+      base-duration-ticks: 160      # 基本旋回時間(tick=8秒)
+      extend-duration-bonus: 40     # 延長1段あたりの追加時間(tick=2秒)
+      hit-cooldown-ticks: 20        # 同一対象への再ヒット間隔(tick)
+    max-augments:
+      accelerate: 6
+      decelerate: 6
+      split: 4
+      extend_time: 6
+      duration_down: 3
+      rapid_fire: 4
+      aoe_radius: 6
     unlock-cost:
       level: 20
       materials:
-        ENDER_EYE: 8
-        AMETHYST_SHARD: 8
+        ENDER_EYE: 16
         COMPASS: 1
+
+  # 説明: 時限式の火球を発射し、炸裂地点に効果を適用する
+  burst:
+    tier: 2
+    mana-cost: 70
+    # 延伸:弾速UP=遠くで炸裂(距離ベース) | 延長:信管延長=遅く炸裂(時間ベース)
+    # 半径増加:炸裂範囲↑ | 貫通:エンティティ貫通 | 分裂:複数弾
+    # 空中炸裂でもブロック対象を取れる
+    params:
+      base-speed: 1.0               # 基本弾速
+      base-fuse-ticks: 40           # 基本信管時間(tick=2秒)
+      base-burst-radius: 1.0        # 基本炸裂半径(ブロック)
+      radius-per-aoe: 1.0          # 半径増加1段あたりの炸裂半径増加(ブロック)
+      reach-speed-bonus: 0.25        # 延伸1段あたりの弾速増加
+      fuse-per-duration-level: 10   # 延長1段あたりの信管延長(tick=0.5秒)
+    max-augments:
+      pierce: 4
+      split: 4
+      aoe_radius: 6
+      extend_reach: 6
+      shrink_reach: 3
+      extend_time: 6
+      duration_down: 3
+    unlock-cost:
+      level: 25
+      materials:
+        TNT: 16
+        ENDER_EYE: 8
 
   # 説明: 直線レーザーを照射し経路上の全対象に効果を適用する（デフォルト全貫通）
   beam:
@@ -114,10 +173,19 @@ glyphs:
     mana-cost: 110
     # エンティティ全貫通 | 加速:射程↑ | 減速:射程↓ | 分裂:複数ビーム
     # 半径増加:ビームが太くなる（範囲内全エンティティ対象）
-    # 貫通:ソリッドブロックを貫通（2*pierce個まで） | 軌跡:軌道上のブロックにも効果 | 延伸:射程延長
-    # 全効果互換
+    # 貫通:ソリッドブロックを貫通（1*pierce個） | 軌跡:軌道上のブロックにも効果 | 延伸:射程延長
+    params:
+      base-range: 25.0              # 基本射程(ブロック)
+      range-per-reach: 5.0         # 延伸1段あたりの射程増加(ブロック)
+      spread-angle-step: 0.12       # 分裂時のビーム拡散角度(rad)
+      radius-per-aoe: 1.0           # 半径増加1段あたりのビーム太さ増加(ブロック)
     max-augments:
-      pierce: 3
+      split: 4
+      aoe_radius: 4
+      rapid_fire: 2
+      extend_reach: 6
+      shrink_reach: 4
+      pierce: 4
     unlock-cost:
       level: 40
       materials:
@@ -125,23 +193,7 @@ glyphs:
         DRAGON_BREATH: 4
         SEA_LANTERN: 16
   
-  # 説明: 時限式の火球を発射し、炸裂地点に効果を適用する
-  burst:
-    tier: 2
-    mana-cost: 70
-    # 延伸:射程延長+信管延長 | 半径増加:炸裂範囲↑ | 加速/減速:弾速
-    # 貫通:エンティティ貫通 | 分裂:複数弾
-    # 空中炸裂でもブロック対象を取れる
-    max-augments:
-      extend_reach: 5
-      aoe_radius: 5
-      pierce: 3
-      split: 3
-    unlock-cost:
-      level: 25
-      materials:
-        TNT: 16
-        ENDER_EYE: 8
+
 
   # ============================================================
   # Effects（効果）- Tier 1 (Novice)
@@ -175,24 +227,18 @@ glyphs:
   harm:
     tier: 1
     mana-cost: 20
-    # 増幅:ダメージ↑(+2.0HP/段) | 減少:ダメージ↓ | 半径増加:範囲ダメージ
+    # 増幅:ダメージ↑(+2.0HP/段) | 減少:ダメージ↓
     # 延長:毒の持続延長(+3秒/段) | 短縮:毒の持続短縮
     max-augments:
-      amplify: 5
-      dampen: 4   # 2個でamp-1(=2.0HP), 4個でamp-2(=0に近い)。これ以上積んでも変化なし
-      aoe_radius: 7
-      extend_time: 7
-      duration_down: 7
-    # params (設定可能な定数):
-    #   base-damage: 5.0 (HP、基本ダメージ)
-    #   amplify-bonus: 2.0 (HP/段、増幅1段あたり+2.0HP)
-    #   base-poison-seconds: 5 (秒、基本毒持続)
-    #   poison-seconds-per-duration: 3 (秒/段、延長1段あたり+3秒)
+      amplify: 6
+      dampen: 2   # 2個でamp-1(=2.0HP), 4個でamp-2(=0に近い)。これ以上積んでも変化なし
+      extend_time: 8
+      duration_down: 2
     params:
-      base-damage: 5.0
-      amplify-bonus: 3.0
-      base-poison-seconds: 5
-      poison-seconds-per-duration: 3
+      base-damage: 9.0              # 基本ダメージ(HP)
+      amplify-bonus: 3.0            # 増幅1段あたりのダメージ増加(HP)
+      base-poison-seconds: 6        # 基本毒持続(秒)
+      poison-seconds-per-duration: 2 # 延長1段あたりの毒持続増加(秒)
     unlock-cost:
       level: 15
       materials:
@@ -208,17 +254,17 @@ glyphs:
     # 延長:炎上持続延長(+20tick/段) | 短縮:持続短縮
     # 火炎耐性が有効（DamageType.ON_FIRE使用）
     max-augments:
-      amplify: 5
-      dampen: 2   # 2個でamp-1(=最低ダメージ0.5)。これ以上積んでも変化なし
-      aoe_radius: 7
-      extend_time: 7
-      duration_down: 7
-    # params (設定可能な定数):
-    #   base-fire-ticks: 60 (tick=3秒、基本炎上持続)
-    #   duration-bonus-ticks: 20 (tick/段、延長1段あたり+1秒)
-    #   base-damage: 1.0 (HP、1回あたりの火炎ダメージ)
-    #   amplify-damage-bonus: 0.5 (HP/段、増幅1段あたり+0.5HP)
-    #   damage-interval: 20 (tick=1秒、ダメージ間隔)
+      amplify: 6
+      dampen: 1   
+      extend_time: 6
+      duration_down: 3
+
+    params:
+      base-fire-ticks: 80 #(tick=3秒、基本炎上持続)
+      duration-bonus-ticks: 20 #(tick/段、延長1段あたり+1秒)
+      base-damage: 1.0 #(HP、1回あたりの火炎ダメージ)
+      amplify-damage-bonus: 0.5 #(HP/段、増幅1段あたり+0.5HP)
+      damage-interval: 20 #(tick=1秒、ダメージ間隔)
 
     unlock-cost:
       level: 20
@@ -230,16 +276,16 @@ glyphs:
   freeze:
     tier: 2
     mana-cost: 25
-    # 増幅:凍結強度↑ | 減少:凍結強度↓ | 半径増加:範囲凍結
+    # 増幅:凍結強度↑ | 減少:凍結強度↓
     # 延長:凍結持続延長 | 短縮:凍結持続短縮
     max-augments:
-      amplify: 5
-      aoe_radius: 7
+      amplify: 6
+      dampen: 1 
       extend_time: 7
       duration_down: 7
-    # params (設定可能な定数):
-    #   base-duration: 100 (tick=5秒、基本凍結持続)
-    #   duration-per-level: 200 (tick=10秒/段、延長1段あたり加算)
+    params :
+      base-duration: 100 (tick=5秒、基本凍結持続)
+      duration-per-level: 200 (tick=10秒/段、延長1段あたり加算)
     unlock-cost:
       level: 20
       materials:
@@ -250,19 +296,18 @@ glyphs:
   knockback:
     tier: 2
     mana-cost: 25
-    # 増幅:吹き飛ばし力↑(+1.0/段) | 減少:吹き飛ばし力↓ | 半径増加:範囲吹き飛ばし
+    # 増幅:吹き飛ばし力↑(+1.0/段) | 減少:吹き飛ばし力↓
     max-augments:
       amplify: 5
       dampen: 2   # 2個でamp-1(=力0.5)。これ以上積んでも変化なし
-      aoe_radius: 7
     # params (設定可能な定数):
     #   base-force: 1.5
     #   amplify-bonus: 1.0 (/段、増幅1段あたり+1.0)
     #   max-force: 5.0 (吹き飛ばし力上限。大きすぎると制御不能)
-    params :
-      base-force: 1.5
-      amplify-bonus: 1.0
-      max-force: 6.5
+    params:
+      base-force: 1.5               # 基本吹き飛ばし力
+      amplify-bonus: 1.0            # 増幅1段あたりの力増加
+      max-force: 6.5                # 吹き飛ばし力上限
     unlock-cost:
       level: 20
       materials:
@@ -287,9 +332,9 @@ glyphs:
     #   base-duration: 100 (tick=5秒、基本持続)
     #   duration-per-level: 60 (tick=3秒/段、延長あたり加算)
     params:
-      base-radius: 3.0
-      base-force: 0.5
-      amplify-force-bonus: 0.3
+      base-radius: 3.0              # 吸引範囲半径(ブロック)
+      base-force: 0.5               # 基本吸引力
+      amplify-force-bonus: 0.3      # 増幅1段あたりの吸引力増加
     unlock-cost:
       level: 20
       materials:
@@ -300,11 +345,10 @@ glyphs:
   gravity:
     tier: 2
     mana-cost: 25
-    # 増幅:重力効果↑ | 減少:重力効果↓(浮遊) | 半径増加:範囲重力
+    # 増幅:重力効果↑ | 減少:重力効果↓(浮遊)
     # 延長:持続延長 | 短縮:持続短縮
     max-augments:
       amplify: 5
-      aoe_radius: 7
       extend_time: 7
       duration_down: 7
     # params (設定可能な定数):
@@ -322,11 +366,10 @@ glyphs:
   light:
     tier: 1
     mana-cost: 15
-    # 増幅:暗視レベル↑ | 減少:暗視レベル↓ | 範囲:範囲設置
+    # 範囲:範囲設置
     # 延長:暗視持続延長 | 短縮:暗視持続短縮
     # ブロック→松明設置 | エンティティ→暗視+発光付与
     max-augments:
-      amplify: 1
       aoe: 7
       extend_time: 7
     # params (設定可能な定数):
@@ -486,9 +529,9 @@ glyphs:
     #   amplify-bonus: 0.8 (/段、増幅1段あたり+0.8)
     #   max-velocity: 5.0 (打ち上げ速度上限。大きすぎると天井貫通)
     params:
-      base-velocity: 1.0
-      amplify-bonus: 0.8
-      max-velocity: 5.0
+      base-velocity: 1.0            # 基本打ち上げ速度
+      amplify-bonus: 0.8            # 増幅1段あたりの速度増加
+      max-velocity: 5.0             # 打ち上げ速度上限
     unlock-cost:
       level: 20
       materials:
@@ -519,20 +562,26 @@ glyphs:
   bounce:
     tier: 2
     mana-cost: 25
-    # 増幅:バウンド高度↑ | 減少:バウンド高度↓ | 半径増加:AOE跳弾範囲
+    # 増幅:バウンド高度↑ | 減少:バウンド高度↓
     # 延長:バウンド持続延長(+160tick/段) | 短縮:バウンド持続短縮
     # 着地時に自動ジャンプする効果を付与
     max-augments:
       amplify: 5
-      aoe_radius: 7
       extend_time: 7
       duration_down: 7
-    # params (設定可能な定数):
-    #   base-duration: 600 (tick=30秒)
+    params:
+      base-duration: 600             # 基本バウンド持続時間(tick=30秒)
+      duration-per-level: 160        # 延長1段あたりの追加時間(tick=8秒)
+      multiplier-base: 0.7           # 基本バウンド倍率
+      multiplier-per-amplify: 0.1    # 増幅1段あたりのバウンド倍率増加
+      multiplier-max: 1.2            # バウンド倍率上限
+      min-speed: 0.35                # 最低バウンド速度
+      max-speed: 4.0                 # 最大バウンド速度
+      horizontal-friction: 0.9       # 水平方向の摩擦係数
     #   duration-per-level: 160 (tick=8秒/段、延長1段あたり+8秒)
     params:
-      base-duration: 200 
-      duration-per-level: 100
+      base-duration: 200            # 基本バウンド持続(tick=10秒)
+      duration-per-level: 100       # 延長1段あたりの持続増加(tick=5秒)
     unlock-cost:
       level: 20
       materials:
@@ -543,18 +592,17 @@ glyphs:
   snare:
     tier: 3
     mana-cost: 50
-    # 半径増加:範囲拘束 | 延長:拘束持続延長(+20tick/段) | 短縮:拘束持続短縮
+    # 延長:拘束持続延長(+20tick/段) | 短縮:拘束持続短縮
     # ※コードではSlowness 255固定のためamplifyは効果なし
     max-augments:
-      aoe_radius: 7
       extend_time: 7
       duration_down: 7
     # params (設定可能な定数):
     #   base-duration: 160 (tick=8秒)
     #   duration-per-level: 20 (tick=1秒/段、延長1段あたり+1秒)
-    params :
-      base-duration: 60 
-      duration-per-level: 20
+    params:
+      base-duration: 60             # 基本拘束持続(tick=3秒)
+      duration-per-level: 20        # 延長1段あたりの持続増加(tick=1秒)
     unlock-cost:
       level: 30
       materials:
@@ -579,10 +627,9 @@ glyphs:
   dispel:
     tier: 2
     mana-cost: 40
-    # 増幅:解除するポーションレベル↑ | 減少:解除レベル↓ | 半径増加:範囲解除
+    # 増幅:解除するポーションレベル↑ | 減少:解除レベル↓
     max-augments:
       amplify: 5
-      aoe_radius: 7
     unlock-cost:
       level: 20
       materials:
@@ -643,13 +690,13 @@ glyphs:
     #   max-wolf-count: 4
     #   base-hp: 20.0 (HP)
     #   hp-per-amplify: 8.0 (HP/段、増幅1段あたり+8.0HP)
-    params :
-      base-duration-ticks: 400 
-      duration-per-level: 100
-      base-wolf-count: 1
-      max-wolf-count: 8
-      base-hp: 20.0 
-      hp-per-amplify: 8.0 
+    params:
+      base-duration-ticks: 400      # 基本召喚持続(tick=20秒)
+      duration-per-level: 100       # 延長1段あたりの持続増加(tick=5秒)
+      base-wolf-count: 1            # 基本召喚数
+      max-wolf-count: 8             # 最大召喚数
+      base-hp: 20.0                 # 基本HP
+      hp-per-amplify: 8.0           # 増幅1段あたりのHP増加
     unlock-cost:
       level: 25
       materials:
@@ -712,12 +759,11 @@ glyphs:
   heal:
     tier: 2
     mana-cost: 40
-    # 増幅:回復量↑(+3.0HP/段) | 減少:回復量↓ | 半径増加:範囲回復
+    # 増幅:回復量↑(+3.0HP/段) | 減少:回復量↓
     # アンデッドにはダメージを与える
     max-augments:
       amplify: 5
       dampen: 2   # 2個でamp-1(=最低回復1HP)。これ以上積んでも変化なし
-      aoe_radius: 7
     # params (設定可能な定数):
     #   base-heal: 3.0 (HP、基本回復量)
     #   amplify-bonus: 3.0 (HP/段、増幅1段あたり+3.0HP)
@@ -809,18 +855,17 @@ glyphs:
   crush_wave:
     tier: 2
     mana-cost: 25
-    # 増幅:威力↑(+2.0HP/段) | 減少:威力↓ | 半径増加:ダメージエリア拡大
+    # 増幅:威力↑(+2.0HP/段) | 減少:威力↓
     # 水に触れている敵に2倍ダメージ
     max-augments:
       amplify: 5
       dampen: 4   # 2個でamp-1(=2.0HP), 4個でamp-2(=0に近い)。これ以上変化なし
-      aoe_radius: 7
     # params (設定可能な定数):
     #   base-damage: 3.0 (HP、基本ダメージ)
     #   amplify-bonus: 2.0 (HP/段、増幅1段あたり+2.0HP) ※水中2倍
     params:
-      base-damage: 5.0
-      amplify-bonus: 3.0
+      base-damage: 5.0              # 基本ダメージ(HP、水中2倍)
+      amplify-bonus: 3.0            # 増幅1段あたりのダメージ増加(HP)
     unlock-cost:
       level: 20
       materials:
@@ -831,18 +876,17 @@ glyphs:
   scorch:
     tier: 2
     mana-cost: 25
-    # 増幅:威力↑(+2.0HP/段) | 減少:威力↓ | 半径増加:ダメージエリア拡大
+    # 増幅:威力↑(+2.0HP/段) | 減少:威力↓
     # 炎上中の敵に1.5倍ダメージ
     max-augments:
       amplify: 5
       dampen: 4   # 2個でamp-1(=3.0HP), 4個でamp-2(=1.0HP)。これ以上変化なし
-      aoe_radius: 7
     # params (設定可能な定数):
     #   base-damage: 3.0 (HP、基本ダメージ)
     #   amplify-bonus: 2.0 (HP/段、増幅1段あたり+2.0HP) ※炎上中1.5倍
     params:
-      base-damage: 5.0 
-      amplify-bonus: 2.0 
+      base-damage: 5.0              # 基本ダメージ(HP、炎上中1.5倍)
+      amplify-bonus: 2.0            # 増幅1段あたりのダメージ増加(HP)
     unlock-cost:
       level: 20
       materials:
@@ -853,16 +897,15 @@ glyphs:
   cold_snap:
     tier: 2
     mana-cost: 25
-    # 増幅:凍結ダメージ↑ | 減少:凍結ダメージ↓ | 半径増加:範囲凍結ダメージ
+    # 増幅:凍結ダメージ↑ | 減少:凍結ダメージ↓
     max-augments:
       amplify: 5  # コード上限: MAX_AMP=2
-      aoe_radius: 7
     # params (設定可能な定数):
     #   base-damage: 6.0 (HP、基本凍結ダメージ)
     #   max-amp: 2 (最大増幅段数。上限なし)
     params:
-      base-damage: 6.0 
-      max-amp: 5 
+      base-damage: 6.0              # 基本凍結ダメージ(HP)
+      max-amp: 5                    # 最大増幅段数
     unlock-cost:
       level: 20
       materials:
@@ -873,11 +916,10 @@ glyphs:
   windshear:
     tier: 2
     mana-cost: 25
-    # 増幅:風ダメージ↑ | 減少:風ダメージ↓ | 半径増加:範囲風ダメージ
+    # 増幅:風ダメージ↑ | 減少:風ダメージ↓
     max-augments:
       amplify: 5
       dampen: 4   # 高度ボーナスがあるため幅を持たせる。4個以上は変化なし
-      aoe_radius: 7
     # params (設定可能な定数):
     #   base-damage: 5.0 (HP、基本風ダメージ)
     #   max-height-bonus: 10.0 (HP、高度比例ボーナス最大値)
@@ -910,13 +952,14 @@ glyphs:
   slowfall:
     tier: 2
     mana-cost: 30
-    # 半径増加:範囲低速落下 | 延長:持続延長 | 短縮:持続短縮
+    # 延長:持続延長 | 短縮:持続短縮
     max-augments:
-      aoe_radius: 7
       extend_time: 7
       duration_down: 7
-    # params (設定可能な定数):
-    #   base-duration-ticks: 100 (tick=5秒)
+    params:
+      base-duration-ticks: 100       # 基本持続時間(tick=5秒)
+      duration-bonus-ticks: 100      # 延長1段あたりの追加時間(tick=5秒)
+      high-level-threshold: 5        # この延長レベル以上でLv2に上昇
     unlock-cost:
       level: 15
       materials:
@@ -934,8 +977,8 @@ glyphs:
     #   base-duration-ticks: 600 (tick=30秒、基本持続)
     #   duration-bonus-ticks: 160 (tick=8秒/段、延長あたり加算)
     params:
-      base-duration-ticks: 400 
-      duration-bonus-ticks: 200 
+      base-duration-ticks: 400      # 基本透明化持続(tick=20秒)
+      duration-bonus-ticks: 200     # 延長1段あたりの持続増加(tick=10秒)
     unlock-cost:
       level: 25
       materials:
@@ -1002,7 +1045,7 @@ glyphs:
     # params (設定可能な定数):
     #   max-stars: 5 (花火の最大数)
     params:
-      max-stars: 8 
+      max-stars: 8                  # 花火の最大数
     unlock-cost:
       level: 10
       materials:
@@ -1034,9 +1077,9 @@ glyphs:
     #   base-force: 1.0
     #   amplify-force-bonus: 0.5 (/段、増幅1段あたり+0.5)
     params:
-      base-radius: 3.0
-      base-force: 1.5
-      amplify-force-bonus: 1.0
+      base-radius: 3.0              # 吹き飛ばし範囲半径(ブロック)
+      base-force: 1.5               # 基本吹き飛ばし力
+      amplify-force-bonus: 1.0      # 増幅1段あたりの力増加
     unlock-cost:
       level: 25
       materials:
@@ -1053,7 +1096,6 @@ glyphs:
     max-augments:
       amplify: 5
       dampen: 2   # 2個でamp-1(=速度0.7)。4個以上は最低速度0.3でクランプされ変化なし
-      aoe_radius: 7
       extend_time: 7
       duration_down: 7
     # params (設定可能な定数):
@@ -1071,11 +1113,10 @@ glyphs:
   levitate:
     tier: 2
     mana-cost: 35
-    # 増幅:浮遊速度↑(レベル上昇) | 減少:浮遊速度↓ | 半径増加:範囲浮遊
+    # 増幅:浮遊速度↑(レベル上昇) | 減少:浮遊速度↓
     # 延長:持続延長(+40tick/段) | 短縮:持続短縮
     max-augments:
       amplify: 5
-      aoe_radius: 7
       extend_time: 7
       duration_down: 7
     # params (設定可能な定数):
@@ -1106,9 +1147,9 @@ glyphs:
     #   reach-bonus: 8 (ブロック/段、延伸1段あたり+8ブロック)
     #   max-distance: 64 (ブロック、コード上限)
     params:
-      base-distance: 12
-      reach-bonus: 8
-      max-distance: 64
+      base-distance: 12             # 基本テレポート距離(ブロック)
+      reach-bonus: 8                # 延伸1段あたりの距離増加(ブロック)
+      max-distance: 64              # テレポート距離上限(ブロック)
     unlock-cost:
       level: 30
       materials:
@@ -1119,20 +1160,19 @@ glyphs:
   lightning:
     tier: 3
     mana-cost: 100
-    # 増幅:落雷ダメージ↑(最大2段) | 減少:ダメージ↓(0以下で演出雷) | 半径増加:範囲落雷
+    # 増幅:落雷ダメージ↑(最大2段) | 減少:ダメージ↓(0以下で演出雷)
     # 延長:連続落雷回数↑ | 短縮:連続落雷回数↓
     max-augments:
       amplify: 5  # コード上限: MAX_AMPLIFY=2
       dampen: 4   # 2個でamp-1(=2.0HP), 4個でamp-2(=演出雷:ダメージなし)。これ以上変化なし
-      aoe_radius: 7
       extend_time: 7
       duration_down: 7
     # params (設定可能な定数):
     #   base-damage: 5.0 (HP、基本落雷ダメージ)
     #   max-amplify: 2 (落雷最大段数。上限なし)
-    params :
-      base-damage: 5.0 
-      max-amplify: 5
+    params:
+      base-damage: 5.0              # 基本落雷ダメージ(HP)
+      max-amplify: 5                # 最大増幅段数
     unlock-cost:
       level: 40
       materials:
@@ -1143,17 +1183,16 @@ glyphs:
   wither:
     tier: 3
     mana-cost: 80
-    # 増幅:ウィザー効果レベル↑ | 減少:レベル↓ | 半径増加:範囲ウィザー
+    # 増幅:ウィザー効果レベル↑ | 減少:レベル↓
     # 延長:ウィザー持続延長 | 短縮:持続短縮
     max-augments:
       amplify: 3
-      aoe_radius: 7
       extend_time: 7
       duration_down: 7
     # params (設定可能な定数):
     #   max-amplifier: 4 (ウィザー最大レベル。MC仕様上255まで設定可能)
-    params :
-      max-amplifier: 4
+    params:
+      max-amplifier: 4              # ウィザー最大レベル
     unlock-cost:
       level: 40
       materials:
@@ -1164,13 +1203,12 @@ glyphs:
   hex:
     tier: 3
     mana-cost: 100
-    # 増幅:追撃倍率↑(+5%/段) + 弱体化レベル↑ | 減少:追撃倍率↓ | 半径増加:範囲呪い
+    # 増幅:追撃倍率↑(+5%/段) + 弱体化レベル↑ | 減少:追撃倍率↓
     # 延長:呪い持続延長 | 短縮:持続短縮
     # 被ダメージの (10 + 5*増幅)% を追撃ダメージとして付与
     # 有益なポーション効果を全て除去
     max-augments:
       amplify: 3
-      aoe_radius: 7
       extend_time: 7
       duration_down: 7
     # params (設定可能な定数):
@@ -1180,9 +1218,9 @@ glyphs:
     #   base-damage-percent: 0.10 (基本追撃率10%)
     #   amplify-bonus-percent: 0.05 (増幅1段あたり+5%)
     params:
-      max-amplifier: 4
-      base-damage-percent: 0.10
-      amplify-bonus-percent: 0.05
+      max-amplifier: 4              # 弱体化最大レベル+追撃倍率上限
+      base-damage-percent: 0.10     # 基本追撃率(10%)
+      amplify-bonus-percent: 0.05   # 増幅1段あたりの追撃率増加(+5%)
     unlock-cost:
       level: 40
       materials:
@@ -1241,10 +1279,10 @@ glyphs:
     #   base-duration-ticks: 300 (tick=15秒)
     #   duration-per-level-ticks: 160 (tick=8秒/段、延長1段あたり+8秒)
     #   max-summons: 4
-    params :
-      base-duration-ticks: 300 
-      duration-per-level-ticks: 160 
-      max-summons: 8
+    params:
+      base-duration-ticks: 300      # 基本召喚持続(tick=15秒)
+      duration-per-level-ticks: 160 # 延長1段あたりの持続増加(tick=8秒)
+      max-summons: 8                # 最大召喚数
     unlock-cost:
       level: 40
       materials:
@@ -1265,7 +1303,7 @@ glyphs:
     # params (設定可能な定数):
     #   max-summons: 3 (最大召喚数。多すぎるとサーバー負荷)
     params:
-      max-summons: 8
+      max-summons: 8                # 最大召喚数
     unlock-cost:
       level: 40
       materials:
@@ -1373,9 +1411,9 @@ glyphs:
     tier: 1
     mana-cost: 5
     # 延長:遅延時間↑ | 短縮:遅延時間↓ | 無作為:遅延を±25%変動
-    # params (設定可能な定数):
-    #   base-delay-ticks: 20 (tick=1秒、基本遅延時間)
-    #   duration-bonus-ticks: 20 (tick=1秒/段、延長あたり加算)
+    params:
+      base-ticks: 20                 # 基本遅延時間(tick=1秒)
+      ticks-per-duration-level: 20   # 延長1段あたりの追加遅延(tick=1秒)
     unlock-cost:
       level: 10
       materials:
@@ -1386,7 +1424,9 @@ glyphs:
   rapid_fire:
     tier: 2
     mana-cost: 20
-    # 全形態互換。1つにつきCTを-100ms（最低100ms）
+    # 全形態互換。1つにつきCTを半減（最低100ms）
+    params:
+      per-stack: 1                   # 1個あたりの連射レベル増加量
     unlock-cost:
       level: 20
       materials:
@@ -1399,6 +1439,8 @@ glyphs:
   amplify:
     tier: 1
     mana-cost: 20
+    params:
+      per-stack: 1                   # 1個あたりの増幅レベル増加量
     unlock-cost:
       level: 10
       materials:
@@ -1419,6 +1461,8 @@ glyphs:
   extend_time:
     tier: 1
     mana-cost: 10
+    params:
+      per-stack: 1                   # 1個あたりの持続レベル増加量
     unlock-cost:
       level: 10
       materials:
@@ -1439,6 +1483,8 @@ glyphs:
   aoe:
     tier: 1
     mana-cost: 15
+    params:
+      per-stack: 1                   # 1個あたりのAOE幅増加量
     unlock-cost:
       level: 10
       materials:
@@ -1449,6 +1495,8 @@ glyphs:
   aoe_height:
     tier: 1
     mana-cost: 15
+    params:
+      per-stack: 1                   # 1個あたりの上下範囲増加量
     unlock-cost:
       level: 10
       materials:
@@ -1459,6 +1507,8 @@ glyphs:
   aoe_vertical:
     tier: 1
     mana-cost: 15
+    params:
+      per-stack: 2                   # 1個あたりの奥行き増加量(2ブロック)
     unlock-cost:
       level: 10
       materials:
@@ -1469,6 +1519,8 @@ glyphs:
   aoe_radius:
     tier: 2
     mana-cost: 20
+    params:
+      per-stack: 1                   # 1個あたりの半径増加量
     unlock-cost:
       level: 20
       materials:
@@ -1491,6 +1543,8 @@ glyphs:
   accelerate:
     tier: 2
     mana-cost: 10
+    params:
+      per-stack: 1.0                 # 1個あたりの加速量(速度倍率+1.0)
     unlock-cost:
       level: 20
       materials:
@@ -1501,6 +1555,8 @@ glyphs:
   decelerate:
     tier: 2
     mana-cost: 0
+    params:
+      per-stack: 0.5                 # 1個あたりの減速量(速度倍率-0.5)
     unlock-cost:
       level: 5
       materials:
@@ -1511,6 +1567,8 @@ glyphs:
   pierce:
     tier: 2
     mana-cost: 10
+    params:
+      per-stack: 1                   # 1個あたりの貫通回数増加量
     unlock-cost:
       level: 20
       materials:
@@ -1521,8 +1579,8 @@ glyphs:
   extend_reach:
     tier: 2
     mana-cost: 15
-    # 射程・距離を延長する増強
-    # 瞬間移動の距離、投射の射程等に適用
+    params:
+      per-stack: 1                   # 1個あたりの射程レベル増加量
     unlock-cost:
       level: 20
       materials:
@@ -1533,6 +1591,8 @@ glyphs:
   split:
     tier: 2
     mana-cost: 20
+    params:
+      per-stack: 1                   # 1個あたりの分裂数増加量
     unlock-cost:
       level: 20
       materials:
@@ -1552,13 +1612,12 @@ glyphs:
         ENDER_EYE: 16
         SNOWBALL: 16
 
-  # 説明: ブロック着弾時に周辺エンティティにも効果を伝播する（投射/接触用、1個まで）
+  # 説明: エンティティヒット時に周囲の敵にエフェクトをチェーンする
   propagate:
     tier: 2
     mana-cost: 20
-    # 投射/接触互換
-    # ブロック着弾時に周辺エンティティにも効果を伝播
-    # 半径増加と組み合わせて伝播範囲を拡大可能
+    params:
+      targets-per-stack: 3           # 1個あたりのチェーン対象数
     unlock-cost:
       level: 20
       materials:
@@ -1572,6 +1631,8 @@ glyphs:
   extract:
     tier: 2
     mana-cost: 30
+    params:
+      per-stack: 1                   # 1個あたりのシルクタッチレベル(通常1固定)
     unlock-cost:
       level: 20
       materials:
@@ -1582,6 +1643,8 @@ glyphs:
   fortune:
     tier: 2
     mana-cost: 25
+    params:
+      per-stack: 1                   # 1個あたりの幸運レベル増加量
     unlock-cost:
       level: 20
       materials:
@@ -1595,11 +1658,11 @@ glyphs:
     # 命中範囲に効果を持続的に再発動するエリアを生成
     # ルーン：残留を組み合わせると発動後も効果が残る
     # エンティティ効果系（凍結、害悪、治癒等）にも互換
-    # params (設定可能な定数):
-    #   zone-radius: 3.0 (ブロック、残留エリア半径)
-    #   base-duration-ticks: 100 (tick=5秒、基本残留持続)
-    #   duration-bonus-per-level: 60 (tick=3秒/段、延長あたり加算)
-    #   zone-tick-interval: 20 (tick=1秒、効果再適用間隔)
+    params:
+      zone-radius: 3.0              # 残留エリア半径(ブロック)
+      base-duration-ticks: 100      # 基本残留持続(tick=5秒)
+      duration-bonus-per-level: 60  # 延長1段あたりの追加時間(tick=3秒)
+      zone-tick-interval: 20        # 効果再適用間隔(tick=1秒)
     unlock-cost:
       level: 40
       materials:
@@ -1614,6 +1677,8 @@ glyphs:
   shrink_reach:
     tier: 1
     mana-cost: 0
+    params:
+      per-stack: 1                   # 1個あたりの射程レベル減少量
     unlock-cost:
       level: 5
       materials:
@@ -1628,6 +1693,10 @@ glyphs:
   cry:
     tier: 1
     mana-cost: 0
+    params:
+      base-volume: 1.0              # 基本音量
+      amplify-volume-bonus: 0.5     # 増幅1段あたりの音量増加
+      aoe-radius-volume-bonus: 1.0  # 半径増加1段あたりの音量増加(遠距離可聴)
     unlock-cost:
       level: 10
       materials:
@@ -1674,6 +1743,12 @@ glyphs:
   scale:
     tier: 2
     mana-cost: 25
+    params:
+      base-duration: 600             # 基本持続時間(tick=30秒)
+      duration-per-level: 200        # 延長1段あたりの追加時間(tick=10秒)
+      scale-per-level: 0.5           # 増幅1段あたりのサイズ倍率(+50%)
+      min-scale: 0.0625              # 最小スケール(MC制限)
+      max-scale: 16.0                # 最大スケール(MC制限)
     max-augments:
       amplify: 5
       dampen: 3
@@ -1704,6 +1779,12 @@ glyphs:
   sonic_boom:
     tier: 3
     mana-cost: 200
+    params:
+      range: 20.0                   # 射程(ブロック)
+      base-damage: 10.0             # 基本ダメージ(HP)
+      amplify-damage-bonus: 4.0     # 増幅1段あたりのダメージ増加(HP)
+      hit-radius: 1.0               # ヒット判定半径(ブロック)
+      spread-angle-step: 0.15       # 分裂時の拡散角度(rad)
     max-augments:
       amplify: 5
       split: 4
@@ -1719,6 +1800,14 @@ glyphs:
     tier: 3
     mana-cost: 500
     # 増幅:ダメージ↑ | 半径増加:索敵範囲↑ | 延長:持続時間↑ | 分裂:発射頻度↑
+    params:
+      base-damage: 4.0              # 1発あたりの基本ダメージ(HP、防御無視)
+      amplify-damage-bonus: 2.0     # 増幅1段あたりのダメージ増加(HP)
+      base-radius: 8.0              # 索敵範囲(ブロック)
+      base-duration: 200            # 基本召喚時間(tick=10秒)
+      duration-per-level: 100       # 延長1段あたりの追加時間(tick=5秒)
+      base-fire-interval: 20        # 基本発射間隔(tick=1秒)
+      fire-ticks: 60                # 炎上時間(tick=3秒)
     max-augments:
       amplify: 5
       aoe_radius: 5
@@ -1741,6 +1830,15 @@ glyphs:
     tier: 3
     mana-cost: 500
     # 増幅:ダメージ↑ | 半径増加:索敵範囲↑ | 延長:持続時間↑ | 分裂:発射頻度↑
+    params:
+      base-damage: 4.0              # 1発あたりの基本ダメージ(HP、防御無視)
+      amplify-damage-bonus: 2.0     # 増幅1段あたりのダメージ増加(HP)
+      base-radius: 8.0              # 索敵範囲(ブロック)
+      base-duration: 200            # 基本召喚時間(tick=10秒)
+      duration-per-level: 100       # 延長1段あたりの追加時間(tick=5秒)
+      base-fire-interval: 20        # 基本発射間隔(tick=1秒)
+      freeze-ticks: 140             # 凍結時間(tick=7秒)
+      snare-duration: 60            # 鈍足拘束時間(tick=3秒)
     max-augments:
       amplify: 5
       aoe_radius: 5
@@ -1762,6 +1860,13 @@ glyphs:
   heavy_impact:
     tier: 3
     mana-cost: 150
+    params:
+      base-damage-per-hit: 3.0      # 1段あたりの基本ダメージ(HP)
+      amplify-damage-bonus: 1.5     # 増幅1段あたりのダメージ増加(HP)
+      base-radius: 1                # 基本衝撃範囲(3×3=中心+1ブロック)
+      hit-count: 5                  # 連続ダメージ段数
+      linger-duration-ticks: 200    # 残留ゾーン持続時間(tick=10秒)
+      linger-tick-interval: 40      # 残留ゾーンダメージ間隔(tick=2秒)
     max-augments:
       amplify: 5
       aoe_radius: 5

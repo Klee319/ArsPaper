@@ -22,7 +22,8 @@ public class ExtendReachAugment implements SpellAugment {
 
     @Override
     public void modify(SpellContext context) {
-        context.setReachLevel(context.getReachLevel() + 1);
+        int bonus = (int) config.getParam("extend_reach", "per-stack", 1.0);
+        context.setReachLevel(context.getReachLevel() + bonus);
     }
 
     @Override

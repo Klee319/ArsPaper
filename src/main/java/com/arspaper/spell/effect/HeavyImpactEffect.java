@@ -70,7 +70,11 @@ public class HeavyImpactEffect implements SpellEffect {
         double baseDmg = config.getParam("heavy_impact", "base-damage-per-hit", BASE_DAMAGE_PER_HIT);
         double amplifyBonus = config.getParam("heavy_impact", "amplify-damage-bonus", AMPLIFY_DAMAGE_BONUS);
         double damagePerHit = baseDmg + context.getAmplifyLevel() * amplifyBonus;
-        int radius = BASE_RADIUS + context.getAoeRadiusLevel();
+        int radius = (int) config.getParam("heavy_impact", "base-radius", (double) BASE_RADIUS)
+            + context.getAoeRadiusLevel();
+        int hitCount = (int) config.getParam("heavy_impact", "hit-count", (double) HIT_COUNT);
+        int lingerDurationTicks = (int) config.getParam("heavy_impact", "linger-duration-ticks", (double) LINGER_DURATION_TICKS);
+        int lingerTickInterval = (int) config.getParam("heavy_impact", "linger-tick-interval", (double) LINGER_TICK_INTERVAL);
         boolean linger = context.isLingerPattern();
 
         // 衝撃波サウンド
@@ -83,11 +87,11 @@ public class HeavyImpactEffect implements SpellEffect {
 
             @Override
             public void run() {
-                if (hitIndex >= HIT_COUNT) {
+                if (hitIndex >= hitCount) {
                     cancel();
                     // 残留モード
                     if (linger) {
-                        startLingerZone(center, radius, damagePerHit, caster, context);
+                        startLingerZone(center, radius, damagePerHit, caster, context, lingerDurationTicks, lingerTickInterval);
                     }
                     return;
                 }
@@ -117,15 +121,16 @@ public class HeavyImpactEffect implements SpellEffect {
      * 残留ダメージゾーンを開始する。
      */
     private void startLingerZone(Location center, int radius, double damagePerHit,
-                                  Player caster, SpellContext context) {
+                                  Player caster, SpellContext context,
+                                  int lingerDurationTicks, int lingerTickInterval) {
         java.util.UUID casterUUID = caster.getUniqueId();
         BukkitTask lingerTask = new BukkitRunnable() {
             int ticks = 0;
 
             @Override
             public void run() {
-                ticks += LINGER_TICK_INTERVAL;
-                if (ticks > LINGER_DURATION_TICKS) {
+                ticks += lingerTickInterval;
+                if (ticks > lingerDurationTicks) {
                     cancel();
                     return;
                 }
@@ -148,7 +153,7 @@ public class HeavyImpactEffect implements SpellEffect {
                 // 残留パーティクル
                 spawnLingerParticles(center, radius);
             }
-        }.runTaskTimer(plugin, LINGER_TICK_INTERVAL, LINGER_TICK_INTERVAL);
+        }.runTaskTimer(plugin, lingerTickInterval, lingerTickInterval);
         SpellTaskLimiter.register("heavy_impact_linger", lingerTask);
     }
 
@@ -158,7 +163,8 @@ public class HeavyImpactEffect implements SpellEffect {
      */
     private void spawnShockwaveRing(Location center, int hitIndex, int maxRadius) {
         // 衝撃波が内側から外側に広がる
-        double ringRadius = (hitIndex + 1) * ((maxRadius + 1.0) / HIT_COUNT);
+        int cfgHitCount = (int) config.getParam("heavy_impact", "hit-count", (double) HIT_COUNT);
+        double ringRadius = (hitIndex + 1) * ((maxRadius + 1.0) / cfgHitCount);
 
         int points = Math.max(8, (int) (ringRadius * 8));
         for (int i = 0; i < points; i++) {

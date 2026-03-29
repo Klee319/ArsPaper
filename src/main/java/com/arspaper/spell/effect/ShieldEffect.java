@@ -13,14 +13,13 @@ import org.bukkit.potion.PotionEffectType;
 
 /**
  * 対象にダメージ耐性を付与するEffect。Ars Nouveau Tier 3, mana 150相当。
- * Resistance II（固定40%軽減）とAbsorption（増幅でレベル上昇、+4HP/段）を同時付与して
- * マナ消費シールドに近い保護感を再現する。
+ * 増幅で耐性レベルが上昇する（デフォルトII = 40%軽減）。
  */
 public class ShieldEffect implements SpellEffect {
 
     private static final int DEFAULT_BASE_DURATION = 100;          // 5秒
     private static final int DEFAULT_DURATION_PER_LEVEL = 160;     // ExtendTimeごと +8秒
-    private static final int RESISTANCE_AMPLIFIER = 1;             // Resistance II = 40%軽減（固定）
+    private static final int DEFAULT_RESISTANCE_LEVEL = 1;         // Resistance II = 40%軽減（増幅0時）
     private final NamespacedKey id;
     private final GlyphConfig config;
 
@@ -35,11 +34,9 @@ public class ShieldEffect implements SpellEffect {
         int durationPerLevel = (int) config.getParam("shield", "duration-per-level", DEFAULT_DURATION_PER_LEVEL);
         int duration = baseDuration + context.getDurationLevel() * durationPerLevel;
 
-        // Resistance II（固定、amplifyの影響を受けない）
-        target.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, duration, RESISTANCE_AMPLIFIER));
-        // Absorptionは増幅でレベル上昇（+4HP/段）
-        int absorptionAmplifier = Math.max(0, context.getAmplifyLevel());
-        target.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, duration, absorptionAmplifier));
+        // 耐性レベル = デフォルト + 増幅レベル（Resistance II〜）
+        int resistanceLevel = DEFAULT_RESISTANCE_LEVEL + Math.max(0, context.getAmplifyLevel());
+        target.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, duration, resistanceLevel));
 
         SpellFxUtil.spawnShieldFx(target.getLocation());
     }
@@ -56,7 +53,7 @@ public class ShieldEffect implements SpellEffect {
     public String getDisplayName() { return "盾"; }
 
     @Override
-    public String getDescription() { return "ダメージ耐性と吸収HPを付与する"; }
+    public String getDescription() { return "ダメージ耐性を付与する（増幅でレベル上昇）"; }
 
     @Override
     public int getManaCost() { return config.getManaCost("shield"); }

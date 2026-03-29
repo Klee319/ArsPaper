@@ -45,7 +45,7 @@ threads:
     display_name: "マナ回復速度上昇のスレッド"
     regen-bonus: 2
     stackable: true
-    max: 2
+    max: 3
     recipe:
       core-item: "custom:thread_empty"
       pedestal-items:
@@ -61,7 +61,7 @@ threads:
     display_name: "最大マナ上昇のスレッド"
     mana-bonus: 20
     stackable: true
-    max: 2
+    max: 3
     recipe:
       core-item: "custom:thread_empty"
       pedestal-items:
@@ -76,7 +76,7 @@ threads:
   health_boost:
     display_name: "体力増強のスレッド"
     stackable: true
-    max: 2
+    max: 3
     recipe:
       core-item: "custom:thread_empty"
       pedestal-items:

@@ -43,7 +43,8 @@ public class FangsEffect implements SpellEffect {
         int amplifyLevel = Math.max(0, context.getAmplifyLevel());
         int aoeLevel = context.getAoeRadiusLevel();
         int maxFangs = (int) config.getParam("fangs", "max-fangs", (double) MAX_FANGS);
-        int fangCount = Math.min(BASE_FANG_COUNT_ENTITY + amplifyLevel * AMPLIFY_BONUS, maxFangs);
+        int amplifyBonus = (int) config.getParam("fangs", "amplify-bonus", (double) AMPLIFY_BONUS);
+        int fangCount = Math.min(BASE_FANG_COUNT_ENTITY + amplifyLevel * amplifyBonus, maxFangs);
 
         Location targetLoc = target.getLocation();
 
@@ -71,7 +72,8 @@ public class FangsEffect implements SpellEffect {
         int amplifyLevel = Math.max(0, context.getAmplifyLevel());
         int aoeLevel = context.getAoeRadiusLevel();
         int maxFangs = (int) config.getParam("fangs", "max-fangs", (double) MAX_FANGS);
-        int fangCount = Math.min(BASE_FANG_COUNT_BLOCK + amplifyLevel * AMPLIFY_BONUS, maxFangs);
+        int amplifyBonus = (int) config.getParam("fangs", "amplify-bonus", (double) AMPLIFY_BONUS);
+        int fangCount = Math.min(BASE_FANG_COUNT_BLOCK + amplifyLevel * amplifyBonus, maxFangs);
 
         // ブロック対象の場合、牙はブロックの上面に生成する
         Location spawnLoc = blockLocation.clone().add(0, 1, 0);
@@ -92,8 +94,9 @@ public class FangsEffect implements SpellEffect {
      * 直線上に牙を配置する。
      */
     private void spawnFangsLine(Location origin, Vector direction, int count, LivingEntity owner) {
+        double fangSpacing = config.getParam("fangs", "fang-spacing", FANG_SPACING);
         for (int i = 0; i < count; i++) {
-            Location fangLoc = origin.clone().add(direction.clone().multiply(i * FANG_SPACING));
+            Location fangLoc = origin.clone().add(direction.clone().multiply(i * fangSpacing));
             spawnSingleFang(fangLoc, owner);
         }
     }

@@ -22,8 +22,9 @@ public class DecelerateAugment implements SpellAugment {
 
     @Override
     public void modify(SpellContext context) {
-        context.setAcceleration(context.getAcceleration() - 0.5);
-        context.setProjectileSpeedMultiplier(Math.max(0.1, context.getProjectileSpeedMultiplier() - 0.5));
+        double reduction = config.getParam("decelerate", "per-stack", 0.5);
+        context.setAcceleration(context.getAcceleration() - reduction);
+        context.setProjectileSpeedMultiplier(Math.max(0.1, context.getProjectileSpeedMultiplier() - reduction));
     }
 
     @Override

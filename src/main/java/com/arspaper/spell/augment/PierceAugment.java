@@ -23,7 +23,8 @@ public class PierceAugment implements SpellAugment {
 
     @Override
     public void modify(SpellContext context) {
-        context.setPierceCount(context.getPierceCount() + 1);
+        int bonus = (int) config.getParam("pierce", "per-stack", 1.0);
+        context.setPierceCount(context.getPierceCount() + bonus);
     }
 
     @Override

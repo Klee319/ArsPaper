@@ -49,20 +49,27 @@ public class OrbitForm implements SpellForm {
     public void cast(Player caster, SpellContext context) {
         SpellFxUtil.playCastSound(caster);
 
-        int orbCount = Math.min(3 + context.getSplitCount(), MAX_ORBS);
+        int maxOrbs = (int) config.getParam("orbit", "max-orbs", (double) MAX_ORBS);
+        int baseOrbs = (int) config.getParam("orbit", "base-orbs", 3.0);
+        int orbCount = Math.min(baseOrbs + context.getSplitCount(), maxOrbs);
         double accel = context.getAcceleration(); // 加速:回転速度↑ / 減速:回転速度↓
         int durationLevel = context.getDurationLevel(); // ExtendTime(+) / DurationDown(-)
-        int totalDuration = Math.max(1, BASE_DURATION_TICKS
-            + durationLevel * EXTEND_DURATION_BONUS);
+        int baseDurationTicks = (int) config.getParam("orbit", "base-duration-ticks", (double) BASE_DURATION_TICKS);
+        int extendDurationBonus = (int) config.getParam("orbit", "extend-duration-bonus", (double) EXTEND_DURATION_BONUS);
+        int totalDuration = Math.max(1, baseDurationTicks
+            + durationLevel * extendDurationBonus);
         double angularSpeed = BASE_ANGULAR_SPEED * (1.0 + accel * 0.3);
 
-        double radius = ORBIT_RADIUS + context.getAoeRadiusLevel() * 1.0;
+        double orbitRadius = config.getParam("orbit", "orbit-radius", ORBIT_RADIUS);
+        double radiusPerAoe = config.getParam("orbit", "radius-per-aoe", 1.0);
+        double radius = orbitRadius + context.getAoeRadiusLevel() * radiusPerAoe;
+        int hitCooldownTicks = (int) config.getParam("orbit", "hit-cooldown-ticks", (double) HIT_COOLDOWN_TICKS);
 
         for (int orbIndex = 0; orbIndex < orbCount; orbIndex++) {
             double phaseOffset = (2.0 * Math.PI / orbCount) * orbIndex;
             SpellContext orbContext = context.copy();
 
-            new OrbitTask(caster, orbContext, totalDuration, angularSpeed, phaseOffset, radius)
+            new OrbitTask(caster, orbContext, totalDuration, angularSpeed, phaseOffset, radius, hitCooldownTicks)
                 .runTaskTimer(plugin, 0L, 2L);
         }
     }
@@ -79,18 +86,20 @@ public class OrbitForm implements SpellForm {
         private final double angularSpeed;
         private final double phaseOffset;
         private final double radius;
+        private final int hitCooldownTicks;
         /** エンティティUUID → 最後にヒットしたtick */
         private final Map<UUID, Integer> hitCooldowns = new HashMap<>();
 
         private int elapsed = 0;
 
-        OrbitTask(Player caster, SpellContext context, int maxTicks, double angularSpeed, double phaseOffset, double radius) {
+        OrbitTask(Player caster, SpellContext context, int maxTicks, double angularSpeed, double phaseOffset, double radius, int hitCooldownTicks) {
             this.caster = caster;
             this.context = context;
             this.maxTicks = maxTicks;
             this.angularSpeed = angularSpeed;
             this.phaseOffset = phaseOffset;
             this.radius = radius;
+            this.hitCooldownTicks = hitCooldownTicks;
         }
 
         @Override
@@ -121,7 +130,7 @@ public class OrbitForm implements SpellForm {
 
                 UUID entityId = entity.getUniqueId();
                 Integer lastHitTick = hitCooldowns.get(entityId);
-                if (lastHitTick != null && (elapsed - lastHitTick) < HIT_COOLDOWN_TICKS) continue;
+                if (lastHitTick != null && (elapsed - lastHitTick) < hitCooldownTicks) continue;
 
                 hitCooldowns.put(entityId, elapsed);
                 SpellFxUtil.spawnImpactBurst(entity.getLocation());
@@ -136,7 +145,7 @@ public class OrbitForm implements SpellForm {
                 long blockKey = block.getLocation().hashCode();
                 String blockKeyStr = block.getX() + "," + block.getY() + "," + block.getZ();
                 Integer lastBlockHit = hitCooldowns.get(UUID.nameUUIDFromBytes(blockKeyStr.getBytes()));
-                if (lastBlockHit == null || (elapsed - lastBlockHit) >= HIT_COOLDOWN_TICKS) {
+                if (lastBlockHit == null || (elapsed - lastBlockHit) >= hitCooldownTicks) {
                     hitCooldowns.put(UUID.nameUUIDFromBytes(blockKeyStr.getBytes()), elapsed);
                     SpellContext blockContext = context.copy();
                     blockContext.resolveOnBlock(block.getLocation());

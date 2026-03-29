@@ -60,13 +60,14 @@ public class SonicBoomEffect implements SpellEffect {
         int totalBeams = 1 + Math.min(context.getSplitCount(), 6);
         // 貫通1個 = ソリッドブロック2個分貫通
         int blockPierceBlocks = 2 * context.getPierceCount();
+        double spreadAngleStep = config.getParam("sonic_boom", "spread-angle-step", SPREAD_ANGLE_STEP);
 
         Vector baseDirection = caster.getLocation().getDirection();
 
         for (int i = 0; i < totalBeams; i++) {
             Vector direction = baseDirection.clone();
             if (totalBeams > 1) {
-                double angle = (i - (totalBeams - 1) / 2.0) * SPREAD_ANGLE_STEP;
+                double angle = (i - (totalBeams - 1) / 2.0) * spreadAngleStep;
                 direction.rotateAroundY(angle);
             }
             fireSonicBoom(caster, direction, range, damage, blockPierceBlocks, context);
@@ -106,9 +107,10 @@ public class SonicBoomEffect implements SpellEffect {
         }
 
         // エンティティヒット（全貫通、PvP保護準拠）
+        double hitRadius = config.getParam("sonic_boom", "hit-radius", HIT_RADIUS);
         for (double dist = 1.0; dist <= effectiveRange; dist += SCAN_STEP) {
             Location point = origin.clone().add(direction.clone().multiply(dist));
-            for (LivingEntity nearby : point.getNearbyLivingEntities(HIT_RADIUS)) {
+            for (LivingEntity nearby : point.getNearbyLivingEntities(hitRadius)) {
                 if (nearby.equals(caster)) continue;
                 if (!hitEntities.add(nearby.getUniqueId())) continue;
                 if (!context.isValidAoeTarget(nearby, caster)) continue;

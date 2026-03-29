@@ -53,11 +53,20 @@ public class BurstForm implements SpellForm {
     public void cast(Player caster, SpellContext context) {
         SpellFxUtil.playCastSound(caster);
 
-        double speed = BASE_SPEED * Math.min(context.getProjectileSpeedMultiplier(), 4.0)
-            + context.getReachLevel() * 0.3;
+        double baseSpeed = config.getParam("burst", "base-speed", BASE_SPEED);
+        int baseFuseTicks = (int) config.getParam("burst", "base-fuse-ticks", (double) BASE_FUSE_TICKS);
+        double baseBurstRadius = config.getParam("burst", "base-burst-radius", BASE_BURST_RADIUS);
+
+        // 延伸: 弾速UP（信管据え置き）→ 遠くで爆発（距離ベース炸裂）
+        double reachSpeedBonus = config.getParam("burst", "reach-speed-bonus", 0.5);
+        double speed = baseSpeed + context.getReachLevel() * reachSpeedBonus;
+        speed = Math.max(0.3, speed);
         int totalProjectiles = 1 + Math.min(context.getSplitCount(), 8);
-        int fuseTicks = BASE_FUSE_TICKS + context.getReachLevel() * 10;
-        double burstRadius = BASE_BURST_RADIUS + context.getAoeRadiusLevel() * 1.5;
+        // 延長: 信管延長（弾速据え置き）→ 遅く爆発（時間ベース炸裂）
+        int fusePerDuration = (int) config.getParam("burst", "fuse-per-duration-level", 10.0);
+        int fuseTicks = baseFuseTicks + context.getDurationLevel() * fusePerDuration;
+        double radiusPerAoe = config.getParam("burst", "radius-per-aoe", 1.5);
+        double burstRadius = baseBurstRadius + context.getAoeRadiusLevel() * radiusPerAoe;
 
         Vector baseDirection = caster.getLocation().getDirection();
 

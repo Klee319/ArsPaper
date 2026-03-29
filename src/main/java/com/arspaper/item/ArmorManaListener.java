@@ -333,7 +333,9 @@ public class ArmorManaListener implements Listener {
                             p.setAllowFlight(true);
                         }
                         // flying状態の検出（ダブルタップによる飛行開始を即座にグライドに変換）
-                        if (p.isFlying()) {
+                        // 儀式飛行がアクティブな場合はクリエ飛行を維持
+                        if (p.isFlying()
+                                && !com.arspaper.ritual.effect.FlightRitualEffect.hasActiveFlight(p)) {
                             p.setFlying(false);
                             if (!p.isOnGround() && !p.isGliding()) {
                                 p.setGliding(true);
@@ -364,7 +366,10 @@ public class ArmorManaListener implements Listener {
         if (player.getGameMode() == org.bukkit.GameMode.CREATIVE
                 || player.getGameMode() == org.bukkit.GameMode.SPECTATOR) return;
 
-        // クリエイティブ飛行を常にキャンセル
+        // 儀式飛行がアクティブな場合はクリエ飛行を許可（グライド変換しない）
+        if (com.arspaper.ritual.effect.FlightRitualEffect.hasActiveFlight(player)) return;
+
+        // クリエイティブ飛行を常にキャンセル（スレッドのグライドに変換）
         event.setCancelled(true);
         player.setFlying(false);
 

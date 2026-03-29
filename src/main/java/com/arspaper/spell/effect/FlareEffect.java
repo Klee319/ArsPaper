@@ -37,7 +37,9 @@ public class FlareEffect implements SpellEffect {
             return;
         }
 
-        double damage = BASE_DAMAGE + context.getAmplifyLevel() * AMPLIFY_BONUS;
+        double baseDamage = config.getParam("flare", "base-damage", BASE_DAMAGE);
+        double amplifyBonus = config.getParam("flare", "amplify-bonus", AMPLIFY_BONUS);
+        double damage = baseDamage + context.getAmplifyLevel() * amplifyBonus;
         target.damage(damage, context.getCaster());
 
         spawnFlareFx(target.getLocation());

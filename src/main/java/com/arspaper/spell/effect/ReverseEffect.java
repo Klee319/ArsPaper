@@ -13,19 +13,20 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
-import org.bukkit.util.Vector;
 
 import com.arspaper.spell.SpellTaskLimiter;
 
 /**
  * 反転エフェクト。対象の移動方向を反転させる。
- * 毎tick、対象の水平移動ベクトルを逆転する（視点方向は正常のまま）。
+ * テレポートベース: 移動差分を検出し、逆方向にテレポートで強制移動。
+ * velocity操作ではなくテレポートを使用するためクライアント予測との衝突が発生しない。
  * 延長/短縮: 効果時間
  */
 public class ReverseEffect implements SpellEffect {
 
     private static final int BASE_DURATION = 100;            // 5秒
     private static final int DURATION_PER_LEVEL = 60;        // +3秒/段
+    private static final int CHECK_INTERVAL = 1;             // 毎tickチェック（単体対象のため負荷軽微）
 
     private final NamespacedKey id;
     private final GlyphConfig config;
@@ -47,36 +48,48 @@ public class ReverseEffect implements SpellEffect {
 
         BukkitTask task = new BukkitRunnable() {
             int ticks = 0;
-            Location prevLoc = target.getLocation().clone();
+            double prevX = target.getLocation().getX();
+            double prevZ = target.getLocation().getZ();
 
             @Override
             public void run() {
-                ticks += 3;
+                ticks++;
                 if (ticks > durationTicks || target.isDead() || !target.isValid()) {
                     cancel();
                     return;
                 }
 
-                // 3tick間の移動差分を計算して水平方向を反転
                 Location currentLoc = target.getLocation();
-                double dx = currentLoc.getX() - prevLoc.getX();
-                double dz = currentLoc.getZ() - prevLoc.getZ();
+                double dx = currentLoc.getX() - prevX;
+                double dz = currentLoc.getZ() - prevZ;
 
-                if (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01) {
-                    // 移動量を反転して追加適用（元の移動 + 逆方向の2倍 = 逆移動）
-                    Vector reversal = new Vector(-dx * 2, 0, -dz * 2);
-                    target.setVelocity(target.getVelocity().add(reversal));
+                // 移動閾値（静止中は無視）
+                if (Math.abs(dx) > 0.03 || Math.abs(dz) > 0.03) {
+                    // 移動方向を反転してテレポート（元の位置から逆方向へ）
+                    Location reversed = currentLoc.clone();
+                    reversed.setX(prevX - dx);
+                    reversed.setZ(prevZ - dz);
+                    // yaw/pitchは現在の視線方向を維持
+                    reversed.setYaw(currentLoc.getYaw());
+                    reversed.setPitch(currentLoc.getPitch());
+
+                    target.teleport(reversed);
+
+                    // 次回の基準は反転後の位置
+                    prevX = reversed.getX();
+                    prevZ = reversed.getZ();
+                } else {
+                    prevX = currentLoc.getX();
+                    prevZ = currentLoc.getZ();
                 }
 
-                prevLoc = currentLoc.clone();
-
-                // 15tickごとにパーティクル
-                if (ticks % 15 == 0) {
+                // パーティクル（10tickごと）
+                if (ticks % 10 == 0) {
                     target.getWorld().spawnParticle(Particle.REVERSE_PORTAL,
-                        target.getLocation().add(0, 1, 0), 3, 0.2, 0.3, 0.2, 0.05);
+                        target.getLocation().add(0, 1, 0), 5, 0.2, 0.3, 0.2, 0.05);
                 }
             }
-        }.runTaskTimer(plugin, 0L, 3L);
+        }.runTaskTimer(plugin, 0L, CHECK_INTERVAL);
         SpellTaskLimiter.register("reverse", task);
     }
 

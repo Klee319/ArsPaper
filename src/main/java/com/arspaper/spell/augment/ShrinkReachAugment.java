@@ -21,7 +21,8 @@ public class ShrinkReachAugment implements SpellAugment {
 
     @Override
     public void modify(SpellContext context) {
-        context.setReachLevel(context.getReachLevel() - 1);
+        int reduction = (int) config.getParam("shrink_reach", "per-stack", 1.0);
+        context.setReachLevel(context.getReachLevel() - reduction);
     }
 
     @Override
