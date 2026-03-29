@@ -650,20 +650,24 @@ public class SpellCraftingGui extends BaseGui {
         // max-augmentsの上限チェック: 対象Effect/Formの後ろから次のEffect/Formまで
         // 全スロットをスキャンし、同一Augmentの総数をカウントする。
         // これにより、null gaps の前後に分散したAugmentも正しくカウントされる。
+        String baseKey = com.arspaper.spell.GlyphConfig.stripSuperPrefix(augmentKey);
         int maxStack = plugin.getGlyphConfig().getMaxAugmentStack(targetKey, augmentKey);
         if (maxStack < Integer.MAX_VALUE) {
             int currentCount = 0;
+            int addWeight = comp instanceof com.arspaper.spell.augment.SuperAugment ? 2 : 1;
             for (int j = targetIndex + 1; j < MAX_GLYPHS; j++) {
                 SpellComponent c = composition[j];
                 if (c == null) continue;
                 if (c.getType() == SpellComponent.ComponentType.EFFECT
                     || c.getType() == SpellComponent.ComponentType.FORM) break;
-                if (c.getType() == SpellComponent.ComponentType.AUGMENT
-                    && c.getId().getKey().equals(augmentKey)) {
-                    currentCount++;
+                if (c.getType() == SpellComponent.ComponentType.AUGMENT) {
+                    String cBase = com.arspaper.spell.GlyphConfig.stripSuperPrefix(c.getId().getKey());
+                    if (cBase.equals(baseKey)) {
+                        currentCount += (c instanceof com.arspaper.spell.augment.SuperAugment) ? 2 : 1;
+                    }
                 }
             }
-            if (currentCount >= maxStack) {
+            if (currentCount + addWeight > maxStack) {
                 return false;
             }
         }

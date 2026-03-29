@@ -55,9 +55,22 @@ public class GuiListener implements Listener {
         if (event.getPlayer() instanceof Player player && event.getView().title() != null) {
             String title = PlainTextComponentSerializer.plainText().serialize(event.getView().title());
             if ("バックパック".equals(title)) {
-                for (org.bukkit.inventory.ItemStack armor : player.getInventory().getArmorContents()) {
+                // getArmorContents()はコピーを返すため、直接スロットを参照して書き戻す
+                org.bukkit.inventory.PlayerInventory inv = player.getInventory();
+                org.bukkit.inventory.ItemStack[] armorSlots = {
+                    inv.getHelmet(), inv.getChestplate(), inv.getLeggings(), inv.getBoots()
+                };
+                for (int s = 0; s < armorSlots.length; s++) {
+                    org.bukkit.inventory.ItemStack armor = armorSlots[s];
                     if (armor != null && BackpackGui.countBackpackThreads(armor) > 0) {
                         BackpackGui.saveBackpackContents(armor, event.getInventory());
+                        // editMetaで変更されたItemStackを装備スロットに書き戻す
+                        switch (s) {
+                            case 0 -> inv.setHelmet(armor);
+                            case 1 -> inv.setChestplate(armor);
+                            case 2 -> inv.setLeggings(armor);
+                            case 3 -> inv.setBoots(armor);
+                        }
                         break;
                     }
                 }

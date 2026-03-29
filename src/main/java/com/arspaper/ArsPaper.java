@@ -241,151 +241,161 @@ public class ArsPaper extends JavaPlugin {
     }
 
     private void registerDefaultGlyphs() {
-        // Forms (8種)
-        spellRegistry.register(new ProjectileForm(this, glyphConfig));
-        spellRegistry.register(new TouchForm(this, glyphConfig));
-        spellRegistry.register(new SelfForm(this, glyphConfig));
-        spellRegistry.register(new UnderfootForm(this, glyphConfig));
-        spellRegistry.register(new com.arspaper.spell.form.OverheadForm(this, glyphConfig));
-        spellRegistry.register(new OrbitForm(this, glyphConfig));
-        spellRegistry.register(new BeamForm(this, glyphConfig));
-        spellRegistry.register(new com.arspaper.spell.form.BurstForm(this, glyphConfig));
+        // ===== Forms (9種) - 使用頻度・直感順 =====
+        spellRegistry.register(new ProjectileForm(this, glyphConfig));   // 投射（最頻出）
+        spellRegistry.register(new TouchForm(this, glyphConfig));        // 接触
+        spellRegistry.register(new SelfForm(this, glyphConfig));         // 自己
+        spellRegistry.register(new UnderfootForm(this, glyphConfig));    // 足元
+        spellRegistry.register(new com.arspaper.spell.form.OverheadForm(this, glyphConfig)); // 頭上
+        spellRegistry.register(new com.arspaper.spell.form.BurstForm(this, glyphConfig));    // 炸裂
+        spellRegistry.register(new OrbitForm(this, glyphConfig));        // 旋回
+        spellRegistry.register(new BeamForm(this, glyphConfig));         // 照射
 
-        // Effects - Tier 1 (Novice)
-        spellRegistry.register(new BreakEffect(this, glyphConfig));
-        spellRegistry.register(new HarmEffect(this, glyphConfig));
-        spellRegistry.register(new IgniteEffect(this, glyphConfig));
-        spellRegistry.register(new FreezeEffect(this, glyphConfig));
-        spellRegistry.register(new KnockbackEffect(this, glyphConfig));
-        spellRegistry.register(new PullEffect(this, glyphConfig));
-        spellRegistry.register(new GravityEffect(this, glyphConfig));
-        spellRegistry.register(new LightEffect(this, glyphConfig));
-        spellRegistry.register(new HarvestEffect(this, glyphConfig));
-        spellRegistry.register(new CutEffect(this, glyphConfig));
-        spellRegistry.register(new InteractEffect(this, glyphConfig));
-        spellRegistry.register(new PickupEffect(this, glyphConfig));
-        spellRegistry.register(new RotateEffect(this, glyphConfig));
-        spellRegistry.register(new FellEffect(this, glyphConfig));
-        // RedstoneSignalEffect は削除済み
-        spellRegistry.register(new PhantomBlockEffect(this, glyphConfig));
-        spellRegistry.register(new PlaceBlockEffect(this, glyphConfig));
-        // TossEffect は廃止（アイテムバインドで代替）
-        spellRegistry.register(new LaunchEffect(this, glyphConfig));
-        spellRegistry.register(new LeapEffect(this, glyphConfig));
-        spellRegistry.register(new BounceEffect(this, glyphConfig));
-        spellRegistry.register(new SnareEffect(this, glyphConfig));
-        spellRegistry.register(new EvaporateEffect(this, glyphConfig));
-        spellRegistry.register(new DispelEffect(this, glyphConfig));
-        spellRegistry.register(new RuneEffect(this, glyphConfig));
-        spellRegistry.register(new SummonSteedEffect(this, glyphConfig));
-        spellRegistry.register(new SummonWolvesEffect(this, glyphConfig));
-        spellRegistry.register(new WololoEffect(this, glyphConfig));
-        spellRegistry.register(new BubbleEffect(this, glyphConfig));
-        spellRegistry.register(new PrestidigitationEffect(this, glyphConfig));
-        spellRegistry.register(new CryEffect(this, glyphConfig));
+        // ===== Effects - 戦闘（ダメージ/デバフ） =====
+        spellRegistry.register(new HarmEffect(this, glyphConfig));       // T1: 害悪
+        spellRegistry.register(new IgniteEffect(this, glyphConfig));     // T1: 炎上
+        spellRegistry.register(new FreezeEffect(this, glyphConfig));     // T2: 凍結
+        spellRegistry.register(new KnockbackEffect(this, glyphConfig));  // T1: 吹飛
+        spellRegistry.register(new PullEffect(this, glyphConfig));       // T2: 引寄
+        spellRegistry.register(new GravityEffect(this, glyphConfig));    // T2: 重力
+        spellRegistry.register(new SnareEffect(this, glyphConfig));      // T1: 拘束
+        spellRegistry.register(new ScorchEffect(this, glyphConfig));     // T2: 焦熱
+        spellRegistry.register(new ColdSnapEffect(this, glyphConfig));   // T2: 凍裂
+        spellRegistry.register(new CrushWaveEffect(this, glyphConfig));  // T2: 粉砕波
+        spellRegistry.register(new WindshearEffect(this, glyphConfig));  // T2: 烈風
+        spellRegistry.register(new WindBurstEffect(this, glyphConfig));  // T3: 突風
+        spellRegistry.register(new LightningEffect(this, glyphConfig));  // T3: 落雷
+        spellRegistry.register(new WitherEffect(this, glyphConfig));     // T3: 衰弱
+        spellRegistry.register(new HexEffect(this, glyphConfig));        // T3: 呪詛
+        spellRegistry.register(new FangsEffect(this, glyphConfig));      // T3: 牙
+        spellRegistry.register(new SonicBoomEffect(this, glyphConfig));  // T3: ソニックブーム
+        spellRegistry.register(new HeavyImpactEffect(this, glyphConfig));// T3: ヘビーインパクト
+        spellRegistry.register(new SolarEffect(this, glyphConfig));      // T3: 日輪
+        spellRegistry.register(new LunarEffect(this, glyphConfig));      // T3: 月輪
 
-        // Effects - Tier 2 (Apprentice)
-        spellRegistry.register(new HealEffect(this, glyphConfig));
-        spellRegistry.register(new GrowEffect(this, glyphConfig));
-        spellRegistry.register(new ExplosionEffect(this, glyphConfig));
-        spellRegistry.register(new ExchangeEffect(this, glyphConfig));
-        spellRegistry.register(new SmeltEffect(this, glyphConfig));
-        spellRegistry.register(new CrushEffect(this, glyphConfig));
-        spellRegistry.register(new CrushWaveEffect(this, glyphConfig));
-        spellRegistry.register(new ScorchEffect(this, glyphConfig));
-        spellRegistry.register(new ColdSnapEffect(this, glyphConfig));
-        spellRegistry.register(new WindshearEffect(this, glyphConfig));
-        spellRegistry.register(new ConjureWaterEffect(this, glyphConfig));
-        spellRegistry.register(new SlowfallEffect(this, glyphConfig));
-        spellRegistry.register(new InvisibilityEffect(this, glyphConfig));
-        spellRegistry.register(new InfuseEffect(this, glyphConfig));
-        spellRegistry.register(new CraftEffect(this, glyphConfig));
-        spellRegistry.register(new AnimateEffect(this, glyphConfig));
-        spellRegistry.register(new FireworkEffect(this, glyphConfig));
-        spellRegistry.register(new NameEffect(this, glyphConfig));
-        spellRegistry.register(new WindBurstEffect(this, glyphConfig));
-        spellRegistry.register(new SpeedBoostEffect(this, glyphConfig));
-        spellRegistry.register(new LevitateEffect(this, glyphConfig));
-        spellRegistry.register(new ReverseEffect(this, glyphConfig));
-        spellRegistry.register(new SaturationEffect(this, glyphConfig));
-        spellRegistry.register(new GaleEffect(this, glyphConfig));
-        spellRegistry.register(new ScaleEffect(this, glyphConfig));
+        // ===== Effects - 移動/ユーティリティ =====
+        spellRegistry.register(new LaunchEffect(this, glyphConfig));     // T1: 打ち上げ
+        spellRegistry.register(new LeapEffect(this, glyphConfig));       // T1: 跳躍
+        spellRegistry.register(new BounceEffect(this, glyphConfig));     // T2: 跳弾
+        spellRegistry.register(new SpeedBoostEffect(this, glyphConfig)); // T2: 指向
+        spellRegistry.register(new GaleEffect(this, glyphConfig));       // T2: 疾風
+        spellRegistry.register(new SlowfallEffect(this, glyphConfig));   // T2: 低速落下
+        spellRegistry.register(new LevitateEffect(this, glyphConfig));   // T2: 浮遊
+        spellRegistry.register(new ReverseEffect(this, glyphConfig));    // T2: 反転
+        spellRegistry.register(new BlinkEffect(this, glyphConfig));      // T3: 瞬間移動
+        spellRegistry.register(new GlideEffect(this, glyphConfig));      // T3: 滑空
 
-        // Effects - Tier 3 (Archmage)
-        spellRegistry.register(new AdvancedBreakEffect(this, glyphConfig));
-        spellRegistry.register(new BlinkEffect(this, glyphConfig));
-        spellRegistry.register(new LightningEffect(this, glyphConfig));
-        spellRegistry.register(new WitherEffect(this, glyphConfig));
-        spellRegistry.register(new ShieldEffect(this, glyphConfig));
-        spellRegistry.register(new HexEffect(this, glyphConfig));
-        spellRegistry.register(new GlideEffect(this, glyphConfig));
-        spellRegistry.register(new FangsEffect(this, glyphConfig));
-        spellRegistry.register(new IntangibleEffect(this, glyphConfig));
-        spellRegistry.register(new RewindEffect(this, glyphConfig));
-        spellRegistry.register(new SummonUndeadEffect(this, glyphConfig));
-        spellRegistry.register(new SummonVexEffect(this, glyphConfig));
-        spellRegistry.register(new SummonDecoyEffect(this, glyphConfig));
-        spellRegistry.register(new JourneyEffect(this, glyphConfig));
-        spellRegistry.register(new SonicBoomEffect(this, glyphConfig));
-        spellRegistry.register(new SolarEffect(this, glyphConfig));
-        spellRegistry.register(new LunarEffect(this, glyphConfig));
-        spellRegistry.register(new HeavyImpactEffect(this, glyphConfig));
+        // ===== Effects - バフ/回復 =====
+        spellRegistry.register(new HealEffect(this, glyphConfig));       // T2: 回復
+        spellRegistry.register(new SaturationEffect(this, glyphConfig)); // T2: 満腹
+        spellRegistry.register(new ShieldEffect(this, glyphConfig));     // T3: 盾
+        spellRegistry.register(new InvisibilityEffect(this, glyphConfig));// T2: 透明
+        spellRegistry.register(new BubbleEffect(this, glyphConfig));     // T1: 泡
+        spellRegistry.register(new DispelEffect(this, glyphConfig));     // T2: 解呪
+        spellRegistry.register(new JourneyEffect(this, glyphConfig));    // T3: 旅路の魔法
+        spellRegistry.register(new ScaleEffect(this, glyphConfig));      // T2: スケール
 
-        // Augments (21種)
+        // ===== Effects - ブロック操作 =====
+        spellRegistry.register(new BreakEffect(this, glyphConfig));      // T1: 破壊
+        spellRegistry.register(new AdvancedBreakEffect(this, glyphConfig));// T3: 高度破壊
+        spellRegistry.register(new LightEffect(this, glyphConfig));      // T1: 光明
+        spellRegistry.register(new GrowEffect(this, glyphConfig));       // T2: 成長
+        spellRegistry.register(new HarvestEffect(this, glyphConfig));    // T1: 収穫
+        spellRegistry.register(new CutEffect(this, glyphConfig));        // T1: 刈取
+        spellRegistry.register(new FellEffect(this, glyphConfig));       // T1: 伐採
+        spellRegistry.register(new PlaceBlockEffect(this, glyphConfig)); // T1: 設置
+        spellRegistry.register(new PhantomBlockEffect(this, glyphConfig));// T1: 幻影
+        spellRegistry.register(new ExchangeEffect(this, glyphConfig));   // T2: 交換
+        spellRegistry.register(new SmeltEffect(this, glyphConfig));      // T2: 精錬
+        spellRegistry.register(new CrushEffect(this, glyphConfig));      // T2: 粉砕
+        spellRegistry.register(new ExplosionEffect(this, glyphConfig));  // T2: 爆発
+        spellRegistry.register(new EvaporateEffect(this, glyphConfig));  // T1: 蒸発
+        spellRegistry.register(new ConjureWaterEffect(this, glyphConfig));// T1: 水生成
+        spellRegistry.register(new IntangibleEffect(this, glyphConfig)); // T3: 透過
+
+        // ===== Effects - 特殊/召喚 =====
+        spellRegistry.register(new InteractEffect(this, glyphConfig));   // T1: 操作
+        spellRegistry.register(new PickupEffect(this, glyphConfig));     // T1: 拾得
+        spellRegistry.register(new RotateEffect(this, glyphConfig));     // T1: 回転
+        spellRegistry.register(new InfuseEffect(this, glyphConfig));     // T2: 注入
+        spellRegistry.register(new CraftEffect(this, glyphConfig));      // T1: 作業台
+        spellRegistry.register(new RuneEffect(this, glyphConfig));       // T3: 罠術
+        spellRegistry.register(new RewindEffect(this, glyphConfig));     // T3: 巻き戻し
+        spellRegistry.register(new WololoEffect(this, glyphConfig));     // T1: 色彩
+        spellRegistry.register(new NameEffect(this, glyphConfig));       // T2: 命名
+        spellRegistry.register(new FireworkEffect(this, glyphConfig));   // T2: 花火
+        spellRegistry.register(new PrestidigitationEffect(this, glyphConfig));// T1: 手品
+        spellRegistry.register(new CryEffect(this, glyphConfig));        // T1: 鳴き声
+        spellRegistry.register(new SummonSteedEffect(this, glyphConfig));// T1: 馬召喚
+        spellRegistry.register(new SummonWolvesEffect(this, glyphConfig));// T2: 狼召喚
+        spellRegistry.register(new AnimateEffect(this, glyphConfig));    // T2: ゴーレム召喚
+        spellRegistry.register(new SummonUndeadEffect(this, glyphConfig));// T3: 不死召喚
+        spellRegistry.register(new SummonVexEffect(this, glyphConfig));  // T3: ヴェックス召喚
+        spellRegistry.register(new SummonDecoyEffect(this, glyphConfig));// T3: デコイ召喚
+
+        // ===== Augments - 基本ペア（増幅/減衰）=====
         var amplify = new AmplifyAugment(this, glyphConfig);
         var dampen = new DampenAugment(this, glyphConfig);
+        spellRegistry.register(amplify);                                 // 増幅
+        spellRegistry.register(dampen);                                  // 減衰
+
+        // ===== Augments - 範囲系 =====
+        spellRegistry.register(new AoeAugment(this, glyphConfig));       // 幅
+        spellRegistry.register(new AoeHeightAugment(this, glyphConfig)); // 上下
+        spellRegistry.register(new AoeVerticalAugment(this, glyphConfig));// 奥行き
         var aoeRadius = new AoeRadiusAugment(this, glyphConfig);
+        spellRegistry.register(aoeRadius);                               // 半径増加
+
+        // ===== Augments - 時間系 =====
         var extendTime = new ExtendTimeAugment(this, glyphConfig);
         var durationDown = new DurationDownAugment(this, glyphConfig);
+        spellRegistry.register(extendTime);                              // 延長
+        spellRegistry.register(durationDown);                            // 短縮
+
+        // ===== Augments - 射程/速度系 =====
+        var extendReach = new com.arspaper.spell.augment.ExtendReachAugment(this, glyphConfig);
+        var shrinkReach = new com.arspaper.spell.augment.ShrinkReachAugment(this, glyphConfig);
+        spellRegistry.register(extendReach);                             // 延伸
+        spellRegistry.register(shrinkReach);                             // 収縮
         var accelerate = new AccelerateAugment(this, glyphConfig);
         var decelerate = new DecelerateAugment(this, glyphConfig);
+        spellRegistry.register(accelerate);                              // 加速
+        spellRegistry.register(decelerate);                              // 減速
+
+        // ===== Augments - 投射系 =====
         var pierce = new PierceAugment(this, glyphConfig);
         var split = new SplitAugment(this, glyphConfig);
+        spellRegistry.register(pierce);                                  // 貫通
+        spellRegistry.register(split);                                   // 分裂
+        spellRegistry.register(new TrailAugment(this, glyphConfig));     // 連射
+        spellRegistry.register(new TraceAugment(this, glyphConfig));     // 軌跡
+
+        // ===== Augments - 特殊 =====
         var propagate = new PropagateAugment(this, glyphConfig);
-        var extendReach = new com.arspaper.spell.augment.ExtendReachAugment(this, glyphConfig);
-
-        spellRegistry.register(amplify);
-        spellRegistry.register(dampen);
-        spellRegistry.register(new AoeAugment(this, glyphConfig));
-        spellRegistry.register(new AoeHeightAugment(this, glyphConfig));
-        spellRegistry.register(new AoeVerticalAugment(this, glyphConfig));
-        spellRegistry.register(aoeRadius);
-        spellRegistry.register(extendTime);
-        spellRegistry.register(durationDown);
-        spellRegistry.register(accelerate);
-        spellRegistry.register(decelerate);
-        spellRegistry.register(pierce);
-        spellRegistry.register(split);
-        spellRegistry.register(new ExtractAugment(this, glyphConfig));
-        var fortune = new FortuneAugment(this, glyphConfig);
-        spellRegistry.register(fortune);
-        spellRegistry.register(new RandomizeAugment(this, glyphConfig));
-        spellRegistry.register(new DelayAugment(this, glyphConfig));
-        // WallAugment は廃止
+        spellRegistry.register(propagate);                               // 伝播
         var linger = new LingerAugment(this, glyphConfig);
-        spellRegistry.register(linger);
-        spellRegistry.register(new TrailAugment(this, glyphConfig));
-        spellRegistry.register(new TraceAugment(this, glyphConfig));
-        spellRegistry.register(propagate);
-        spellRegistry.register(extendReach);
-        var shrinkReach = new com.arspaper.spell.augment.ShrinkReachAugment(this, glyphConfig);
-        spellRegistry.register(shrinkReach);
+        spellRegistry.register(linger);                                  // 残留
+        spellRegistry.register(new DelayAugment(this, glyphConfig));     // 遅延
+        spellRegistry.register(new ExtractAugment(this, glyphConfig));   // 抽出
+        var fortune = new FortuneAugment(this, glyphConfig);
+        spellRegistry.register(fortune);                                 // 幸運
+        spellRegistry.register(new RandomizeAugment(this, glyphConfig)); // 無作為
 
-        // 超増強 (13種) — ベース増強2個分の効果、コスト4倍（上限64）
+        // ===== 超増強 (14種) - 通常と同順で配置 =====
         spellRegistry.register(new SuperAugment(this, glyphConfig, amplify,     "超増幅", "増幅2個分の強化効果"));
         spellRegistry.register(new SuperAugment(this, glyphConfig, dampen,      "超減衰", "減衰2個分の抑制効果"));
-        spellRegistry.register(new SuperAugment(this, glyphConfig, accelerate,  "超加速", "加速2個分の速度上昇"));
-        spellRegistry.register(new SuperAugment(this, glyphConfig, decelerate,  "超減速", "減速2個分の速度低下"));
-        spellRegistry.register(new SuperAugment(this, glyphConfig, split,       "超分裂", "分裂2個分の弾数増加"));
-        spellRegistry.register(new SuperAugment(this, glyphConfig, pierce,      "超貫通", "貫通2個分の貫通効果"));
         spellRegistry.register(new SuperAugment(this, glyphConfig, aoeRadius,   "超半径増加", "半径増加2個分の範囲拡大"));
-        spellRegistry.register(new SuperAugment(this, glyphConfig, extendReach, "超延伸", "延伸2個分の射程延長"));
-        spellRegistry.register(new SuperAugment(this, glyphConfig, propagate,   "超伝播", "伝播2個分のチェーン対象"));
         spellRegistry.register(new SuperAugment(this, glyphConfig, extendTime,  "超延長", "延長2個分の持続時間延長"));
         spellRegistry.register(new SuperAugment(this, glyphConfig, durationDown,"超短縮", "短縮2個分の持続時間短縮"));
+        spellRegistry.register(new SuperAugment(this, glyphConfig, extendReach, "超延伸", "延伸2個分の射程延長"));
         spellRegistry.register(new SuperAugment(this, glyphConfig, shrinkReach, "超収縮", "収縮2個分の射程短縮"));
-        spellRegistry.register(new SuperAugment(this, glyphConfig, fortune,    "超幸運", "幸運2個分のドロップ増加"));
-        spellRegistry.register(new SuperAugment(this, glyphConfig, linger,     "超残留", "残留2個分の持続時間"));
+        spellRegistry.register(new SuperAugment(this, glyphConfig, accelerate,  "超加速", "加速2個分の速度上昇"));
+        spellRegistry.register(new SuperAugment(this, glyphConfig, decelerate,  "超減速", "減速2個分の速度低下"));
+        spellRegistry.register(new SuperAugment(this, glyphConfig, pierce,      "超貫通", "貫通2個分の貫通効果"));
+        spellRegistry.register(new SuperAugment(this, glyphConfig, split,       "超分裂", "分裂2個分の弾数増加"));
+        spellRegistry.register(new SuperAugment(this, glyphConfig, propagate,   "超伝播", "伝播2個分のチェーン対象"));
+        spellRegistry.register(new SuperAugment(this, glyphConfig, linger,      "超残留", "残留2個分の持続時間"));
+        spellRegistry.register(new SuperAugment(this, glyphConfig, fortune,     "超幸運", "幸運2個分のドロップ増加"));
     }
 
     private void registerDefaultItems() {

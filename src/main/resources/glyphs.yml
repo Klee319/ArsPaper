@@ -1581,7 +1581,7 @@ glyphs:
   # 説明: 半径を拡大する（爆発/召喚数/拾い範囲等）
   aoe_radius:
     tier: 2
-    mana-cost: 20
+    mana-cost: 25
     params:
       per-stack: 1                   # 1個あたりの半径増加量
     unlock-cost:
@@ -1717,7 +1717,7 @@ glyphs:
   # 説明: 命中範囲に効果を持続的に再発動するエリアを生成する
   linger:
     tier: 3
-    mana-cost: 80
+    mana-cost: 30
     # 命中範囲に効果を持続的に再発動するエリアを生成
     # ルーン：残留を組み合わせると発動後も効果が残る
     # エンティティ効果系（凍結、害悪、治癒等）にも互換
@@ -1798,8 +1798,8 @@ glyphs:
     mana-cost: 25
     # 増幅:満腹レベル↑ | 減衰:空腹デバフ
     max-augments:
-      amplify: 6
-      dampen: 4
+      amplify: 2
+      dampen: 2
       duration_down: 6
       extend_time: 1
       linger: 6
@@ -1820,16 +1820,16 @@ glyphs:
     tier: 2
     mana-cost: 25
     max-augments:
-      amplify: 3
+      amplify: 4
       dampen: 4
-      duration_down: 3
-      extend_time: 5
+      duration_down: 1
+      extend_time: 6
       linger: 6
-      propagate: 3
+      propagate: 4
     params:
       base-level: 0                 # 基本ポーションレベル(0=Lv1)
-      base-duration: 400
-      duration-per-level: 200
+      base-duration: 300
+      duration-per-level: 100
     unlock-cost:
       level: 20
       materials:
@@ -1842,18 +1842,18 @@ glyphs:
     tier: 2
     mana-cost: 25
     params:
-      base-duration: 600             # 基本持続時間(tick=30秒)
-      duration-per-level: 200        # 延長1段あたりの追加時間(tick=10秒)
+      base-duration: 300             # 基本持続時間(tick=30秒)
+      duration-per-level: 100        # 延長1段あたりの追加時間(tick=10秒)
       scale-per-level: 0.5           # 増幅1段あたりのサイズ倍率(+50%)
       min-scale: 0.0625              # 最小スケール(MC制限)
       max-scale: 16.0                # 最大スケール(MC制限)
     max-augments:
-      amplify: 5
-      dampen: 3
-      duration_down: 3
-      extend_time: 5
+      amplify: 6
+      dampen: 6
+      duration_down: 2
+      extend_time: 6
       linger: 6
-      propagate: 3
+      propagate: 4
     unlock-cost:
       level: 25
       materials:
@@ -1865,14 +1865,14 @@ glyphs:
     tier: 3
     mana-cost: 500
     max-augments:
-      amplify: 3
-      duration_down: 3
-      extend_time: 5
+      amplify: 6
+      duration_down: 2
+      extend_time: 6
       linger: 6
-      propagate: 3
+      propagate: 4
     params:
-      base-duration: 6000
-      duration-per-level: 2400
+      base-duration: 1200
+      duration-per-level: 400
     unlock-cost:
       level: 100
       materials:
@@ -1891,14 +1891,14 @@ glyphs:
     params:
       range: 20.0                   # 射程(ブロック)
       base-damage: 10.0             # 基本ダメージ(HP)
-      amplify-damage-bonus: 4.0     # 増幅1段あたりのダメージ増加(HP)
+      amplify-damage-bonus: 5.0     # 増幅1段あたりのダメージ増加(HP)
       hit-radius: 1.0               # ヒット判定半径(ブロック)
       spread-angle-step: 0.15       # 分裂時の拡散角度(rad)
     max-augments:
-      amplify: 5
-      dampen: 4
+      amplify: 6
+      dampen: 1
       split: 4
-      pierce: 3
+      pierce: 4
     unlock-cost:
       level: 40
       materials:
@@ -1920,12 +1920,12 @@ glyphs:
       base-fire-interval: 20        # 基本発射間隔(tick=1秒)
       fire-ticks: 60                # 炎上時間(tick=3秒)
     max-augments:
-      amplify: 5
-      dampen: 4
-      aoe_radius: 5
+      amplify: 6
+      dampen: 1
+      aoe_radius: 6
       split: 4
-      duration_down: 3
-      extend_time: 5
+      duration_down: 1
+      extend_time: 6
     unlock-cost:
       level: 50
       materials:
@@ -1952,15 +1952,15 @@ glyphs:
       base-duration: 200            # 基本召喚時間(tick=10秒)
       duration-per-level: 100       # 延長1段あたりの追加時間(tick=5秒)
       base-fire-interval: 20        # 基本発射間隔(tick=1秒)
-      freeze-ticks: 140             # 凍結時間(tick=7秒)
+      freeze-ticks: 100             # 凍結時間(tick=7秒)
       snare-duration: 60            # 鈍足拘束時間(tick=3秒)
     max-augments:
-      amplify: 5
-      dampen: 4
-      aoe_radius: 5
+      amplify: 6
+      dampen: 1
+      aoe_radius: 6
       split: 4
-      duration_down: 3
-      extend_time: 5
+      duration_down: 1
+      extend_time: 6
     unlock-cost:
       level: 50
       materials:
@@ -1981,15 +1981,15 @@ glyphs:
     params:
       base-damage-per-hit: 3.0      # 1段あたりの基本ダメージ(HP)
       amplify-damage-bonus: 1.5     # 増幅1段あたりのダメージ増加(HP)
-      base-radius: 1                # 基本衝撃範囲(3×3=中心+1ブロック)
+      base-radius: 2                # 基本衝撃範囲(3×3=中心+1ブロック)
       hit-count: 5                  # 連続ダメージ段数
       hit-interval-ticks: 3         # 連撃間隔(tick)
       linger-duration-ticks: 200    # 残留ゾーン持続時間(tick=10秒)
       linger-tick-interval: 40      # 残留ゾーンダメージ間隔(tick=2秒)
     max-augments:
-      amplify: 5
-      dampen: 4
-      aoe_radius: 5
+      amplify: 6
+      dampen: 1
+      aoe_radius: 6
       linger: 6
     unlock-cost:
       level: 35
@@ -2007,7 +2007,7 @@ glyphs:
   # 説明: 増幅2個分の強化効果
   super_amplify:
     tier: 3
-    mana-cost: 64
+    mana-cost: 50
     unlock-cost:
       level: 40
       materials:
@@ -2017,7 +2017,7 @@ glyphs:
   # 説明: 減衰2個分の抑制効果
   super_dampen:
     tier: 3
-    mana-cost: 0
+    mana-cost: 10
     unlock-cost:
       level: 40
       materials:
@@ -2027,7 +2027,7 @@ glyphs:
   # 説明: 加速2個分の速度上昇
   super_accelerate:
     tier: 3
-    mana-cost: 40
+    mana-cost: 30
     unlock-cost:
       level: 40
       materials:
@@ -2037,7 +2037,7 @@ glyphs:
   # 説明: 減速2個分の速度低下
   super_decelerate:
     tier: 3
-    mana-cost: 0
+    mana-cost: 10
     unlock-cost:
       level: 40
       materials:
@@ -2047,7 +2047,7 @@ glyphs:
   # 説明: 分裂2個分の弾数増加
   super_split:
     tier: 3
-    mana-cost: 64
+    mana-cost: 50
     unlock-cost:
       level: 40
       materials:
@@ -2067,7 +2067,7 @@ glyphs:
   # 説明: 半径増加2個分の範囲拡大
   super_aoe_radius:
     tier: 3
-    mana-cost: 64
+    mana-cost: 60
     unlock-cost:
       level: 40
       materials:
@@ -2077,7 +2077,7 @@ glyphs:
   # 説明: 延伸2個分の射程延長
   super_extend_reach:
     tier: 3
-    mana-cost: 60
+    mana-cost: 40
     unlock-cost:
       level: 40
       materials:
@@ -2087,7 +2087,7 @@ glyphs:
   # 説明: 伝播2個分のチェーン対象
   super_propagate:
     tier: 3
-    mana-cost: 64
+    mana-cost: 60
     unlock-cost:
       level: 40
       materials:
@@ -2097,7 +2097,7 @@ glyphs:
   # 説明: 延長2個分の持続時間延長
   super_extend_time:
     tier: 3
-    mana-cost: 40
+    mana-cost: 30
     unlock-cost:
       level: 40
       materials:
@@ -2107,7 +2107,7 @@ glyphs:
   # 説明: 短縮2個分の持続時間短縮
   super_duration_down:
     tier: 3
-    mana-cost: 0
+    mana-cost: 10
     unlock-cost:
       level: 40
       materials:
@@ -2117,7 +2117,7 @@ glyphs:
   # 説明: 幸運2個分のドロップ増加
   super_fortune:
     tier: 3
-    mana-cost: 64
+    mana-cost: 60
     unlock-cost:
       level: 40
       materials:
@@ -2127,7 +2127,7 @@ glyphs:
   # 説明: 収縮2個分の射程短縮
   super_shrink_reach:
     tier: 3
-    mana-cost: 0
+    mana-cost: 10
     unlock-cost:
       level: 40
       materials:
@@ -2137,7 +2137,7 @@ glyphs:
   # 説明: 残留2個分の持続時間
   super_linger:
     tier: 3
-    mana-cost: 64
+    mana-cost: 70
     unlock-cost:
       level: 40
       materials:
@@ -2197,14 +2197,49 @@ exchange_tiers:
 # 変換後が非ブロック素材（染料等）の場合、ブロックを破壊してアイテムをドロップする。
 crush_map:
   # 石系
+  STONE: COBBLESTONE
+  COBBLESTONE: GRAVEL
+  GRAVEL: SAND
+  SANDSTONE: SAND
+  RED_SANDSTONE: RED_SAND
+  SMOOTH_STONE: STONE
+  DEEPSLATE: COBBLED_DEEPSLATE
+  TUFF: GRAVEL
+  CALCITE: GRAVEL
   # 骨系
+  BONE_BLOCK: BONE_MEAL
   # 氷系
+  BLUE_ICE: PACKED_ICE
+  PACKED_ICE: ICE
   # 花 → 染料
+  DANDELION: YELLOW_DYE
+  POPPY: RED_DYE
+  BLUE_ORCHID: LIGHT_BLUE_DYE
+  ALLIUM: MAGENTA_DYE
+  AZURE_BLUET: LIGHT_GRAY_DYE
+  RED_TULIP: RED_DYE
+  ORANGE_TULIP: ORANGE_DYE
+  WHITE_TULIP: LIGHT_GRAY_DYE
+  PINK_TULIP: PINK_DYE
+  OXEYE_DAISY: LIGHT_GRAY_DYE
+  CORNFLOWER: BLUE_DYE
+  LILY_OF_THE_VALLEY: WHITE_DYE
   # 羊毛 → 糸
+  WHITE_WOOL: STRING
   # その他
+  GLOWSTONE: GLOWSTONE_DUST
+  SEA_LANTERN: PRISMARINE_CRYSTALS
   # ブロック分解
+  NETHER_WART_BLOCK: NETHER_WART
+  BRICKS: BRICK
+  QUARTZ_BLOCK: QUARTZ
+  HONEYCOMB_BLOCK: HONEYCOMB
+  MAGMA_BLOCK: MAGMA_CREAM
   # 風化・逆精錬
+  SMOOTH_BASALT: BASALT
   # 食品分解
+  MELON: MELON_SLICE
+  SUGAR_CANE: SUGAR
 
 # ============================================================
 # 交換グリフ エンティティペアマッピング

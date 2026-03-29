@@ -57,7 +57,7 @@ public class SuperAugment implements SpellAugment {
 
     @Override
     public int getManaCost() {
-        return Math.min(64, config.getManaCost(base.getId().getKey()) * 4);
+        return config.getManaCost(id.getKey());
     }
 
     @Override

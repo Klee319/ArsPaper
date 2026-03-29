@@ -77,9 +77,9 @@ public class HeavyImpactEffect implements SpellEffect {
         int lingerTickInterval = (int) config.getParam("heavy_impact", "linger-tick-interval", (double) LINGER_TICK_INTERVAL);
         boolean linger = context.isLingerPattern();
 
-        // 衝撃波サウンド
-        center.getWorld().playSound(center, Sound.ENTITY_WARDEN_SONIC_CHARGE,
-            SoundCategory.PLAYERS, 1.0f, 0.5f);
+        // 衝撃波サウンド（金床、控えめ）
+        center.getWorld().playSound(center, Sound.BLOCK_ANVIL_LAND,
+            SoundCategory.PLAYERS, 0.4f, 0.6f);
 
         // 5段階連続ダメージ
         BukkitTask task = new BukkitRunnable() {
@@ -187,17 +187,19 @@ public class HeavyImpactEffect implements SpellEffect {
                 1, 0.1, 0.1, 0.1, 0.02);
         }
 
-        // 衝撃音（段階に応じてピッチ変化）
-        float pitch = 0.5f + hitIndex * 0.15f;
-        center.getWorld().playSound(center, Sound.ENTITY_IRON_GOLEM_ATTACK,
-            SoundCategory.PLAYERS, 1.0f, pitch);
+        // 衝撃音（奇数段のみ再生して音ずれ防止、ピッチ上昇）
+        if (hitIndex % 2 == 0) {
+            float pitch = 0.6f + hitIndex * 0.15f;
+            center.getWorld().playSound(center, Sound.BLOCK_ANVIL_LAND,
+                SoundCategory.PLAYERS, 0.3f, pitch);
+        }
     }
 
     private void spawnLingerParticles(Location center, int radius) {
         center.getWorld().spawnParticle(Particle.DUST_PLUME, center,
             10, radius * 0.5, 0.2, radius * 0.5, 0.05);
         center.getWorld().playSound(center, Sound.BLOCK_ANVIL_LAND,
-            SoundCategory.PLAYERS, 0.3f, 1.5f);
+            SoundCategory.PLAYERS, 0.2f, 1.5f);
     }
 
     @Override
