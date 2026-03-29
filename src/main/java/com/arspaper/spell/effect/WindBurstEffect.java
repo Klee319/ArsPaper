@@ -13,7 +13,10 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
+
+import com.arspaper.spell.SpellTaskLimiter;
 
 /**
  * 突風エフェクト - 対象の周囲に風のバリアを展開する。
@@ -89,7 +92,7 @@ public class WindBurstEffect implements SpellEffect {
 
         java.util.UUID casterUUID = caster != null ? caster.getUniqueId() : null;
 
-        new BukkitRunnable() {
+        BukkitTask task = new BukkitRunnable() {
             int ticks = 0;
 
             @Override
@@ -134,6 +137,7 @@ public class WindBurstEffect implements SpellEffect {
                 }
             }
         }.runTaskTimer(plugin, 0L, 1L);
+        SpellTaskLimiter.register("wind_burst", task);
     }
 
     private void knockbackAway(LivingEntity entity, Location center, double force) {

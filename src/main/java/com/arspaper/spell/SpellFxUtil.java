@@ -3,6 +3,7 @@ package com.arspaper.spell;
 import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.block.data.BlockData;
+import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -14,11 +15,72 @@ import org.bukkit.util.BoundingBox;
  * Effect固有の補助エフェクトを提供する。
  *
  * 全てバニラパーティクル/サウンドを使用（Geyser互換）。
+ *
+ * パフォーマンス最適化:
+ * - 距離カリング: スペル発動パーティクルは64ブロック以内、エフェクトパーティクルは32ブロック以内
+ * - 二次発動削減: 伝播/軌跡経由のパーティクル数を1/3に削減
  */
 @SuppressWarnings("unused")
 public final class SpellFxUtil {
 
     private SpellFxUtil() {}
+
+    /** スペル発動パーティクルの最大表示距離 */
+    public static final int CAST_PARTICLE_RANGE = 64;
+    /** エフェクトパーティクルの最大表示距離 */
+    public static final int EFFECT_PARTICLE_RANGE = 32;
+
+    /**
+     * 距離カリング付きパーティクル生成。範囲内のプレイヤーにのみ送信。
+     * @param secondaryScale true の場合パーティクル数を1/3に削減
+     */
+    public static <T> void spawnParticleCulled(Location loc, Particle particle, int count,
+                                                double dx, double dy, double dz, double extra,
+                                                T data, int range, boolean secondaryScale) {
+        int actualCount = secondaryScale ? Math.max(1, count / 3) : count;
+        double rangeSq = (double) range * range;
+        for (Player p : loc.getWorld().getPlayers()) {
+            if (p.getLocation().distanceSquared(loc) <= rangeSq) {
+                p.spawnParticle(particle, loc, actualCount, dx, dy, dz, extra, data);
+            }
+        }
+    }
+
+    /** データなし版 */
+    public static void spawnParticleCulled(Location loc, Particle particle, int count,
+                                            double dx, double dy, double dz, double extra,
+                                            int range, boolean secondaryScale) {
+        spawnParticleCulled(loc, particle, count, dx, dy, dz, extra, null, range, secondaryScale);
+    }
+
+    /**
+     * SpellContextの二次発動状態に基づくパーティクル生成。
+     * 二次発動（伝播/軌跡経由）時はパーティクル数を1/3に削減し、距離カリングを適用。
+     * 通常発動時はバニラのspawnParticleを使用（距離カリング: 64ブロック）。
+     */
+    public static void spawnEffectParticle(SpellContext ctx, Location loc, Particle particle,
+                                            int count, double dx, double dy, double dz, double extra) {
+        if (ctx != null && ctx.isSecondaryInvocation()) {
+            spawnParticleCulled(loc, particle, count, dx, dy, dz, extra,
+                EFFECT_PARTICLE_RANGE, true);
+        } else {
+            spawnParticleCulled(loc, particle, count, dx, dy, dz, extra,
+                CAST_PARTICLE_RANGE, false);
+        }
+    }
+
+    /** データ付き版 */
+    public static <T> void spawnEffectParticle(SpellContext ctx, Location loc, Particle particle,
+                                                int count, double dx, double dy, double dz,
+                                                double extra, T data) {
+        if (ctx != null && ctx.isSecondaryInvocation()) {
+            spawnParticleCulled(loc, particle, count, dx, dy, dz, extra, data,
+                EFFECT_PARTICLE_RANGE, true);
+        } else {
+            spawnParticleCulled(loc, particle, count, dx, dy, dz, extra, data,
+                CAST_PARTICLE_RANGE, false);
+        }
+    }
 
     // ========== Form共通 ==========
 

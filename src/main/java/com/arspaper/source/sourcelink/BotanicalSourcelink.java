@@ -25,7 +25,7 @@ import java.util.List;
 public class BotanicalSourcelink extends Sourcelink {
 
     /** 植物成長1回あたりのソースポイント */
-    public static final int SOURCE_PER_GROWTH = 15;
+    public static final int SOURCE_PER_GROWTH = 5;
     /** 成長検知範囲（ブロック） */
     public static final int DETECTION_RADIUS = 10;
 

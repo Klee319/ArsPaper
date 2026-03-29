@@ -133,7 +133,7 @@ public class FangsEffect implements SpellEffect {
     }
 
     @Override
-    public boolean allowsTraceRepeating() { return false; }
+    public boolean allowsTraceRepeating() { return true; }
 
     @Override
     public NamespacedKey getId() { return id; }

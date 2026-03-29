@@ -13,7 +13,10 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
+
+import com.arspaper.spell.SpellTaskLimiter;
 
 /**
  * 引き寄せエフェクト — 対象の位置を中心に吸引エリアを生成する。
@@ -93,7 +96,7 @@ public class PullEffect implements SpellEffect {
         final double pullForce = force;
         java.util.UUID casterUUID = caster != null ? caster.getUniqueId() : null;
 
-        new BukkitRunnable() {
+        BukkitTask task = new BukkitRunnable() {
             int ticks = 0;
 
             @Override
@@ -138,6 +141,7 @@ public class PullEffect implements SpellEffect {
                 }
             }
         }.runTaskTimer(plugin, 0L, 1L);
+        SpellTaskLimiter.register("pull", task);
     }
 
     private void pullToward(LivingEntity entity, Location center, double force) {

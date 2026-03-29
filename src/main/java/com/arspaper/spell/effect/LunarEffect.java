@@ -15,6 +15,9 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.scheduler.BukkitTask;
+
+import com.arspaper.spell.SpellTaskLimiter;
 
 import java.util.Comparator;
 import java.util.List;
@@ -83,7 +86,7 @@ public class LunarEffect implements SpellEffect {
         center.getWorld().playSound(center, Sound.BLOCK_RESPAWN_ANCHOR_DEPLETE,
             SoundCategory.PLAYERS, 1.2f, 1.8f);
 
-        new BukkitRunnable() {
+        BukkitTask task = new BukkitRunnable() {
             int ticks = 0;
 
             @Override
@@ -117,6 +120,7 @@ public class LunarEffect implements SpellEffect {
                 }
             }
         }.runTaskTimer(plugin, 0L, 1L);
+        SpellTaskLimiter.register("lunar", task);
     }
 
     private void fireFrostProjectile(Location from, LivingEntity target, double damage) {
@@ -172,6 +176,9 @@ public class LunarEffect implements SpellEffect {
 
     @Override
     public boolean handlesAoeInternally() { return true; }
+
+    @Override
+    public boolean allowsTraceRepeating() { return false; }
 
     @Override public NamespacedKey getId() { return id; }
     @Override public String getDisplayName() { return "月輪"; }

@@ -32,47 +32,48 @@ public class VolcanicSourcelink extends Sourcelink {
      * stick(100tick)=10, coal(1600tick)=30, lava_bucket(20000tick)=50
      */
     private static final Map<Material, Integer> FUEL_VALUES = Map.ofEntries(
-        // 低価値（10）: 短い燃焼時間
-        Map.entry(Material.STICK, 10),
-        Map.entry(Material.BAMBOO, 10),
-        Map.entry(Material.WHITE_CARPET, 10),
-        // やや低（15）: 木材系ハーフブロック
-        Map.entry(Material.OAK_SLAB, 15),
-        Map.entry(Material.SPRUCE_SLAB, 15),
-        Map.entry(Material.BIRCH_SLAB, 15),
-        Map.entry(Material.JUNGLE_SLAB, 15),
-        Map.entry(Material.ACACIA_SLAB, 15),
-        Map.entry(Material.DARK_OAK_SLAB, 15),
-        Map.entry(Material.MANGROVE_SLAB, 15),
-        Map.entry(Material.CHERRY_SLAB, 15),
-        Map.entry(Material.BAMBOO_SLAB, 15),
-        // 中価値（20）: 板材・原木
-        Map.entry(Material.OAK_PLANKS, 20),
-        Map.entry(Material.SPRUCE_PLANKS, 20),
-        Map.entry(Material.BIRCH_PLANKS, 20),
-        Map.entry(Material.JUNGLE_PLANKS, 20),
-        Map.entry(Material.ACACIA_PLANKS, 20),
-        Map.entry(Material.DARK_OAK_PLANKS, 20),
-        Map.entry(Material.MANGROVE_PLANKS, 20),
-        Map.entry(Material.CHERRY_PLANKS, 20),
-        Map.entry(Material.BAMBOO_PLANKS, 20),
-        Map.entry(Material.OAK_LOG, 20),
-        Map.entry(Material.SPRUCE_LOG, 20),
-        Map.entry(Material.BIRCH_LOG, 20),
-        Map.entry(Material.JUNGLE_LOG, 20),
-        Map.entry(Material.ACACIA_LOG, 20),
-        Map.entry(Material.DARK_OAK_LOG, 20),
-        Map.entry(Material.MANGROVE_LOG, 20),
-        Map.entry(Material.CHERRY_LOG, 20),
-        Map.entry(Material.CHARCOAL, 25),
-        // 高価値（30）: 石炭
-        Map.entry(Material.COAL, 30),
-        Map.entry(Material.DRIED_KELP_BLOCK, 30),
-        // 非常に高い（40）: ブレイズロッド・石炭ブロック
-        Map.entry(Material.BLAZE_ROD, 40),
-        Map.entry(Material.COAL_BLOCK, 40),
-        // 最高（50）: 溶岩バケツ
-        Map.entry(Material.LAVA_BUCKET, 50)
+        // === バニラ燃焼時間基準: 石炭(1600t) = 5 ===
+        // 最低（1）: 棒、竹、カーペット、ハーフブロック、板材、原木 (50-300t)
+        Map.entry(Material.STICK, 1),
+        Map.entry(Material.BAMBOO, 1),
+        Map.entry(Material.WHITE_CARPET, 1),
+        Map.entry(Material.OAK_SLAB, 1),
+        Map.entry(Material.SPRUCE_SLAB, 1),
+        Map.entry(Material.BIRCH_SLAB, 1),
+        Map.entry(Material.JUNGLE_SLAB, 1),
+        Map.entry(Material.ACACIA_SLAB, 1),
+        Map.entry(Material.DARK_OAK_SLAB, 1),
+        Map.entry(Material.MANGROVE_SLAB, 1),
+        Map.entry(Material.CHERRY_SLAB, 1),
+        Map.entry(Material.BAMBOO_SLAB, 1),
+        Map.entry(Material.OAK_PLANKS, 1),
+        Map.entry(Material.SPRUCE_PLANKS, 1),
+        Map.entry(Material.BIRCH_PLANKS, 1),
+        Map.entry(Material.JUNGLE_PLANKS, 1),
+        Map.entry(Material.ACACIA_PLANKS, 1),
+        Map.entry(Material.DARK_OAK_PLANKS, 1),
+        Map.entry(Material.MANGROVE_PLANKS, 1),
+        Map.entry(Material.CHERRY_PLANKS, 1),
+        Map.entry(Material.BAMBOO_PLANKS, 1),
+        // 原木（3）
+        Map.entry(Material.OAK_LOG, 3),
+        Map.entry(Material.SPRUCE_LOG, 3),
+        Map.entry(Material.BIRCH_LOG, 3),
+        Map.entry(Material.JUNGLE_LOG, 3),
+        Map.entry(Material.ACACIA_LOG, 3),
+        Map.entry(Material.DARK_OAK_LOG, 3),
+        Map.entry(Material.MANGROVE_LOG, 3),
+        Map.entry(Material.CHERRY_LOG, 3),
+        // 基準（5）: 石炭・木炭 (1600t)
+        Map.entry(Material.CHARCOAL, 5),
+        Map.entry(Material.COAL, 5),
+        // 高価値（10）: ブレイズロッド・乾燥昆布ブロック
+        Map.entry(Material.BLAZE_ROD, 10),
+        Map.entry(Material.DRIED_KELP_BLOCK, 10),
+        // 非常に高い（45）: 石炭ブロック (16000t = 10×石炭)
+        Map.entry(Material.COAL_BLOCK, 45),
+        // 最高（100）: 溶岩バケツ (20000t = 12.5×石炭)
+        Map.entry(Material.LAVA_BUCKET, 100)
     );
 
     public VolcanicSourcelink(JavaPlugin plugin) {

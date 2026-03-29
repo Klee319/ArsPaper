@@ -40,6 +40,7 @@ import com.arspaper.spell.PhantomBlockListener;
 import com.arspaper.spell.ProjectileHitListener;
 import com.arspaper.spell.SpellCaster;
 import com.arspaper.spell.SpellRegistry;
+import com.arspaper.spell.SpellTaskLimiter;
 import com.arspaper.spell.SummonedMobListener;
 import com.arspaper.spell.augment.*;
 import com.arspaper.spell.augment.LingerAugment;
@@ -150,6 +151,7 @@ public class ArsPaper extends JavaPlugin {
         GlideEffect.restoreAll();
         BounceEffect.cleanupAll();
         ScaleEffect.cleanupAll();
+        SpellTaskLimiter.cleanupAll();
         getLogger().info("ArsPaper disabled!");
     }
 

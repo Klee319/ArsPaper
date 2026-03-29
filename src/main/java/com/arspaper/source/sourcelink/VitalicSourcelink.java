@@ -23,9 +23,9 @@ import java.util.List;
  */
 public class VitalicSourcelink extends Sourcelink {
 
-    private static final int SOURCE_PER_TICK = 20;
+    private static final int SOURCE_PER_TICK = 5;
     /** mob死亡時のボーナスSource */
-    public static final int SOURCE_PER_KILL = 50;
+    public static final int SOURCE_PER_KILL = 15;
     /** mob死亡検知範囲（ブロック） */
     public static final int DETECTION_RADIUS = 10;
 

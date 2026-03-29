@@ -12,7 +12,10 @@ import org.bukkit.SoundCategory;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
+
+import com.arspaper.spell.SpellTaskLimiter;
 
 /**
  * 反転エフェクト。対象の移動方向を反転させる。
@@ -42,7 +45,7 @@ public class ReverseEffect implements SpellEffect {
 
         spawnReverseFx(target.getLocation());
 
-        new BukkitRunnable() {
+        BukkitTask task = new BukkitRunnable() {
             int ticks = 0;
             Location prevLoc = target.getLocation().clone();
 
@@ -74,6 +77,7 @@ public class ReverseEffect implements SpellEffect {
                 }
             }
         }.runTaskTimer(plugin, 0L, 3L);
+        SpellTaskLimiter.register("reverse", task);
     }
 
     @Override

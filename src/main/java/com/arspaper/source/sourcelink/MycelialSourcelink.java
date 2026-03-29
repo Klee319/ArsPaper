@@ -28,51 +28,50 @@ import java.util.Map;
 public class MycelialSourcelink extends Sourcelink {
 
     /**
-     * 食料アイテム → ソースポイント（バニラの満腹度回復量に比例、10〜50範囲）
-     * cookie(2hunger)=10, bread(5hunger)=20, steak(8hunger)=35, golden_carrot=50
+     * 食料アイテム → ソースポイント（満腹度回復量基準）
+     * 基準: 石炭=5相当。一般的な調理肉=5、金ニンジン=20
      */
     private static final Map<Material, Integer> FOOD_VALUES = Map.ofEntries(
-        // 低価値（10）: 少量回復
-        Map.entry(Material.COOKIE, 10),
-        Map.entry(Material.DRIED_KELP, 10),
-        Map.entry(Material.MELON_SLICE, 10),
-        Map.entry(Material.SWEET_BERRIES, 10),
-        Map.entry(Material.GLOW_BERRIES, 10),
-        Map.entry(Material.POISONOUS_POTATO, 10),
-        // やや低（15）: 中少量回復
-        Map.entry(Material.APPLE, 15),
-        Map.entry(Material.BEETROOT, 15),
-        Map.entry(Material.CARROT, 15),
-        Map.entry(Material.POTATO, 15),
-        Map.entry(Material.BAKED_POTATO, 15),
-        Map.entry(Material.SPIDER_EYE, 15),
-        Map.entry(Material.TROPICAL_FISH, 10),
-        // 中価値（20）: 中量回復
-        Map.entry(Material.BREAD, 20),
-        Map.entry(Material.COD, 15),
-        Map.entry(Material.SALMON, 15),
-        Map.entry(Material.COOKED_COD, 20),
-        Map.entry(Material.COOKED_SALMON, 20),
-        Map.entry(Material.MUSHROOM_STEW, 20),
-        Map.entry(Material.BEETROOT_SOUP, 20),
-        Map.entry(Material.SUSPICIOUS_STEW, 20),
-        // やや高（25-30）: 多量回復
-        Map.entry(Material.CHICKEN, 15),
-        Map.entry(Material.COOKED_CHICKEN, 25),
-        Map.entry(Material.MUTTON, 15),
-        Map.entry(Material.COOKED_MUTTON, 25),
-        Map.entry(Material.PORKCHOP, 20),
-        Map.entry(Material.COOKED_PORKCHOP, 30),
-        Map.entry(Material.BEEF, 20),
-        Map.entry(Material.COOKED_BEEF, 35),
-        Map.entry(Material.RABBIT, 15),
-        Map.entry(Material.COOKED_RABBIT, 25),
-        Map.entry(Material.RABBIT_STEW, 35),
-        Map.entry(Material.PUMPKIN_PIE, 30),
-        // 高価値（40-50）: 特殊食料
-        Map.entry(Material.GOLDEN_APPLE, 40),
-        Map.entry(Material.GOLDEN_CARROT, 50),
-        Map.entry(Material.ENCHANTED_GOLDEN_APPLE, 50)
+        // 最低（1）: クラフト不要で直接入手できる食料
+        Map.entry(Material.MELON_SLICE, 1),
+        Map.entry(Material.SWEET_BERRIES, 1),
+        Map.entry(Material.GLOW_BERRIES, 1),
+        Map.entry(Material.APPLE, 1),
+        Map.entry(Material.CARROT, 1),
+        Map.entry(Material.POTATO, 1),
+        Map.entry(Material.BEETROOT, 1),
+        Map.entry(Material.DRIED_KELP, 1),
+        Map.entry(Material.POISONOUS_POTATO, 1),
+        Map.entry(Material.TROPICAL_FISH, 1),
+        Map.entry(Material.SPIDER_EYE, 1),
+        Map.entry(Material.COD, 1),
+        Map.entry(Material.SALMON, 1),
+        Map.entry(Material.CHICKEN, 1),
+        Map.entry(Material.MUTTON, 1),
+        Map.entry(Material.RABBIT, 1),
+        Map.entry(Material.BEEF, 1),
+        Map.entry(Material.PORKCHOP, 1),
+        // 低（3）: クラフト/加工が必要な食料・肉以外の調理品
+        Map.entry(Material.COOKIE, 3),
+        Map.entry(Material.BAKED_POTATO, 3),
+        Map.entry(Material.BREAD, 3),
+        Map.entry(Material.COOKED_COD, 3),
+        Map.entry(Material.COOKED_SALMON, 3),
+        Map.entry(Material.MUSHROOM_STEW, 3),
+        Map.entry(Material.BEETROOT_SOUP, 3),
+        Map.entry(Material.SUSPICIOUS_STEW, 3),
+        // 中（5）: 調理肉
+        Map.entry(Material.COOKED_CHICKEN, 5),
+        Map.entry(Material.COOKED_MUTTON, 5),
+        Map.entry(Material.COOKED_PORKCHOP, 5),
+        Map.entry(Material.COOKED_BEEF, 5),
+        Map.entry(Material.COOKED_RABBIT, 5),
+        // 高（10）: 高級料理・金ニンジン
+        Map.entry(Material.RABBIT_STEW, 10),
+        Map.entry(Material.PUMPKIN_PIE, 10),
+        Map.entry(Material.GOLDEN_CARROT, 10),
+        // 最高（50）: 金リンゴ
+        Map.entry(Material.GOLDEN_APPLE, 50)
     );
 
     public MycelialSourcelink(JavaPlugin plugin) {

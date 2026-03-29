@@ -16,6 +16,9 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.scheduler.BukkitTask;
+
+import com.arspaper.spell.SpellTaskLimiter;
 
 import java.util.Collection;
 
@@ -75,7 +78,7 @@ public class HeavyImpactEffect implements SpellEffect {
             SoundCategory.PLAYERS, 1.0f, 0.5f);
 
         // 5段階連続ダメージ
-        new BukkitRunnable() {
+        BukkitTask task = new BukkitRunnable() {
             int hitIndex = 0;
 
             @Override
@@ -107,6 +110,7 @@ public class HeavyImpactEffect implements SpellEffect {
                 hitIndex++;
             }
         }.runTaskTimer(plugin, 0L, HIT_INTERVAL_TICKS);
+        SpellTaskLimiter.register("heavy_impact", task);
     }
 
     /**
@@ -115,7 +119,7 @@ public class HeavyImpactEffect implements SpellEffect {
     private void startLingerZone(Location center, int radius, double damagePerHit,
                                   Player caster, SpellContext context) {
         java.util.UUID casterUUID = caster.getUniqueId();
-        new BukkitRunnable() {
+        BukkitTask lingerTask = new BukkitRunnable() {
             int ticks = 0;
 
             @Override
@@ -145,6 +149,7 @@ public class HeavyImpactEffect implements SpellEffect {
                 spawnLingerParticles(center, radius);
             }
         }.runTaskTimer(plugin, LINGER_TICK_INTERVAL, LINGER_TICK_INTERVAL);
+        SpellTaskLimiter.register("heavy_impact_linger", lingerTask);
     }
 
     /**
@@ -191,6 +196,9 @@ public class HeavyImpactEffect implements SpellEffect {
 
     @Override
     public boolean handlesAoeInternally() { return true; }
+
+    @Override
+    public boolean allowsTraceRepeating() { return false; }
 
     @Override public NamespacedKey getId() { return id; }
     @Override public String getDisplayName() { return "ヘビーインパクト"; }

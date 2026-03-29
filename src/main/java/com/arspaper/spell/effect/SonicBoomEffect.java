@@ -58,7 +58,8 @@ public class SonicBoomEffect implements SpellEffect {
         double damage = baseDamage + context.getAmplifyLevel() * amplifyBonus;
 
         int totalBeams = 1 + Math.min(context.getSplitCount(), 6);
-        int blockPierceCharges = 2 * context.getPierceCount();
+        // 貫通1個 = ソリッドブロック2個分貫通
+        int blockPierceBlocks = 2 * context.getPierceCount();
 
         Vector baseDirection = caster.getLocation().getDirection();
 
@@ -68,29 +69,39 @@ public class SonicBoomEffect implements SpellEffect {
                 double angle = (i - (totalBeams - 1) / 2.0) * SPREAD_ANGLE_STEP;
                 direction.rotateAroundY(angle);
             }
-            fireSonicBoom(caster, direction, range, damage, blockPierceCharges, context);
+            fireSonicBoom(caster, direction, range, damage, blockPierceBlocks, context);
         }
     }
 
     private void fireSonicBoom(Player caster, Vector direction, double range,
-                                double damage, int blockPierceCharges, SpellContext context) {
+                                double damage, int blockPierceBlocks, SpellContext context) {
         Location origin = caster.getEyeLocation().clone();
         Set<UUID> hitEntities = new HashSet<>();
-        int pierceRemaining = blockPierceCharges;
+        int pierceRemaining = blockPierceBlocks;
 
         double effectiveRange = range;
 
-        // ブロック衝突スキャン（透過ブロックは自動貫通）
-        for (double dist = 1.0; dist <= range; dist += 1.0) {
+        // ブロック衝突スキャン
+        // 透過ブロック（ガラス、葉等）とPassable(空気、花等)は自動貫通
+        // ソリッド不透明ブロックのみ貫通チャージを消費
+        Set<Location> checkedBlocks = new HashSet<>();
+        for (double dist = 0.5; dist <= range; dist += 0.5) {
             Location point = origin.clone().add(direction.clone().multiply(dist));
             Block block = point.getBlock();
-            if (!block.isPassable() && !block.isLiquid()) {
-                if (pierceRemaining > 0) {
-                    pierceRemaining--;
-                } else {
-                    effectiveRange = dist;
-                    break;
-                }
+            Location blockLoc = block.getLocation();
+            if (!checkedBlocks.add(blockLoc)) continue; // 同一ブロック重複チェック回避
+
+            // Passable(空気、花、松明等)・液体 → 自動貫通
+            if (block.isPassable() || block.isLiquid()) continue;
+            // 非不透明ブロック(ガラス、氷、葉等) → 自動貫通
+            if (!block.getType().isOccluding()) continue;
+
+            // ソリッド不透明ブロック → 貫通チャージ消費
+            if (pierceRemaining > 0) {
+                pierceRemaining--;
+            } else {
+                effectiveRange = dist;
+                break;
             }
         }
 

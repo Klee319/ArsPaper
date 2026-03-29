@@ -66,6 +66,7 @@ public class SpellContext {
     private int propagateChainCount = 0;     // 伝播（エンティティヒット時に周辺の敵にチェーン、1段=3体）
     private boolean inPropagateChain = false; // チェーン中フラグ（無限再帰防止）
     private int reachLevel = 0;              // 延伸（射程/距離延長）
+    private boolean secondaryInvocation = false; // 二次発動（伝播/軌跡経由、パーティクル削減用）
 
     // Form-augment用（ProjectileForm等が参照）
     private double projectileSpeedMultiplier = 1.0;
@@ -265,6 +266,10 @@ public class SpellContext {
     public boolean isInPropagateChain() { return inPropagateChain; }
     public void setInPropagateChain(boolean v) { this.inPropagateChain = v; }
 
+    /** 二次発動（伝播/軌跡経由）かどうか。パーティクル削減に使用。 */
+    public boolean isSecondaryInvocation() { return secondaryInvocation; }
+    public void setSecondaryInvocation(boolean v) { this.secondaryInvocation = v; }
+
     public int getReachLevel() { return reachLevel; }
     public void setReachLevel(int reachLevel) { this.reachLevel = reachLevel; }
 
@@ -298,6 +303,7 @@ public class SpellContext {
         copy.rapidFireLevel = this.rapidFireLevel;
         copy.dampenAccum = this.dampenAccum;
         copy.durationDownAccum = this.durationDownAccum;
+        copy.secondaryInvocation = this.secondaryInvocation;
         return copy;
     }
 
@@ -540,14 +546,24 @@ public class SpellContext {
                     .limit(propagateChainCount)
                     .toList();
 
-                for (LivingEntity chainTarget : chainTargets) {
-                    SpellContext chainCtx = this.copy();
-                    chainCtx.setInPropagateChain(true); // 再帰防止
-                    group.effect.applyToEntity(chainCtx, chainTarget);
-
-                    // チェーンパーティクル
-                    SpellFxUtil.spawnChainFx(target.getLocation().add(0, 1, 0),
-                        chainTarget.getLocation().add(0, 1, 0));
+                // 遅延実行: 各チェーン対象を2tick間隔でずらしてスパイク軽減
+                final SpellEffect chainEffect = group.effect;
+                for (int ci = 0; ci < chainTargets.size(); ci++) {
+                    final LivingEntity chainTarget = chainTargets.get(ci);
+                    final int delay = (ci + 1) * 2; // 2, 4, 6, ... tick後
+                    final Location targetLocSnapshot = target.getLocation().add(0, 1, 0);
+                    new org.bukkit.scheduler.BukkitRunnable() {
+                        @Override
+                        public void run() {
+                            if (chainTarget.isDead() || !chainTarget.isValid()) return;
+                            SpellContext chainCtx = SpellContext.this.copy();
+                            chainCtx.setInPropagateChain(true);
+                            chainCtx.setSecondaryInvocation(true); // パーティクル削減
+                            chainEffect.applyToEntity(chainCtx, chainTarget);
+                            SpellFxUtil.spawnChainFx(targetLocSnapshot,
+                                chainTarget.getLocation().add(0, 1, 0));
+                        }
+                    }.runTaskLater(ArsPaper.getInstance(), delay);
                 }
             }
         }
@@ -580,6 +596,8 @@ public class SpellContext {
     public void resolveOnBlockTrace(Location blockLocation) {
         Player caster = getCaster();
         if (caster == null) return;
+
+        this.secondaryInvocation = true; // 軌跡経由 → パーティクル削減
 
         List<EffectGroup> groups = buildEffectGroups();
         for (EffectGroup group : groups) {

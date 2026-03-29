@@ -28,37 +28,38 @@ import java.util.Map;
 public class AlchemicalSourcelink extends Sourcelink {
 
     /**
-     * 醸造・錬金素材 → ソースポイント（希少度に基づく、10〜50範囲）
+     * 醸造・錬金素材 → ソースポイント（希少度基準）
+     * 基準: 石炭=5相当。ネザーウォート=3、ブレイズパウダー=8
      */
     private static final Map<Material, Integer> ALCHEMY_VALUES = Map.ofEntries(
-        // 低価値（10）: 基本素材
-        Map.entry(Material.GLASS_BOTTLE, 10),
-        Map.entry(Material.SUGAR, 10),
-        Map.entry(Material.GUNPOWDER, 10),
-        Map.entry(Material.REDSTONE, 10),
-        Map.entry(Material.GLOWSTONE_DUST, 10),
-        Map.entry(Material.SPIDER_EYE, 10),
-        // 中価値（20）: やや入手難
-        Map.entry(Material.NETHER_WART, 20),
-        Map.entry(Material.FERMENTED_SPIDER_EYE, 20),
-        Map.entry(Material.GLISTERING_MELON_SLICE, 20),
-        Map.entry(Material.GOLDEN_CARROT, 20),
-        Map.entry(Material.PUFFERFISH, 20),
-        Map.entry(Material.MAGMA_CREAM, 20),
-        // やや高（30）: 希少素材
-        Map.entry(Material.BLAZE_POWDER, 30),
-        Map.entry(Material.RABBIT_FOOT, 30),
-        Map.entry(Material.PHANTOM_MEMBRANE, 30),
-        Map.entry(Material.TURTLE_HELMET, 30),
-        // 高価値（40）: レア素材
-        Map.entry(Material.GHAST_TEAR, 40),
-        Map.entry(Material.EXPERIENCE_BOTTLE, 40),
+        // 最低（1）: 基本素材
+        Map.entry(Material.GLASS_BOTTLE, 1),
+        Map.entry(Material.SUGAR, 1),
+        Map.entry(Material.GUNPOWDER, 1),
+        Map.entry(Material.REDSTONE, 1),
+        Map.entry(Material.GLOWSTONE_DUST, 1),
+        Map.entry(Material.SPIDER_EYE, 1),
+        // 低（3）: 標準醸造素材
+        Map.entry(Material.NETHER_WART, 3),
+        Map.entry(Material.FERMENTED_SPIDER_EYE, 3),
+        Map.entry(Material.GLISTERING_MELON_SLICE, 3),
+        Map.entry(Material.GOLDEN_CARROT, 3),
+        Map.entry(Material.PUFFERFISH, 3),
+        Map.entry(Material.MAGMA_CREAM, 3),
+        // 中（8）: 希少素材
+        Map.entry(Material.BLAZE_POWDER, 8),
+        Map.entry(Material.RABBIT_FOOT, 8),
+        Map.entry(Material.PHANTOM_MEMBRANE, 8),
+        Map.entry(Material.TURTLE_HELMET, 8),
+        // 高（15）: レア素材
+        Map.entry(Material.GHAST_TEAR, 15),
+        Map.entry(Material.EXPERIENCE_BOTTLE, 15),
         // ポーション系
-        Map.entry(Material.POTION, 25),
-        Map.entry(Material.SPLASH_POTION, 30),
-        Map.entry(Material.LINGERING_POTION, 35),
-        // 最高（50）: 最希少
-        Map.entry(Material.DRAGON_BREATH, 50)
+        Map.entry(Material.POTION, 5),
+        Map.entry(Material.SPLASH_POTION, 8),
+        Map.entry(Material.LINGERING_POTION, 10),
+        // 最高（30）: 最希少
+        Map.entry(Material.DRAGON_BREATH, 30)
     );
 
     public AlchemicalSourcelink(JavaPlugin plugin) {
