@@ -113,6 +113,13 @@ public class SpellCaster {
         SpellForm spellForm = recipe.getForm();
         spellForm.cast(caster, context);
 
+        // エフェクトがキャンセルした場合、マナを返還
+        if (context.isCancelled()) {
+            manaManager.addMana(caster, cost);
+            cooldowns.remove(caster.getUniqueId());
+            return false;
+        }
+
         // アクションバーにスペル名を表示
         caster.sendActionBar(Component.text("§d" + recipe.getName()));
 

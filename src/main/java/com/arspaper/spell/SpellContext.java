@@ -40,6 +40,11 @@ public class SpellContext {
     private final SpellRecipe recipe;
     private final List<SpellComponent> components;
 
+    // === キャンセルフラグ（エフェクトがマナ消費なしで中止する場合に使用） ===
+    private boolean cancelled = false;
+    public boolean isCancelled() { return cancelled; }
+    public void setCancelled(boolean cancelled) { this.cancelled = cancelled; }
+
     // === Augment統計値（Effect適用後にリセット） ===
     private int amplifyLevel = 0;
     private int aoeLevel = 0;
@@ -58,7 +63,8 @@ public class SpellContext {
     private int delayTicks = 0;             // 遅延ティック
     private int rapidFireLevel = 0;         // 連射レベル（CT短縮）
     private boolean traceActive = false;     // 軌跡（経路上に効果適用）
-    private boolean propagateActive = false; // 伝播（ブロック着弾時に周辺エンティティにも適用）
+    private int propagateChainCount = 0;     // 伝播（エンティティヒット時に周辺の敵にチェーン、1段=3体）
+    private boolean inPropagateChain = false; // チェーン中フラグ（無限再帰防止）
     private int reachLevel = 0;              // 延伸（射程/距離延長）
 
     // Form-augment用（ProjectileForm等が参照）
@@ -107,9 +113,14 @@ public class SpellContext {
         }
     }
 
-    /** 減衰が1回以上適用されているか（ユーティリティモード判定用） */
+    /** 減衰が1回以上適用されているか */
     public boolean hasDampen() {
         return dampenAccum > 0;
+    }
+
+    /** 減衰の累積回数を返す */
+    public int getDampenAccum() {
+        return dampenAccum;
     }
 
     // === AOE 視線基準3軸 ===
@@ -248,8 +259,11 @@ public class SpellContext {
     public boolean isTraceActive() { return traceActive; }
     public void setTraceActive(boolean traceActive) { this.traceActive = traceActive; }
 
-    public boolean isPropagateActive() { return propagateActive; }
-    public void setPropagateActive(boolean propagateActive) { this.propagateActive = propagateActive; }
+    public int getPropagateChainCount() { return propagateChainCount; }
+    public void setPropagateChainCount(int count) { this.propagateChainCount = count; }
+    public void addPropagateChain() { this.propagateChainCount += 3; }
+    public boolean isInPropagateChain() { return inPropagateChain; }
+    public void setInPropagateChain(boolean v) { this.inPropagateChain = v; }
 
     public int getReachLevel() { return reachLevel; }
     public void setReachLevel(int reachLevel) { this.reachLevel = reachLevel; }
@@ -265,7 +279,8 @@ public class SpellContext {
         copy.aoeVerticalLevel = this.aoeVerticalLevel;
         copy.aoeRadiusLevel = this.aoeRadiusLevel;
         copy.traceActive = this.traceActive;
-        copy.propagateActive = this.propagateActive;
+        copy.propagateChainCount = this.propagateChainCount;
+        copy.inPropagateChain = this.inPropagateChain;
         copy.reachLevel = this.reachLevel;
         copy.hitFace = this.hitFace;
         copy.durationLevel = this.durationLevel;
@@ -329,13 +344,14 @@ public class SpellContext {
                     // 互換性チェック: GlyphConfigで定義されたaugmentsに含まれるかどうか
                     String effectKey = currentGroup.effect.getId().getKey();
                     String augmentKey = augment.getId().getKey();
+                    String baseKey = GlyphConfig.stripSuperPrefix(augmentKey);
                     GlyphConfig glyphConfig = ArsPaper.getInstance().getGlyphConfig();
                     if (glyphConfig.isAugmentCompatible(effectKey, augmentKey)) {
-                        // 最大スタック数チェック
+                        // 最大スタック数チェック（超増強は2個分としてカウント）
                         int maxStack = glyphConfig.getMaxAugmentStack(effectKey, augmentKey);
-                        long currentCount = currentGroup.augments.stream()
-                            .filter(a -> a.getId().getKey().equals(augmentKey)).count();
-                        if (currentCount < maxStack) {
+                        int currentCount = getEffectiveAugmentCount(currentGroup.augments, baseKey);
+                        int addWeight = augment instanceof com.arspaper.spell.augment.SuperAugment ? 2 : 1;
+                        if (currentCount + addWeight <= maxStack) {
                             currentGroup.augments.add(augment);
                         }
                     }
@@ -343,6 +359,22 @@ public class SpellContext {
             }
         }
         return groups;
+    }
+
+    /**
+     * ベースキーに対する実効スタック数を計算する。
+     * 超増強（SuperAugment）は2個分としてカウントされる。
+     */
+    private static int getEffectiveAugmentCount(java.util.List<SpellAugment> augments, String baseKey) {
+        int count = 0;
+        for (SpellAugment a : augments) {
+            String key = a.getId().getKey();
+            String aBase = GlyphConfig.stripSuperPrefix(key);
+            if (aBase.equals(baseKey)) {
+                count += (a instanceof com.arspaper.spell.augment.SuperAugment) ? 2 : 1;
+            }
+        }
+        return count;
     }
 
     /**
@@ -423,6 +455,20 @@ public class SpellContext {
         Player caster = getCaster();
         if (caster == null) return;
 
+        // Form-level delay: Formに付けたdelay増強で最初のエフェクト発動を遅延
+        if (startIndex == 0 && delayTicks > 0) {
+            int formDelay = delayTicks;
+            delayTicks = 0; // consume the form delay
+            final SpellContext ctx = this;
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    ctx.resolveGroupsOnEntity(groups, 0, target);
+                }
+            }.runTaskLater(ArsPaper.getInstance(), formDelay);
+            return;
+        }
+
         for (int i = startIndex; i < groups.size(); i++) {
             EffectGroup group = groups.get(i);
             resetAugmentState();
@@ -475,6 +521,33 @@ public class SpellContext {
                         .filter(e -> !e.equals(target) && !e.equals(caster))
                         .filter(e -> isValidAoeTarget(e, caster))
                         .forEach(e -> group.effect.applyToEntity(this, e));
+                }
+            }
+
+            // === 伝播チェーン: ヒットしたエンティティの周囲の敵にエフェクトを連鎖 ===
+            if (propagateChainCount > 0 && !inPropagateChain) {
+                double chainRadius = 8.0; // チェーン検索範囲（固定）
+                java.util.Set<LivingEntity> alreadyHit = new java.util.HashSet<>();
+                alreadyHit.add(target);
+                if (caster != null) alreadyHit.add(caster);
+
+                java.util.List<LivingEntity> chainTargets = target.getLocation()
+                    .getNearbyLivingEntities(chainRadius).stream()
+                    .filter(e -> !alreadyHit.contains(e))
+                    .filter(e -> isValidAoeTarget(e, caster))
+                    .sorted(java.util.Comparator.comparingDouble(
+                        e -> e.getLocation().distanceSquared(target.getLocation())))
+                    .limit(propagateChainCount)
+                    .toList();
+
+                for (LivingEntity chainTarget : chainTargets) {
+                    SpellContext chainCtx = this.copy();
+                    chainCtx.setInPropagateChain(true); // 再帰防止
+                    group.effect.applyToEntity(chainCtx, chainTarget);
+
+                    // チェーンパーティクル
+                    SpellFxUtil.spawnChainFx(target.getLocation().add(0, 1, 0),
+                        chainTarget.getLocation().add(0, 1, 0));
                 }
             }
         }
@@ -535,6 +608,20 @@ public class SpellContext {
         Player caster = getCaster();
         if (caster == null) return;
 
+        // Form-level delay: Formに付けたdelay増強で最初のエフェクト発動を遅延
+        if (startIndex == 0 && delayTicks > 0) {
+            int formDelay = delayTicks;
+            delayTicks = 0; // consume the form delay
+            final SpellContext ctx = this;
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    ctx.resolveGroupsOnBlock(groups, 0, blockLocation);
+                }
+            }.runTaskLater(ArsPaper.getInstance(), formDelay);
+            return;
+        }
+
         for (int i = startIndex; i < groups.size(); i++) {
             EffectGroup group = groups.get(i);
             resetAugmentState();
@@ -590,18 +677,6 @@ public class SpellContext {
             }
 
             group.effect.applyToBlock(this, effectBlockLoc);
-
-            // === 伝播: ブロック着弾時に周辺エンティティにもエフェクト適用 ===
-            if (propagateActive) {
-                double propagateRadius = Math.max(2.0, aoeRadiusLevel + 2.0);
-                Location center = effectBlockLoc.clone().add(0.5, 0.5, 0.5);
-                if (caster != null) {
-                    center.getNearbyLivingEntities(propagateRadius).stream()
-                        .filter(e -> !e.equals(caster))
-                        .filter(e -> isValidAoeTarget(e, caster))
-                        .forEach(e -> group.effect.applyToEntity(this, e));
-                }
-            }
 
             // === AOE展開（新3軸: 幅/上下/奥行き + 壁グリフ） ===
             if (!group.effect.handlesAoeInternally()) {
@@ -749,7 +824,8 @@ public class SpellContext {
         lingerPattern = false;
         delayTicks = 0;
         traceActive = false;
-        propagateActive = false;
+        propagateChainCount = 0;
+        inPropagateChain = false;
         reachLevel = 0;
         // rapidFireLevel はForm-levelのためリセットしない
     }

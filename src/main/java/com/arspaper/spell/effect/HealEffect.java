@@ -97,7 +97,7 @@ public class HealEffect implements SpellEffect {
     public String getDisplayName() { return "回復"; }
 
     @Override
-    public String getDescription() { return "対象の体力を回復する"; }
+    public String getDescription() { return "対象の体力を回復する（満腹度を消費）"; }
 
     @Override
     public int getManaCost() { return config.getManaCost("heal"); }

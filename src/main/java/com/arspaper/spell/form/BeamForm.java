@@ -5,16 +5,15 @@ import com.arspaper.spell.SpellContext;
 import com.arspaper.spell.SpellForm;
 import com.arspaper.spell.SpellFxUtil;
 import org.bukkit.Color;
-import org.bukkit.FluidCollisionMode;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.SoundCategory;
+import org.bukkit.block.Block;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
@@ -32,7 +31,7 @@ import java.util.UUID;
  *   - 拡散(split): ビーム数増加
  *   - 減速(decelerate): ビーム射程↓
  *   - 加速(accelerate): ビーム射程↑
- *   - 貫通(pierce): 複数エンティティを貫通
+ *   - 貫通(pierce): ソリッドブロックを貫通（2*pierceCount個まで）
  *   - 半径増加(aoe_radius): ビームが太くなる
  */
 public class BeamForm implements SpellForm {
@@ -100,12 +99,58 @@ public class BeamForm implements SpellForm {
         Particle.DustTransition dustTransition = new Particle.DustTransition(
             Color.fromRGB(255, 40, 40), Color.fromRGB(10, 0, 0), dustSize);
 
-        // rayTraceでブロックヒット位置を先に取得（目線からトレース）
-        RayTraceResult blockHit = caster.getWorld().rayTraceBlocks(
-            eyeOrigin, direction, range, FluidCollisionMode.NEVER, true);
-        double effectiveRange = blockHit != null
-            ? eyeOrigin.distance(blockHit.getHitPosition().toLocation(caster.getWorld()))
-            : range;
+        // ブロック貫通スキャン: 透明ブロックは自動貫通、pierceでソリッドブロックも貫通
+        int blockPierceCharges = 2 * context.getPierceCount(); // pierce増強によるソリッド貫通回数
+        double effectiveRange = range;
+        Block lastSolidBlock = null;
+        {
+            Set<Location> checkedBlocks = new HashSet<>();
+            for (double dist = 0.5; dist <= range; dist += 1.0) {
+                boolean blocked = false;
+                // 中心ブロックをチェック
+                Location centerPoint = eyeOrigin.clone().add(direction.clone().multiply(dist));
+                Block centerBlock = centerPoint.getBlock();
+                Location centerBlockLoc = centerBlock.getLocation();
+                if (checkedBlocks.add(centerBlockLoc) && !centerBlock.isPassable() && !centerBlock.isLiquid()) {
+                    if (blockPierceCharges > 0) {
+                        blockPierceCharges--;
+                    } else {
+                        effectiveRange = dist;
+                        lastSolidBlock = centerBlock;
+                        blocked = true;
+                    }
+                }
+                // ビーム幅がある場合、端のブロックもチェック
+                if (!blocked && beamRadius > 0) {
+                    Vector up = Math.abs(direction.getY()) > 0.9
+                        ? new Vector(1, 0, 0) : new Vector(0, 1, 0);
+                    Vector right = direction.getCrossProduct(up).normalize();
+                    Vector forward = right.getCrossProduct(direction).normalize();
+                    // 4方向の端をチェック
+                    Vector[] offsets = {
+                        right.clone().multiply(beamRadius),
+                        right.clone().multiply(-beamRadius),
+                        forward.clone().multiply(beamRadius),
+                        forward.clone().multiply(-beamRadius)
+                    };
+                    for (Vector offset : offsets) {
+                        Block edgeBlock = centerPoint.clone().add(offset).getBlock();
+                        Location edgeBlockLoc = edgeBlock.getLocation();
+                        if (checkedBlocks.add(edgeBlockLoc) && !edgeBlock.isPassable() && !edgeBlock.isLiquid()) {
+                            if (blockPierceCharges > 0) {
+                                blockPierceCharges--;
+                            } else {
+                                effectiveRange = dist;
+                                lastSolidBlock = centerBlock;
+                                blocked = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (blocked) break;
+            }
+        }
 
         // エンティティヒット判定半径（ビーム幅考慮）
         double entityHitRadius = 0.5 + beamRadius;
@@ -199,14 +244,11 @@ public class BeamForm implements SpellForm {
         }
 
         // ブロックヒット処理
-        if (blockHit != null && blockHit.getHitBlock() != null) {
-            Location blockLoc = blockHit.getHitBlock().getLocation();
+        if (lastSolidBlock != null) {
+            Location blockLoc = lastSolidBlock.getLocation();
             SpellContext blockCtx = context.copy();
-            if (blockHit.getHitBlockFace() != null) {
-                blockCtx.setHitFace(blockHit.getHitBlockFace());
-            }
             blockCtx.resolveOnBlock(blockLoc);
-            spawnBeamImpact(blockHit.getHitPosition().toLocation(caster.getWorld()));
+            spawnBeamImpact(blockLoc.clone().add(0.5, 0.5, 0.5));
         } else {
             // ブロック未ヒット（空中照射）: 端点にブロック効果を適用（水生成等）
             Location endPoint = eyeOrigin.clone().add(direction.clone().multiply(range));

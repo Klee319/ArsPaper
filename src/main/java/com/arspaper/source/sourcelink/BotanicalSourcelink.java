@@ -15,38 +15,38 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.util.List;
 
 /**
- * Vitalic Sourcelink - 生命の力でSourceを生成。
- * バニラのBARREL（樽）をベースに使用。
+ * Botanical Sourcelink - 植物の成長からSourceを生成。
+ * バニラのCOMPOSTER（コンポスター）をベースに使用。
  *
- * 基本の定期生成に加え、近くでmobが死亡するとボーナスSourceをバッファに蓄積。
- * バッファ分はティック時に隣接Source Jarへ供給される。
+ * 半径10ブロック以内で作物・植物が成長するとソースポイントをバッファに蓄積。
+ * 定期的にバッファから排出して隣接Source Jarに供給する。
+ * 燃料投入は不要（完全イベント駆動型）。
  */
-public class VitalicSourcelink extends Sourcelink {
+public class BotanicalSourcelink extends Sourcelink {
 
-    private static final int SOURCE_PER_TICK = 20;
-    /** mob死亡時のボーナスSource */
-    public static final int SOURCE_PER_KILL = 50;
-    /** mob死亡検知範囲（ブロック） */
+    /** 植物成長1回あたりのソースポイント */
+    public static final int SOURCE_PER_GROWTH = 15;
+    /** 成長検知範囲（ブロック） */
     public static final int DETECTION_RADIUS = 10;
 
-    public VitalicSourcelink(JavaPlugin plugin) {
-        super(plugin, "vitalic_sourcelink");
+    public BotanicalSourcelink(JavaPlugin plugin) {
+        super(plugin, "botanical_sourcelink");
     }
 
     @Override
     public Material getBlockMaterial() {
-        return Material.BARREL;
+        return Material.BEEHIVE;
     }
 
     @Override
     public Component getDisplayName() {
-        return Component.text("バイタリックソースリンク", NamedTextColor.GREEN)
+        return Component.text("ボタニカルソースリンク", NamedTextColor.GREEN)
             .decoration(TextDecoration.ITALIC, false);
     }
 
     @Override
     public int getCustomModelData() {
-        return 200006;
+        return 200007;
     }
 
     @Override
@@ -54,9 +54,9 @@ public class VitalicSourcelink extends Sourcelink {
         ItemStack item = super.createItemStack();
         item.editMeta(meta ->
             meta.lore(List.of(
-                Component.text("生命の力でソースを生成", NamedTextColor.GRAY)
+                Component.text("植物の成長からソースを生成", NamedTextColor.GRAY)
                     .decoration(TextDecoration.ITALIC, false),
-                Component.text("近くでmobが倒されるとボーナス生成", NamedTextColor.DARK_GRAY)
+                Component.text("半径10ブロック以内の作物成長で蓄積", NamedTextColor.DARK_GRAY)
                     .decoration(TextDecoration.ITALIC, false)
             ))
         );
@@ -65,23 +65,21 @@ public class VitalicSourcelink extends Sourcelink {
 
     @Override
     public ItemStack getDisplayHeadItem() {
-        ItemStack head = new ItemStack(Material.BONE);
-        head.editMeta(meta -> meta.setCustomModelData(200006));
+        ItemStack head = new ItemStack(Material.OAK_LEAVES);
+        head.editMeta(meta -> meta.setCustomModelData(200007));
         return head;
     }
 
     @Override
     public int generateSource(Block block) {
-        // 基本生成 + バッファ（mob死亡ボーナス分）
-        int bonus = drainBuffer(block);
-        return SOURCE_PER_TICK + bonus;
+        return drainBuffer(block);
     }
 
     @Override
     public void onBlockInteract(Player player, Block block, TileState tileState) {
         int buffer = getBuffer(tileState);
         player.sendMessage(Component.text(
-            "バイタリックソースリンク - ボーナス蓄積: " + buffer, NamedTextColor.GREEN
+            "ボタニカルソースリンク - 蓄積ソース: " + buffer, NamedTextColor.GREEN
         ));
     }
 

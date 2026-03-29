@@ -22,6 +22,22 @@ geyser:
   # リソースパック未使用のGeyserサーバーではtrueにすること
   disable-custom-model-data: true
 
+# カスタムエンチャント定数
+# 金床でメイジ防具に適用した際のボーナス値
+enchantments:
+  mana-regen-per-level: [0, 1, 3, 6]    # Lv0(未使用), Lv1, Lv2, Lv3
+  mana-boost-per-level: [0, 15, 30, 50]  # Lv0(未使用), Lv1, Lv2, Lv3
+  max-level: 3
+
+# モブドロップ設定
+mob-drops:
+  # ウォーデン討伐時に残響の欠片をドロップするか
+  warden-echo-shard: false
+  # ドロップ数（min-max）
+  # ドロップ数（min-max、ドロップ増加エンチャントで追加加算）
+  warden-echo-shard-min: 0
+  warden-echo-shard-max: 2
+
 # ルートチェスト設定
 loot:
   enabled: true

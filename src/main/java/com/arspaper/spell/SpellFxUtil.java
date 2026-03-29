@@ -239,4 +239,18 @@ public final class SpellFxUtil {
      * 指定ブロック位置にエンティティが存在するか（設置キャンセル判定用）。
      * バニラと同様、エンティティのバウンディングボックスとブロック位置が重なる場合true。
      */
+
+    /** 伝播チェーン: 2点間を結ぶ電撃風パーティクル */
+    public static void spawnChainFx(Location from, Location to) {
+        int steps = 8;
+        for (int i = 0; i <= steps; i++) {
+            double t = (double) i / steps;
+            double x = from.getX() + (to.getX() - from.getX()) * t;
+            double y = from.getY() + (to.getY() - from.getY()) * t;
+            double z = from.getZ() + (to.getZ() - from.getZ()) * t;
+            Location point = new Location(from.getWorld(), x, y, z);
+            from.getWorld().spawnParticle(Particle.ELECTRIC_SPARK, point, 1, 0.05, 0.05, 0.05, 0);
+        }
+        to.getWorld().spawnParticle(Particle.WITCH, to, 5, 0.2, 0.2, 0.2, 0.05);
+    }
 }

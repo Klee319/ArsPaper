@@ -9,6 +9,7 @@ import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.SoundCategory;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -36,6 +37,12 @@ public class NameEffect implements SpellEffect {
 
         target.setCustomName("§f" + displayName);
         target.setCustomNameVisible(true);
+
+        // 名札と同等: デスポーン完全無効化
+        if (target instanceof Mob mob) {
+            mob.setPersistent(true);
+            mob.setRemoveWhenFarAway(false);
+        }
 
         spawnNameFx(target.getLocation());
     }

@@ -430,6 +430,9 @@ public final class ArsCommand {
         // config.yml リロード
         plugin.reloadConfig();
 
+        // エンチャント定数リロード
+        com.arspaper.enchant.ArsEnchantments.loadConfig(plugin.getConfig());
+
         // glyphs.yml リロード（グリフのティア・コスト・係数）
         plugin.reloadGlyphConfig();
 

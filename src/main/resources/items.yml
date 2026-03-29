@@ -848,6 +848,132 @@ items:
       source: 5000
       result: "custom:mage_weaver_archmage_boots"
 
+  # ==========================================================
+  # エンチャント本（儀式クラフト）
+  # ==========================================================
+
+  enchant_book_mana_regen_1:
+    recipe:
+      method: ritual
+      name: "マナ再生I"
+      effect-type: enchant_book
+      effect-params:
+        enchantment: mana_regen
+        level: 1
+      core-item: BOOK
+      pedestal-items:
+        - "custom:source_gem x2"
+        - "GHAST_TEAR"
+        - "LAPIS_LAZULI x2"
+      source: 500
+
+  enchant_book_mana_regen_2:
+    recipe:
+      method: ritual
+      name: "マナ再生II"
+      effect-type: enchant_book
+      effect-params:
+        enchantment: mana_regen
+        level: 2
+      core-item: BOOK
+      pedestal-items:
+        - "custom:source_gem x3"
+        - "GHAST_TEAR x2"
+        - "DIAMOND_BLOCK"
+      source: 1000
+
+  enchant_book_mana_regen_3:
+    recipe:
+      method: ritual
+      name: "マナ再生III"
+      effect-type: enchant_book
+      effect-params:
+        enchantment: mana_regen
+        level: 3
+      core-item: BOOK
+      pedestal-items:
+        - "custom:source_gem x4"
+        - "GHAST_TEAR x2"
+        - "NETHER_STAR"
+      source: 2000
+
+  enchant_book_mana_boost_1:
+    recipe:
+      method: ritual
+      name: "マナ上昇I"
+      effect-type: enchant_book
+      effect-params:
+        enchantment: mana_boost
+        level: 1
+      core-item: BOOK
+      pedestal-items:
+        - "custom:source_gem x2"
+        - "ECHO_SHARD"
+        - "LAPIS_LAZULI x2"
+      source: 500
+
+  enchant_book_mana_boost_2:
+    recipe:
+      method: ritual
+      name: "マナ上昇II"
+      effect-type: enchant_book
+      effect-params:
+        enchantment: mana_boost
+        level: 2
+      core-item: BOOK
+      pedestal-items:
+        - "custom:source_gem x3"
+        - "ECHO_SHARD"
+        - "DIAMOND_BLOCK"
+      source: 1000
+
+  enchant_book_mana_boost_3:
+    recipe:
+      method: ritual
+      name: "マナ上昇III"
+      effect-type: enchant_book
+      effect-params:
+        enchantment: mana_boost
+        level: 3
+      core-item: BOOK
+      pedestal-items:
+        - "custom:source_gem x4"
+        - "ECHO_SHARD"
+        - "NETHER_STAR"
+      source: 2000
+
+  enchant_book_share:
+    recipe:
+      method: ritual
+      name: "共有"
+      effect-type: enchant_book
+      effect-params:
+        enchantment: share
+        level: 1
+      core-item: BOOK
+      pedestal-items:
+        - "custom:source_gem_block x2"
+        - "ENDER_EYE x4"
+        - "NETHER_STAR"
+        - "DIAMOND_BLOCK"
+      source: 3000
+
+  enchant_book_soulbound:
+    recipe:
+      method: ritual
+      name: "回生"
+      effect-type: enchant_book
+      effect-params:
+        enchantment: soulbound
+        level: 1
+      core-item: BOOK
+      pedestal-items:
+        - "custom:source_gem_block x2"
+        - "DIAMOND_BLOCK"
+        - "TOTEM_OF_UNDYING"
+        - "GOLDEN_APPLE x2"
+      source: 2000
+
 # ============================================================
 # 儀式エフェクト (ワールドエフェクト - アイテム結果なし)
 # ============================================================
@@ -1041,122 +1167,5 @@ ritual_effects:
       - "PRISMARINE_SHARD x2"
       - "custom:source_gem x3"
     source: 1200
-
-  # ==========================================================
-  # エンチャント本の儀式
-  # ==========================================================
-
-  # ----------------------------------------------------------
-  # マナ再生エンチャント本 Lv.1
-  # ----------------------------------------------------------
-  enchant_book_mana_regen_1:
-    name: "マナ再生I 儀式レシピ"
-    effect-type: enchant_book
-    effect-params:
-      enchantment: mana_regen
-      level: 1
-    core-item: BOOK
-    pedestal-items:
-      - "custom:source_gem x2"
-      - "GHAST_TEAR"
-      - "LAPIS_LAZULI x2"
-    source: 500
-
-  # ----------------------------------------------------------
-  # マナ再生エンチャント本 Lv.2
-  # ----------------------------------------------------------
-  enchant_book_mana_regen_2:
-    name: "マナ再生II 儀式レシピ"
-    effect-type: enchant_book
-    effect-params:
-      enchantment: mana_regen
-      level: 2
-    core-item: BOOK
-    pedestal-items:
-      - "custom:source_gem x3"
-      - "GHAST_TEAR x2"
-      - "DIAMOND_BLOCK"
-    source: 1000
-
-  # ----------------------------------------------------------
-  # マナ再生エンチャント本 Lv.3
-  # ----------------------------------------------------------
-  enchant_book_mana_regen_3:
-    name: "マナ再生III 儀式レシピ"
-    effect-type: enchant_book
-    effect-params:
-      enchantment: mana_regen
-      level: 3
-    core-item: BOOK
-    pedestal-items:
-      - "custom:source_gem x4"
-      - "GHAST_TEAR x2"
-      - "NETHER_STAR"
-    source: 2000
-
-  # ----------------------------------------------------------
-  # マナ上昇エンチャント本 Lv.1
-  # ----------------------------------------------------------
-  enchant_book_mana_boost_1:
-    name: "マナ上昇I 儀式レシピ"
-    effect-type: enchant_book
-    effect-params:
-      enchantment: mana_boost
-      level: 1
-    core-item: BOOK
-    pedestal-items:
-      - "custom:source_gem x2"
-      - "ECHO_SHARD"
-      - "LAPIS_LAZULI x2"
-    source: 500
-
-  # ----------------------------------------------------------
-  # マナ上昇エンチャント本 Lv.2
-  # ----------------------------------------------------------
-  enchant_book_mana_boost_2:
-    name: "マナ上昇II 儀式レシピ"
-    effect-type: enchant_book
-    effect-params:
-      enchantment: mana_boost
-      level: 2
-    core-item: BOOK
-    pedestal-items:
-      - "custom:source_gem x3"
-      - "ECHO_SHARD"
-      - "DIAMOND_BLOCK"
-    source: 1000
-
-  # ----------------------------------------------------------
-  # マナ上昇エンチャント本 Lv.3
-  # ----------------------------------------------------------
-  enchant_book_mana_boost_3:
-    name: "マナ上昇III 儀式レシピ"
-    effect-type: enchant_book
-    effect-params:
-      enchantment: mana_boost
-      level: 3
-    core-item: BOOK
-    pedestal-items:
-      - "custom:source_gem x4"
-      - "ECHO_SHARD"
-      - "NETHER_STAR"
-    source: 2000
-
-  # ----------------------------------------------------------
-  # 共有エンチャント本
-  # ----------------------------------------------------------
-  enchant_book_share:
-    name: "共有エンチャント 儀式レシピ"
-    effect-type: enchant_book
-    effect-params:
-      enchantment: share
-      level: 1
-    core-item: BOOK
-    pedestal-items:
-      - "custom:source_gem_block x2"
-      - "ENDER_EYE x4"
-      - "NETHER_STAR"
-      - "DIAMOND_BLOCK"
-    source: 3000
 
 

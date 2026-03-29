@@ -48,6 +48,18 @@ public class ArsBootstrap implements PluginBootstrap {
                 );
 
                 event.registry().register(
+                    TypedKey.create(RegistryKey.ENCHANTMENT, Key.key("arspaper", "soulbound")),
+                    b -> b.description(Component.text("回生"))
+                        .supportedItems(event.getOrCreateTag(ItemTypeTagKeys.ENCHANTABLE_DURABILITY))
+                        .weight(1)
+                        .maxLevel(1)
+                        .anvilCost(1)
+                        .minimumCost(EnchantmentRegistryEntry.EnchantmentCost.of(100, 0))
+                        .maximumCost(EnchantmentRegistryEntry.EnchantmentCost.of(200, 0))
+                        .activeSlots(EquipmentSlotGroup.ANY)
+                );
+
+                event.registry().register(
                     TypedKey.create(RegistryKey.ENCHANTMENT, Key.key("arspaper", "share")),
                     b -> b.description(Component.text("共有"))
                         .supportedItems(event.getOrCreateTag(ItemTypeTagKeys.ENCHANTABLE_VANISHING))

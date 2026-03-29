@@ -2,7 +2,9 @@ package com.arspaper.source;
 
 import com.arspaper.block.BlockKeys;
 import com.arspaper.block.CustomBlockRegistry;
+import com.arspaper.source.sourcelink.BotanicalSourcelink;
 import com.arspaper.source.sourcelink.Sourcelink;
+import com.arspaper.source.sourcelink.VitalicSourcelink;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
@@ -10,15 +12,15 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.TileState;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.block.BlockGrowEvent;
+import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.world.ChunkLoadEvent;
+import org.bukkit.event.world.StructureGrowEvent;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
-
-import com.arspaper.source.sourcelink.VitalicSourcelink;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.Listener;
-import org.bukkit.event.entity.EntityDeathEvent;
-import org.bukkit.event.world.ChunkLoadEvent;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -63,9 +65,8 @@ public class SourcelinkTickTask implements Listener {
      */
     @EventHandler
     public void onChunkLoad(ChunkLoadEvent event) {
-        if (event.isNewChunk()) return; // 新規生成チャンクにはSourcelinkなし
+        if (event.isNewChunk()) return;
         Chunk chunk = event.getChunk();
-        // 1tick遅延でチャンクの準備完了を待つ
         plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
             if (!chunk.isLoaded()) return;
             for (BlockState state : chunk.getTileEntities()) {
@@ -86,7 +87,6 @@ public class SourcelinkTickTask implements Listener {
 
     /**
      * ロード済みチャンクからSourcelinkを検出してキャッシュを再構築する。
-     * サーバー再起動時にインメモリキャッシュを復元するために使用。
      */
     private void rebuildCache() {
         int[] count = {0};
@@ -119,29 +119,22 @@ public class SourcelinkTickTask implements Listener {
         }
     }
 
-    /**
-     * Sourcelinkの設置を登録する。
-     */
     public void addSourcelink(Location location, String blockId) {
         sourcelinkLocations
             .computeIfAbsent(blockId, k -> ConcurrentHashMap.newKeySet())
-            .add(location.getBlock().getLocation()); // ブロック座標に正規化
+            .add(location.getBlock().getLocation());
     }
 
-    /**
-     * Sourcelinkの撤去を登録する。
-     */
     public void removeSourcelink(Location location) {
         Location blockLoc = location.getBlock().getLocation();
         sourcelinkLocations.values().forEach(locs -> locs.remove(blockLoc));
     }
 
     /**
-     * Vitalic Sourcelink: 近くでmobが死亡した際にボーナスSourceを隣接Jarに供給。
+     * Vitalic Sourcelink: 近くでmobが死亡した際にボーナスSourceをバッファに蓄積。
      */
     @EventHandler
     public void onEntityDeath(EntityDeathEvent event) {
-        // プレイヤーの死亡は無視
         if (event.getEntity() instanceof org.bukkit.entity.Player) return;
 
         Location deathLoc = event.getEntity().getLocation();
@@ -153,7 +146,6 @@ public class SourcelinkTickTask implements Listener {
 
         int radiusSq = VitalicSourcelink.DETECTION_RADIUS * VitalicSourcelink.DETECTION_RADIUS;
 
-        // 防御的コピー: イテレーション中のConcurrentModificationを回避
         for (Location loc : List.copyOf(vitalicLocs)) {
             World locWorld = loc.getWorld();
             if (locWorld == null || !deathWorld.equals(locWorld)) continue;
@@ -164,7 +156,49 @@ public class SourcelinkTickTask implements Listener {
 
             blockRegistry.get("vitalic_sourcelink").ifPresent(cb -> {
                 if (cb instanceof Sourcelink sourcelink) {
-                    sourcelink.supplyAdjacent(block, VitalicSourcelink.SOURCE_PER_KILL);
+                    // バッファに蓄積（次のtickで排出される）
+                    sourcelink.addToBuffer(block, VitalicSourcelink.SOURCE_PER_KILL);
+                }
+            });
+        }
+    }
+
+    /**
+     * Botanical Sourcelink: 近くで作物・植物が成長した際にソースをバッファに蓄積。
+     */
+    @EventHandler
+    public void onBlockGrow(BlockGrowEvent event) {
+        handlePlantGrowth(event.getBlock().getLocation());
+    }
+
+    /**
+     * Botanical Sourcelink: 木や巨大キノコ等の構造物成長時にも蓄積。
+     */
+    @EventHandler
+    public void onStructureGrow(StructureGrowEvent event) {
+        handlePlantGrowth(event.getLocation());
+    }
+
+    private void handlePlantGrowth(Location growthLoc) {
+        World growthWorld = growthLoc.getWorld();
+        if (growthWorld == null) return;
+
+        Set<Location> botanicalLocs = sourcelinkLocations.get("botanical_sourcelink");
+        if (botanicalLocs == null || botanicalLocs.isEmpty()) return;
+
+        int radiusSq = BotanicalSourcelink.DETECTION_RADIUS * BotanicalSourcelink.DETECTION_RADIUS;
+
+        for (Location loc : List.copyOf(botanicalLocs)) {
+            World locWorld = loc.getWorld();
+            if (locWorld == null || !growthWorld.equals(locWorld)) continue;
+            if (growthLoc.distanceSquared(loc) > radiusSq) continue;
+
+            Block block = loc.getBlock();
+            if (!(block.getState() instanceof TileState)) continue;
+
+            blockRegistry.get("botanical_sourcelink").ifPresent(cb -> {
+                if (cb instanceof Sourcelink sourcelink) {
+                    sourcelink.addToBuffer(block, BotanicalSourcelink.SOURCE_PER_GROWTH);
                 }
             });
         }
@@ -182,23 +216,21 @@ public class SourcelinkTickTask implements Listener {
                 for (Location loc : locations) {
                     World world = loc.getWorld();
                     if (world == null || !world.isChunkLoaded(loc.getBlockX() >> 4, loc.getBlockZ() >> 4)) {
-                        continue; // アンロード済みチャンクはスキップ
+                        continue;
                     }
 
                     Block block = loc.getBlock();
                     if (!(block.getState() instanceof TileState)) {
-                        // ブロックが撤去されている場合は後で除去
                         staleLocations.add(loc);
                         continue;
                     }
 
-                    int generated = sourcelink.generateSource();
+                    int generated = sourcelink.generateSource(block);
                     if (generated > 0) {
                         sourcelink.supplyAdjacent(block, generated);
                         sourcelink.onGenerate(block);
                     }
                 }
-                // イテレーション後に一括除去
                 staleLocations.forEach(locations::remove);
             });
         }

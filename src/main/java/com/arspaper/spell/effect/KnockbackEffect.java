@@ -41,31 +41,16 @@ public class KnockbackEffect implements SpellEffect {
         Vector direction;
 
         if (caster != null && caster.equals(target)) {
-            // 自己対象: 視線と反対方向に飛び出す
-            Vector backward = caster.getLocation().getDirection().multiply(-1).normalize();
-            backward.setY(Math.max(backward.getY(), 0.3));
-            backward.normalize().multiply(Math.min(force, maxForce));
-            target.setVelocity(backward);
-            SpellFxUtil.spawnKnockbackFx(target.getLocation());
-            return;
+            // 自己対象: 視線の反対方向に吹き飛ぶ
+            direction = caster.getLocation().getDirection().multiply(-1).normalize();
         } else if (caster != null) {
-            // 他者対象: 術者 → 対象方向（押し出し）
-            direction = target.getLocation().toVector()
-                .subtract(caster.getLocation().toVector());
+            // 他者対象: 術者の視線方向に吹き飛ばす
+            direction = caster.getLocation().getDirection().normalize();
         } else {
-            // 術者不在時: 対象の向いている方向の逆
-            direction = target.getLocation().getDirection().multiply(-1);
-        }
-
-        // ゼロベクトル防止
-        if (direction.lengthSquared() < 0.001) {
-            direction = new Vector(0, 1, 0);
-        } else {
-            direction.normalize();
+            direction = target.getLocation().getDirection().multiply(-1).normalize();
         }
 
         direction.multiply(force).setY(0.4 * Math.max(1.0, force * 0.5));
-
         target.setVelocity(direction);
         SpellFxUtil.spawnKnockbackFx(target.getLocation());
     }

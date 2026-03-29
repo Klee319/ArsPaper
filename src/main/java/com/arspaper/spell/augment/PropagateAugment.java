@@ -7,9 +7,8 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /**
- * 伝播増強。投射・接触のブロック着弾時に、
- * 範囲内のエンティティにもエフェクトを適用する。
- * 半径増加と組み合わせて範囲を拡大可能。
+ * 伝播増強。エンティティヒット時に周囲の敵にエフェクトをチェーンする。
+ * 1つにつき最大3体。複数スタックで対象数が増加する。
  */
 public class PropagateAugment implements SpellAugment {
 
@@ -23,7 +22,7 @@ public class PropagateAugment implements SpellAugment {
 
     @Override
     public void modify(SpellContext context) {
-        context.setPropagateActive(true);
+        context.addPropagateChain(); // +3体/スタック
     }
 
     @Override
@@ -33,7 +32,7 @@ public class PropagateAugment implements SpellAugment {
     public String getDisplayName() { return "伝播"; }
 
     @Override
-    public String getDescription() { return "ブロック着弾時に周辺エンティティにも効果を適用"; }
+    public String getDescription() { return "エンティティヒット時に周囲の敵にチェーン（1段=3体）"; }
 
     @Override
     public int getManaCost() { return config.getManaCost("propagate"); }

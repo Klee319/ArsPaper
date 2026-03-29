@@ -1,0 +1,138 @@
+package com.arspaper.spell.effect;
+
+import com.arspaper.spell.GlyphConfig;
+import com.arspaper.spell.SpellContext;
+import com.arspaper.spell.SpellEffect;
+import org.bukkit.Location;
+import org.bukkit.NamespacedKey;
+import org.bukkit.Particle;
+import org.bukkit.Sound;
+import org.bukkit.SoundCategory;
+import org.bukkit.block.Block;
+import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Player;
+import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.util.Vector;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
+/**
+ * ソニックブーム — 術者の視点方向へ直線状にソニックブームを発生させる。
+ *
+ * エンティティと透過ブロックはデフォルトで貫通。
+ * ソリッドブロックで停止（貫通増強で 2×n ブロック貫通可能）。
+ * 分裂: 左右に拡散ソニックブーム追加。
+ * 増幅: ダメージ威力増加。
+ * 互換形態: 自己のみ。
+ */
+public class SonicBoomEffect implements SpellEffect {
+
+    private static final double BASE_RANGE = 20.0;
+    private static final double BASE_DAMAGE = 10.0;
+    private static final double AMPLIFY_DAMAGE_BONUS = 4.0;
+    private static final double SPREAD_ANGLE_STEP = 0.15;
+    private static final double SCAN_STEP = 0.5;
+    private static final double HIT_RADIUS = 1.0;
+
+    private final NamespacedKey id;
+    private final GlyphConfig config;
+
+    public SonicBoomEffect(JavaPlugin plugin, GlyphConfig config) {
+        this.id = new NamespacedKey(plugin, "sonic_boom");
+        this.config = config;
+    }
+
+    @Override
+    public void applyToEntity(SpellContext context, LivingEntity target) {
+        // self form: target == caster
+        Player caster = context.getCaster();
+        if (caster == null) return;
+
+        double range = config.getParam("sonic_boom", "range", BASE_RANGE);
+        double baseDamage = config.getParam("sonic_boom", "base-damage", BASE_DAMAGE);
+        double amplifyBonus = config.getParam("sonic_boom", "amplify-damage-bonus", AMPLIFY_DAMAGE_BONUS);
+        double damage = baseDamage + context.getAmplifyLevel() * amplifyBonus;
+
+        int totalBeams = 1 + Math.min(context.getSplitCount(), 6);
+        int blockPierceCharges = 2 * context.getPierceCount();
+
+        Vector baseDirection = caster.getLocation().getDirection();
+
+        for (int i = 0; i < totalBeams; i++) {
+            Vector direction = baseDirection.clone();
+            if (totalBeams > 1) {
+                double angle = (i - (totalBeams - 1) / 2.0) * SPREAD_ANGLE_STEP;
+                direction.rotateAroundY(angle);
+            }
+            fireSonicBoom(caster, direction, range, damage, blockPierceCharges, context);
+        }
+    }
+
+    private void fireSonicBoom(Player caster, Vector direction, double range,
+                                double damage, int blockPierceCharges, SpellContext context) {
+        Location origin = caster.getEyeLocation().clone();
+        Set<UUID> hitEntities = new HashSet<>();
+        int pierceRemaining = blockPierceCharges;
+
+        double effectiveRange = range;
+
+        // ブロック衝突スキャン（透過ブロックは自動貫通）
+        for (double dist = 1.0; dist <= range; dist += 1.0) {
+            Location point = origin.clone().add(direction.clone().multiply(dist));
+            Block block = point.getBlock();
+            if (!block.isPassable() && !block.isLiquid()) {
+                if (pierceRemaining > 0) {
+                    pierceRemaining--;
+                } else {
+                    effectiveRange = dist;
+                    break;
+                }
+            }
+        }
+
+        // エンティティヒット（全貫通、PvP保護準拠）
+        for (double dist = 1.0; dist <= effectiveRange; dist += SCAN_STEP) {
+            Location point = origin.clone().add(direction.clone().multiply(dist));
+            for (LivingEntity nearby : point.getNearbyLivingEntities(HIT_RADIUS)) {
+                if (nearby.equals(caster)) continue;
+                if (!hitEntities.add(nearby.getUniqueId())) continue;
+                if (!context.isValidAoeTarget(nearby, caster)) continue;
+
+                double finalDamage = context.calculateSpellDamage(damage, nearby);
+                nearby.damage(finalDamage, caster);
+            }
+        }
+
+        // ビジュアル: ソニックブームパーティクル
+        spawnSonicBoomFx(origin, direction, effectiveRange);
+    }
+
+    private void spawnSonicBoomFx(Location origin, Vector direction, double range) {
+        // Warden風ソニックブーム演出
+        origin.getWorld().playSound(origin, Sound.ENTITY_WARDEN_SONIC_BOOM,
+            SoundCategory.PLAYERS, 1.5f, 1.0f);
+
+        for (double dist = 1.5; dist <= range; dist += 1.5) {
+            Location point = origin.clone().add(direction.clone().multiply(dist));
+            origin.getWorld().spawnParticle(Particle.SONIC_BOOM, point, 1, 0, 0, 0, 0);
+        }
+    }
+
+    @Override
+    public void applyToBlock(SpellContext context, Location blockLocation) {
+        // 自己形態のみなのでブロック対象は発生しない
+    }
+
+    @Override
+    public boolean handlesAoeInternally() { return true; }
+
+    @Override public NamespacedKey getId() { return id; }
+    @Override public String getDisplayName() { return "ソニックブーム"; }
+    @Override public String getDescription() { return "視点方向へソニックブームを発射する"; }
+    @Override public int getManaCost() { return config.getManaCost("sonic_boom"); }
+    @Override public int getTier() { return config.getTier("sonic_boom"); }
+}

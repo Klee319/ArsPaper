@@ -40,7 +40,13 @@ public class TouchForm implements SpellForm {
             entity -> entity instanceof LivingEntity && !entity.equals(caster)
         );
 
-        if (result == null) return;
+        if (result == null) {
+            // 空気に向けて発動 → マナ消費なしで失敗
+            caster.sendMessage(net.kyori.adventure.text.Component.text(
+                "対象が見つかりません", net.kyori.adventure.text.format.NamedTextColor.RED));
+            context.setCancelled(true);
+            return;
+        }
 
         if (result.getHitEntity() instanceof LivingEntity target) {
             SpellFxUtil.spawnImpactBurst(target.getLocation());

@@ -46,10 +46,8 @@ glyphs:
     tier: 1
     mana-cost: 10
     # 加速:弾速↑ | 減速:弾速↓ | 貫通:対象を貫通 | 分裂:弾が複数化
-    # 軌跡:飛行経路上にも効果 | 延伸:射程延長 | 伝播:ブロック着弾→周辺伝播
+    # 軌跡:飛行経路上にも効果 | 延伸:射程延長
     # effects空=全効果互換
-    max-augments:
-      propagate: 1
     unlock-cost:
       level: 5
       materials:
@@ -60,10 +58,7 @@ glyphs:
   touch:
     tier: 1
     mana-cost: 10
-    # 伝播:ブロック着弾→周辺伝播
     # effects空=全効果互換（投擲のみコード側で除外）
-    max-augments:
-      propagate: 1
     unlock-cost:
       level: 5
       materials:
@@ -90,10 +85,20 @@ glyphs:
         IRON_BOOTS: 1
         LAPIS_BLOCK: 1
 
+  # 説明: 頭上のブロックに効果を適用する（足元の上方向版）
+  overhead:
+    tier: 1
+    mana-cost: 5
+    unlock-cost:
+      level: 5
+      materials:
+        IRON_HELMET: 1
+        LAPIS_BLOCK: 1
+
   # 説明: 自身の周囲を回転する球体が接触した対象に効果を適用する
   orbit:
     tier: 2
-    mana-cost: 50
+    mana-cost: 80
     # 加速:回転速度↑ | 減速:回転速度↓ | 分裂:軌道数増加
     # 延長:旋回持続+3秒/段 | 短縮:旋回持続-3秒/段 | 半径増加:軌道半径↑
     unlock-cost:
@@ -106,11 +111,13 @@ glyphs:
   # 説明: 直線レーザーを照射し経路上の全対象に効果を適用する（デフォルト全貫通）
   beam:
     tier: 3
-    mana-cost: 80
-    # デフォルト全貫通 | 加速:射程↑ | 減速:射程↓ | 分裂:複数ビーム
+    mana-cost: 110
+    # エンティティ全貫通 | 加速:射程↑ | 減速:射程↓ | 分裂:複数ビーム
     # 半径増加:ビームが太くなる（範囲内全エンティティ対象）
-    # 軌跡:軌道上のブロックにも効果 | 延伸:射程延長
+    # 貫通:ソリッドブロックを貫通（2*pierce個まで） | 軌跡:軌道上のブロックにも効果 | 延伸:射程延長
     # 全効果互換
+    max-augments:
+      pierce: 3
     unlock-cost:
       level: 40
       materials:
@@ -118,6 +125,24 @@ glyphs:
         DRAGON_BREATH: 4
         SEA_LANTERN: 16
   
+  # 説明: 時限式の火球を発射し、炸裂地点に効果を適用する
+  burst:
+    tier: 2
+    mana-cost: 70
+    # 延伸:射程延長+信管延長 | 半径増加:炸裂範囲↑ | 加速/減速:弾速
+    # 貫通:エンティティ貫通 | 分裂:複数弾
+    # 空中炸裂でもブロック対象を取れる
+    max-augments:
+      extend_reach: 5
+      aoe_radius: 5
+      pierce: 3
+      split: 3
+    unlock-cost:
+      level: 25
+      materials:
+        TNT: 16
+        ENDER_EYE: 8
+
   # ============================================================
   # Effects（効果）- Tier 1 (Novice)
   # ============================================================
@@ -127,11 +152,12 @@ glyphs:
     tier: 1
     mana-cost: 20
     # 増幅:ツールティア上昇(0=石, 1=鉄, 2=ダイヤ, 3=ネザライト) + 破壊可能硬度上昇
-    # 減少:ユーティリティモード(道/樹皮剥ぎ/さび落とし/さび止め落とし/苔落とし)
+    # 減衰1:掘削モード(シャベル適正ブロックのみ破壊)
+    # 減衰2:ユーティリティモード(道/樹皮剥ぎ/さび落とし/さび止め落とし/苔落とし)
     # 範囲:範囲破壊 | 抽出:シルクタッチ | 幸運:ドロップ増
     max-augments:
       amplify: 3  # 0=石(硬度25), 1=鉄(硬度50), 2=ダイヤ(硬度75,黒曜石可), 3=ネザライト(硬度100)
-      dampen: 1   # ※ON/OFFのみ（ユーティリティモード切替）
+      dampen: 2   # 1=掘削モード, 2=ユーティリティモード
       aoe: 7
       fortune: 3
       extract: 1  # ※ON/OFFのみ（シルクタッチは2段階以上なし）
@@ -244,24 +270,26 @@ glyphs:
         WIND_CHARGE: 4
 
   # 説明: 対象を術者方向に引き寄せる
+  # 説明: 対象の位置に吸引エリアを生成し周囲を引き寄せる（突風の逆）
+  # 対象がエンティティの場合、対象自身は影響を受けない
   pull:
     tier: 2
     mana-cost: 25
-    # 増幅:引き寄せ力↑(+0.5/段) | 減少:引き寄せ力↓ | 半径増加:範囲引き寄せ
+    # 増幅:吸引力↑ | 減少:吸引力↓ | 半径増加:吸引範囲拡大 | 延長/短縮:効果時間
     max-augments:
       amplify: 5
-      dampen: 2   # 2個でamp-1(=力0.5)。これ以上積んでも変化なし
+      dampen: 2
       aoe_radius: 7
     # params (設定可能な定数):
-    #   base-force: 0.8
-    #   amplify-bonus: 0.5 (/段、増幅1段あたり+0.5)
-    #   max-force: 3.0 (引き寄せ力上限。大きすぎると制御不能)
-    #   min-y: 0.15
+    #   base-radius: 3.0 (吸引範囲半径)
+    #   base-force: 0.5 (基本吸引力)
+    #   amplify-force-bonus: 0.3 (/段)
+    #   base-duration: 100 (tick=5秒、基本持続)
+    #   duration-per-level: 60 (tick=3秒/段、延長あたり加算)
     params:
-      base-force: 1.0
-      amplify-bonus: 0.5
-      max-force: 3.5
-      min-y: 0.15
+      base-radius: 3.0
+      base-force: 0.5
+      amplify-force-bonus: 0.3
     unlock-cost:
       level: 20
       materials:
@@ -457,7 +485,7 @@ glyphs:
     #   base-velocity: 1.5
     #   amplify-bonus: 0.8 (/段、増幅1段あたり+0.8)
     #   max-velocity: 5.0 (打ち上げ速度上限。大きすぎると天井貫通)
-    params (設定可能な定数):
+    params:
       base-velocity: 1.0
       amplify-bonus: 0.8
       max-velocity: 5.0
@@ -471,18 +499,16 @@ glyphs:
   leap:
     tier: 2
     mana-cost: 25
-    # 増幅:前方跳躍力↑(+0.3/段) | 減少:跳躍力↓
+    # 増幅:ジャンプブーストレベル↑ | 減少:跳躍不能（amplifier 128）
+    # 延長:持続時間延長(+100tick/段) | 短縮:持続時間短縮
     max-augments:
       amplify: 5
-      dampen: 2   # 2個でamp-1(=速度0.7)。これ以上積んでも変化なし
+      dampen: 1   # ※ON/OFFのみ（跳躍不能モード切替）
+      extend_time: 7
+      duration_down: 7
     # params (設定可能な定数):
-    #   base-velocity: 1.0
-    #   amplify-bonus: 0.3 (/段、増幅1段あたり+0.3)
-    #   max-velocity: 3.0 (跳躍速度上限。大きすぎると制御不能)
-    params (設定可能な定数):
-      base-velocity: 1.0
-      amplify-bonus: 0.3 
-      max-velocity: 2.5
+    #   base-duration: 200 (tick=10秒)
+    #   duration-per-level: 100 (tick=5秒/段、延長1段あたり+5秒)
     unlock-cost:
       level: 20
       materials:
@@ -504,7 +530,7 @@ glyphs:
     # params (設定可能な定数):
     #   base-duration: 600 (tick=30秒)
     #   duration-per-level: 160 (tick=8秒/段、延長1段あたり+8秒)
-    params (設定可能な定数):
+    params:
       base-duration: 200 
       duration-per-level: 100
     unlock-cost:
@@ -814,7 +840,7 @@ glyphs:
     # params (設定可能な定数):
     #   base-damage: 3.0 (HP、基本ダメージ)
     #   amplify-bonus: 2.0 (HP/段、増幅1段あたり+2.0HP) ※炎上中1.5倍
-    params (設定可能な定数):
+    params:
       base-damage: 5.0 
       amplify-bonus: 2.0 
     unlock-cost:
@@ -834,7 +860,7 @@ glyphs:
     # params (設定可能な定数):
     #   base-damage: 6.0 (HP、基本凍結ダメージ)
     #   max-amp: 2 (最大増幅段数。上限なし)
-    params (設定可能な定数):
+    params:
       base-damage: 6.0 
       max-amp: 5 
     unlock-cost:
@@ -907,7 +933,7 @@ glyphs:
     # params (設定可能な定数):
     #   base-duration-ticks: 600 (tick=30秒、基本持続)
     #   duration-bonus-ticks: 160 (tick=8秒/段、延長あたり加算)
-    params (設定可能な定数):
+    params:
       base-duration-ticks: 400 
       duration-bonus-ticks: 200 
     unlock-cost:
@@ -1007,7 +1033,7 @@ glyphs:
     #   base-radius: 3.0 (ブロック)
     #   base-force: 1.0
     #   amplify-force-bonus: 0.5 (/段、増幅1段あたり+0.5)
-    params (設定可能な定数):
+    params:
       base-radius: 3.0
       base-force: 1.5
       amplify-force-bonus: 1.0
@@ -1069,17 +1095,20 @@ glyphs:
   blink:
     tier: 3
     mana-cost: 50
-    # 延伸:テレポート距離↑(+8ブロック/段)+透過ブロック貫通
+    # 延伸:テレポート距離↑(+8ブロック/段)
+    # 貫通:ブロック貫通TP（1段につき1ブロック貫通）
+    # 対象エンティティとは位置交換（互いの向きを維持）
     max-augments:
       extend_reach: 7
+      pierce: 3
     # params (設定可能な定数):
-    #   base-distance: 8 (ブロック)
+    #   base-distance: 12 (ブロック、デフォルト射程)
     #   reach-bonus: 8 (ブロック/段、延伸1段あたり+8ブロック)
-    #   max-distance: 48 (ブロック、コード上限)
-    params (設定可能な定数):
-      base-distance: 10
-      reach-bonus: 7
-      max-distance: 60
+    #   max-distance: 64 (ブロック、コード上限)
+    params:
+      base-distance: 12
+      reach-bonus: 8
+      max-distance: 64
     unlock-cost:
       level: 30
       materials:
@@ -1181,16 +1210,15 @@ glyphs:
   shield:
     tier: 3
     mana-cost: 150
-    # 増幅:耐性レベル↑(最大Lv3) | 減少:耐性レベル↓
+    # 耐性II固定(40%軽減) | 増幅:吸収レベル↑(+4HP/段)
     # 延長:シールド持続延長(+160tick/段) | 短縮:持続短縮
     max-augments:
-      amplify: 3
+      amplify: 5
       extend_time: 7
       duration_down: 7
     # params (設定可能な定数):
-    #   base-duration: 200 (tick=10秒)
+    #   base-duration: 100 (tick=5秒)
     #   duration-per-level: 160 (tick=8秒/段、延長1段あたり+8秒)
-    #   max-amplifier: 3 (耐性最大Lv。※Lv5以上で完全無敵、注意)
     unlock-cost:
       level: 20
       materials:
@@ -1236,7 +1264,7 @@ glyphs:
       duration_down: 7
     # params (設定可能な定数):
     #   max-summons: 3 (最大召喚数。多すぎるとサーバー負荷)
-    params (設定可能な定数):
+    params:
       max-summons: 8
     unlock-cost:
       level: 40
@@ -1577,6 +1605,308 @@ glyphs:
       materials:
         OMINOUS_BOTTLE: 1
         DRAGON_BREATH: 4
+
+  # ============================================================
+  # 新規増強
+  # ============================================================
+
+  # 説明: 射程・距離を短縮する（延伸の逆）
+  shrink_reach:
+    tier: 1
+    mana-cost: 0
+    unlock-cost:
+      level: 5
+      materials:
+        ARROW: 16
+        SNOWBALL: 16
+
+  # ============================================================
+  # 新規エフェクト
+  # ============================================================
+
+  # 説明: ランダムな音を対象の位置から発声する
+  cry:
+    tier: 1
+    mana-cost: 0
+    unlock-cost:
+      level: 10
+      materials:
+        NOTE_BLOCK: 4
+        GOLD_INGOT: 1
+
+  # 説明: 対象の移動方向を反転させる
+  reverse:
+    tier: 2
+    mana-cost: 30
+    unlock-cost:
+      level: 20
+      materials:
+        REDSTONE_TORCH: 16
+        LEVER: 64
+
+  # 説明: 対象に満腹効果を付与する（減衰で空腹）
+  saturation:
+    tier: 2
+    mana-cost: 25
+    max-augments:
+      amplify: 3
+      dampen: 4
+    unlock-cost:
+      level: 20
+      materials:
+        COOKED_BEEF: 32
+        GOLDEN_CARROT: 16
+
+  # 説明: 対象にスピードを付与する（減衰で鈍足）
+  gale:
+    tier: 2
+    mana-cost: 25
+    max-augments:
+      amplify: 3
+      dampen: 4
+    unlock-cost:
+      level: 20
+      materials:
+        SUGAR: 64
+        BLAZE_ROD: 4
+
+  # 説明: 対象のサイズを変更する（当たり判定含む）
+  scale:
+    tier: 2
+    mana-cost: 25
+    max-augments:
+      amplify: 5
+      dampen: 3
+    unlock-cost:
+      level: 25
+      materials:
+        SLIME_BLOCK: 8
+        MAGMA_BLOCK: 8
+
+  # 説明: 対象に体力増強を付与する
+  journey:
+    tier: 3
+    mana-cost: 500
+    max-augments:
+      amplify: 3
+    unlock-cost:
+      level: 100
+      materials:
+        CONDUIT: 1
+        CREAKING_HEART: 1
+        NETHERITE_BLOCK: 1
+        BEACON: 1
+        RECOVERY_COMPASS: 1
+        DRAGON_HEAD: 1
+        ENCHANTED_GOLDEN_APPLE: 1
+
+  # 説明: 視点方向へソニックブームを発射する（自己形態専用）
+  sonic_boom:
+    tier: 3
+    mana-cost: 200
+    max-augments:
+      amplify: 5
+      split: 4
+      pierce: 3
+    unlock-cost:
+      level: 40
+      materials:
+        ECHO_SHARD: 4
+        SCULK_SHRIEKER: 16
+
+  # 説明: 太陽を召喚し周囲の敵に防御無視の炎ダメージを与え炎上させる
+  solar:
+    tier: 3
+    mana-cost: 500
+    # 増幅:ダメージ↑ | 半径増加:索敵範囲↑ | 延長:持続時間↑ | 分裂:発射頻度↑
+    max-augments:
+      amplify: 5
+      aoe_radius: 5
+      split: 4
+    unlock-cost:
+      level: 50
+      materials:
+        OCHRE_FROGLIGHT: 1
+        VERDANT_FROGLIGHT: 1
+        PEARLESCENT_FROGLIGHT: 1
+        GLOWSTONE: 1
+        SHROOMLIGHT: 1
+        REDSTONE_LAMP: 1
+        JACK_O_LANTERN: 1
+        LANTERN: 16
+        TORCH: 16
+
+  # 説明: 月を召喚し周囲の敵に防御無視の凍結ダメージを与え拘束する
+  lunar:
+    tier: 3
+    mana-cost: 500
+    # 増幅:ダメージ↑ | 半径増加:索敵範囲↑ | 延長:持続時間↑ | 分裂:発射頻度↑
+    max-augments:
+      amplify: 5
+      aoe_radius: 5
+      split: 4
+    unlock-cost:
+      level: 50
+      materials:
+        GLOW_INK_SAC: 32
+        SOUL_LANTERN: 16
+        SOUL_TORCH: 16
+        GLOW_BERRIES: 32
+        GLOW_LICHEN: 16
+        SEA_LANTERN: 16
+        OCHRE_FROGLIGHT: 1
+        VERDANT_FROGLIGHT: 1
+        PEARLESCENT_FROGLIGHT: 1
+
+  # 説明: 地面に衝撃波を走らせ5段階の連続ダメージを与える
+  heavy_impact:
+    tier: 3
+    mana-cost: 150
+    max-augments:
+      amplify: 5
+      aoe_radius: 5
+    unlock-cost:
+      level: 35
+      materials:
+        MACE: 1
+        ANVIL: 8
+
+  # ============================================================
+  # 超増強 (Super Augments) — ベース増強2個分の効果を1スロットで発揮
+  # コストはベースの4倍（上限64マナ）
+  # スタック上限は通常増強と共有（超増強1個 = 通常2個分）
+  # 上限を超える場合はスペルに搭載できない
+  # ============================================================
+
+  # 説明: 増幅2個分の強化効果
+  super_amplify:
+    tier: 3
+    mana-cost: 64
+    unlock-cost:
+      level: 40
+      materials:
+        NETHER_STAR: 1
+        DIAMOND_BLOCK: 2
+
+  # 説明: 減衰2個分の抑制効果
+  super_dampen:
+    tier: 3
+    mana-cost: 0
+    unlock-cost:
+      level: 40
+      materials:
+        NETHER_STAR: 1
+        SOUL_SAND: 32
+
+  # 説明: 加速2個分の速度上昇
+  super_accelerate:
+    tier: 3
+    mana-cost: 40
+    unlock-cost:
+      level: 40
+      materials:
+        NETHER_STAR: 1
+        SUGAR: 64
+
+  # 説明: 減速2個分の速度低下
+  super_decelerate:
+    tier: 3
+    mana-cost: 0
+    unlock-cost:
+      level: 40
+      materials:
+        NETHER_STAR: 1
+        COBWEB: 32
+
+  # 説明: 分裂2個分の弾数増加
+  super_split:
+    tier: 3
+    mana-cost: 64
+    unlock-cost:
+      level: 40
+      materials:
+        NETHER_STAR: 1
+        PRISMARINE_SHARD: 64
+
+  # 説明: 貫通2個分の貫通効果
+  super_pierce:
+    tier: 3
+    mana-cost: 40
+    unlock-cost:
+      level: 40
+      materials:
+        NETHER_STAR: 1
+        ARROW: 64
+
+  # 説明: 半径増加2個分の範囲拡大
+  super_aoe_radius:
+    tier: 3
+    mana-cost: 64
+    unlock-cost:
+      level: 40
+      materials:
+        NETHER_STAR: 1
+        TNT: 16
+
+  # 説明: 延伸2個分の射程延長
+  super_extend_reach:
+    tier: 3
+    mana-cost: 60
+    unlock-cost:
+      level: 40
+      materials:
+        NETHER_STAR: 1
+        ENDER_PEARL: 16
+
+  # 説明: 伝播2個分のチェーン対象
+  super_propagate:
+    tier: 3
+    mana-cost: 64
+    unlock-cost:
+      level: 40
+      materials:
+        NETHER_STAR: 1
+        SCULK_CATALYST: 4
+
+  # 説明: 延長2個分の持続時間延長
+  super_extend_time:
+    tier: 3
+    mana-cost: 40
+    unlock-cost:
+      level: 40
+      materials:
+        NETHER_STAR: 1
+        CLOCK: 8
+
+  # 説明: 短縮2個分の持続時間短縮
+  super_duration_down:
+    tier: 3
+    mana-cost: 0
+    unlock-cost:
+      level: 40
+      materials:
+        NETHER_STAR: 1
+        REDSTONE: 64
+
+  # 説明: 幸運2個分のドロップ増加
+  super_fortune:
+    tier: 3
+    mana-cost: 64
+    unlock-cost:
+      level: 40
+      materials:
+        NETHER_STAR: 1
+        EMERALD_BLOCK: 8
+
+  # 説明: 収縮2個分の射程短縮
+  super_shrink_reach:
+    tier: 3
+    mana-cost: 0
+    unlock-cost:
+      level: 40
+      materials:
+        NETHER_STAR: 1
+        SNOW_BLOCK: 16
 
 # ============================================================
 # 交換グリフ ブロック変換マッピング

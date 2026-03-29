@@ -7,8 +7,10 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.enchantments.Enchantment;
+import org.bukkit.entity.Warden;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.world.LootGenerateEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.EnchantmentStorageMeta;
@@ -39,6 +41,9 @@ public class LootTableListener implements Listener {
     private boolean enabled;
     private double enchantBookChance;
     private double enchantedGoldenAppleChance;
+    private boolean wardenEchoShard;
+    private int wardenEchoShardMin;
+    private int wardenEchoShardMax;
 
     public LootTableListener(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -49,6 +54,35 @@ public class LootTableListener implements Listener {
         enabled = plugin.getConfig().getBoolean("loot.enabled", true);
         enchantBookChance = plugin.getConfig().getDouble("loot.enchant-book-chance", 0.05);
         enchantedGoldenAppleChance = plugin.getConfig().getDouble("loot.enchanted-golden-apple-chance", 0.02);
+        wardenEchoShard = plugin.getConfig().getBoolean("mob-drops.warden-echo-shard", true);
+        wardenEchoShardMin = plugin.getConfig().getInt("mob-drops.warden-echo-shard-min", 1);
+        wardenEchoShardMax = plugin.getConfig().getInt("mob-drops.warden-echo-shard-max", 3);
+    }
+
+    /**
+     * ウォーデン討伐時に残響の欠片をドロップする。
+     * ドロップ増加（Looting）エンチャントで個数が増加する。
+     */
+    @EventHandler
+    public void onEntityDeath(EntityDeathEvent event) {
+        if (!wardenEchoShard) return;
+        if (!(event.getEntity() instanceof Warden warden)) return;
+
+        int base = ThreadLocalRandom.current().nextInt(wardenEchoShardMin, wardenEchoShardMax + 1);
+
+        // ドロップ増加エンチャント（Looting）のレベル分を加算
+        var killer = warden.getKiller();
+        if (killer != null) {
+            var weapon = killer.getInventory().getItemInMainHand();
+            int lootingLevel = weapon.getEnchantmentLevel(org.bukkit.enchantments.Enchantment.LOOTING);
+            if (lootingLevel > 0) {
+                base += ThreadLocalRandom.current().nextInt(lootingLevel + 1);
+            }
+        }
+
+        if (base > 0) {
+            event.getDrops().add(new ItemStack(Material.ECHO_SHARD, base));
+        }
     }
 
     @EventHandler

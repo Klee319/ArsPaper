@@ -179,6 +179,9 @@ public class BreakEffect implements SpellEffect {
         Material.MOSSY_STONE_BRICK_WALL, Material.STONE_BRICK_WALL
     );
 
+    /** シャベル適正判定用の仮想ツール（掘削モード） */
+    private static final ItemStack SHOVEL_CHECK = new ItemStack(Material.WOODEN_SHOVEL);
+
     private final NamespacedKey id;
     private final GlyphConfig config;
 
@@ -200,9 +203,18 @@ public class BreakEffect implements SpellEffect {
         Player caster = context.getCaster();
         if (caster == null) return;
 
-        // Dampen: ユーティリティモード（減衰1個でON）
-        if (context.hasDampen() && context.getAmplifyLevel() <= 0) {
+        int dampenLevel = context.getDampenAccum();
+
+        // Dampen 2+: ユーティリティモード（道/樹皮剥ぎ/さび落とし等）
+        if (dampenLevel >= 2 && context.getAmplifyLevel() <= 0) {
             applyUtility(block, caster, blockLocation);
+            return;
+        }
+
+        // Dampen 1: 掘削モード（シャベル適正ブロックのみ破壊）
+        if (dampenLevel == 1) {
+            if (!block.isPreferredTool(SHOVEL_CHECK)) return;
+            breakBlock(block, caster, context, blockLocation);
             return;
         }
 
@@ -219,10 +231,21 @@ public class BreakEffect implements SpellEffect {
         ItemStack tool = buildVirtualTool(context);
         if (hardness > 0 && !block.isPreferredTool(tool)) return;
 
+        breakBlock(block, caster, context, blockLocation);
+    }
+
+    /**
+     * ブロックを破壊してドロップする共通処理。
+     * 通常破壊モードと掘削モードの両方から呼ばれる。
+     */
+    private void breakBlock(Block block, Player caster, SpellContext context, Location blockLocation) {
         BlockBreakEvent breakEvent = new BlockBreakEvent(block, caster);
         Bukkit.getPluginManager().callEvent(breakEvent);
         if (breakEvent.isCancelled()) return;
 
+        // 掘削モードはシャベル、通常モードはピッケル
+        ItemStack tool = context.getDampenAccum() >= 1
+            ? buildVirtualShovel(context) : buildVirtualTool(context);
         Material blockType = block.getType();
         SpellFxUtil.spawnBreakFx(blockLocation, blockType);
 
@@ -437,6 +460,20 @@ public class BreakEffect implements SpellEffect {
             toolMat = Material.STONE_PICKAXE;
         }
         ItemStack tool = new ItemStack(toolMat);
+        if (context.getExtractCount() > 0) {
+            tool.addEnchantment(Enchantment.SILK_TOUCH, 1);
+        } else if (context.getFortuneLevel() > 0) {
+            tool.addUnsafeEnchantment(Enchantment.FORTUNE, context.getFortuneLevel());
+        }
+        return tool;
+    }
+
+    /**
+     * 掘削モード用のシャベル仮想ツールを構築する。
+     * Extract/Fortune Augmentのみ適用（増幅はツールティアに影響しない）。
+     */
+    private ItemStack buildVirtualShovel(SpellContext context) {
+        ItemStack tool = new ItemStack(Material.NETHERITE_SHOVEL);
         if (context.getExtractCount() > 0) {
             tool.addEnchantment(Enchantment.SILK_TOUCH, 1);
         } else if (context.getFortuneLevel() > 0) {

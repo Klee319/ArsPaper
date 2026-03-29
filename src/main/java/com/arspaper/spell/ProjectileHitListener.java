@@ -1,7 +1,9 @@
 package com.arspaper.spell;
 
+import com.arspaper.spell.form.BurstForm;
 import org.bukkit.Location;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.ProjectileHitEvent;
@@ -10,13 +12,14 @@ import org.bukkit.metadata.MetadataValue;
 import java.util.List;
 
 /**
- * ProjectileFormで発射したSnowballの着弾を処理するリスナー。
+ * ProjectileForm/BurstFormで発射した飛翔体の着弾を処理するリスナー。
  * PierceAugmentによる貫通をサポート。
  */
 public class ProjectileHitListener implements Listener {
 
     private static final String META_KEY = "ars_spell_context";
     private static final String META_PIERCE_REMAINING = "ars_pierce_remaining";
+    private static final String META_BURST = "ars_burst_form";
 
     public ProjectileHitListener() {
     }
@@ -29,6 +32,34 @@ public class ProjectileHitListener implements Listener {
         Object value = metadata.get(0).value();
         if (!(value instanceof SpellContext context)) return;
 
+        // 炸裂フォームの場合は炸裂処理に委譲
+        boolean isBurst = !event.getEntity().getMetadata(META_BURST).isEmpty();
+
+        if (isBurst) {
+            // 炸裂: エンティティヒット時は貫通処理+炸裂
+            if (event.getHitEntity() instanceof LivingEntity target) {
+                int pierceRemaining = getPierceRemaining(event);
+                if (pierceRemaining > 0) {
+                    // 貫通: エンティティに効果適用して飛行継続
+                    SpellContext hitContext = context.copy();
+                    hitContext.resolveOnEntity(target);
+                    event.setCancelled(true);
+                    setPierceRemaining(event, pierceRemaining - 1);
+                    return;
+                }
+            }
+            // 炸裂起爆（ヒットまたはブロック着弾）
+            Location detonationPoint = event.getHitBlock() != null
+                ? event.getHitBlock().getLocation().add(0.5, 0.5, 0.5)
+                : event.getEntity().getLocation();
+            Player shooter = event.getEntity().getShooter() instanceof Player p ? p : null;
+            double burstRadius = 2.0 + context.getAoeRadiusLevel() * 1.5;
+            BurstForm.detonate(detonationPoint, context, burstRadius, shooter);
+            event.getEntity().remove();
+            return;
+        }
+
+        // 通常の投射フォーム処理
         if (event.getHitEntity() instanceof LivingEntity target) {
             // Pierce処理
             int pierceRemaining = getPierceRemaining(event);

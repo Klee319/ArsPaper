@@ -13,9 +13,10 @@ import org.bukkit.potion.PotionEffect;
 import java.util.List;
 
 /**
- * 対象の全ポーション効果を除去するEffect。Ars NouveauのEffectDispelに準拠。
- * Amplifyなし: 有害効果のみ除去。
- * Amplify 1+: 全ポーション効果を除去。
+ * 対象のポーション効果を除去するEffect。
+ * 通常: 有害効果のみ除去。
+ * 増幅: 全ポーション効果を除去。
+ * 減衰: 良い効果のみ除去（敵に使って有利な状態を剥がす用途）。
  */
 public class DispelEffect implements SpellEffect {
 
@@ -32,9 +33,16 @@ public class DispelEffect implements SpellEffect {
         List<PotionEffect> effects = List.copyOf(target.getActivePotionEffects());
 
         if (context.getAmplifyLevel() > 0) {
-            // Amplify付き: 全ポーション効果を除去
+            // 増幅: 全ポーション効果を除去
             for (PotionEffect effect : effects) {
                 target.removePotionEffect(effect.getType());
+            }
+        } else if (context.hasDampen()) {
+            // 減衰: 良い効果のみ除去（敵のバフ剥がし）
+            for (PotionEffect effect : effects) {
+                if (!effect.getType().isInstant() && !isHarmful(effect)) {
+                    target.removePotionEffect(effect.getType());
+                }
             }
         } else {
             // 通常: 有害ポーション効果のみ除去

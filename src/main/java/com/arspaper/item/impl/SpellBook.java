@@ -229,7 +229,8 @@ public class SpellBook extends BaseCustomItem {
         }
 
         SpellRecipe recipe = slots.get(slot);
-        ArsPaper.getInstance().getSpellCaster().cast(player, recipe);
+        boolean sharedSpell = com.arspaper.enchant.ArsEnchantments.hasShareEnchant(item);
+        ArsPaper.getInstance().getSpellCaster().cast(player, recipe, sharedSpell);
     }
 
     private void switchSlot(Player player, ItemStack item) {

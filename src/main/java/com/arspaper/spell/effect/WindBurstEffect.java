@@ -1,5 +1,6 @@
 package com.arspaper.spell.effect;
 
+import com.arspaper.ArsPaper;
 import com.arspaper.spell.GlyphConfig;
 import com.arspaper.spell.SpellContext;
 import com.arspaper.spell.SpellEffect;
@@ -11,93 +12,139 @@ import org.bukkit.SoundCategory;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 
 /**
- * 衝撃位置周囲のエンティティを吹き飛ばす風爆発Effect。
- * Ars Nouveau Tier 2準拠:
- *   - 衝撃点から半径 (3.0 + aoeLevel) 内の全LivingEntityを吹き飛ばす
- *   - ノックバック力: 1.0 + 0.5 × amplifyLevel
- *   - Sensitive: 発動者はノックバックを受けない
- *   - ブロック対象にも適用可（衝撃点中心に周囲エンティティを吹き飛ばす）
+ * 突風エフェクト - 対象の周囲に風のバリアを展開する。
+ *
+ * ブロック対象: 指定位置の周囲にバリアを展開。近づくエンティティを弾き返す。
+ * エンティティ対象: 対象エンティティの周囲にバリアを展開。対象自身は影響を受けない。
+ *
+ * 半径増加: バリア範囲拡大
+ * 増幅: 吹き飛ばし威力（距離）上昇
+ * 減衰: 吹き飛ばし威力低下
  */
 public class WindBurstEffect implements SpellEffect {
 
     private static final double BASE_RADIUS = 3.0;
     private static final double BASE_FORCE = 1.0;
     private static final double AMPLIFY_FORCE_BONUS = 0.5;
+    private static final int BASE_DURATION = 100;           // 5秒
+    private static final int DURATION_PER_LEVEL = 60;       // +3秒/段
 
     private final NamespacedKey id;
     private final GlyphConfig config;
+    private final JavaPlugin plugin;
 
     public WindBurstEffect(JavaPlugin plugin, GlyphConfig config) {
         this.id = new NamespacedKey(plugin, "wind_burst");
         this.config = config;
+        this.plugin = plugin;
     }
 
     @Override
     public void applyToEntity(SpellContext context, LivingEntity target) {
+        double radius = config.getParam("wind_burst", "base-radius", BASE_RADIUS)
+            + context.getAoeRadiusLevel();
+        double force = config.getParam("wind_burst", "base-force", BASE_FORCE)
+            + config.getParam("wind_burst", "amplify-force-bonus", AMPLIFY_FORCE_BONUS)
+                * context.getAmplifyLevel();
+        int baseDur = (int) config.getParam("wind_burst", "base-duration", BASE_DURATION);
+        int durPerLevel = (int) config.getParam("wind_burst", "duration-per-level", DURATION_PER_LEVEL);
+        int duration = baseDur + context.getDurationLevel() * durPerLevel;
+
         Player caster = context.getCaster();
-        double baseForce = config.getParam("wind_burst", "base-force", BASE_FORCE);
-        double amplifyForceBonus = config.getParam("wind_burst", "amplify-force-bonus", AMPLIFY_FORCE_BONUS);
-        double force = baseForce + amplifyForceBonus * context.getAmplifyLevel();
 
-        if (caster != null && caster.equals(target)) {
-            // 自己対象: 視線と反対方向に飛び出す
-            Vector backward = caster.getLocation().getDirection().multiply(-1).normalize();
-            backward.setY(Math.max(backward.getY(), 0.3));
-            backward.normalize().multiply(force);
-            target.setVelocity(backward);
-            spawnWindBurstFx(target.getLocation());
-            return;
-        }
-
-        // 他者対象: 衝撃点からノックバック
-        Location impactPoint = target.getLocation();
-        knockbackAway(target, impactPoint, force);
-        spawnWindBurstFx(impactPoint);
+        // エンティティバリア: 対象の周囲に展開。対象自身は影響を受けない
+        startBarrierTask(target, null, radius, force, duration, caster, context);
     }
 
     @Override
     public void applyToBlock(SpellContext context, Location blockLocation) {
-        // ブロック対象: 衝撃点中心に周囲エンティティをノックバック
-        // （ブロックにはSpellContextのAOEエンティティスキャンが効かないため自前でスキャン）
+        double radius = config.getParam("wind_burst", "base-radius", BASE_RADIUS)
+            + context.getAoeRadiusLevel();
+        double force = config.getParam("wind_burst", "base-force", BASE_FORCE)
+            + config.getParam("wind_burst", "amplify-force-bonus", AMPLIFY_FORCE_BONUS)
+                * context.getAmplifyLevel();
+        int baseDur = (int) config.getParam("wind_burst", "base-duration", BASE_DURATION);
+        int durPerLevel = (int) config.getParam("wind_burst", "duration-per-level", DURATION_PER_LEVEL);
+        int duration = baseDur + context.getDurationLevel() * durPerLevel;
+
         Player caster = context.getCaster();
-        int amplifyLevel = context.getAmplifyLevel();
-        int aoeLevel = context.getAoeRadiusLevel();
-        Location impactPoint = blockLocation.clone().add(0.5, 0.5, 0.5);
-        double baseRadius = config.getParam("wind_burst", "base-radius", BASE_RADIUS);
-        double baseForceB = config.getParam("wind_burst", "base-force", BASE_FORCE);
-        double amplifyForceBonusB = config.getParam("wind_burst", "amplify-force-bonus", AMPLIFY_FORCE_BONUS);
-        double radius = baseRadius + aoeLevel;
-        double force = baseForceB + amplifyForceBonusB * amplifyLevel;
+        Location center = blockLocation.clone().add(0.5, 0.5, 0.5);
 
-        for (LivingEntity nearby : impactPoint.getNearbyLivingEntities(radius)) {
-            if (caster != null && nearby.equals(caster)) continue;
-            knockbackAway(nearby, impactPoint, force);
-        }
-
-        spawnWindBurstFx(impactPoint);
+        // ブロックバリア: 固定位置に展開
+        startBarrierTask(null, center, radius, force, duration, caster, context);
     }
 
     /**
-     * エンティティを衝撃点から遠ざける方向にノックバックさせる。
+     * バリアタスクを開始する。
+     * @param anchorEntity null以外ならエンティティ追従、nullならfixedCenter固定位置
      */
-    private void knockbackAway(LivingEntity entity, Location impactPoint, double force) {
-        Vector direction = entity.getLocation().toVector()
-            .subtract(impactPoint.toVector());
+    private void startBarrierTask(LivingEntity anchorEntity, Location fixedCenter,
+                                   double radius, double force, int durationTicks,
+                                   Player caster, SpellContext context) {
+        spawnWindBurstFx(anchorEntity != null ? anchorEntity.getLocation() : fixedCenter);
 
-        // 距離が0の場合（エンティティが衝撃点に重なっている場合）はランダム上方向
+        java.util.UUID casterUUID = caster != null ? caster.getUniqueId() : null;
+
+        new BukkitRunnable() {
+            int ticks = 0;
+
+            @Override
+            public void run() {
+                ticks++;
+                if (ticks > durationTicks) {
+                    cancel();
+                    return;
+                }
+
+                // casterオフラインチェック
+                Player onlineCaster = casterUUID != null
+                    ? org.bukkit.Bukkit.getPlayer(casterUUID) : null;
+
+                // アンカー位置を決定
+                Location center;
+                if (anchorEntity != null) {
+                    if (anchorEntity.isDead() || !anchorEntity.isValid()) {
+                        cancel();
+                        return;
+                    }
+                    center = anchorEntity.getLocation().add(0, 0.5, 0);
+                } else {
+                    center = fixedCenter;
+                }
+
+                // 範囲内のエンティティを弾き返す（5tickごと、PvP保護準拠）
+                if (ticks % 5 == 0) {
+                    for (LivingEntity nearby : center.getNearbyLivingEntities(radius)) {
+                        // アンカーエンティティ自身と術者は除外
+                        if (anchorEntity != null && nearby.equals(anchorEntity)) continue;
+                        if (onlineCaster != null && nearby.equals(onlineCaster)) continue;
+                        if (onlineCaster != null && !context.isValidAoeTarget(nearby, onlineCaster)) continue;
+
+                        knockbackAway(nearby, center, force);
+                    }
+                }
+
+                // パーティクル（10tickごと）
+                if (ticks % 10 == 0) {
+                    spawnBarrierParticles(center, radius);
+                }
+            }
+        }.runTaskTimer(plugin, 0L, 1L);
+    }
+
+    private void knockbackAway(LivingEntity entity, Location center, double force) {
+        Vector direction = entity.getLocation().toVector().subtract(center.toVector());
         if (direction.lengthSquared() < 0.0001) {
             direction = new Vector(0, 1, 0);
         } else {
             direction.normalize();
         }
-
-        // 上方向成分を追加して浮き上がるように
-        direction.setY(Math.max(direction.getY(), 0.4));
+        direction.setY(Math.max(direction.getY(), 0.3));
         direction.normalize().multiply(force);
-
         entity.setVelocity(direction);
     }
 
@@ -108,6 +155,19 @@ public class WindBurstEffect implements SpellEffect {
             SoundCategory.PLAYERS, 1.0f, 0.9f);
     }
 
+    private void spawnBarrierParticles(Location center, double radius) {
+        int points = 12;
+        for (int i = 0; i < points; i++) {
+            double angle = 2 * Math.PI * i / points;
+            Location point = center.clone().add(
+                Math.cos(angle) * radius, 0.5, Math.sin(angle) * radius);
+            center.getWorld().spawnParticle(Particle.CLOUD, point, 1, 0.1, 0.1, 0.1, 0.01);
+        }
+    }
+
+    @Override
+    public boolean handlesAoeInternally() { return true; }
+
     @Override
     public NamespacedKey getId() { return id; }
 
@@ -115,7 +175,7 @@ public class WindBurstEffect implements SpellEffect {
     public String getDisplayName() { return "突風"; }
 
     @Override
-    public String getDescription() { return "風の爆発で周囲を吹き飛ばす"; }
+    public String getDescription() { return "対象の周囲に風のバリアを展開し、近づく者を弾き返す"; }
 
     @Override
     public int getManaCost() { return config.getManaCost("wind_burst"); }

@@ -31,6 +31,7 @@ import com.arspaper.ritual.effect.*;
 import com.arspaper.source.SourceNetwork;
 import com.arspaper.source.SourcelinkTickTask;
 import com.arspaper.source.sourcelink.AlchemicalSourcelink;
+import com.arspaper.source.sourcelink.BotanicalSourcelink;
 import com.arspaper.source.sourcelink.MycelialSourcelink;
 import com.arspaper.source.sourcelink.VitalicSourcelink;
 import com.arspaper.source.sourcelink.VolcanicSourcelink;
@@ -148,6 +149,7 @@ public class ArsPaper extends JavaPlugin {
         RotateEffect.cleanupAll();
         GlideEffect.restoreAll();
         BounceEffect.cleanupAll();
+        ScaleEffect.cleanupAll();
         getLogger().info("ArsPaper disabled!");
     }
 
@@ -197,6 +199,9 @@ public class ArsPaper extends JavaPlugin {
         spellRegistry = new SpellRegistry();
         registerDefaultGlyphs();
 
+        // エンチャント定数読み込み
+        com.arspaper.enchant.ArsEnchantments.loadConfig(getConfig());
+
         // マナマネージャー
         ManaConfig manaConfig = ManaConfig.fromConfig(getConfig());
         manaManager = new ManaManager(this, manaConfig);
@@ -234,13 +239,15 @@ public class ArsPaper extends JavaPlugin {
     }
 
     private void registerDefaultGlyphs() {
-        // Forms (6種)
+        // Forms (8種)
         spellRegistry.register(new ProjectileForm(this, glyphConfig));
         spellRegistry.register(new TouchForm(this, glyphConfig));
         spellRegistry.register(new SelfForm(this, glyphConfig));
         spellRegistry.register(new UnderfootForm(this, glyphConfig));
+        spellRegistry.register(new com.arspaper.spell.form.OverheadForm(this, glyphConfig));
         spellRegistry.register(new OrbitForm(this, glyphConfig));
         spellRegistry.register(new BeamForm(this, glyphConfig));
+        spellRegistry.register(new com.arspaper.spell.form.BurstForm(this, glyphConfig));
 
         // Effects - Tier 1 (Novice)
         spellRegistry.register(new BreakEffect(this, glyphConfig));
@@ -273,6 +280,7 @@ public class ArsPaper extends JavaPlugin {
         spellRegistry.register(new WololoEffect(this, glyphConfig));
         spellRegistry.register(new BubbleEffect(this, glyphConfig));
         spellRegistry.register(new PrestidigitationEffect(this, glyphConfig));
+        spellRegistry.register(new CryEffect(this, glyphConfig));
 
         // Effects - Tier 2 (Apprentice)
         spellRegistry.register(new HealEffect(this, glyphConfig));
@@ -296,6 +304,10 @@ public class ArsPaper extends JavaPlugin {
         spellRegistry.register(new WindBurstEffect(this, glyphConfig));
         spellRegistry.register(new SpeedBoostEffect(this, glyphConfig));
         spellRegistry.register(new LevitateEffect(this, glyphConfig));
+        spellRegistry.register(new ReverseEffect(this, glyphConfig));
+        spellRegistry.register(new SaturationEffect(this, glyphConfig));
+        spellRegistry.register(new GaleEffect(this, glyphConfig));
+        spellRegistry.register(new ScaleEffect(this, glyphConfig));
 
         // Effects - Tier 3 (Archmage)
         spellRegistry.register(new AdvancedBreakEffect(this, glyphConfig));
@@ -311,30 +323,65 @@ public class ArsPaper extends JavaPlugin {
         spellRegistry.register(new SummonUndeadEffect(this, glyphConfig));
         spellRegistry.register(new SummonVexEffect(this, glyphConfig));
         spellRegistry.register(new SummonDecoyEffect(this, glyphConfig));
+        spellRegistry.register(new JourneyEffect(this, glyphConfig));
+        spellRegistry.register(new SonicBoomEffect(this, glyphConfig));
+        spellRegistry.register(new SolarEffect(this, glyphConfig));
+        spellRegistry.register(new LunarEffect(this, glyphConfig));
+        spellRegistry.register(new HeavyImpactEffect(this, glyphConfig));
 
-        // Augments (19種)
-        spellRegistry.register(new AmplifyAugment(this, glyphConfig));
-        spellRegistry.register(new DampenAugment(this, glyphConfig));
+        // Augments (21種)
+        var amplify = new AmplifyAugment(this, glyphConfig);
+        var dampen = new DampenAugment(this, glyphConfig);
+        var aoeRadius = new AoeRadiusAugment(this, glyphConfig);
+        var extendTime = new ExtendTimeAugment(this, glyphConfig);
+        var durationDown = new DurationDownAugment(this, glyphConfig);
+        var accelerate = new AccelerateAugment(this, glyphConfig);
+        var decelerate = new DecelerateAugment(this, glyphConfig);
+        var pierce = new PierceAugment(this, glyphConfig);
+        var split = new SplitAugment(this, glyphConfig);
+        var propagate = new PropagateAugment(this, glyphConfig);
+        var extendReach = new com.arspaper.spell.augment.ExtendReachAugment(this, glyphConfig);
+
+        spellRegistry.register(amplify);
+        spellRegistry.register(dampen);
         spellRegistry.register(new AoeAugment(this, glyphConfig));
         spellRegistry.register(new AoeHeightAugment(this, glyphConfig));
         spellRegistry.register(new AoeVerticalAugment(this, glyphConfig));
-        spellRegistry.register(new AoeRadiusAugment(this, glyphConfig));
-        spellRegistry.register(new ExtendTimeAugment(this, glyphConfig));
-        spellRegistry.register(new DurationDownAugment(this, glyphConfig));
-        spellRegistry.register(new AccelerateAugment(this, glyphConfig));
-        spellRegistry.register(new DecelerateAugment(this, glyphConfig));
-        spellRegistry.register(new PierceAugment(this, glyphConfig));
-        spellRegistry.register(new SplitAugment(this, glyphConfig));
+        spellRegistry.register(aoeRadius);
+        spellRegistry.register(extendTime);
+        spellRegistry.register(durationDown);
+        spellRegistry.register(accelerate);
+        spellRegistry.register(decelerate);
+        spellRegistry.register(pierce);
+        spellRegistry.register(split);
         spellRegistry.register(new ExtractAugment(this, glyphConfig));
-        spellRegistry.register(new FortuneAugment(this, glyphConfig));
+        var fortune = new FortuneAugment(this, glyphConfig);
+        spellRegistry.register(fortune);
         spellRegistry.register(new RandomizeAugment(this, glyphConfig));
         spellRegistry.register(new DelayAugment(this, glyphConfig));
         // WallAugment は廃止
         spellRegistry.register(new LingerAugment(this, glyphConfig));
         spellRegistry.register(new TrailAugment(this, glyphConfig));
         spellRegistry.register(new TraceAugment(this, glyphConfig));
-        spellRegistry.register(new PropagateAugment(this, glyphConfig));
-        spellRegistry.register(new com.arspaper.spell.augment.ExtendReachAugment(this, glyphConfig));
+        spellRegistry.register(propagate);
+        spellRegistry.register(extendReach);
+        var shrinkReach = new com.arspaper.spell.augment.ShrinkReachAugment(this, glyphConfig);
+        spellRegistry.register(shrinkReach);
+
+        // 超増強 (13種) — ベース増強2個分の効果、コスト4倍（上限64）
+        spellRegistry.register(new SuperAugment(this, glyphConfig, amplify,     "超増幅", "増幅2個分の強化効果"));
+        spellRegistry.register(new SuperAugment(this, glyphConfig, dampen,      "超減衰", "減衰2個分の抑制効果"));
+        spellRegistry.register(new SuperAugment(this, glyphConfig, accelerate,  "超加速", "加速2個分の速度上昇"));
+        spellRegistry.register(new SuperAugment(this, glyphConfig, decelerate,  "超減速", "減速2個分の速度低下"));
+        spellRegistry.register(new SuperAugment(this, glyphConfig, split,       "超分裂", "分裂2個分の弾数増加"));
+        spellRegistry.register(new SuperAugment(this, glyphConfig, pierce,      "超貫通", "貫通2個分の貫通効果"));
+        spellRegistry.register(new SuperAugment(this, glyphConfig, aoeRadius,   "超半径増加", "半径増加2個分の範囲拡大"));
+        spellRegistry.register(new SuperAugment(this, glyphConfig, extendReach, "超延伸", "延伸2個分の射程延長"));
+        spellRegistry.register(new SuperAugment(this, glyphConfig, propagate,   "超伝播", "伝播2個分のチェーン対象"));
+        spellRegistry.register(new SuperAugment(this, glyphConfig, extendTime,  "超延長", "延長2個分の持続時間延長"));
+        spellRegistry.register(new SuperAugment(this, glyphConfig, durationDown,"超短縮", "短縮2個分の持続時間短縮"));
+        spellRegistry.register(new SuperAugment(this, glyphConfig, shrinkReach, "超収縮", "収縮2個分の射程短縮"));
+        spellRegistry.register(new SuperAugment(this, glyphConfig, fortune,    "超幸運", "幸運2個分のドロップ増加"));
     }
 
     private void registerDefaultItems() {
@@ -373,6 +420,7 @@ public class ArsPaper extends JavaPlugin {
         MycelialSourcelink mycelialSourcelink = new MycelialSourcelink(this);
         AlchemicalSourcelink alchemicalSourcelink = new AlchemicalSourcelink(this);
         VitalicSourcelink vitalicSourcelink = new VitalicSourcelink(this);
+        BotanicalSourcelink botanicalSourcelink = new BotanicalSourcelink(this);
         RitualCore ritualCore = new RitualCore(this);
         Pedestal pedestal = new Pedestal(this);
 
@@ -386,6 +434,7 @@ public class ArsPaper extends JavaPlugin {
         blockRegistry.register(mycelialSourcelink);
         blockRegistry.register(alchemicalSourcelink);
         blockRegistry.register(vitalicSourcelink);
+        blockRegistry.register(botanicalSourcelink);
         blockRegistry.register(ritualCore);
         blockRegistry.register(pedestal);
         blockRegistry.register(waystone);
@@ -398,6 +447,7 @@ public class ArsPaper extends JavaPlugin {
         itemRegistry.register(mycelialSourcelink);
         itemRegistry.register(alchemicalSourcelink);
         itemRegistry.register(vitalicSourcelink);
+        itemRegistry.register(botanicalSourcelink);
         itemRegistry.register(ritualCore);
         itemRegistry.register(pedestal);
         itemRegistry.register(waystone);
@@ -420,6 +470,7 @@ public class ArsPaper extends JavaPlugin {
         pluginManager.registerEvents(new PhantomBlockListener(), this);
         pluginManager.registerEvents(new SummonedMobListener(this), this);
         pluginManager.registerEvents(new com.arspaper.enchant.EnchantBookListener(), this);
+        pluginManager.registerEvents(new com.arspaper.enchant.SoulboundListener(), this);
         pluginManager.registerEvents(new com.arspaper.spell.SpellBindListener(), this);
         lootTableListener = new com.arspaper.loot.LootTableListener(this);
         pluginManager.registerEvents(lootTableListener, this);
