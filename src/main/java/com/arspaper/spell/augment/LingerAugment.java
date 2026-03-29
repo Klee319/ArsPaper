@@ -8,6 +8,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 /**
  * 残留増強: 効果を持続領域として展開する。
+ * 1個につき残留時間を加算（デフォルト5秒/個）。
  * 後続のEffectチェーンを着弾地点で定期的に再適用するゾーンを生成する。
  */
 public class LingerAugment implements SpellAugment {
@@ -22,7 +23,8 @@ public class LingerAugment implements SpellAugment {
 
     @Override
     public void modify(SpellContext context) {
-        context.setLingerPattern(true);
+        int bonus = (int) config.getParam("linger", "per-stack", 1.0);
+        context.setLingerLevel(context.getLingerLevel() + bonus);
     }
 
     @Override

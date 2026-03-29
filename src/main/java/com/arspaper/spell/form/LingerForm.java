@@ -76,12 +76,10 @@ public class LingerForm implements SpellForm {
      * ProjectileHitListenerから呼び出し可能。
      */
     public void startLingerZone(Player caster, SpellContext context, Location center) {
-        int durationLevel = context.getDurationLevel();
-        int baseDurationTicks = (int) config.getParam("linger", "base-duration-ticks", (double) BASE_DURATION_TICKS);
-        int durationBonusPerLevel = (int) config.getParam("linger", "duration-bonus-per-level", (double) DURATION_BONUS_PER_LEVEL);
+        int ticksPerLevel = (int) config.getParam("linger", "ticks-per-level", 100.0);
         int zoneTickInterval = (int) config.getParam("linger", "zone-tick-interval", (double) ZONE_TICK_INTERVAL);
         double zoneRadius = config.getParam("linger", "zone-radius", ZONE_RADIUS);
-        int totalDuration = Math.max(1, baseDurationTicks + durationLevel * durationBonusPerLevel);
+        int totalDuration = Math.max(zoneTickInterval, context.getLingerLevel() * ticksPerLevel);
 
         new BukkitRunnable() {
             private int elapsed = 0;

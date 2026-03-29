@@ -59,7 +59,7 @@ public class SpellContext {
 
     // パターン増強用
     private boolean wallPattern = false;    // 壁パターン（壁状AOE）
-    private boolean lingerPattern = false;  // 残留パターン（ルーン持続化）
+    private int lingerLevel = 0;            // 残留レベル（1個=5秒、0=無効）
     private int delayTicks = 0;             // 遅延ティック
     private int rapidFireLevel = 0;         // 連射レベル（CT短縮）
     private boolean traceActive = false;     // 軌跡（経路上に効果適用）
@@ -246,8 +246,11 @@ public class SpellContext {
     public void setWallPattern(boolean wallPattern) { this.wallPattern = wallPattern; }
 
     // === Linger Pattern ===
-    public boolean isLingerPattern() { return lingerPattern; }
-    public void setLingerPattern(boolean lingerPattern) { this.lingerPattern = lingerPattern; }
+    public boolean isLingerPattern() { return lingerLevel > 0; }
+    public int getLingerLevel() { return lingerLevel; }
+    public void setLingerLevel(int level) { this.lingerLevel = level; }
+    /** 後方互換: booleanセッター */
+    public void setLingerPattern(boolean v) { if (v && lingerLevel == 0) lingerLevel = 1; }
 
     // === Delay ===
     public int getDelayTicks() { return delayTicks; }
@@ -298,7 +301,7 @@ public class SpellContext {
         copy.extractCount = this.extractCount;
         copy.fortuneLevel = this.fortuneLevel;
         copy.wallPattern = this.wallPattern;
-        copy.lingerPattern = this.lingerPattern;
+        copy.lingerLevel = this.lingerLevel;
         copy.delayTicks = this.delayTicks;
         copy.rapidFireLevel = this.rapidFireLevel;
         copy.dampenAccum = this.dampenAccum;
@@ -432,7 +435,7 @@ public class SpellContext {
             }
 
             // Linger増強: 後続グループをゾーンで定期適用（Rune以外の効果用）
-            if (lingerPattern) {
+            if (lingerLevel > 0) {
                 group.effect.applyToEntity(this, target);
                 startLingerZoneFromAugment(groups, i + 1, target.getLocation());
                 return;
@@ -510,7 +513,7 @@ public class SpellContext {
             }
 
             // Linger増強: 後続グループをゾーンで定期適用（Rune以外の効果用）
-            if (lingerPattern) {
+            if (lingerLevel > 0) {
                 group.effect.applyToEntity(this, target);
                 startLingerZoneFromAugment(groups, i + 1, target.getLocation());
                 return;
@@ -688,7 +691,7 @@ public class SpellContext {
             }
 
             // Linger増強: 後続グループをゾーンで定期適用（Rune以外の効果用）
-            if (lingerPattern) {
+            if (lingerLevel > 0) {
                 group.effect.applyToBlock(this, effectBlockLoc);
                 startLingerZoneFromAugment(groups, i + 1, effectBlockLoc.clone().add(0.5, 0.5, 0.5));
                 return;
@@ -839,7 +842,7 @@ public class SpellContext {
         extractCount = 0;
         fortuneLevel = 0;
         wallPattern = false;
-        lingerPattern = false;
+        lingerLevel = 0;
         delayTicks = 0;
         traceActive = false;
         propagateChainCount = 0;

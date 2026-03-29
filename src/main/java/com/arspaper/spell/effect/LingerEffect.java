@@ -63,10 +63,9 @@ public class LingerEffect implements SpellEffect {
         if (caster == null) return;
 
         double zoneRadius = config.getParam("linger", "zone-radius", ZONE_RADIUS);
-        int baseDuration = (int) config.getParam("linger", "base-duration-ticks", BASE_DURATION_TICKS);
-        int durationBonus = (int) config.getParam("linger", "duration-bonus-per-level", DURATION_BONUS_PER_LEVEL);
+        int ticksPerLevel = (int) config.getParam("linger", "ticks-per-level", 100.0);
         int tickInterval = (int) config.getParam("linger", "zone-tick-interval", ZONE_TICK_INTERVAL);
-        int duration = Math.max(1, baseDuration + context.getDurationLevel() * durationBonus);
+        int duration = Math.max(tickInterval, context.getLingerLevel() * ticksPerLevel);
 
         final BukkitTask[] taskHolder = new BukkitTask[1];
         taskHolder[0] = new BukkitRunnable() {
@@ -162,10 +161,9 @@ public class LingerEffect implements SpellEffect {
         final java.util.UUID casterUuid = caster.getUniqueId();
         GlyphConfig glyphConfig = ArsPaper.getInstance().getGlyphConfig();
         double zoneRadius = glyphConfig.getParam("linger", "zone-radius", ZONE_RADIUS);
-        int baseDuration = (int) glyphConfig.getParam("linger", "base-duration-ticks", BASE_DURATION_TICKS);
-        int durationBonus = (int) glyphConfig.getParam("linger", "duration-bonus-per-level", DURATION_BONUS_PER_LEVEL);
+        int ticksPerLevel = (int) glyphConfig.getParam("linger", "ticks-per-level", 100.0); // 5秒/レベル
         int tickInterval = (int) glyphConfig.getParam("linger", "zone-tick-interval", ZONE_TICK_INTERVAL);
-        int duration = Math.max(1, baseDuration + context.getDurationLevel() * durationBonus);
+        int duration = Math.max(tickInterval, context.getLingerLevel() * ticksPerLevel);
 
         final BukkitTask[] taskHolder = new BukkitTask[1];
         taskHolder[0] = new BukkitRunnable() {
@@ -216,9 +214,9 @@ public class LingerEffect implements SpellEffect {
     }
 
     public int calculateDuration(SpellContext context) {
-        int baseDuration = (int) config.getParam("linger", "base-duration-ticks", BASE_DURATION_TICKS);
-        int durationBonus = (int) config.getParam("linger", "duration-bonus-per-level", DURATION_BONUS_PER_LEVEL);
-        return Math.max(1, baseDuration + context.getDurationLevel() * durationBonus);
+        int ticksPerLevel = (int) config.getParam("linger", "ticks-per-level", 100.0);
+        int tickInterval = (int) config.getParam("linger", "zone-tick-interval", ZONE_TICK_INTERVAL);
+        return Math.max(tickInterval, context.getLingerLevel() * ticksPerLevel);
     }
 
     @Override

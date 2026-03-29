@@ -38,7 +38,8 @@ public class SaturationEffect implements SpellEffect {
         int durationPerLevel = (int) config.getParam("saturation", "duration-per-level", DURATION_PER_LEVEL);
         int duration = baseDuration + context.getDurationLevel() * durationPerLevel;
 
-        int level = context.getAmplifyLevel();
+        int baseLevel = (int) config.getParam("saturation", "base-level", 0.0);
+        int level = baseLevel + context.getAmplifyLevel();
         if (level >= 0) {
             target.addPotionEffect(new PotionEffect(PotionEffectType.SATURATION, duration, level));
             spawnSaturationFx(target.getLocation());

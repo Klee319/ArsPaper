@@ -60,7 +60,8 @@ public class SummonVexEffect implements SpellEffect {
         int amplifyLevel = context.getAmplifyLevel();
         int aoeLevel = context.getAoeRadiusLevel();
         int maxSummons = (int) config.getParam("summon_vex", "max-summons", (double) MAX_SUMMONS);
-        int summonCount = Math.min(1 + Math.min(aoeLevel, 2), maxSummons);
+        int baseSummonCount = (int) config.getParam("summon_vex", "base-summon-count", 1.0);
+        int summonCount = Math.min(baseSummonCount + aoeLevel, maxSummons);
 
         double baseHealth = config.getParam("summon_vex", "base-health", BASE_HEALTH);
         double healthPerAmplify = config.getParam("summon_vex", "health-per-amplify", HEALTH_PER_AMPLIFY);

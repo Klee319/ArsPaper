@@ -58,8 +58,9 @@ public class SummonUndeadEffect implements SpellEffect {
         int maxSummons = (int) config.getParam("summon_undead", "max-summons", DEFAULT_MAX_SUMMONS);
         int durationTicks = Math.max(1, baseDurationTicks + durationLevel * durationPerLevelTicks);
         int amplifyLevel = context.getAmplifyLevel();
+        int baseSummonCount = (int) config.getParam("summon_undead", "base-summon-count", 1.0);
         int aoeLevel = context.getAoeRadiusLevel();
-        int summonCount = Math.min(1 + Math.min(aoeLevel, 3), maxSummons);
+        int summonCount = Math.min(baseSummonCount + aoeLevel, maxSummons);
         boolean useSkeleton = amplifyLevel >= 1;
 
         for (int i = 0; i < summonCount; i++) {

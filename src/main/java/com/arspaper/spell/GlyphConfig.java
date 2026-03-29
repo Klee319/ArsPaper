@@ -233,10 +233,10 @@ public class GlyphConfig {
         Map.entry("infuse",          Set.of()),
         Map.entry("craft",           Set.of()),
         Map.entry("animate",         Set.of("amplify", "dampen", "aoe_radius", "extend_time", "duration_down")),
-        Map.entry("firework",        Set.of("amplify", "dampen", "aoe_radius", "extend_time", "duration_down", "randomize")),
+        Map.entry("firework",        Set.of("amplify", "dampen", "aoe_radius", "extend_time", "duration_down")),
         Map.entry("name",            Set.of()),
         Map.entry("wind_burst",      Set.of("amplify", "dampen", "aoe_radius", "extend_time", "duration_down")),
-        Map.entry("speed_boost",     Set.of("amplify", "dampen", "extend_time", "duration_down", "randomize", "linger", "propagate")),
+        Map.entry("speed_boost",     Set.of("amplify", "dampen", "extend_reach", "shrink_reach", "randomize", "linger", "propagate")),
         Map.entry("reverse",         Set.of("extend_time", "duration_down", "propagate", "linger")),
         Map.entry("saturation",      Set.of("amplify", "dampen", "extend_time", "duration_down", "propagate", "linger")),
         Map.entry("gale",            Set.of("amplify", "dampen", "extend_time", "duration_down", "propagate", "linger")),
@@ -331,7 +331,7 @@ public class GlyphConfig {
      */
     /** 1個までしか積めない増強（トグル系） */
     private static final Set<String> SINGLE_STACK_AUGMENTS = Set.of(
-        "linger", "randomize", "extract", "trace"
+        "randomize", "extract", "trace"
     );
 
     public int getMaxAugmentStack(String glyphKey, String augmentKey) {

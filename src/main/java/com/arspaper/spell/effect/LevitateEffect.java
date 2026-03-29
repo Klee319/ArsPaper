@@ -36,8 +36,8 @@ public class LevitateEffect implements SpellEffect {
 
     @Override
     public void applyToEntity(SpellContext context, LivingEntity target) {
-        int amplify = context.getAmplifyLevel(); // 負の値(Dampen)も許容
-        int level = Math.max(0, amplify);        // ポーションレベル（0-indexed）
+        int baseLevel = (int) config.getParam("levitate", "base-level", 0.0);
+        int level = Math.max(0, baseLevel + context.getAmplifyLevel());
         int baseDurationTicks = (int) config.getParam("levitate", "base-duration-ticks", DEFAULT_BASE_DURATION_TICKS);
         int durationBonusTicks = (int) config.getParam("levitate", "duration-bonus-ticks", DEFAULT_DURATION_BONUS_TICKS);
         int durationTicks = Math.max(1,

@@ -53,17 +53,28 @@ public class FireworkEffect implements SpellEffect {
         int amplifyLevel = Math.max(0, context.getAmplifyLevel());
         int durationLevel = context.getDurationLevel();
 
-        // スター数: 1 + amplifyLevel (上限設定可能)
+        // スター数: base + amplifyLevel (上限設定可能)
         int maxStars = (int) config.getParam("firework", "max-stars", (double) DEFAULT_MAX_STARS);
         int baseStars = (int) config.getParam("firework", "base-stars", 1.0);
         int starCount = Math.min(baseStars + amplifyLevel, maxStars);
 
-        // 飛翔距離: 1 + durationLevel (上限設定可能)
+        // 飛翔距離: base + durationLevel (上限設定可能)
         int maxFlightPower = (int) config.getParam("firework", "max-flight-power", 3.0);
         int baseFlightPower = (int) config.getParam("firework", "base-flight-power", 1.0);
         int flightPower = Math.min(baseFlightPower + Math.max(0, durationLevel), maxFlightPower);
 
-        spawnLoc.getWorld().spawn(spawnLoc, Firework.class, fw -> {
+        // 花火エンティティ数: base + aoeRadiusLevel
+        int baseFireworkCount = (int) config.getParam("firework", "base-firework-count", 1.0);
+        int maxFireworkCount = (int) config.getParam("firework", "max-firework-count", 5.0);
+        int fireworkCount = Math.min(baseFireworkCount + context.getAoeRadiusLevel(), maxFireworkCount);
+
+        for (int fc = 0; fc < fireworkCount; fc++) {
+            // 複数花火は少しずらしてスポーン
+            double ox = fc == 0 ? 0 : (RANDOM.nextDouble() * 2 - 1);
+            double oz = fc == 0 ? 0 : (RANDOM.nextDouble() * 2 - 1);
+            Location fwLoc = spawnLoc.clone().add(ox, 0, oz);
+
+        fwLoc.getWorld().spawn(fwLoc, Firework.class, fw -> {
             FireworkMeta meta = fw.getFireworkMeta();
             meta.setPower(flightPower);
 
@@ -73,6 +84,7 @@ public class FireworkEffect implements SpellEffect {
 
             fw.setFireworkMeta(meta);
         });
+        } // end fireworkCount loop
 
         spawnLoc.getWorld().playSound(spawnLoc, Sound.ENTITY_FIREWORK_ROCKET_LAUNCH,
             SoundCategory.PLAYERS, 0.7f, 1.0f);

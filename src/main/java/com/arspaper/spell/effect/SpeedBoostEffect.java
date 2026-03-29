@@ -69,9 +69,9 @@ public class SpeedBoostEffect implements SpellEffect {
             direction = caster.getLocation().getDirection();
         } else {
             // 他エンティティ使用: キャスターの視線先の方向にブースト
-            double aimRangePerDuration = config.getParam("speed_boost", "aim-range-per-duration", AIM_RANGE_PER_DURATION);
+            double aimRangePerReach = config.getParam("speed_boost", "aim-range-per-reach", AIM_RANGE_PER_DURATION);
             double aimRange = Math.max(5.0,
-                baseAimRange + context.getDurationLevel() * aimRangePerDuration);
+                baseAimRange + context.getReachLevel() * aimRangePerReach);
             direction = getAimDirection(caster, aimRange);
         }
 

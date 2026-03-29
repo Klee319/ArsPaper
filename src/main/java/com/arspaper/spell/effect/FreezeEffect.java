@@ -39,9 +39,10 @@ public class FreezeEffect implements SpellEffect {
         int baseDuration = (int) config.getParam("freeze", "base-duration", DEFAULT_BASE_DURATION);
         int durationPerLevel = (int) config.getParam("freeze", "duration-per-level", DEFAULT_DURATION_PER_LEVEL);
         int duration = baseDuration + context.getDurationLevel() * durationPerLevel;
-        int amplifier = Math.max(0, context.getAmplifyLevel());
+        int baseLevel = (int) config.getParam("freeze", "base-slowness-level", 0.0);
+        int amplifier = Math.max(0, baseLevel + context.getAmplifyLevel());
 
-        target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, duration, Math.max(0, amplifier)));
+        target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, duration, amplifier));
         target.setFreezeTicks(Math.min(target.getFreezeTicks() + duration, target.getMaxFreezeTicks()));
 
         SpellFxUtil.spawnFreezeFx(target.getLocation());

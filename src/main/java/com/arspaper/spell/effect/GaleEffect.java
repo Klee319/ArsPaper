@@ -37,7 +37,8 @@ public class GaleEffect implements SpellEffect {
         int durationPerLevel = (int) config.getParam("gale", "duration-per-level", DURATION_PER_LEVEL);
         int duration = baseDuration + context.getDurationLevel() * durationPerLevel;
 
-        int level = context.getAmplifyLevel();
+        int baseLevel = (int) config.getParam("gale", "base-level", 0.0);
+        int level = baseLevel + context.getAmplifyLevel();
         if (level >= 0) {
             target.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, duration, level));
             spawnSpeedFx(target.getLocation());

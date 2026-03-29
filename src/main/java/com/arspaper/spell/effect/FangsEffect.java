@@ -107,7 +107,9 @@ public class FangsEffect implements SpellEffect {
      * 円形に牙を配置する。
      */
     private void spawnFangsCircle(Location center, int count, int aoeLevel, LivingEntity owner) {
-        double radius = 1.0 + aoeLevel * 0.8;
+        double baseCircleRadius = config.getParam("fangs", "base-circle-radius", 1.0);
+        double radiusPerAoe = config.getParam("fangs", "circle-radius-per-aoe", 0.8);
+        double radius = baseCircleRadius + aoeLevel * radiusPerAoe;
         double angleStep = 2.0 * Math.PI / count;
 
         for (int i = 0; i < count; i++) {

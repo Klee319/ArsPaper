@@ -362,7 +362,8 @@ public class ArsPaper extends JavaPlugin {
         spellRegistry.register(new RandomizeAugment(this, glyphConfig));
         spellRegistry.register(new DelayAugment(this, glyphConfig));
         // WallAugment は廃止
-        spellRegistry.register(new LingerAugment(this, glyphConfig));
+        var linger = new LingerAugment(this, glyphConfig);
+        spellRegistry.register(linger);
         spellRegistry.register(new TrailAugment(this, glyphConfig));
         spellRegistry.register(new TraceAugment(this, glyphConfig));
         spellRegistry.register(propagate);
@@ -384,6 +385,7 @@ public class ArsPaper extends JavaPlugin {
         spellRegistry.register(new SuperAugment(this, glyphConfig, durationDown,"超短縮", "短縮2個分の持続時間短縮"));
         spellRegistry.register(new SuperAugment(this, glyphConfig, shrinkReach, "超収縮", "収縮2個分の射程短縮"));
         spellRegistry.register(new SuperAugment(this, glyphConfig, fortune,    "超幸運", "幸運2個分のドロップ増加"));
+        spellRegistry.register(new SuperAugment(this, glyphConfig, linger,     "超残留", "残留2個分の持続時間"));
     }
 
     private void registerDefaultItems() {
