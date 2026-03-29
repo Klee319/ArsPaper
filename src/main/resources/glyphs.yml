@@ -57,6 +57,7 @@ glyphs:
       split: 4
       rapid_fire: 4
       trace: 1
+    unlock-cost:
       level: 5
       materials:
         ARROW: 16
@@ -83,6 +84,7 @@ glyphs:
     mana-cost: 10
     max-augments:
       rapid_fire: 4
+    unlock-cost:
       level: 5
       materials:
         IRON_CHESTPLATE: 1
@@ -94,6 +96,7 @@ glyphs:
     mana-cost: 10
     max-augments:
       rapid_fire: 4
+    unlock-cost:
       level: 5
       materials:
         IRON_BOOTS: 1
@@ -105,6 +108,7 @@ glyphs:
     mana-cost: 5
     max-augments:
       rapid_fire: 4
+    unlock-cost:
       level: 5
       materials:
         IRON_HELMET: 1
@@ -132,6 +136,7 @@ glyphs:
       duration_down: 3
       rapid_fire: 4
       aoe_radius: 6
+    unlock-cost:
       level: 20
       materials:
         ENDER_EYE: 16
@@ -159,6 +164,7 @@ glyphs:
       shrink_reach: 3
       extend_time: 6
       duration_down: 3
+    unlock-cost:
       level: 25
       materials:
         TNT: 16
@@ -184,6 +190,7 @@ glyphs:
       shrink_reach: 4
       pierce: 4
       trace: 1
+    unlock-cost:
       level: 40
       materials:
         BEACON: 1
@@ -213,6 +220,7 @@ glyphs:
     params:
       max-hardness: 25.0  # 基礎破壊可能硬度上限
       hardness-per-amplify: 25.0  # 増幅1段ごとの硬度上限増加
+    unlock-cost:
       level: 15
       materials:
         GOLDEN_PICKAXE: 1
@@ -237,6 +245,7 @@ glyphs:
       amplify-bonus: 3.0            # 増幅1段あたりのダメージ増加(HP)
       base-poison-seconds: 6        # 基本毒持続(秒)
       poison-seconds-per-duration: 2 # 延長1段あたりの毒持続増加(秒)
+    unlock-cost:
       level: 15
       materials:
         STONE_SWORD: 1
@@ -265,6 +274,7 @@ glyphs:
       amplify-damage-bonus: 0.5 #(HP/段、増幅1段あたり+0.5HP)
       damage-interval: 20 #(tick=1秒、ダメージ間隔)
 
+    unlock-cost:
       level: 20
       materials:
         FLINT: 16
@@ -287,6 +297,7 @@ glyphs:
       base-duration: 120             # 基本凍結持続(tick=6秒)
       duration-per-level: 40        # 延長1段あたりの持続増加(tick=2秒)
       # amplify: 鈍足レベル上昇(per-stackはamplifyグリフのparams参照)
+    unlock-cost:
       level: 20
       materials:
         ICE: 16
@@ -307,6 +318,7 @@ glyphs:
       amplify-bonus: 1.0            # 増幅1段あたりの力増加
       max-force: 7.5                # 吹き飛ばし力上限
       base-block-radius: 2.0                   # ブロック着弾時の基本効果範囲(ブロック)
+    unlock-cost:
       level: 20
       materials:
         PISTON: 16
@@ -332,6 +344,7 @@ glyphs:
       amplify-force-bonus: 0.3      # 増幅1段あたりの吸引力増加
       base-duration: 120  # tick=6秒、基本持続
       duration-per-level: 40  # tick=2秒/段、延長あたり加算
+    unlock-cost:
       level: 20
       materials:
         FISHING_ROD: 1
@@ -355,6 +368,7 @@ glyphs:
       amplify-push-bonus: 0.25  # /段、増幅あたり加算
       gravity-duration-base-ticks: 80  # tick=4秒、基本持続
       gravity-duration-per-level-ticks: 40  # tick=2秒/段、延長あたり加算
+    unlock-cost:
       level: 20
       materials:
         ANVIL: 1
@@ -374,6 +388,7 @@ glyphs:
     params:
       base-duration-ticks: 600      # 基本持続(tick=30秒)
       duration-per-level: 200      # 延長1段あたりの持続増加(tick=10秒)
+    unlock-cost:
       level: 10
       materials:
         LANTERN: 4
@@ -393,6 +408,7 @@ glyphs:
       extract: 1  # ※ON/OFFのみ
     params:
       base-radius: 0                   # 基本収穫範囲(ブロック)
+    unlock-cost:
       level: 10
       materials:
         IRON_HOE: 1
@@ -406,6 +422,7 @@ glyphs:
     # 範囲:範囲カット
     max-augments:
       aoe: 7
+    unlock-cost:
       level: 10
       materials:
         SHEARS: 1
@@ -419,6 +436,7 @@ glyphs:
     # 遠隔で右クリック操作（ドア開閉・ボタン押下・レバー操作）
     max-augments:
       aoe: 7
+    unlock-cost:
       level: 10
       materials:
         LEVER: 4
@@ -433,6 +451,7 @@ glyphs:
       aoe_radius: 7
     params:
       base-radius: 2.0  # 球体、基本拾得範囲
+    unlock-cost:
       level: 15
       materials:
         HOPPER: 4
@@ -453,6 +472,7 @@ glyphs:
     params:
       base-lock-ticks: 80  # tick=4秒、操作ロック時間
       lock-bonus-ticks: 40  # tick=2秒/段、延長あたり加算
+    unlock-cost:
       level: 20
       materials:
         COMPASS: 4
@@ -468,6 +488,7 @@ glyphs:
     params:
       base-max-blocks: 25  # デフォルト伐採ブロック数
       aoe-bonus-blocks: 25  # /段、半径増加あたり加算
+    unlock-cost:
       level: 15
       materials:
         IRON_AXE: 1
@@ -489,6 +510,7 @@ glyphs:
     params:
       base-removal-ticks: 200  # tick=10秒、一時ブロック消滅までの時間
       duration-bonus-ticks: 100  # tick=5秒/段、延長あたり加算
+    unlock-cost:
       level: 15
       materials:
         GLASS: 16
@@ -503,6 +525,7 @@ glyphs:
     # オフハンドまたはホットバー右側のブロックを設置
     max-augments:
       aoe: 7
+    unlock-cost:
       level: 15
       materials:
         DISPENSER: 4
@@ -523,6 +546,7 @@ glyphs:
       amplify-bonus: 0.5            # 増幅1段あたりの速度増加
       max-velocity: 5.5             # 打ち上げ速度上限
       base-block-radius: 0                   # 基本ブロック打ち上げ範囲(ブロック)
+    unlock-cost:
       level: 20
       materials:
         FIREWORK_ROCKET: 8
@@ -542,6 +566,7 @@ glyphs:
     params:
       base-duration: 200  # tick=10秒
       duration-per-level: 100  # tick=5秒/段、延長1段あたり+5秒
+    unlock-cost:
       level: 20
       materials:
         RABBIT_FOOT: 1
@@ -570,6 +595,7 @@ glyphs:
       min-speed: 0.35                # 最低バウンド速度
       max-speed: 4.0                 # 最大バウンド速度
       horizontal-friction: 0.9       # 水平方向の摩擦係数
+    unlock-cost:
       level: 20
       materials:
         SLIME_BLOCK: 4
@@ -590,6 +616,7 @@ glyphs:
     params:
       base-duration: 60             # 基本拘束持続(tick=3秒)
       duration-per-level: 20        # 延長1段あたりの持続増加(tick=1秒)
+    unlock-cost:
       level: 30
       materials:
         COBWEB: 16
@@ -602,6 +629,7 @@ glyphs:
     # 半径増加:蒸発範囲拡大
     max-augments:
       aoe_radius: 6
+    unlock-cost:
       level: 10
       materials:
         SPONGE: 1
@@ -615,6 +643,7 @@ glyphs:
       amplify: 1                    # ON/OFF: 全効果除去モード
       dampen: 1                     # ON/OFF: 良い効果のみ除去モード
       propagate: 4
+    unlock-cost:
       level: 20
       materials:
         MILK_BUCKET: 1
@@ -636,6 +665,7 @@ glyphs:
       lifetime-per-duration: 100    # 延長1段あたりの持続増加(tick=5秒)
       trigger-radius: 2           # 基本トリガー半径(ブロック)
       radius-per-aoe: 1.0           # 半径増加1段あたりのトリガー範囲増加(ブロック)
+    unlock-cost:
       level: 30
       materials:
         LIGHT_WEIGHTED_PRESSURE_PLATE: 4
@@ -659,6 +689,7 @@ glyphs:
       base-speed: 0.225                   # 馬の基本速度(-1=バニラランダム、0.225=バニラ平均)
       speed-boost-per-amplify: 0.05  # 増幅1段あたりの馬の速度増加
       max-speed-level: 3             # 馬の最大速度段数
+    unlock-cost:
       level: 10
       materials:
         SADDLE: 1
@@ -683,6 +714,7 @@ glyphs:
       max-wolf-count: 7             # 最大召喚数
       base-hp: 20.0                 # 基本HP
       hp-per-amplify: 8.0           # 増幅1段あたりのHP増加
+    unlock-cost:
       level: 25
       materials:
         BONE: 8
@@ -699,6 +731,7 @@ glyphs:
       randomize: 1
     params:
       base-step: 1                   # 基本色スキップ数
+    unlock-cost:
       level: 10
       materials:
         RED_DYE: 4
@@ -718,6 +751,7 @@ glyphs:
     params:
       base-duration-ticks: 600  # tick=30秒、基本持続
       duration-per-level: 200  # tick=10秒/段、延長あたり加算
+    unlock-cost:
       level: 5
       materials:
         GLASS_BOTTLE: 4
@@ -732,6 +766,7 @@ glyphs:
     # 装飾用。パーティクルと発光を付与する見た目のみの効果
     max-augments:
       randomize: 1
+    unlock-cost:
       level: 5
       materials:
         GOLD_INGOT: 1
@@ -756,6 +791,7 @@ glyphs:
       base-heal: 3.0  # HP、基本回復量
       amplify-bonus: 2.0  # HP/段、増幅1段あたり+2.0HP
       food-cost: 2  # 満腹度
+    unlock-cost:
       level: 25
       materials:
         GLISTERING_MELON_SLICE: 4
@@ -771,11 +807,12 @@ glyphs:
       aoe_radius: 6
     params:
       base-radius: 0                   # 基本成長範囲(ブロック)
+      base-growth: 1
+    unlock-cost:
       level: 20
       materials:
         BONE_BLOCK: 4
         WHEAT_SEEDS: 32
-      base-growth: 1
 
   # 説明: 対象位置で爆発を起こす（ブロック破壊なし）
   explosion:
@@ -790,6 +827,7 @@ glyphs:
       base-power: 2  # createExplosionのpower値
       aoe-power-bonus: 1.5  # 半径増加1段あたりのpower増加
       max-power: 10.0  # 爆発power上限。※大きすぎるとサーバー負荷、注意
+    unlock-cost:
       level: 35
       materials:
         TNT: 64
@@ -805,6 +843,7 @@ glyphs:
     max-augments:
       amplify: 0
       aoe: 7
+    unlock-cost:
       level: 20
       materials:
         STICKY_PISTON: 4
@@ -817,6 +856,7 @@ glyphs:
     # 半径増加:範囲精錬
     max-augments:
       aoe_radius: 6
+    unlock-cost:
       level: 25
       materials:
         FURNACE: 16
@@ -831,6 +871,7 @@ glyphs:
     max-augments:
       aoe: 7
       fortune: 3
+    unlock-cost:
       level: 15
       materials:
         ANVIL: 1
@@ -850,11 +891,12 @@ glyphs:
     params:
       base-damage: 6.0              # 基本ダメージ(HP、水中2倍)
       amplify-bonus: 3.0            # 増幅1段あたりのダメージ増加(HP)
+      water-multiplier: 2.0
+    unlock-cost:
       level: 20
       materials:
         TRIDENT: 1
         SEA_LANTERN: 4
-      water-multiplier: 2.0
 
   # 説明: 炎上中の敵に1.5倍ダメージの灼熱攻撃
   scorch:
@@ -890,6 +932,7 @@ glyphs:
     params:
       base-damage: 12.0              # 基本凍結ダメージ(HP)
       amplify-bonus: 4            # 増幅1段あたりのダメージ増加(HP)
+    unlock-cost:
       level: 20
       materials:
         BLUE_ICE: 16
@@ -909,6 +952,7 @@ glyphs:
       base-damage: 5.0              # 基本風ダメージ(HP)
       amplify-bonus: 2.5            # 増幅1段あたりのダメージ増加(HP)
       max-height-bonus: 20.0        # 高度比例ボーナス最大値(HP)
+    unlock-cost:
       level: 20
       materials:
         FEATHER: 8
@@ -928,6 +972,7 @@ glyphs:
       duration-bonus-ticks: 40  # tick=2秒/段、延長あたり加算
       base-water-lifetime: 160  # tick=8秒、水源の寿命
       water-lifetime-per-duration: 80  # tick=4秒/段、延長あたり加算
+    unlock-cost:
       level: 10
       materials:
         WATER_BUCKET: 1
@@ -946,6 +991,7 @@ glyphs:
       base-duration-ticks: 120       # 基本持続時間(tick=6秒)
       duration-bonus-ticks: 40      # 延長1段あたりの追加時間(tick=2秒)
       high-level-threshold: 0        # この延長レベル以上でLv2に上昇
+    unlock-cost:
       level: 15
       materials:
         PHANTOM_MEMBRANE: 1
@@ -962,6 +1008,7 @@ glyphs:
     params:
       base-duration-ticks: 300      # 基本透明化持続(tick=15秒)
       duration-bonus-ticks: 200     # 延長1段あたりの持続増加(tick=10秒)
+    unlock-cost:
       level: 25
       materials:
         FERMENTED_SPIDER_EYE: 4
@@ -973,6 +1020,7 @@ glyphs:
     mana-cost: 25
     # 増強不可（AUGMENT_COMPATが空集合）
     # オフハンドまたはホットバー右側のポーション(通常/スプラッシュ/残留)を対象に適用・消費
+    unlock-cost:
       level: 20
       materials:
         BREWING_STAND: 4
@@ -982,6 +1030,7 @@ glyphs:
   craft:
     tier: 1
     mana-cost: 10
+    unlock-cost:
       level: 10
       materials:
         CRAFTING_TABLE: 4
@@ -1004,12 +1053,13 @@ glyphs:
       duration-per-level-ticks: 100 # 延長1段あたりの持続増加(tick=5秒)
       base-hp: 90.0                # ゴーレムの基本HP
       hp-per-amplify: 30.0          # 増幅1段あたりのHP増加
+      base-spawn-count: 1
+    unlock-cost:
       level: 20
       materials:
         SOUL_LANTERN: 2
         CARVED_PUMPKIN: 4
         IRON_BLOCK: 16
-      base-spawn-count: 1
 
   # 説明: 花火を打ち上げる
   firework:
@@ -1027,18 +1077,20 @@ glyphs:
     params:
       max-stars: 8                  # 花火の最大数
       max-flight-power: 3           # 飛翔力の最大値(延長で増加)
+      base-flight-power: 1
+      base-stars: 1
+    unlock-cost:
       level: 10
       materials:
         FIREWORK_ROCKET: 16
         GUNPOWDER: 8
-      base-flight-power: 1
-      base-stars: 1
 
   # 説明: キャスターの名前を対象に付与する
   name:
     tier: 1
     mana-cost: 20
     # 増強不可。対象にキャスターの名前を付与する
+    unlock-cost:
       level: 10
       materials:
         NAME_TAG: 4
@@ -1060,12 +1112,13 @@ glyphs:
       radius-per-aoe: 1.0           # 半径増加1段あたりの範囲増加(ブロック)
       base-force: 1.5               # 基本吹き飛ばし力
       amplify-force-bonus: 1.0      # 増幅1段あたりの力増加
+      base-duration: 100
+      duration-per-level: 60
+    unlock-cost:
       level: 25
       materials:
         BREEZE_ROD: 4
         WIND_CHARGE: 8
-      base-duration: 100
-      duration-per-level: 60
 
   # 説明: 対象を視線先に高速移動させる
   speed_boost:
@@ -1087,11 +1140,12 @@ glyphs:
       amplify-bonus: 0.5  # /段、増幅1段あたり+0.5
       max-speed: 4.0  # 速度上限。大きすぎると制御不能
       base-aim-range: 10.0  # ブロック
+      aim-range-per-duration: 5.0
+    unlock-cost:
       level: 25
       materials:
         SUGAR: 64
         FEATHER: 4
-      aim-range-per-duration: 5.0
 
   # 説明: 浮遊効果を付与する
   levitate:
@@ -1109,6 +1163,7 @@ glyphs:
     params:
       base-duration-ticks: 60  # tick=3秒
       duration-bonus-ticks: 40  # tick=2秒/段、延長1段あたり+2秒
+    unlock-cost:
       level: 25
       materials:
         SHULKER_SHELL: 4
@@ -1133,6 +1188,7 @@ glyphs:
       base-distance: 12             # 基本テレポート距離(ブロック)
       reach-bonus: 8                # 延伸1段あたりの距離増加(ブロック)
       max-distance: 64              # テレポート距離上限(ブロック)
+    unlock-cost:
       level: 30
       materials:
         ENDER_PEARL: 16
@@ -1158,6 +1214,7 @@ glyphs:
       wet-bonus-damage: 2.0         # 水濡れ時のボーナスダメージ(HP)
       shocked-base-ticks: 100       # 基本感電(鈍足)持続(tick=5秒)
       shocked-per-level: 60         # 延長1段あたりの感電持続増加(tick=3秒)
+    unlock-cost:
       level: 40
       materials:
         LIGHTNING_ROD: 16
@@ -1178,12 +1235,13 @@ glyphs:
       propagate: 3
     params:
       max-amplifier: 4              # ウィザー最大レベル
+      base-duration: 600
+      duration-per-level: 160
+    unlock-cost:
       level: 40
       materials:
         WITHER_SKELETON_SKULL: 4
         WITHER_ROSE: 8
-      base-duration: 600
-      duration-per-level: 160
 
   # 説明: 複数デバフを同時付与する呪い
   hex:
@@ -1206,6 +1264,7 @@ glyphs:
       amplify-bonus-percent: 0.05   # 増幅1段あたりの追撃率増加(+5%)
       base-duration: 400  # tick=20秒、基本呪い持続
       duration-per-level: 160  # tick=8秒/段、延長あたり加算
+    unlock-cost:
       level: 40
       materials:
         FERMENTED_SPIDER_EYE: 16
@@ -1223,6 +1282,7 @@ glyphs:
     params:
       base-duration: 300  # tick=15秒
       duration-per-level: 100  # tick=5秒/段、延長1段あたり+5秒
+    unlock-cost:
       level: 20
       materials:
         PHANTOM_MEMBRANE: 8
@@ -1242,12 +1302,13 @@ glyphs:
     params:
       base-duration: 100  # tick=5秒
       duration-per-level: 160  # tick=8秒/段、延長1段あたり+8秒
+      base-resistance-level: 1
+    unlock-cost:
       level: 20
       materials:
         DIAMOND_BLOCK: 4
         ENCHANTED_GOLDEN_APPLE: 1
         TOTEM_OF_UNDYING: 1
-      base-resistance-level: 1
 
   # 説明: 一時的なゾンビを召喚する。増幅でスケルトンに切替
   summon_undead:
@@ -1265,6 +1326,7 @@ glyphs:
       base-duration-ticks: 300      # 基本召喚持続(tick=15秒)
       duration-per-level-ticks: 160 # 延長1段あたりの持続増加(tick=8秒)
       max-summons: 8                # 最大召喚数
+    unlock-cost:
       level: 40
       materials:
         ROTTEN_FLESH: 64
@@ -1284,14 +1346,15 @@ glyphs:
       duration_down: 7
     params:
       max-summons: 8                # 最大召喚数
-      level: 40
-      materials:
-        TOTEM_OF_UNDYING: 4
-        EMERALD_BLOCK: 16
       base-duration-ticks: 200
       base-health: 14.0
       duration-per-level: 100
       health-per-amplify: 4.0
+    unlock-cost:
+      level: 40
+      materials:
+        TOTEM_OF_UNDYING: 4
+        EMERALD_BLOCK: 16
 
   # 説明: キャスターの装備をコピーした囮ゾンビを召喚する
   summon_decoy:
@@ -1310,6 +1373,7 @@ glyphs:
       duration-per-level-ticks: 100  # tick=5秒/段、延長1段あたり+5秒
       base-health: 20.0  # HP
       health-per-amplify: 10.0  # HP/段、増幅1段あたり+10.0HP
+    unlock-cost:
       level: 40
       materials:
         ARMOR_STAND: 16
@@ -1330,6 +1394,7 @@ glyphs:
     params:
       base-duration: 60
       duration-per-level: 40
+    unlock-cost:
       level: 20
       materials:
         GLASS: 64
@@ -1348,6 +1413,7 @@ glyphs:
     params:
       base-delay-ticks: 60  # tick=3秒、帰還までの基本遅延
       delay-per-level-ticks: 40  # tick=2秒/段、延長あたり加算
+    unlock-cost:
       level: 40
       materials:
         CLOCK: 16
@@ -1369,6 +1435,7 @@ glyphs:
       fang-spacing: 1.2             # 牙の間隔(ブロック)
       base-fang-count-entity: 1     # エンティティ対象時の基本牙数
       base-fang-count-block: 3      # ブロック対象時の基本牙数
+    unlock-cost:
       level: 40
       materials:
         TOTEM_OF_UNDYING: 4
@@ -1384,6 +1451,7 @@ glyphs:
       aoe: 7
       fortune: 0  # ※内蔵幸運3に加算（1にすると幸運4、2で幸運5）
       extract: 1
+    unlock-cost:
       level: 40
       materials:
         NETHERITE_PICKAXE: 1
@@ -1403,12 +1471,13 @@ glyphs:
     params:
       base-ticks: 20                 # 基本遅延時間(tick=1秒)
       ticks-per-duration-level: 20   # 延長1段あたりの追加遅延(tick=1秒)
+      base-delay-ticks: 20
+      duration-bonus-ticks: 20
+    unlock-cost:
       level: 10
       materials:
         CLOCK: 4
         REPEATER: 4
-      base-delay-ticks: 20
-      duration-bonus-ticks: 20
 
   # 説明: スペルのCTを短縮する（1段=-100ms、最低100ms）
   rapid_fire:
@@ -1417,6 +1486,7 @@ glyphs:
     # 全形態互換。1つにつきCTを半減（最低100ms）
     params:
       per-stack: 1                   # 1個あたりの連射レベル増加量
+    unlock-cost:
       level: 20
       materials:
         SUGAR: 64
@@ -1430,6 +1500,7 @@ glyphs:
     mana-cost: 20
     params:
       per-stack: 1                   # 1個あたりの増幅レベル増加量
+    unlock-cost:
       level: 10
       materials:
         DIAMOND_PICKAXE: 2
@@ -1439,6 +1510,7 @@ glyphs:
   dampen:
     tier: 1
     mana-cost: 0
+    unlock-cost:
       level: 5
       materials:
         NETHER_BRICKS: 4
@@ -1450,6 +1522,7 @@ glyphs:
     mana-cost: 10
     params:
       per-stack: 1                   # 1個あたりの持続レベル増加量
+    unlock-cost:
       level: 10
       materials:
         REDSTONE_BLOCK: 4
@@ -1459,6 +1532,7 @@ glyphs:
   duration_down:
     tier: 1
     mana-cost: 0
+    unlock-cost:
       level: 5
       materials:
         QUARTZ_BLOCK: 4
@@ -1470,6 +1544,7 @@ glyphs:
     mana-cost: 15
     params:
       per-stack: 1                   # 1個あたりのAOE幅増加量
+    unlock-cost:
       level: 10
       materials:
         DIORITE_WALL: 16
@@ -1481,6 +1556,7 @@ glyphs:
     mana-cost: 15
     params:
       per-stack: 1                   # 1個あたりの上下範囲増加量
+    unlock-cost:
       level: 10
       materials:
         GRANITE_WALL: 16
@@ -1492,6 +1568,7 @@ glyphs:
     mana-cost: 15
     params:
       per-stack: 2                   # 1個あたりの奥行き増加量(2ブロック)
+    unlock-cost:
       level: 10
       materials:
         ANDESITE_WALL: 16
@@ -1503,6 +1580,7 @@ glyphs:
     mana-cost: 20
     params:
       per-stack: 1                   # 1個あたりの半径増加量
+    unlock-cost:
       level: 20
       materials:
         JUKEBOX: 4
@@ -1512,6 +1590,7 @@ glyphs:
   randomize:
     tier: 1
     mana-cost: 5
+    unlock-cost:
       level: 5
       materials:
         TARGET: 4
@@ -1525,6 +1604,7 @@ glyphs:
     mana-cost: 10
     params:
       per-stack: 1.0                 # 1個あたりの加速量(速度倍率+1.0)
+    unlock-cost:
       level: 20
       materials:
         SUGAR: 64
@@ -1536,6 +1616,7 @@ glyphs:
     mana-cost: 0
     params:
       per-stack: 0.5                 # 1個あたりの減速量(速度倍率-0.5)
+    unlock-cost:
       level: 5
       materials:
         SOUL_SAND: 4
@@ -1547,6 +1628,7 @@ glyphs:
     mana-cost: 10
     params:
       per-stack: 1                   # 1個あたりの貫通回数増加量
+    unlock-cost:
       level: 20
       materials:
         CROSSBOW: 1
@@ -1558,6 +1640,7 @@ glyphs:
     mana-cost: 15
     params:
       per-stack: 1                   # 1個あたりの射程レベル増加量
+    unlock-cost:
       level: 20
       materials:
         FISHING_ROD: 1
@@ -1569,6 +1652,7 @@ glyphs:
     mana-cost: 20
     params:
       per-stack: 1                   # 1個あたりの分裂数増加量
+    unlock-cost:
       level: 20
       materials:
         SLIME_BLOCK: 16
@@ -1580,6 +1664,7 @@ glyphs:
     mana-cost: 25
     # 投射/照射互換
     # 飛行経路上にも効果を適用
+    unlock-cost:
       level: 40
       materials:
         SHULKER_SHELL: 4
@@ -1592,6 +1677,7 @@ glyphs:
     mana-cost: 20
     params:
       targets-per-stack: 3           # 1個あたりのチェーン対象数
+    unlock-cost:
       level: 20
       materials:
         GRASS_BLOCK: 16
@@ -1606,6 +1692,7 @@ glyphs:
     mana-cost: 30
     params:
       per-stack: 1                   # 1個あたりのシルクタッチレベル(通常1固定)
+    unlock-cost:
       level: 20
       materials:
         COBWEB: 16
@@ -1617,6 +1704,7 @@ glyphs:
     mana-cost: 25
     params:
       per-stack: 1                   # 1個あたりの幸運レベル増加量
+    unlock-cost:
       level: 20
       materials:
         EMERALD_BLOCK: 4
@@ -1634,6 +1722,7 @@ glyphs:
       base-duration-ticks: 100      # 基本残留持続(tick=5秒)
       duration-bonus-per-level: 60  # 延長1段あたりの追加時間(tick=3秒)
       zone-tick-interval: 20        # 効果再適用間隔(tick=1秒)
+    unlock-cost:
       level: 40
       materials:
         OMINOUS_BOTTLE: 1
@@ -1649,6 +1738,7 @@ glyphs:
     mana-cost: 0
     params:
       per-stack: 1                   # 1個あたりの射程レベル減少量
+    unlock-cost:
       level: 5
       materials:
         ARROW: 16
@@ -1671,6 +1761,7 @@ glyphs:
       base-volume: 1.0              # 基本音量
       amplify-volume-bonus: 0.5     # 増幅1段あたりの音量増加
       aoe-radius-volume-bonus: 1.0  # 半径増加1段あたりの音量増加(遠距離可聴)
+    unlock-cost:
       level: 10
       materials:
         NOTE_BLOCK: 4
@@ -1688,6 +1779,7 @@ glyphs:
     params:
       base-duration: 100
       duration-per-level: 60
+    unlock-cost:
       level: 20
       materials:
         REDSTONE_TORCH: 16
@@ -1707,6 +1799,7 @@ glyphs:
     params:
       base-duration: 200
       duration-per-level: 100
+    unlock-cost:
       level: 20
       materials:
         COOKED_BEEF: 32
@@ -1726,6 +1819,7 @@ glyphs:
     params:
       base-duration: 400
       duration-per-level: 200
+    unlock-cost:
       level: 20
       materials:
         SUGAR: 64
@@ -1748,6 +1842,7 @@ glyphs:
       extend_time: 5
       linger: 1
       propagate: 3
+    unlock-cost:
       level: 25
       materials:
         SLIME_BLOCK: 8
@@ -1766,6 +1861,7 @@ glyphs:
     params:
       base-duration: 6000
       duration-per-level: 2400
+    unlock-cost:
       level: 100
       materials:
         CONDUIT: 1
@@ -1791,6 +1887,7 @@ glyphs:
       dampen: 4
       split: 4
       pierce: 3
+    unlock-cost:
       level: 40
       materials:
         ECHO_SHARD: 4
@@ -1817,6 +1914,7 @@ glyphs:
       split: 4
       duration_down: 3
       extend_time: 5
+    unlock-cost:
       level: 50
       materials:
         OCHRE_FROGLIGHT: 1
@@ -1851,6 +1949,7 @@ glyphs:
       split: 4
       duration_down: 3
       extend_time: 5
+    unlock-cost:
       level: 50
       materials:
         GLOW_INK_SAC: 32
@@ -1880,6 +1979,7 @@ glyphs:
       dampen: 4
       aoe_radius: 5
       linger: 1
+    unlock-cost:
       level: 35
       materials:
         MACE: 1
@@ -1896,6 +1996,7 @@ glyphs:
   super_amplify:
     tier: 3
     mana-cost: 64
+    unlock-cost:
       level: 40
       materials:
         NETHER_STAR: 1
@@ -1905,6 +2006,7 @@ glyphs:
   super_dampen:
     tier: 3
     mana-cost: 0
+    unlock-cost:
       level: 40
       materials:
         NETHER_STAR: 1
@@ -1914,6 +2016,7 @@ glyphs:
   super_accelerate:
     tier: 3
     mana-cost: 40
+    unlock-cost:
       level: 40
       materials:
         NETHER_STAR: 1
@@ -1923,6 +2026,7 @@ glyphs:
   super_decelerate:
     tier: 3
     mana-cost: 0
+    unlock-cost:
       level: 40
       materials:
         NETHER_STAR: 1
@@ -1932,6 +2036,7 @@ glyphs:
   super_split:
     tier: 3
     mana-cost: 64
+    unlock-cost:
       level: 40
       materials:
         NETHER_STAR: 1
@@ -1941,6 +2046,7 @@ glyphs:
   super_pierce:
     tier: 3
     mana-cost: 40
+    unlock-cost:
       level: 40
       materials:
         NETHER_STAR: 1
@@ -1950,6 +2056,7 @@ glyphs:
   super_aoe_radius:
     tier: 3
     mana-cost: 64
+    unlock-cost:
       level: 40
       materials:
         NETHER_STAR: 1
@@ -1959,6 +2066,7 @@ glyphs:
   super_extend_reach:
     tier: 3
     mana-cost: 60
+    unlock-cost:
       level: 40
       materials:
         NETHER_STAR: 1
@@ -1968,6 +2076,7 @@ glyphs:
   super_propagate:
     tier: 3
     mana-cost: 64
+    unlock-cost:
       level: 40
       materials:
         NETHER_STAR: 1
@@ -1977,6 +2086,7 @@ glyphs:
   super_extend_time:
     tier: 3
     mana-cost: 40
+    unlock-cost:
       level: 40
       materials:
         NETHER_STAR: 1
@@ -1986,6 +2096,7 @@ glyphs:
   super_duration_down:
     tier: 3
     mana-cost: 0
+    unlock-cost:
       level: 40
       materials:
         NETHER_STAR: 1
@@ -1995,6 +2106,7 @@ glyphs:
   super_fortune:
     tier: 3
     mana-cost: 64
+    unlock-cost:
       level: 40
       materials:
         NETHER_STAR: 1
@@ -2004,6 +2116,7 @@ glyphs:
   super_shrink_reach:
     tier: 3
     mana-cost: 0
+    unlock-cost:
       level: 40
       materials:
         NETHER_STAR: 1
