@@ -44,7 +44,8 @@ public class FangsEffect implements SpellEffect {
         int aoeLevel = context.getAoeRadiusLevel();
         int maxFangs = (int) config.getParam("fangs", "max-fangs", (double) MAX_FANGS);
         int amplifyBonus = (int) config.getParam("fangs", "amplify-bonus", (double) AMPLIFY_BONUS);
-        int fangCount = Math.min(BASE_FANG_COUNT_ENTITY + amplifyLevel * amplifyBonus, maxFangs);
+        int baseFangCountEntity = (int) config.getParam("fangs", "base-fang-count-entity", (double) BASE_FANG_COUNT_ENTITY);
+        int fangCount = Math.min(baseFangCountEntity + amplifyLevel * amplifyBonus, maxFangs);
 
         Location targetLoc = target.getLocation();
 
@@ -73,7 +74,8 @@ public class FangsEffect implements SpellEffect {
         int aoeLevel = context.getAoeRadiusLevel();
         int maxFangs = (int) config.getParam("fangs", "max-fangs", (double) MAX_FANGS);
         int amplifyBonus = (int) config.getParam("fangs", "amplify-bonus", (double) AMPLIFY_BONUS);
-        int fangCount = Math.min(BASE_FANG_COUNT_BLOCK + amplifyLevel * amplifyBonus, maxFangs);
+        int baseFangCountBlock = (int) config.getParam("fangs", "base-fang-count-block", (double) BASE_FANG_COUNT_BLOCK);
+        int fangCount = Math.min(baseFangCountBlock + amplifyLevel * amplifyBonus, maxFangs);
 
         // ブロック対象の場合、牙はブロックの上面に生成する
         Location spawnLoc = blockLocation.clone().add(0, 1, 0);

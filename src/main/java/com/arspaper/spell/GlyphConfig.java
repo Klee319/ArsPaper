@@ -99,6 +99,7 @@ public class GlyphConfig {
 
         // 交換・粉砕マッピング
         loadExchangeTiers(config);
+        loadEntityExchangePairs(config);
         loadCrushMap(config);
     }
 
@@ -188,15 +189,15 @@ public class GlyphConfig {
         Map.entry("break",           Set.of("amplify", "dampen", "aoe", "extract", "fortune")),
         Map.entry("harm",            Set.of("amplify", "dampen", "extend_time", "duration_down", "linger", "propagate")),
         Map.entry("ignite",          Set.of("amplify", "dampen", "extend_time", "duration_down", "linger", "propagate")),
-        Map.entry("freeze",          Set.of("amplify", "extend_time", "duration_down", "linger", "propagate")),
+        Map.entry("freeze",          Set.of("amplify", "dampen", "extend_time", "duration_down", "linger", "propagate")),
         Map.entry("knockback",       Set.of("amplify", "dampen", "linger", "propagate")),
         // pull: 突風と同じ互換（エリア生成型に変更）
         Map.entry("pull",            Set.of("amplify", "dampen", "aoe_radius", "extend_time", "duration_down")),
-        Map.entry("gravity",         Set.of("amplify", "extend_time", "duration_down", "linger", "propagate")),
+        Map.entry("gravity",         Set.of("amplify", "dampen", "extend_time", "duration_down", "linger", "propagate")),
         Map.entry("light",           Set.of("aoe", "extend_time", "duration_down")),
         Map.entry("harvest",         Set.of("amplify", "aoe_radius", "fortune", "extract")),
         Map.entry("cut",             Set.of("aoe")),
-        Map.entry("interact",        Set.of("aoe", "extend_time", "duration_down")),
+        Map.entry("interact",        Set.of("aoe")),
         Map.entry("pickup",          Set.of("aoe_radius")),
         Map.entry("rotate",          Set.of("amplify", "dampen", "aoe_radius", "extend_time", "duration_down")),
         Map.entry("fell",            Set.of("aoe_radius")),
@@ -204,14 +205,14 @@ public class GlyphConfig {
         Map.entry("place_block",     Set.of("aoe")),
         Map.entry("launch",          Set.of("amplify", "dampen", "aoe_radius")),
         Map.entry("leap",            Set.of("amplify", "dampen", "extend_time", "duration_down")),
-        Map.entry("bounce",          Set.of("amplify", "extend_time", "duration_down", "linger", "propagate")),
+        Map.entry("bounce",          Set.of("amplify", "dampen", "extend_time", "duration_down", "linger", "propagate")),
         Map.entry("snare",           Set.of("amplify", "extend_time", "duration_down", "linger", "propagate")),
         Map.entry("evaporate",       Set.of("aoe_radius")),
         Map.entry("dispel",          Set.of("amplify", "dampen", "propagate")),  // dampen: 良い効果のみ除去
-        Map.entry("rune",            Set.of("extend_time", "duration_down", "linger")),
+        Map.entry("rune",            Set.of("extend_time", "duration_down", "linger", "aoe_radius")),
         Map.entry("cry",             Set.of("amplify", "dampen", "aoe_radius", "linger")),
-        Map.entry("summon_steed",    Set.of("amplify", "extend_time", "duration_down")),
-        Map.entry("summon_wolves",   Set.of("amplify", "aoe_radius", "extend_time", "duration_down")),
+        Map.entry("summon_steed",    Set.of("amplify", "dampen", "extend_time", "duration_down")),
+        Map.entry("summon_wolves",   Set.of("amplify", "dampen", "aoe_radius", "extend_time", "duration_down")),
         Map.entry("wololo",          Set.of("amplify", "aoe_radius", "randomize")),
         Map.entry("bubble",          Set.of("aoe_radius", "extend_time", "duration_down")),
         Map.entry("prestidigitation", Set.of("randomize")),
@@ -224,15 +225,15 @@ public class GlyphConfig {
         Map.entry("crush",           Set.of("aoe", "fortune")),
         Map.entry("crush_wave",      Set.of("amplify", "dampen", "linger", "propagate")),
         Map.entry("scorch",          Set.of("amplify", "dampen", "linger", "propagate")),
-        Map.entry("cold_snap",       Set.of("amplify", "linger", "propagate")),
+        Map.entry("cold_snap",       Set.of("amplify", "dampen", "linger", "propagate")),
         Map.entry("windshear",       Set.of("amplify", "dampen", "linger", "propagate")),
         Map.entry("conjure_water",   Set.of("aoe", "extend_time", "duration_down")),
-        Map.entry("slowfall",        Set.of("aoe_radius", "extend_time", "duration_down", "linger")),
+        Map.entry("slowfall",        Set.of("extend_time", "duration_down", "linger")),
         Map.entry("invisibility",    Set.of("extend_time", "duration_down")),
         Map.entry("infuse",          Set.of()),
-        Map.entry("craft",           Set.of("aoe_radius")),
-        Map.entry("animate",         Set.of("amplify", "aoe_radius", "extend_time", "duration_down")),
-        Map.entry("firework",        Set.of("amplify", "aoe_radius", "extend_time", "duration_down", "randomize")),
+        Map.entry("craft",           Set.of()),
+        Map.entry("animate",         Set.of("amplify", "dampen", "aoe_radius", "extend_time", "duration_down")),
+        Map.entry("firework",        Set.of("amplify", "dampen", "aoe_radius", "extend_time", "duration_down", "randomize")),
         Map.entry("name",            Set.of()),
         Map.entry("wind_burst",      Set.of("amplify", "dampen", "aoe_radius", "extend_time", "duration_down")),
         Map.entry("speed_boost",     Set.of("amplify", "dampen", "extend_time", "duration_down", "randomize", "linger", "propagate")),
@@ -240,25 +241,25 @@ public class GlyphConfig {
         Map.entry("saturation",      Set.of("amplify", "dampen", "extend_time", "duration_down", "propagate", "linger")),
         Map.entry("gale",            Set.of("amplify", "dampen", "extend_time", "duration_down", "propagate", "linger")),
         Map.entry("scale",           Set.of("amplify", "dampen", "extend_time", "duration_down", "propagate", "linger")),
-        Map.entry("levitate",        Set.of("amplify", "extend_time", "duration_down", "linger", "propagate")),
+        Map.entry("levitate",        Set.of("amplify", "dampen", "extend_time", "duration_down", "linger", "propagate")),
         // === Effects - Tier 3 ===
         Map.entry("blink",           Set.of("extend_reach", "shrink_reach", "pierce")),
         Map.entry("lightning",       Set.of("amplify", "dampen", "extend_time", "duration_down", "linger", "propagate")),
-        Map.entry("wither",          Set.of("amplify", "extend_time", "duration_down", "linger", "propagate")),
-        Map.entry("hex",             Set.of("amplify", "extend_time", "duration_down", "linger", "propagate")),
+        Map.entry("wither",          Set.of("amplify", "dampen", "extend_time", "duration_down", "linger", "propagate")),
+        Map.entry("hex",             Set.of("amplify", "dampen", "extend_time", "duration_down", "linger", "propagate")),
         Map.entry("glide",           Set.of("extend_time", "duration_down")),
         Map.entry("shield",          Set.of("amplify", "extend_time", "duration_down", "linger")),
         Map.entry("journey",         Set.of("amplify", "extend_time", "duration_down", "propagate", "linger")),
-        Map.entry("solar",           Set.of("amplify", "aoe_radius", "extend_time", "duration_down", "split")),
-        Map.entry("lunar",           Set.of("amplify", "aoe_radius", "extend_time", "duration_down", "split")),
-        Map.entry("sonic_boom",      Set.of("amplify", "split", "pierce")),
-        Map.entry("heavy_impact",    Set.of("amplify", "aoe_radius", "linger")),
-        Map.entry("summon_undead",   Set.of("amplify", "aoe_radius", "extend_time", "duration_down")),
-        Map.entry("summon_vex",      Set.of("amplify", "aoe_radius", "extend_time", "duration_down")),
-        Map.entry("summon_decoy",    Set.of("amplify", "extend_time", "duration_down")),
+        Map.entry("solar",           Set.of("amplify", "dampen", "aoe_radius", "extend_time", "duration_down", "split")),
+        Map.entry("lunar",           Set.of("amplify", "dampen", "aoe_radius", "extend_time", "duration_down", "split")),
+        Map.entry("sonic_boom",      Set.of("amplify", "dampen", "split", "pierce")),
+        Map.entry("heavy_impact",    Set.of("amplify", "dampen", "aoe_radius", "linger")),
+        Map.entry("summon_undead",   Set.of("amplify", "dampen", "aoe_radius", "extend_time", "duration_down")),
+        Map.entry("summon_vex",      Set.of("amplify", "dampen", "aoe_radius", "extend_time", "duration_down")),
+        Map.entry("summon_decoy",    Set.of("amplify", "dampen", "extend_time", "duration_down")),
         Map.entry("intangible",      Set.of("aoe", "extend_time", "duration_down")),
         Map.entry("rewind",          Set.of("extend_time", "duration_down")),
-        Map.entry("fangs",           Set.of("amplify", "aoe_radius")),
+        Map.entry("fangs",           Set.of("amplify", "dampen", "aoe_radius")),
         Map.entry("advanced_break",  Set.of("aoe", "extract", "fortune"))
     );
 
@@ -388,6 +389,42 @@ public class GlyphConfig {
         }
         this.exchangeTiers = List.copyOf(tiers);
         logger.info("Loaded " + tiers.size() + " exchange tiers");
+    }
+
+    // ============================================================
+    // 交換グリフ エンティティペアマッピング
+    // ============================================================
+    private volatile Map<org.bukkit.entity.EntityType, org.bukkit.entity.EntityType> entityExchangeMap = Map.of();
+
+    /**
+     * エンティティ種別の交換マップを返す。双方向マッピング。
+     */
+    public Map<org.bukkit.entity.EntityType, org.bukkit.entity.EntityType> getEntityExchangeMap() {
+        return entityExchangeMap;
+    }
+
+    private void loadEntityExchangePairs(YamlConfiguration config) {
+        Map<org.bukkit.entity.EntityType, org.bukkit.entity.EntityType> map = new HashMap<>();
+        List<?> rawPairs = config.getList("entity_exchange_pairs");
+        if (rawPairs != null) {
+            for (Object pairObj : rawPairs) {
+                if (pairObj instanceof List<?> pair && pair.size() >= 2) {
+                    try {
+                        org.bukkit.entity.EntityType a = org.bukkit.entity.EntityType.valueOf(
+                            String.valueOf(pair.get(0)).toUpperCase());
+                        org.bukkit.entity.EntityType b = org.bukkit.entity.EntityType.valueOf(
+                            String.valueOf(pair.get(1)).toUpperCase());
+                        // 双方向マッピング
+                        map.put(a, b);
+                        map.put(b, a);
+                    } catch (IllegalArgumentException e) {
+                        logger.warning("Invalid entity exchange pair: " + pair);
+                    }
+                }
+            }
+        }
+        this.entityExchangeMap = Map.copyOf(map);
+        logger.info("Loaded " + (map.size() / 2) + " entity exchange pairs");
     }
 
     private void loadCrushMap(YamlConfiguration config) {

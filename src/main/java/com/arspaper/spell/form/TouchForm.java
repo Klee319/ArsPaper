@@ -33,7 +33,7 @@ public class TouchForm implements SpellForm {
         RayTraceResult result = caster.getWorld().rayTrace(
             caster.getEyeLocation(),
             caster.getLocation().getDirection(),
-            RANGE,
+            config.getParam("touch", "range", RANGE),
             org.bukkit.FluidCollisionMode.NEVER,
             false,
             0.5,

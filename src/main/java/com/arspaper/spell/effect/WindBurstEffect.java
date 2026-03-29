@@ -48,8 +48,9 @@ public class WindBurstEffect implements SpellEffect {
 
     @Override
     public void applyToEntity(SpellContext context, LivingEntity target) {
+        double radiusPerAoe = config.getParam("wind_burst", "radius-per-aoe", 1.0);
         double radius = config.getParam("wind_burst", "base-radius", BASE_RADIUS)
-            + context.getAoeRadiusLevel();
+            + context.getAoeRadiusLevel() * radiusPerAoe;
         double force = config.getParam("wind_burst", "base-force", BASE_FORCE)
             + config.getParam("wind_burst", "amplify-force-bonus", AMPLIFY_FORCE_BONUS)
                 * context.getAmplifyLevel();
@@ -65,8 +66,9 @@ public class WindBurstEffect implements SpellEffect {
 
     @Override
     public void applyToBlock(SpellContext context, Location blockLocation) {
+        double radiusPerAoe = config.getParam("wind_burst", "radius-per-aoe", 1.0);
         double radius = config.getParam("wind_burst", "base-radius", BASE_RADIUS)
-            + context.getAoeRadiusLevel();
+            + context.getAoeRadiusLevel() * radiusPerAoe;
         double force = config.getParam("wind_burst", "base-force", BASE_FORCE)
             + config.getParam("wind_burst", "amplify-force-bonus", AMPLIFY_FORCE_BONUS)
                 * context.getAmplifyLevel();

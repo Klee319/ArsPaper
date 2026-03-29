@@ -44,9 +44,8 @@ public class ColdSnapEffect implements SpellEffect {
         }
 
         double baseDamage = config.getParam("cold_snap", "base-damage", BASE_DAMAGE);
-        int maxAmp = (int) config.getParam("cold_snap", "max-amp", (double) MAX_AMP);
-        int clampedAmp = Math.min(Math.max(0, context.getAmplifyLevel()), maxAmp);
-        double damage = Math.max(0, baseDamage + clampedAmp * AMPLIFY_BONUS);
+        double amplifyBonus = config.getParam("cold_snap", "amplify-bonus", AMPLIFY_BONUS);
+        double damage = Math.max(0, baseDamage + context.getAmplifyLevel() * amplifyBonus);
 
         Player caster = context.getCaster();
         damage = context.calculateSpellDamage(damage, target);

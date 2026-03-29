@@ -79,9 +79,12 @@ public class SummonSteedEffect implements SpellEffect {
             if (clampedAmplify > 0) {
                 AttributeInstance speedAttr = h.getAttribute(Attribute.MOVEMENT_SPEED);
                 if (speedAttr != null) {
+                    double configBaseSpeed = config.getParam("summon_steed", "base-speed", -1.0);
+                    if (configBaseSpeed >= 0) {
+                        speedAttr.setBaseValue(configBaseSpeed);
+                    }
                     double speedBoost = config.getParam("summon_steed", "speed-boost-per-amplify", SPEED_BOOST_PER_AMPLIFY);
-                    double baseSpeed = speedAttr.getBaseValue();
-                    speedAttr.setBaseValue(baseSpeed + speedBoost * clampedAmplify);
+                    speedAttr.setBaseValue(speedAttr.getBaseValue() + speedBoost * clampedAmplify);
                 }
             }
         });

@@ -39,7 +39,8 @@ public class WindshearEffect implements SpellEffect {
         double baseDamage = config.getParam("windshear", "base-damage", BASE_DAMAGE);
         double maxHeightBonus = config.getParam("windshear", "max-height-bonus", MAX_HEIGHT_BONUS);
         double heightBonus = Math.min(height, maxHeightBonus);
-        double damage = baseDamage + AMPLIFY_BONUS * context.getAmplifyLevel() + heightBonus;
+        double amplifyBonus = config.getParam("windshear", "amplify-bonus", AMPLIFY_BONUS);
+        double damage = baseDamage + amplifyBonus * context.getAmplifyLevel() + heightBonus;
 
         damage = context.calculateSpellDamage(damage, target);
         target.damage(damage, context.getCaster());

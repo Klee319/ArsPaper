@@ -80,7 +80,8 @@ public class LaunchEffect implements SpellEffect {
         double amplifyBonusB = config.getParam("launch", "amplify-bonus", AMPLIFY_BONUS);
         double maxVelocityB = config.getParam("launch", "max-velocity", MAX_VELOCITY);
         double velocity = Math.min(baseVelocityB + context.getAmplifyLevel() * amplifyBonusB, maxVelocityB);
-        int radius = context.getAoeRadiusLevel();
+        int baseRadius = (int) config.getParam("launch", "base-block-radius", 0.0);
+        int radius = baseRadius + context.getAoeRadiusLevel();
         Player caster = context.getCaster();
 
         if (radius > 0) {

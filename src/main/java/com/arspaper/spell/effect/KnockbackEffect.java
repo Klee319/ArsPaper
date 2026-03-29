@@ -61,7 +61,8 @@ public class KnockbackEffect implements SpellEffect {
         Player caster = context.getCaster();
         if (caster == null) return;
 
-        double radius = 2.0 + context.getAoeRadiusLevel();
+        double baseBlockRadius = config.getParam("knockback", "base-block-radius", 2.0);
+        double radius = baseBlockRadius + context.getAoeRadiusLevel();
         Location center = blockLocation.clone().add(0.5, 0.5, 0.5);
         center.getNearbyLivingEntities(radius).stream()
             .filter(e -> !e.equals(caster))

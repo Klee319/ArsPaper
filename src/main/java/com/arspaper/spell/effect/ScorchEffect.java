@@ -42,7 +42,7 @@ public class ScorchEffect implements SpellEffect {
 
         // 炎上状態の敵にダメージ1.5倍
         if (target.getFireTicks() > 0) {
-            damage *= FIRE_MULTIPLIER;
+            damage *= config.getParam("scorch", "fire-multiplier", FIRE_MULTIPLIER);
         }
 
         Player caster = context.getCaster();

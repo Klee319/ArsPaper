@@ -113,7 +113,7 @@ public class HeavyImpactEffect implements SpellEffect {
 
                 hitIndex++;
             }
-        }.runTaskTimer(plugin, 0L, HIT_INTERVAL_TICKS);
+        }.runTaskTimer(plugin, 0L, (int) config.getParam("heavy_impact", "hit-interval-ticks", (double) HIT_INTERVAL_TICKS));
         SpellTaskLimiter.register("heavy_impact", task);
     }
 

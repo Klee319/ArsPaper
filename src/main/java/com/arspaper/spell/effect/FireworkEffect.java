@@ -55,10 +55,13 @@ public class FireworkEffect implements SpellEffect {
 
         // スター数: 1 + amplifyLevel (上限設定可能)
         int maxStars = (int) config.getParam("firework", "max-stars", (double) DEFAULT_MAX_STARS);
-        int starCount = Math.min(1 + amplifyLevel, maxStars);
+        int baseStars = (int) config.getParam("firework", "base-stars", 1.0);
+        int starCount = Math.min(baseStars + amplifyLevel, maxStars);
 
-        // 飛翔距離: 1 + durationLevel (上限3)
-        int flightPower = Math.min(1 + Math.max(0, durationLevel), 3);
+        // 飛翔距離: 1 + durationLevel (上限設定可能)
+        int maxFlightPower = (int) config.getParam("firework", "max-flight-power", 3.0);
+        int baseFlightPower = (int) config.getParam("firework", "base-flight-power", 1.0);
+        int flightPower = Math.min(baseFlightPower + Math.max(0, durationLevel), maxFlightPower);
 
         spawnLoc.getWorld().spawn(spawnLoc, Firework.class, fw -> {
             FireworkMeta meta = fw.getFireworkMeta();

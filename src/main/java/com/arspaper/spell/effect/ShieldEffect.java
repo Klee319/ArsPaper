@@ -35,7 +35,8 @@ public class ShieldEffect implements SpellEffect {
         int duration = baseDuration + context.getDurationLevel() * durationPerLevel;
 
         // 耐性レベル = デフォルト + 増幅レベル（Resistance II〜）
-        int resistanceLevel = DEFAULT_RESISTANCE_LEVEL + Math.max(0, context.getAmplifyLevel());
+        int resistanceLevel = (int) config.getParam("shield", "base-resistance-level", (double) DEFAULT_RESISTANCE_LEVEL)
+            + Math.max(0, context.getAmplifyLevel());
         target.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, duration, resistanceLevel));
 
         SpellFxUtil.spawnShieldFx(target.getLocation());

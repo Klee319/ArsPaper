@@ -51,7 +51,9 @@ public class RuneEffect implements SpellEffect {
 
         int baseLifetime = (int) config.getParam("rune", "base-lifetime", 300);
         int lifetimePerDur = (int) config.getParam("rune", "lifetime-per-duration", 200);
-        double trigRadius = config.getParam("rune", "trigger-radius", 1.5);
+        double baseTrigRadius = config.getParam("rune", "trigger-radius", 1.5);
+        double radiusPerAoe = config.getParam("rune", "radius-per-aoe", 1.0);
+        double trigRadius = baseTrigRadius + context.getAoeRadiusLevel() * radiusPerAoe;
 
         int lifetime = Math.max(1, baseLifetime + context.getDurationLevel() * lifetimePerDur);
         Location runeLoc = blockLocation.clone().add(0.5, 0.1, 0.5);
@@ -182,7 +184,7 @@ public class RuneEffect implements SpellEffect {
     public boolean allowsTraceRepeating() { return false; }
 
     @Override public NamespacedKey getId() { return id; }
-    @Override public String getDisplayName() { return "ルーン"; }
+    @Override public String getDisplayName() { return "罠術"; }
     @Override public String getDescription() { return "地面にスペルトラップを設置する"; }
     @Override public int getManaCost() { return config.getManaCost("rune"); }
     @Override public int getTier() { return config.getTier("rune"); }

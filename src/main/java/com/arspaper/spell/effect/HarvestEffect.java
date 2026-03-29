@@ -51,7 +51,8 @@ public class HarvestEffect implements SpellEffect {
         Player caster = context.getCaster();
         if (caster == null) return;
 
-        int radius = context.getAoeRadiusLevel();
+        int baseRadius = (int) config.getParam("harvest", "base-radius", 0.0);
+        int radius = baseRadius + context.getAoeRadiusLevel();
         int amplify = Math.max(0, context.getAmplifyLevel());
         int fortuneLevel = context.getFortuneLevel();
         boolean extract = context.getExtractCount() > 0;

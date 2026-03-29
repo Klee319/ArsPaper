@@ -42,7 +42,7 @@ public class CrushWaveEffect implements SpellEffect {
 
         // 水に触れている敵にダメージ2倍
         if (target.isInWater() || target.isInRain()) {
-            damage *= WATER_MULTIPLIER;
+            damage *= config.getParam("crush_wave", "water-multiplier", WATER_MULTIPLIER);
         }
 
         Player caster = context.getCaster();

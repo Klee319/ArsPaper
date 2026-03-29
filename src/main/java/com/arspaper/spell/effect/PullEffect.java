@@ -48,8 +48,9 @@ public class PullEffect implements SpellEffect {
 
     @Override
     public void applyToEntity(SpellContext context, LivingEntity target) {
+        double radiusPerAoe = config.getParam("pull", "radius-per-aoe", 1.0);
         double radius = config.getParam("pull", "base-radius", BASE_RADIUS)
-            + context.getAoeRadiusLevel();
+            + context.getAoeRadiusLevel() * radiusPerAoe;
         double force = config.getParam("pull", "base-force", BASE_FORCE)
             + config.getParam("pull", "amplify-force-bonus", AMPLIFY_FORCE_BONUS)
                 * context.getAmplifyLevel();
@@ -66,8 +67,9 @@ public class PullEffect implements SpellEffect {
 
     @Override
     public void applyToBlock(SpellContext context, Location blockLocation) {
+        double radiusPerAoe = config.getParam("pull", "radius-per-aoe", 1.0);
         double radius = config.getParam("pull", "base-radius", BASE_RADIUS)
-            + context.getAoeRadiusLevel();
+            + context.getAoeRadiusLevel() * radiusPerAoe;
         double force = config.getParam("pull", "base-force", BASE_FORCE)
             + config.getParam("pull", "amplify-force-bonus", AMPLIFY_FORCE_BONUS)
                 * context.getAmplifyLevel();

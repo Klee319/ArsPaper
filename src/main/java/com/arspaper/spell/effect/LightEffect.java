@@ -37,7 +37,8 @@ public class LightEffect implements SpellEffect {
     @Override
     public void applyToEntity(SpellContext context, LivingEntity target) {
         int baseDuration = (int) config.getParam("light", "base-duration-ticks", BASE_DURATION_TICKS);
-        int duration = baseDuration + context.getDurationTicks();
+        int durationPerLevel = (int) config.getParam("light", "duration-per-level", 200.0);
+        int duration = baseDuration + context.getDurationLevel() * durationPerLevel;
         target.addPotionEffect(new PotionEffect(PotionEffectType.NIGHT_VISION, duration, 0));
         target.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, duration, 0));
         SpellFxUtil.spawnLightFx(target.getLocation());

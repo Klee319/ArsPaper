@@ -37,7 +37,8 @@ public class WololoEffect implements SpellEffect {
         DyeColor current = sheep.getColor();
         if (current == null) current = DyeColor.WHITE;
 
-        int step = 1 + Math.max(0, context.getAmplifyLevel());
+        int baseStep = (int) config.getParam("wololo", "base-step", 1.0);
+        int step = baseStep + Math.max(0, context.getAmplifyLevel());
         int nextIndex = (current.ordinal() + step) % DYE_COLORS.length;
         sheep.setColor(DYE_COLORS[nextIndex]);
 
@@ -48,7 +49,8 @@ public class WololoEffect implements SpellEffect {
     public void applyToBlock(SpellContext context, Location blockLocation) {
         Block block = blockLocation.getBlock();
         Material current = block.getType();
-        Material next = getNextColorVariant(current, 1 + Math.max(0, context.getAmplifyLevel()));
+        int baseStep = (int) config.getParam("wololo", "base-step", 1.0);
+        Material next = getNextColorVariant(current, baseStep + Math.max(0, context.getAmplifyLevel()));
         if (next == null) return;
 
         Player caster = context.getCaster();

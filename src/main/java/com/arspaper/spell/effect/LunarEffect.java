@@ -74,8 +74,9 @@ public class LunarEffect implements SpellEffect {
         double damage = config.getParam("lunar", "base-damage", BASE_DAMAGE)
             + config.getParam("lunar", "amplify-damage-bonus", AMPLIFY_DAMAGE_BONUS)
                 * context.getAmplifyLevel();
+        double radiusPerAoe = config.getParam("lunar", "radius-per-aoe", 1.0);
         double radius = config.getParam("lunar", "base-radius", BASE_RADIUS)
-            + context.getAoeRadiusLevel();
+            + context.getAoeRadiusLevel() * radiusPerAoe;
         int baseDur = (int) config.getParam("lunar", "base-duration", BASE_DURATION);
         int durPerLevel = (int) config.getParam("lunar", "duration-per-level", DURATION_PER_LEVEL);
         int durationTicks = baseDur + context.getDurationLevel() * durPerLevel;

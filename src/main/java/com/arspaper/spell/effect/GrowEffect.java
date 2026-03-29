@@ -46,8 +46,10 @@ public class GrowEffect implements SpellEffect {
         org.bukkit.entity.Player caster = context.getCaster();
         if (caster == null) return;
 
-        int radius = context.getAoeRadiusLevel();
-        int growth = 1 + context.getAmplifyLevel();
+        int baseRadius = (int) config.getParam("grow", "base-radius", 0.0);
+        int radius = baseRadius + context.getAoeRadiusLevel();
+        int baseGrowth = (int) config.getParam("grow", "base-growth", 1.0);
+        int growth = baseGrowth + context.getAmplifyLevel();
 
         // 正方形範囲で成長促進（上下2ブロック走査で足元形態にも対応）
         int centerX = blockLocation.getBlockX();

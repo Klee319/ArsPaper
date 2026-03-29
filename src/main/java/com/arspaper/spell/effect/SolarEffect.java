@@ -71,8 +71,9 @@ public class SolarEffect implements SpellEffect {
         double damage = config.getParam("solar", "base-damage", BASE_DAMAGE)
             + config.getParam("solar", "amplify-damage-bonus", AMPLIFY_DAMAGE_BONUS)
                 * context.getAmplifyLevel();
+        double radiusPerAoe = config.getParam("solar", "radius-per-aoe", 1.0);
         double radius = config.getParam("solar", "base-radius", BASE_RADIUS)
-            + context.getAoeRadiusLevel();
+            + context.getAoeRadiusLevel() * radiusPerAoe;
         int baseDur = (int) config.getParam("solar", "base-duration", BASE_DURATION);
         int durPerLevel = (int) config.getParam("solar", "duration-per-level", DURATION_PER_LEVEL);
         int durationTicks = baseDur + context.getDurationLevel() * durPerLevel;

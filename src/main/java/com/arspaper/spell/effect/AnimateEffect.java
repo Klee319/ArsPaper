@@ -63,7 +63,8 @@ public class AnimateEffect implements SpellEffect {
         int baseDuration = (int) config.getParam("animate", "base-duration-ticks", BASE_DURATION_TICKS);
         int durationPerLevel = (int) config.getParam("animate", "duration-per-level-ticks", DURATION_PER_LEVEL_TICKS);
         int durationTicks = Math.max(1, baseDuration + durationLevel * durationPerLevel);
-        int spawnCount = context.getAoeRadiusLevel() + 1;
+        int baseSpawnCount = (int) config.getParam("animate", "base-spawn-count", 1.0);
+        int spawnCount = baseSpawnCount + context.getAoeRadiusLevel();
 
         for (int i = 0; i < spawnCount; i++) {
             double offsetX = (i == 0) ? 0 : (Math.random() * 4 - 2);
@@ -87,8 +88,9 @@ public class AnimateEffect implements SpellEffect {
 
             // HPをAmplifyで強化
             int amplifyLevel = context.getAmplifyLevel();
-            double baseHp = 100.0;
-            double bonusHp = Math.max(0, amplifyLevel) * 20.0;
+            double baseHp = config.getParam("animate", "base-hp", 100.0);
+            double hpPerAmplify = config.getParam("animate", "hp-per-amplify", 20.0);
+            double bonusHp = Math.max(0, amplifyLevel) * hpPerAmplify;
             var maxHpAttr = g.getAttribute(Attribute.MAX_HEALTH);
             if (maxHpAttr != null) {
                 maxHpAttr.setBaseValue(baseHp + bonusHp);

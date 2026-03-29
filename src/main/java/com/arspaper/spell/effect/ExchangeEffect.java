@@ -7,10 +7,15 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.Particle;
+import org.bukkit.Sound;
+import org.bukkit.SoundCategory;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
@@ -19,6 +24,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 対象ブロックをリスト内の次のブロックに変更するEffect。
@@ -26,7 +32,8 @@ import java.util.List;
  *   - Amplifyでティアを上げる（上位のリストから選択）
  *   - BlockBreakEvent + BlockPlaceEventを発火して保護プラグイン互換。
  *   - AOE対応。
- * エンティティ: キャスターと対象エンティティの位置を入れ替える。
+ * エンティティ: glyphs.ymlのentity_exchange_pairsで定義されたペアの種類を入れ替える。
+ *   - 例: ホグリン⇔ゾグリン、村人⇔魔女 等
  */
 public class ExchangeEffect implements SpellEffect {
 
@@ -47,33 +54,36 @@ public class ExchangeEffect implements SpellEffect {
 
     @Override
     public void applyToEntity(SpellContext context, LivingEntity target) {
-        Player caster = context.getCaster();
-        if (caster == null) return;
+        if (target instanceof Player) return; // プレイヤーは対象外
 
-        // PvP無効ワールドではプレイヤー対象を拒否
-        if (target instanceof Player && !target.getWorld().getPVP()) return;
+        Map<EntityType, EntityType> exchangeMap = config.getEntityExchangeMap();
+        EntityType targetType = target.getType();
+        EntityType newType = exchangeMap.get(targetType);
+        if (newType == null) return;
 
-        // キャスターと対象エンティティの位置を入れ替える
-        Location casterLoc = caster.getLocation().clone();
-        Location targetLoc = target.getLocation().clone();
+        Location loc = target.getLocation().clone();
 
-        Location casterDest = targetLoc.clone();
-        casterDest.setYaw(casterLoc.getYaw());
-        casterDest.setPitch(casterLoc.getPitch());
+        // 新エンティティを同じ位置にスポーン
+        LivingEntity newEntity = (LivingEntity) loc.getWorld().spawnEntity(loc, newType);
 
-        Location targetDest = casterLoc.clone();
-        targetDest.setYaw(targetLoc.getYaw());
-        targetDest.setPitch(targetLoc.getPitch());
+        // HP比率を維持
+        double hpRatio = target.getHealth() / target.getMaxHealth();
+        newEntity.setHealth(Math.max(1, newEntity.getMaxHealth() * hpRatio));
 
-        target.teleport(targetDest);
-        caster.teleport(casterDest);
+        // カスタム名を引き継ぎ
+        if (target.customName() != null) {
+            newEntity.customName(target.customName());
+            newEntity.setCustomNameVisible(target.isCustomNameVisible());
+        }
 
-        casterDest.getWorld().spawnParticle(
-            org.bukkit.Particle.PORTAL, casterDest.clone().add(0, 1, 0), 20, 0.3, 0.5, 0.3, 0.5);
-        targetDest.getWorld().spawnParticle(
-            org.bukkit.Particle.PORTAL, targetDest.clone().add(0, 1, 0), 20, 0.3, 0.5, 0.3, 0.5);
-        casterDest.getWorld().playSound(casterDest,
-            org.bukkit.Sound.ENTITY_ENDERMAN_TELEPORT, org.bukkit.SoundCategory.PLAYERS, 1.0f, 1.0f);
+        // 元エンティティを除去
+        target.remove();
+
+        // エフェクト
+        loc.getWorld().spawnParticle(Particle.PORTAL, loc.clone().add(0, 1, 0),
+            20, 0.3, 0.5, 0.3, 0.5);
+        loc.getWorld().playSound(loc, Sound.ENTITY_ENDERMAN_TELEPORT,
+            SoundCategory.PLAYERS, 1.0f, 1.0f);
     }
 
     @Override
