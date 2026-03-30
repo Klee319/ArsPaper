@@ -1171,7 +1171,6 @@ glyphs:
       materials:
         SHULKER_SHELL: 4
         PHANTOM_MEMBRANE: 8
-      base-level: 0
 
   # ============================================================
   # Effects（効果）- Tier 3 (Archmage)
@@ -1473,10 +1472,10 @@ glyphs:
     mana-cost: 5
     # 延長:遅延時間↑ | 短縮:遅延時間↓ | 無作為:遅延を±25%変動
     params:
-      base-ticks: 20                 # 基本遅延時間(tick=1秒)
-      ticks-per-duration-level: 20   # 延長1段あたりの追加遅延(tick=1秒)
-      base-delay-ticks: 20
-      duration-bonus-ticks: 20
+      base-ticks: 20                 # オーグメント: 基本遅延時間(tick=1秒)
+      ticks-per-duration-level: 20   # オーグメント: 延長1段あたりの追加遅延(tick=1秒)
+      base-delay-ticks: 20           # エフェクト: 基本遅延時間(tick=1秒)
+      duration-bonus-ticks: 20       # エフェクト: 延長1段あたりの追加遅延(tick=1秒)
     unlock-cost:
       level: 10
       materials:
@@ -1731,9 +1730,6 @@ glyphs:
       materials:
         OMINOUS_BOTTLE: 1
         DRAGON_BREATH: 4
-      duration-bonus-per-level: 60
-      per-stack: 1
-      ticks-per-level: 100
 
   # ============================================================
   # 新規増強
@@ -1813,7 +1809,6 @@ glyphs:
       materials:
         COOKED_BEEF: 32
         GOLDEN_CARROT: 16
-      base-level: 0
 
   # 説明: 対象にスピードを付与する（減衰で鈍足）
   gale:
@@ -1835,7 +1830,6 @@ glyphs:
       materials:
         SUGAR: 64
         BLAZE_ROD: 4
-      base-level: 0
 
   # 説明: 対象のサイズを変更する（当たり判定含む）
   scale:

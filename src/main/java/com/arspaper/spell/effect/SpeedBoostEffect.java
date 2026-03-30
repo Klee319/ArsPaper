@@ -75,6 +75,9 @@ public class SpeedBoostEffect implements SpellEffect {
             direction = getAimDirection(caster, aimRange);
         }
 
+        if (direction.lengthSquared() < 0.0001) {
+            direction = new Vector(0, 1, 0); // ゼロベクトル回避
+        }
         target.setVelocity(direction.normalize().multiply(speed));
 
         // エフェクト
