@@ -66,14 +66,53 @@ public class ExchangeEffect implements SpellEffect {
         // 新エンティティを同じ位置にスポーン
         LivingEntity newEntity = (LivingEntity) loc.getWorld().spawnEntity(loc, newType);
 
+        // === 状態引き継ぎ ===
+
         // HP比率を維持
         double hpRatio = target.getHealth() / target.getMaxHealth();
         newEntity.setHealth(Math.max(1, newEntity.getMaxHealth() * hpRatio));
 
-        // カスタム名を引き継ぎ
+        // カスタム名
         if (target.customName() != null) {
             newEntity.customName(target.customName());
             newEntity.setCustomNameVisible(target.isCustomNameVisible());
+        }
+
+        // 装備引き継ぎ
+        if (target.getEquipment() != null && newEntity.getEquipment() != null) {
+            var srcEquip = target.getEquipment();
+            var dstEquip = newEntity.getEquipment();
+            dstEquip.setHelmet(srcEquip.getHelmet());
+            dstEquip.setChestplate(srcEquip.getChestplate());
+            dstEquip.setLeggings(srcEquip.getLeggings());
+            dstEquip.setBoots(srcEquip.getBoots());
+            dstEquip.setItemInMainHand(srcEquip.getItemInMainHand());
+            dstEquip.setItemInOffHand(srcEquip.getItemInOffHand());
+            dstEquip.setHelmetDropChance(srcEquip.getHelmetDropChance());
+            dstEquip.setChestplateDropChance(srcEquip.getChestplateDropChance());
+            dstEquip.setLeggingsDropChance(srcEquip.getLeggingsDropChance());
+            dstEquip.setBootsDropChance(srcEquip.getBootsDropChance());
+        }
+
+        // ポーション効果引き継ぎ
+        for (var effect : target.getActivePotionEffects()) {
+            newEntity.addPotionEffect(effect);
+        }
+
+        // ベビー状態引き継ぎ
+        if (target instanceof org.bukkit.entity.Ageable oldAge
+                && newEntity instanceof org.bukkit.entity.Ageable newAge) {
+            if (!oldAge.isAdult()) newAge.setBaby();
+        }
+
+        // 炎上引き継ぎ
+        if (target.getFireTicks() > 0) {
+            newEntity.setFireTicks(target.getFireTicks());
+        }
+
+        // 凍結引き継ぎ
+        if (target.getFreezeTicks() > 0) {
+            newEntity.setFreezeTicks(target.getFreezeTicks());
         }
 
         // 元エンティティを除去
@@ -159,7 +198,7 @@ public class ExchangeEffect implements SpellEffect {
     public String getDisplayName() { return "交換"; }
 
     @Override
-    public String getDescription() { return "ブロックを変換する"; }
+    public String getDescription() { return "対象を等価交換する"; }
 
     @Override
     public int getManaCost() { return config.getManaCost("exchange"); }

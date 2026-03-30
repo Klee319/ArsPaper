@@ -32,7 +32,7 @@ public class EnchantBookListener implements Listener {
     /**
      * 金床にアイテムがセットされた時、結果スロットにプレビューを表示する。
      */
-    @EventHandler(priority = org.bukkit.event.EventPriority.HIGH)
+    @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST)
     public void onPrepareAnvil(PrepareAnvilEvent event) {
         AnvilInventory anvil = event.getInventory();
         ItemStack target = anvil.getItem(0);
@@ -93,6 +93,8 @@ public class EnchantBookListener implements Listener {
             result.addUnsafeEnchantment(enchant, Math.min(finalLevel, ArsEnchantments.MAX_LEVEL));
 
             event.setResult(result);
+            com.arspaper.ArsPaper.getInstance().getLogger().info(
+                "[Anvil] Applied " + enchantId + " Lv" + finalLevel + " to " + target.getType());
             // 回生エンチャントは付けなおしを考慮してコスト10固定
             if ("soulbound".equals(enchantId)) {
                 result.editMeta(meta -> {

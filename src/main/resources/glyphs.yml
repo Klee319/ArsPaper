@@ -151,11 +151,12 @@ glyphs:
     # 空中炸裂でもブロック対象を取れる
     params:
       base-speed: 1.0               # 基本弾速
-      base-fuse-ticks: 40           # 基本信管時間(tick=2秒)
+      reach-speed-bonus: 0.25        # 延伸1段あたりの弾速増加
+      base-fuse-ticks: 20           # 基本信管時間(tick=1秒)
+      fuse-per-duration-level: 10   # 延長1段あたりの信管延長(tick=0.5秒)
       base-burst-radius: 1.0        # 基本炸裂半径(ブロック)
       radius-per-aoe: 1.0          # 半径増加1段あたりの炸裂半径増加(ブロック)
-      reach-speed-bonus: 0.25        # 延伸1段あたりの弾速増加
-      fuse-per-duration-level: 10   # 延長1段あたりの信管延長(tick=0.5秒)
+      
     max-augments:
       pierce: 4
       split: 4
@@ -163,7 +164,7 @@ glyphs:
       extend_reach: 6
       shrink_reach: 3
       extend_time: 6
-      duration_down: 3
+      duration_down: 1
     unlock-cost:
       level: 25
       materials:
@@ -1770,25 +1771,6 @@ glyphs:
         NOTE_BLOCK: 4
         GOLD_INGOT: 1
 
-  # 説明: 対象の移動方向を反転させる
-  reverse:
-    tier: 2
-    mana-cost: 30
-    max-augments:
-      extend_time: 6
-      duration_down: 1
-      linger: 6
-      propagate: 4
-    params:
-      base-duration: 80
-      duration-per-level: 40
-    unlock-cost:
-      level: 20
-      materials:
-        REDSTONE_TORCH: 16
-        LEVER: 64
-
-  # 説明: 対象に満腹効果を付与する（減衰で空腹）
   saturation:
     tier: 2
     mana-cost: 25
@@ -2137,6 +2119,16 @@ glyphs:
       materials:
         NETHER_STAR: 1
         DRAGON_BREATH: 8
+
+  # 説明: 遅延2個分の遅延時間
+  super_delay:
+    tier: 3
+    mana-cost: 20
+    unlock-cost:
+      level: 40
+      materials:
+        NETHER_STAR: 1
+        CLOCK: 16
 
 # ============================================================
 # 交換グリフ ブロック変換マッピング

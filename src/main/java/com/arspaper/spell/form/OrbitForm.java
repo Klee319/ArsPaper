@@ -106,6 +106,11 @@ public class OrbitForm implements SpellForm {
         public void run() {
             elapsed += 2;
 
+            // hitCooldownsの古いエントリを定期クリーンアップ（100tickごと）
+            if (elapsed % 100 == 0) {
+                hitCooldowns.entrySet().removeIf(e -> (elapsed - e.getValue()) > hitCooldownTicks * 3);
+            }
+
             if (elapsed > maxTicks || !caster.isOnline() || caster.isDead()) {
                 cancel();
                 return;

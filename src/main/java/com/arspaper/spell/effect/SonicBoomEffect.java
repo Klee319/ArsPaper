@@ -107,17 +107,25 @@ public class SonicBoomEffect implements SpellEffect {
         }
 
         // エンティティヒット（全貫通、PvP保護準拠）
+        // 一括スキャン: ビーム全長をカバーする範囲で1回だけgetNearbyLivingEntitiesを呼ぶ
         double hitRadius = config.getParam("sonic_boom", "hit-radius", HIT_RADIUS);
-        for (double dist = 1.0; dist <= effectiveRange; dist += SCAN_STEP) {
-            Location point = origin.clone().add(direction.clone().multiply(dist));
-            for (LivingEntity nearby : point.getNearbyLivingEntities(hitRadius)) {
-                if (nearby.equals(caster)) continue;
-                if (!hitEntities.add(nearby.getUniqueId())) continue;
-                if (!context.isValidAoeTarget(nearby, caster)) continue;
+        Location midPoint = origin.clone().add(direction.clone().multiply(effectiveRange / 2));
+        double scanRadius = effectiveRange / 2 + hitRadius + 1;
+        for (LivingEntity nearby : midPoint.getNearbyLivingEntities(scanRadius)) {
+            if (nearby.equals(caster)) continue;
+            if (!hitEntities.add(nearby.getUniqueId())) continue;
+            if (!context.isValidAoeTarget(nearby, caster)) continue;
 
-                double finalDamage = context.calculateSpellDamage(damage, nearby);
-                nearby.damage(finalDamage, caster);
-            }
+            // ビーム直線上にいるかチェック
+            Vector toEntity = nearby.getLocation().add(0, 1, 0).toVector().subtract(origin.toVector());
+            double projection = toEntity.dot(direction);
+            if (projection < 0 || projection > effectiveRange) continue;
+            Vector closest = origin.toVector().add(direction.clone().multiply(projection));
+            double distSq = closest.distanceSquared(nearby.getLocation().add(0, 1, 0).toVector());
+            if (distSq > hitRadius * hitRadius) continue;
+
+            double finalDamage = context.calculateSpellDamage(damage, nearby);
+            nearby.damage(finalDamage, caster);
         }
 
         // ビジュアル: ソニックブームパーティクル
@@ -145,7 +153,7 @@ public class SonicBoomEffect implements SpellEffect {
 
     @Override public NamespacedKey getId() { return id; }
     @Override public String getDisplayName() { return "ソニックブーム"; }
-    @Override public String getDescription() { return "視点方向へソニックブームを発射する"; }
+    @Override public String getDescription() { return "視点方向へソニックブームを発射する（自己形態のみ対応）"; }
     @Override public int getManaCost() { return config.getManaCost("sonic_boom"); }
     @Override public int getTier() { return config.getTier("sonic_boom"); }
 }

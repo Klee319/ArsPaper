@@ -37,7 +37,7 @@ public class BlinkEffect implements SpellEffect {
     private static final int BASE_DISTANCE = 12;
     private static final int REACH_BONUS = 8;
     private static final int MAX_DISTANCE = 64;
-    private static final int DOWNWARD_SCAN = 3;
+    private static final int DOWNWARD_SCAN = 5;
     private final NamespacedKey id;
     private final GlyphConfig config;
 
@@ -88,23 +88,35 @@ public class BlinkEffect implements SpellEffect {
     }
 
     /**
-     * 視線方向の最大射程から術者側に近づけながらTP可能な位置を探す。
+     * 視線方向にTP可能な位置を探す。
      *
-     * @param eyeLocation 視線の起点（目の位置）
-     * @param direction   視線方向（正規化済み）
-     * @param maxDist     最大射程（ブロック）
-     * @param pierceLevel 貫通レベル（ブロック貫通数）
-     * @param playerHeight プレイヤーの高さ
-     * @return TP可能な足元位置、見つからなければnull
+     * 1. 手前から最遠に向かって壁（非通過ブロック）をスキャン
+     *    → 壁があればそこを最遠地点とする（壁貫通防止）
+     *    → 貫通レベル分だけ壁を突き抜け可能
+     * 2. 最遠地点から術者側に向かって安全な足場を探す
      */
     private Location findTeleportDestination(Location eyeLocation, Vector direction,
                                               int maxDist, int pierceLevel, double playerHeight) {
-        // 最大射程から1ブロックずつ近づけてチェック
-        for (int dist = maxDist; dist >= 1; dist--) {
-            Location checkPoint = eyeLocation.clone().add(direction.clone().multiply(dist));
+        // フェーズ1: 手前→最遠で壁スキャン（有効射程を決定）
+        int effectiveDist = maxDist;
+        int pierceRemaining = pierceLevel;
+        for (int dist = 1; dist <= maxDist; dist++) {
+            Location point = eyeLocation.clone().add(direction.clone().multiply(dist));
+            Block block = point.getBlock();
+            if (!block.isPassable() && !block.isLiquid()) {
+                if (pierceRemaining > 0) {
+                    pierceRemaining--;
+                } else {
+                    effectiveDist = dist - 1; // 壁の手前が最遠
+                    break;
+                }
+            }
+        }
 
-            // 貫通レベルに応じてブロック内もチェック
-            Location safe = findSafeAtPoint(checkPoint, pierceLevel, playerHeight);
+        // フェーズ2: 最遠→手前で安全な足場を探す
+        for (int dist = effectiveDist; dist >= 1; dist--) {
+            Location checkPoint = eyeLocation.clone().add(direction.clone().multiply(dist));
+            Location safe = findFootholdNear(checkPoint, playerHeight);
             if (safe != null) return safe;
         }
         return null;

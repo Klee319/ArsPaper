@@ -15,14 +15,11 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
 /**
- * 満腹エフェクト。対象に満腹度回復または空腹デバフを付与する。
- * 増幅: 満腹レベル上昇 | 減衰: 空腹デバフレベル上昇
- * 延長/短縮: 効果時間
+ * 満腹エフェクト。対象の満腹度を直接操作する。
+ * 基本4 + 増幅×1 の満腹度を回復（空腹度1 = 0.5ゲージ）。
+ * 減衰を積むと amplifyLevel が負になり、4 + |負値|×1 の満腹度を減少させる。
  */
 public class SaturationEffect implements SpellEffect {
-
-    private static final int BASE_DURATION = 200;            // 10秒
-    private static final int DURATION_PER_LEVEL = 100;       // +5秒/段
 
     private final NamespacedKey id;
     private final GlyphConfig config;
@@ -34,18 +31,27 @@ public class SaturationEffect implements SpellEffect {
 
     @Override
     public void applyToEntity(SpellContext context, LivingEntity target) {
-        int baseDuration = (int) config.getParam("saturation", "base-duration", BASE_DURATION);
-        int durationPerLevel = (int) config.getParam("saturation", "duration-per-level", DURATION_PER_LEVEL);
-        int duration = baseDuration + context.getDurationLevel() * durationPerLevel;
+        if (!(target instanceof Player player)) return;
 
-        int baseLevel = (int) config.getParam("saturation", "base-level", 0.0);
-        int level = baseLevel + context.getAmplifyLevel();
-        if (level >= 0) {
-            target.addPotionEffect(new PotionEffect(PotionEffectType.SATURATION, duration, level));
+        int baseFoodAmount = (int) config.getParam("saturation", "base-food-amount", 4.0);
+        int foodPerAmplify = (int) config.getParam("saturation", "food-per-amplify", 1.0);
+        int amplifyLevel = context.getAmplifyLevel();
+
+        int amount = baseFoodAmount + Math.abs(amplifyLevel) * foodPerAmplify;
+
+        if (amplifyLevel >= 0) {
+            // 満腹度回復
+            int newFood = Math.min(20, player.getFoodLevel() + amount);
+            player.setFoodLevel(newFood);
+            // 飽和度も少し回復
+            float newSat = Math.min(newFood, player.getSaturation() + amount * 0.5f);
+            player.setSaturation(newSat);
             spawnSaturationFx(target.getLocation());
         } else {
-            target.addPotionEffect(new PotionEffect(
-                PotionEffectType.HUNGER, duration, Math.abs(level) - 1));
+            // 満腹度減少
+            int newFood = Math.max(0, player.getFoodLevel() - amount);
+            player.setFoodLevel(newFood);
+            player.setSaturation(Math.min(newFood, player.getSaturation()));
             spawnHungerFx(target.getLocation());
         }
     }

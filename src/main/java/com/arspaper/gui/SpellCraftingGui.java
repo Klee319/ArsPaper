@@ -189,7 +189,8 @@ public class SpellCraftingGui extends BaseGui {
     }
 
     private void renderGlyphPalette() {
-        List<SpellComponent> available = plugin.getSpellRegistry().getByType(currentTab);
+        List<SpellComponent> available = filterAndSortPalette(
+            plugin.getSpellRegistry().getByType(currentTab));
 
         List<Integer> paletteSlots = new ArrayList<>();
         for (int s = GLYPH_START; s <= GLYPH_END; s++) {
@@ -409,7 +410,8 @@ public class SpellCraftingGui extends BaseGui {
             return true;
         }
         if (slot == BTN_NEXT_PAGE) {
-            List<SpellComponent> available = plugin.getSpellRegistry().getByType(currentTab);
+            List<SpellComponent> available = filterAndSortPalette(
+                plugin.getSpellRegistry().getByType(currentTab));
             int totalPages = Math.max(1, (int) Math.ceil((double) available.size() / Math.max(1, glyphsPerPage)));
             if (currentPage < totalPages - 1) {
                 currentPage++;
@@ -466,7 +468,8 @@ public class SpellCraftingGui extends BaseGui {
     private void handleGlyphClick(int slot, Player clicker) {
         if (slot % 9 == 0 || slot % 9 == 8) return;
 
-        List<SpellComponent> available = plugin.getSpellRegistry().getByType(currentTab);
+        List<SpellComponent> available = filterAndSortPalette(
+                plugin.getSpellRegistry().getByType(currentTab));
 
         int paletteIndex = 0;
         for (int s = GLYPH_START; s <= slot; s++) {
@@ -612,6 +615,49 @@ public class SpellCraftingGui extends BaseGui {
         Set<String> result = new HashSet<>();
         arr.forEach(el -> result.add(el.getAsString()));
         return result;
+    }
+
+    /**
+     * パレット表示用: フィルタリング＋ソート。
+     * - Effectタブ: 選択中の形態と互換のないエフェクトを除外
+     * - Augmentタブ: 超増強をベースオーグメントの直後に配置
+     */
+    private List<SpellComponent> filterAndSortPalette(List<SpellComponent> raw) {
+        if (raw.isEmpty()) return raw;
+        SpellComponent.ComponentType type = raw.get(0).getType();
+
+        // Effect: フィルタなし（グレーアウトで表示、getDisableReasonで制御）
+
+        // Augment: 超増強をベースの直後に配置
+        if (type == SpellComponent.ComponentType.AUGMENT) {
+            List<SpellComponent> sorted = new ArrayList<>();
+            java.util.Set<String> added = new java.util.HashSet<>();
+            for (SpellComponent c : raw) {
+                if (added.contains(c.getId().getKey())) continue;
+                if (c instanceof com.arspaper.spell.augment.SuperAugment) continue; // 超増強は後で追加
+                sorted.add(c);
+                added.add(c.getId().getKey());
+                // ベースの直後に対応する超増強を挿入
+                String superKey = "super_" + c.getId().getKey();
+                for (SpellComponent s : raw) {
+                    if (s.getId().getKey().equals(superKey) && !added.contains(superKey)) {
+                        sorted.add(s);
+                        added.add(superKey);
+                        break;
+                    }
+                }
+            }
+            // 残りの超増強（ベースが見つからなかったもの）
+            for (SpellComponent c : raw) {
+                if (!added.contains(c.getId().getKey())) {
+                    sorted.add(c);
+                    added.add(c.getId().getKey());
+                }
+            }
+            return sorted;
+        }
+
+        return raw;
     }
 
     /**

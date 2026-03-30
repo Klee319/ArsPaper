@@ -36,6 +36,9 @@ public class ProjectileHitListener implements Listener {
         boolean isBurst = !event.getEntity().getMetadata(META_BURST).isEmpty();
 
         if (isBurst) {
+            // バニラのSmallFireballダメージを無効化（演出のみ残す）
+            event.setCancelled(true);
+
             // 炸裂: エンティティヒット時は貫通処理+炸裂
             if (event.getHitEntity() instanceof LivingEntity target) {
                 int pierceRemaining = getPierceRemaining(event);
@@ -43,7 +46,6 @@ public class ProjectileHitListener implements Listener {
                     // 貫通: エンティティに効果適用して飛行継続
                     SpellContext hitContext = context.copy();
                     hitContext.resolveOnEntity(target);
-                    event.setCancelled(true);
                     setPierceRemaining(event, pierceRemaining - 1);
                     return;
                 }

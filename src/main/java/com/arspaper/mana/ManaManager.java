@@ -7,8 +7,10 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -172,6 +174,30 @@ public class ManaManager implements Listener {
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
         migrateLegacyManaBonus(player);
+        int current = getCurrentMana(player);
+        int max = getMaxMana(player);
+        BossBar bar = barDisplay.update(player.getUniqueId(), current, max);
+        player.showBossBar(bar);
+    }
+
+    @EventHandler
+    public void onPlayerRespawn(PlayerRespawnEvent event) {
+        // リスポーン後1tick遅延でBossBar再表示（リスポーン処理完了を待つ）
+        org.bukkit.Bukkit.getScheduler().runTaskLater(ArsPaper.getInstance(), () -> {
+            Player player = event.getPlayer();
+            if (player.isOnline()) {
+                int current = getCurrentMana(player);
+                int max = getMaxMana(player);
+                BossBar bar = barDisplay.update(player.getUniqueId(), current, max);
+                player.showBossBar(bar);
+            }
+        }, 1L);
+    }
+
+    @EventHandler
+    public void onPlayerChangedWorld(PlayerChangedWorldEvent event) {
+        // ディメンション移動後にBossBar再表示
+        Player player = event.getPlayer();
         int current = getCurrentMana(player);
         int max = getMaxMana(player);
         BossBar bar = barDisplay.update(player.getUniqueId(), current, max);

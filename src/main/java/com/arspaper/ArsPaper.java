@@ -281,7 +281,6 @@ public class ArsPaper extends JavaPlugin {
         spellRegistry.register(new GaleEffect(this, glyphConfig));       // T2: 疾風
         spellRegistry.register(new SlowfallEffect(this, glyphConfig));   // T2: 低速落下
         spellRegistry.register(new LevitateEffect(this, glyphConfig));   // T2: 浮遊
-        spellRegistry.register(new ReverseEffect(this, glyphConfig));    // T2: 反転
         spellRegistry.register(new BlinkEffect(this, glyphConfig));      // T3: 瞬間移動
         spellRegistry.register(new GlideEffect(this, glyphConfig));      // T3: 滑空
 
@@ -333,69 +332,82 @@ public class ArsPaper extends JavaPlugin {
         spellRegistry.register(new SummonVexEffect(this, glyphConfig));  // T3: ヴェックス召喚
         spellRegistry.register(new SummonDecoyEffect(this, glyphConfig));// T3: デコイ召喚
 
-        // ===== Augments - 基本ペア（増幅/減衰）=====
+        // ===== Augments — 対ペアで登録（GUI表示順 = 登録順）=====
+        // filterAndSortPaletteで超増強がベースの直後に自動配置される
+
+        // --- 増幅 / 減衰 ---
         var amplify = new AmplifyAugment(this, glyphConfig);
         var dampen = new DampenAugment(this, glyphConfig);
-        spellRegistry.register(amplify);                                 // 増幅
-        spellRegistry.register(dampen);                                  // 減衰
+        spellRegistry.register(amplify);
+        spellRegistry.register(dampen);
 
-        // ===== Augments - 範囲系 =====
-        spellRegistry.register(new AoeAugment(this, glyphConfig));       // 幅
-        spellRegistry.register(new AoeHeightAugment(this, glyphConfig)); // 上下
-        spellRegistry.register(new AoeVerticalAugment(this, glyphConfig));// 奥行き
-        var aoeRadius = new AoeRadiusAugment(this, glyphConfig);
-        spellRegistry.register(aoeRadius);                               // 半径増加
-
-        // ===== Augments - 時間系 =====
+        // --- 延長 / 短縮 ---
         var extendTime = new ExtendTimeAugment(this, glyphConfig);
         var durationDown = new DurationDownAugment(this, glyphConfig);
-        spellRegistry.register(extendTime);                              // 延長
-        spellRegistry.register(durationDown);                            // 短縮
+        spellRegistry.register(extendTime);
+        spellRegistry.register(durationDown);
 
-        // ===== Augments - 射程/速度系 =====
+        // --- 延伸 / 収縮 ---
         var extendReach = new com.arspaper.spell.augment.ExtendReachAugment(this, glyphConfig);
         var shrinkReach = new com.arspaper.spell.augment.ShrinkReachAugment(this, glyphConfig);
-        spellRegistry.register(extendReach);                             // 延伸
-        spellRegistry.register(shrinkReach);                             // 収縮
+        spellRegistry.register(extendReach);
+        spellRegistry.register(shrinkReach);
+
+        // --- 加速 / 減速 ---
         var accelerate = new AccelerateAugment(this, glyphConfig);
         var decelerate = new DecelerateAugment(this, glyphConfig);
-        spellRegistry.register(accelerate);                              // 加速
-        spellRegistry.register(decelerate);                              // 減速
+        spellRegistry.register(accelerate);
+        spellRegistry.register(decelerate);
 
-        // ===== Augments - 投射系 =====
+        // --- 範囲系（幅 / 上下 / 奥行き / 半径増加）---
+        spellRegistry.register(new AoeAugment(this, glyphConfig));
+        spellRegistry.register(new AoeHeightAugment(this, glyphConfig));
+        spellRegistry.register(new AoeVerticalAugment(this, glyphConfig));
+        var aoeRadius = new AoeRadiusAugment(this, glyphConfig);
+        spellRegistry.register(aoeRadius);
+
+        // --- 貫通 / 分裂 ---
         var pierce = new PierceAugment(this, glyphConfig);
         var split = new SplitAugment(this, glyphConfig);
-        spellRegistry.register(pierce);                                  // 貫通
-        spellRegistry.register(split);                                   // 分裂
-        spellRegistry.register(new TrailAugment(this, glyphConfig));     // 連射
-        spellRegistry.register(new TraceAugment(this, glyphConfig));     // 軌跡
+        spellRegistry.register(pierce);
+        spellRegistry.register(split);
 
-        // ===== Augments - 特殊 =====
-        var propagate = new PropagateAugment(this, glyphConfig);
-        spellRegistry.register(propagate);                               // 伝播
-        var linger = new LingerAugment(this, glyphConfig);
-        spellRegistry.register(linger);                                  // 残留
-        spellRegistry.register(new DelayAugment(this, glyphConfig));     // 遅延
-        spellRegistry.register(new ExtractAugment(this, glyphConfig));   // 抽出
+        // --- 抽出 / 幸運 ---
+        spellRegistry.register(new ExtractAugment(this, glyphConfig));
         var fortune = new FortuneAugment(this, glyphConfig);
-        spellRegistry.register(fortune);                                 // 幸運
-        spellRegistry.register(new RandomizeAugment(this, glyphConfig)); // 無作為
+        spellRegistry.register(fortune);
 
-        // ===== 超増強 (14種) - 通常と同順で配置 =====
+        // --- 伝播 / 残留 ---
+        var propagate = new PropagateAugment(this, glyphConfig);
+        spellRegistry.register(propagate);
+        var linger = new LingerAugment(this, glyphConfig);
+        spellRegistry.register(linger);
+
+        // --- 投射制御（連射 / 軌跡 / 遅延）---
+        spellRegistry.register(new TrailAugment(this, glyphConfig));
+        spellRegistry.register(new TraceAugment(this, glyphConfig));
+        var delay = new DelayAugment(this, glyphConfig);
+        spellRegistry.register(delay);
+
+        // --- ドロップ/ランダム系（無作為）---
+        spellRegistry.register(new RandomizeAugment(this, glyphConfig));
+
+        // ===== 超増強 (14種) — ベースと同順（filterAndSortPaletteでベースの隣に配置）=====
         spellRegistry.register(new SuperAugment(this, glyphConfig, amplify,     "超増幅", "増幅2個分の強化効果"));
         spellRegistry.register(new SuperAugment(this, glyphConfig, dampen,      "超減衰", "減衰2個分の抑制効果"));
-        spellRegistry.register(new SuperAugment(this, glyphConfig, aoeRadius,   "超半径増加", "半径増加2個分の範囲拡大"));
         spellRegistry.register(new SuperAugment(this, glyphConfig, extendTime,  "超延長", "延長2個分の持続時間延長"));
         spellRegistry.register(new SuperAugment(this, glyphConfig, durationDown,"超短縮", "短縮2個分の持続時間短縮"));
         spellRegistry.register(new SuperAugment(this, glyphConfig, extendReach, "超延伸", "延伸2個分の射程延長"));
         spellRegistry.register(new SuperAugment(this, glyphConfig, shrinkReach, "超収縮", "収縮2個分の射程短縮"));
         spellRegistry.register(new SuperAugment(this, glyphConfig, accelerate,  "超加速", "加速2個分の速度上昇"));
         spellRegistry.register(new SuperAugment(this, glyphConfig, decelerate,  "超減速", "減速2個分の速度低下"));
+        spellRegistry.register(new SuperAugment(this, glyphConfig, aoeRadius,   "超半径増加", "半径増加2個分の範囲拡大"));
         spellRegistry.register(new SuperAugment(this, glyphConfig, pierce,      "超貫通", "貫通2個分の貫通効果"));
         spellRegistry.register(new SuperAugment(this, glyphConfig, split,       "超分裂", "分裂2個分の弾数増加"));
+        spellRegistry.register(new SuperAugment(this, glyphConfig, fortune,     "超幸運", "幸運2個分のドロップ増加"));
         spellRegistry.register(new SuperAugment(this, glyphConfig, propagate,   "超伝播", "伝播2個分のチェーン対象"));
         spellRegistry.register(new SuperAugment(this, glyphConfig, linger,      "超残留", "残留2個分の持続時間"));
-        spellRegistry.register(new SuperAugment(this, glyphConfig, fortune,     "超幸運", "幸運2個分のドロップ増加"));
+        spellRegistry.register(new SuperAugment(this, glyphConfig, delay,       "超遅延", "遅延2個分の遅延時間"));
     }
 
     private void registerDefaultItems() {

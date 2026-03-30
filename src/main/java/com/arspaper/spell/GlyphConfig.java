@@ -237,7 +237,6 @@ public class GlyphConfig {
         Map.entry("name",            Set.of()),
         Map.entry("wind_burst",      Set.of("amplify", "dampen", "aoe_radius", "extend_time", "duration_down")),
         Map.entry("speed_boost",     Set.of("amplify", "dampen", "extend_reach", "shrink_reach", "randomize", "linger", "propagate")),
-        Map.entry("reverse",         Set.of("extend_time", "duration_down", "propagate", "linger")),
         Map.entry("saturation",      Set.of("amplify", "dampen", "extend_time", "duration_down", "propagate", "linger")),
         Map.entry("gale",            Set.of("amplify", "dampen", "extend_time", "duration_down", "propagate", "linger")),
         Map.entry("scale",           Set.of("amplify", "dampen", "extend_time", "duration_down", "propagate", "linger")),
@@ -293,9 +292,59 @@ public class GlyphConfig {
      * ここに登録されたエフェクトは、指定フォームでのみ使用可能。
      * 未登録のエフェクトは全フォームと互換。
      */
-    private static final Map<String, Set<String>> EFFECT_FORM_RESTRICT = Map.of(
-        "sonic_boom",    Set.of("self"),
-        "heavy_impact",  Set.of("projectile", "beam", "underfoot", "overhead", "touch", "orbit")
+    /** エンティティ対象フォーム（applyToEntityが呼ばれる） */
+    private static final Set<String> ENTITY_FORMS = Set.of(
+        "projectile", "touch", "self", "orbit", "burst", "beam");
+    /** ブロック対象フォーム（applyToBlockが呼ばれる） */
+    private static final Set<String> BLOCK_FORMS = Set.of(
+        "projectile", "touch", "underfoot", "overhead", "burst", "beam");
+
+    /**
+     * エフェクト→互換フォーム制限マップ。
+     * ここに登録されたエフェクトは、指定フォームでのみ使用可能。
+     * 未登録のエフェクトは全フォームと互換（両方に対応するエフェクト）。
+     */
+    private static final Map<String, Set<String>> EFFECT_FORM_RESTRICT = Map.ofEntries(
+        // === 特殊制限 ===
+        Map.entry("sonic_boom",    Set.of("self")),
+        Map.entry("heavy_impact",  Set.of("projectile", "beam", "underfoot", "overhead", "touch", "orbit", "self", "burst")),
+
+        // === Entity-only: applyToBlockがNoOp → underfoot/overhead非互換 ===
+        Map.entry("harm",          ENTITY_FORMS),
+        Map.entry("heal",          ENTITY_FORMS),
+        Map.entry("shield",        ENTITY_FORMS),
+        Map.entry("snare",         ENTITY_FORMS),
+        Map.entry("bounce",        ENTITY_FORMS),
+        Map.entry("cold_snap",     ENTITY_FORMS),
+        Map.entry("scorch",        ENTITY_FORMS),
+        Map.entry("windshear",     ENTITY_FORMS),
+        Map.entry("crush_wave",    ENTITY_FORMS),
+        Map.entry("slowfall",      ENTITY_FORMS),
+        Map.entry("glide",         ENTITY_FORMS),
+        Map.entry("speed_boost",   ENTITY_FORMS),
+        Map.entry("levitate",      ENTITY_FORMS),
+        Map.entry("wither",        ENTITY_FORMS),
+        Map.entry("hex",           ENTITY_FORMS),
+        Map.entry("bubble",        ENTITY_FORMS),
+        Map.entry("craft",         ENTITY_FORMS),
+        Map.entry("dispel",        ENTITY_FORMS),
+        Map.entry("infuse",        ENTITY_FORMS),
+        Map.entry("invisibility",  ENTITY_FORMS),
+        Map.entry("leap",          ENTITY_FORMS),
+        Map.entry("name",          ENTITY_FORMS),
+        Map.entry("rewind",        ENTITY_FORMS),
+        Map.entry("saturation",    ENTITY_FORMS),
+        Map.entry("gale",          ENTITY_FORMS),
+        Map.entry("journey",       ENTITY_FORMS),
+        Map.entry("scale",         ENTITY_FORMS),
+
+        // === Block-only: applyToEntityがNoOp → self/orbit非互換 ===
+        Map.entry("break",         BLOCK_FORMS),
+        Map.entry("advanced_break", BLOCK_FORMS),
+        Map.entry("crush",         BLOCK_FORMS),
+        Map.entry("evaporate",     BLOCK_FORMS),
+        Map.entry("fell",          BLOCK_FORMS),
+        Map.entry("intangible",    BLOCK_FORMS)
     );
 
     /**
@@ -394,10 +443,11 @@ public class GlyphConfig {
     // ============================================================
     // 交換グリフ エンティティペアマッピング
     // ============================================================
+    /** エンティティ交換サイクルマップ: 各エンティティ→次のエンティティ（サイクル巡回） */
     private volatile Map<org.bukkit.entity.EntityType, org.bukkit.entity.EntityType> entityExchangeMap = Map.of();
 
     /**
-     * エンティティ種別の交換マップを返す。双方向マッピング。
+     * エンティティ種別の交換マップを返す。サイクル巡回（A→B→C→A）。
      */
     public Map<org.bukkit.entity.EntityType, org.bukkit.entity.EntityType> getEntityExchangeMap() {
         return entityExchangeMap;
@@ -405,26 +455,28 @@ public class GlyphConfig {
 
     private void loadEntityExchangePairs(YamlConfiguration config) {
         Map<org.bukkit.entity.EntityType, org.bukkit.entity.EntityType> map = new HashMap<>();
-        List<?> rawPairs = config.getList("entity_exchange_pairs");
-        if (rawPairs != null) {
-            for (Object pairObj : rawPairs) {
-                if (pairObj instanceof List<?> pair && pair.size() >= 2) {
+        List<?> rawCycles = config.getList("entity_exchange_pairs");
+        if (rawCycles != null) {
+            for (Object cycleObj : rawCycles) {
+                if (cycleObj instanceof List<?> cycle && cycle.size() >= 2) {
                     try {
-                        org.bukkit.entity.EntityType a = org.bukkit.entity.EntityType.valueOf(
-                            String.valueOf(pair.get(0)).toUpperCase());
-                        org.bukkit.entity.EntityType b = org.bukkit.entity.EntityType.valueOf(
-                            String.valueOf(pair.get(1)).toUpperCase());
-                        // 双方向マッピング
-                        map.put(a, b);
-                        map.put(b, a);
+                        List<org.bukkit.entity.EntityType> types = new ArrayList<>();
+                        for (Object item : cycle) {
+                            types.add(org.bukkit.entity.EntityType.valueOf(
+                                String.valueOf(item).trim().toUpperCase()));
+                        }
+                        // サイクルマッピング: A→B→C→...→A
+                        for (int i = 0; i < types.size(); i++) {
+                            map.put(types.get(i), types.get((i + 1) % types.size()));
+                        }
                     } catch (IllegalArgumentException e) {
-                        logger.warning("Invalid entity exchange pair: " + pair);
+                        logger.warning("Invalid entity exchange cycle: " + cycle);
                     }
                 }
             }
         }
         this.entityExchangeMap = Map.copyOf(map);
-        logger.info("Loaded " + (map.size() / 2) + " entity exchange pairs");
+        logger.info("Loaded " + map.size() + " entity exchange mappings");
     }
 
     private void loadCrushMap(YamlConfiguration config) {
