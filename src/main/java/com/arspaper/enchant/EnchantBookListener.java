@@ -51,7 +51,7 @@ public class EnchantBookListener implements Listener {
         ItemStack slot0 = anvil.getItem(0);
         ItemStack slot1 = anvil.getItem(1);
 
-        log.info("[Anvil-Debug] PrepareAnvil fired: slot0=" + (slot0 != null ? slot0.getType() : "null")
+        log.fine("[Anvil-Debug] PrepareAnvil fired: slot0=" + (slot0 != null ? slot0.getType() : "null")
             + ", slot1=" + (slot1 != null ? slot1.getType() : "null"));
 
         // エンチャント本同士の合成をブロック（レベル加算防止）
@@ -70,13 +70,13 @@ public class EnchantBookListener implements Listener {
             target = slot1;
             book = slot0;
         } else {
-            log.info("[Anvil-Debug] No enchant book detected. slot0 isEB=" + isEnchantBook(slot0)
+            log.fine("[Anvil-Debug] No enchant book detected. slot0 isEB=" + isEnchantBook(slot0)
                 + ", slot1 isEB=" + isEnchantBook(slot1));
             return; // エンチャント本がない
         }
 
         if (target == null || target.getType().isAir()) {
-            log.info("[Anvil-Debug] Target is null or air");
+            log.fine("[Anvil-Debug] Target is null or air");
             return;
         }
 
@@ -84,21 +84,21 @@ public class EnchantBookListener implements Listener {
         boolean isSpellBook = isSpellBook(target);
         boolean isDamageable = target.getItemMeta() instanceof org.bukkit.inventory.meta.Damageable;
 
-        log.info("[Anvil-Debug] Target: " + target.getType() + " isArmor=" + isArmor
+        log.fine("[Anvil-Debug] Target: " + target.getType() + " isArmor=" + isArmor
             + " isSpellBook=" + isSpellBook + " isDamageable=" + isDamageable);
 
         if (!isArmor && !isSpellBook && !isDamageable) {
-            log.info("[Anvil-Debug] Target is not armor, spellbook, or damageable - skipping");
+            log.fine("[Anvil-Debug] Target is not armor, spellbook, or damageable - skipping");
             return;
         }
 
         // エンチャント本からエンチャントを読み取る
         if (!(book.getItemMeta() instanceof EnchantmentStorageMeta bookMeta)) {
-            log.info("[Anvil-Debug] Book meta is not EnchantmentStorageMeta: " + book.getItemMeta().getClass().getName());
+            log.fine("[Anvil-Debug] Book meta is not EnchantmentStorageMeta: " + book.getItemMeta().getClass().getName());
             return;
         }
 
-        log.info("[Anvil-Debug] Stored enchants: " + bookMeta.getStoredEnchants());
+        log.fine("[Anvil-Debug] Stored enchants: " + bookMeta.getStoredEnchants());
 
         for (String enchantId : new String[]{"mana_regen", "mana_boost", "soulbound", "share"}) {
             // 適用対象フィルタ
@@ -108,11 +108,11 @@ public class EnchantBookListener implements Listener {
 
             Enchantment enchant = ArsEnchantments.getFromId(enchantId);
             if (enchant == null) {
-                log.info("[Anvil-Debug] Enchant lookup returned null for: " + enchantId);
+                log.fine("[Anvil-Debug] Enchant lookup returned null for: " + enchantId);
                 continue;
             }
             int level = bookMeta.getStoredEnchantLevel(enchant);
-            log.info("[Anvil-Debug] " + enchantId + " storedLevel=" + level
+            log.fine("[Anvil-Debug] " + enchantId + " storedLevel=" + level
                 + " existingLevel=" + target.getEnchantmentLevel(enchant));
             if (level <= 0) continue;
 

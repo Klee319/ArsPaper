@@ -174,10 +174,24 @@ public class ManaManager implements Listener {
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
         migrateLegacyManaBonus(player);
+        // 旅路デバフのAttributeModifier残留をクリーンアップ
+        cleanupJourneyDebuff(player);
         int current = getCurrentMana(player);
         int max = getMaxMana(player);
         BossBar bar = barDisplay.update(player.getUniqueId(), current, max);
         player.showBossBar(bar);
+    }
+
+    /** ログイン時に旅路デバフの残留AttributeModifierを除去する */
+    private void cleanupJourneyDebuff(Player player) {
+        org.bukkit.attribute.AttributeInstance attr = player.getAttribute(
+            org.bukkit.attribute.Attribute.MAX_HEALTH);
+        if (attr == null) return;
+        org.bukkit.NamespacedKey debuffKey = new org.bukkit.NamespacedKey(
+            ArsPaper.getInstance(), "journey_debuff");
+        attr.getModifiers().stream()
+            .filter(m -> m.getKey().equals(debuffKey))
+            .forEach(attr::removeModifier);
     }
 
     @EventHandler

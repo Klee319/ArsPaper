@@ -109,8 +109,10 @@ public class BlinkEffect implements SpellEffect {
         for (int dist = 1; dist <= maxDist; dist++) {
             Location point = eyeLocation.clone().add(direction.clone().multiply(dist));
             Block block = point.getBlock();
-            // 壁判定: 非通過 OR ソリッドブロック（板ガラス・鉄格子等の薄いブロックも壁として扱う）
-            boolean isWall = !block.isPassable() || (block.getType().isSolid() && !block.isLiquid());
+            // 壁判定: 非通過 OR 衝突形状がある（板ガラス・鉄格子等の薄いブロックも壁として扱う）
+            // isSolid()は看板等にもtrueを返すため、衝突形状で判定
+            boolean hasCollision = !block.getCollisionShape().getBoundingBoxes().isEmpty();
+            boolean isWall = !block.isPassable() || (hasCollision && !block.isLiquid());
             if (isWall && !block.isLiquid()) {
                 // 岩盤・バリアは貫通不可（絶対障壁）
                 Material mat = block.getType();

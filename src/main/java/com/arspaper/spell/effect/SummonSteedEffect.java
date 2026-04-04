@@ -123,9 +123,8 @@ public class SummonSteedEffect implements SpellEffect {
         NamespacedKey summonedKey = new NamespacedKey(plugin, "summoned");
         NamespacedKey summonerKey = new NamespacedKey(plugin, "summoner_uuid");
         String casterUuid = caster.getUniqueId().toString();
-        return caster.getWorld().getEntities().stream()
-            .filter(e -> e instanceof LivingEntity le
-                && le.getPersistentDataContainer().has(summonedKey, PersistentDataType.BYTE)
+        return caster.getLocation().getNearbyLivingEntities(128).stream()
+            .filter(le -> le.getPersistentDataContainer().has(summonedKey, PersistentDataType.BYTE)
                 && casterUuid.equals(le.getPersistentDataContainer().get(summonerKey, PersistentDataType.STRING)))
             .count();
     }

@@ -126,7 +126,7 @@ public class SummonWolvesEffect implements SpellEffect {
         org.bukkit.NamespacedKey summonedKey = new org.bukkit.NamespacedKey(plugin, "summoned");
         org.bukkit.NamespacedKey summonerKey = new org.bukkit.NamespacedKey(plugin, "summoner_uuid");
         String casterUuid = caster.getUniqueId().toString();
-        return caster.getWorld().getEntities().stream()
+        return caster.getLocation().getNearbyLivingEntities(128).stream()
             .filter(e -> e instanceof org.bukkit.entity.LivingEntity le
                 && le.getPersistentDataContainer().has(summonedKey, org.bukkit.persistence.PersistentDataType.BYTE)
                 && casterUuid.equals(le.getPersistentDataContainer().get(summonerKey, org.bukkit.persistence.PersistentDataType.STRING)))
