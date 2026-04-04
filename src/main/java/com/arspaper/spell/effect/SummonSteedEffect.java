@@ -48,6 +48,17 @@ public class SummonSteedEffect implements SpellEffect {
         Player caster = context.getCaster();
         if (caster == null) return;
 
+        // 召喚上限チェック
+        int maxSummons = (int) config.getParam("summon_steed", "max-summons-per-caster", 1.0);
+        long currentCount = countSummonedEntities(caster, "summon_steed");
+        if (currentCount >= maxSummons) {
+            caster.sendMessage(net.kyori.adventure.text.Component.text(
+                "召喚馬の上限に達しています (" + maxSummons + "体)",
+                net.kyori.adventure.text.format.NamedTextColor.RED));
+            context.setCancelled(true);
+            return;
+        }
+
         int baseDuration = (int) config.getParam("summon_steed", "base-duration-ticks", (double) BASE_DURATION_TICKS);
         int durationPerLevel = (int) config.getParam("summon_steed", "duration-per-level", (double) DURATION_PER_LEVEL);
         int duration = Math.max(1, baseDuration + context.getDurationLevel() * durationPerLevel);
@@ -103,6 +114,20 @@ public class SummonSteedEffect implements SpellEffect {
                 horse.remove();
             }
         }, duration);
+    }
+
+    /**
+     * 指定召喚者が召喚した同タイプのエンティティ数をカウント。
+     */
+    private long countSummonedEntities(Player caster, String summonType) {
+        NamespacedKey summonedKey = new NamespacedKey(plugin, "summoned");
+        NamespacedKey summonerKey = new NamespacedKey(plugin, "summoner_uuid");
+        String casterUuid = caster.getUniqueId().toString();
+        return caster.getWorld().getEntities().stream()
+            .filter(e -> e instanceof LivingEntity le
+                && le.getPersistentDataContainer().has(summonedKey, PersistentDataType.BYTE)
+                && casterUuid.equals(le.getPersistentDataContainer().get(summonerKey, PersistentDataType.STRING)))
+            .count();
     }
 
     private void spawnSummonFx(Location loc) {

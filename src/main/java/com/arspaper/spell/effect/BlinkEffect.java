@@ -51,9 +51,15 @@ public class BlinkEffect implements SpellEffect {
         Player caster = context.getCaster();
         if (caster == null) return;
 
-        // エンティティ対象: 術者と対象の位置を入れ替え
+        // 投射系形態（二次発動含む）でのエンティティ対象: 着弾点にキャスターをTP
+        if (target != caster && context.isSecondaryInvocation()) {
+            teleportCasterToTarget(caster, target.getLocation());
+            return;
+        }
+
+        // エンティティ対象: 着弾点にキャスターをTP（投射ヒット時）
         if (target != caster) {
-            swapPositions(caster, target);
+            teleportCasterToTarget(caster, target.getLocation());
             return;
         }
 
@@ -103,7 +109,15 @@ public class BlinkEffect implements SpellEffect {
         for (int dist = 1; dist <= maxDist; dist++) {
             Location point = eyeLocation.clone().add(direction.clone().multiply(dist));
             Block block = point.getBlock();
-            if (!block.isPassable() && !block.isLiquid()) {
+            // 壁判定: 非通過 OR ソリッドブロック（板ガラス・鉄格子等の薄いブロックも壁として扱う）
+            boolean isWall = !block.isPassable() || (block.getType().isSolid() && !block.isLiquid());
+            if (isWall && !block.isLiquid()) {
+                // 岩盤・バリアは貫通不可（絶対障壁）
+                Material mat = block.getType();
+                if (mat == Material.BEDROCK || mat == Material.BARRIER) {
+                    effectiveDist = dist - 1;
+                    break;
+                }
                 if (pierceRemaining > 0) {
                     pierceRemaining--;
                 } else {
@@ -191,6 +205,22 @@ public class BlinkEffect implements SpellEffect {
     }
 
     /**
+     * 着弾点付近の安全な位置にキャスターをテレポートする。
+     */
+    private void teleportCasterToTarget(Player caster, Location targetLoc) {
+        Location origin = caster.getLocation().clone();
+        Location safe = findFootholdNear(targetLoc, caster.getHeight());
+        if (safe == null) {
+            // 安全な場所がなければターゲット位置にそのままTP
+            safe = targetLoc.clone();
+        }
+        safe.setYaw(origin.getYaw());
+        safe.setPitch(origin.getPitch());
+        caster.teleport(safe);
+        SpellFxUtil.spawnBlinkFx(origin, safe);
+    }
+
+    /**
      * 2つのエンティティの位置を入れ替える（互いの向きを維持）。
      */
     private void swapPositions(Player caster, LivingEntity target) {
@@ -220,11 +250,10 @@ public class BlinkEffect implements SpellEffect {
 
     @Override
     public void applyToBlock(SpellContext context, Location blockLocation) {
-        // ブロック対象: 自己モードとして処理
         Player caster = context.getCaster();
-        if (caster != null) {
-            applyToEntity(context, caster);
-        }
+        if (caster == null) return;
+        // ブロック着弾: 着弾点にキャスターをテレポート
+        teleportCasterToTarget(caster, blockLocation.clone().add(0.5, 1, 0.5));
     }
 
     @Override

@@ -40,30 +40,27 @@ public class RewindEffect implements SpellEffect {
         int delayPerLevel = (int) config.getParam("rewind", "delay-per-level-ticks", DELAY_PER_LEVEL_TICKS);
         int delayTicks = Math.max(1, baseDelay + durationLevel * delayPerLevel);
 
-        // 現在位置を記録（マーク）
-        Location markedLocation = target.getLocation().clone();
-
-        // マーク時のエフェクト
-        spawnRewindMarkFx(markedLocation);
-
-        // delay後にマーク位置へテレポート
+        // 位置記録を2tick遅延（打ち上げ等の速度変化が反映された後の位置を記録するため）
         final LivingEntity finalTarget = target;
         plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
-            if (finalTarget.isDead() || !finalTarget.isValid()) {
-                return;
-            }
-            Location returnLoc = markedLocation.clone();
-            returnLoc.setYaw(finalTarget.getLocation().getYaw());
-            returnLoc.setPitch(finalTarget.getLocation().getPitch());
+            if (finalTarget.isDead() || !finalTarget.isValid()) return;
 
-            // テレポート前のエフェクト（現在位置）
-            spawnRewindTeleportFx(finalTarget.getLocation());
+            // 現在位置を記録（マーク）— 空中含む
+            Location markedLocation = finalTarget.getLocation().clone();
+            spawnRewindMarkFx(markedLocation);
 
-            finalTarget.teleport(returnLoc);
+            // delay後にマーク位置へテレポート
+            plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+                if (finalTarget.isDead() || !finalTarget.isValid()) return;
+                Location returnLoc = markedLocation.clone();
+                returnLoc.setYaw(finalTarget.getLocation().getYaw());
+                returnLoc.setPitch(finalTarget.getLocation().getPitch());
 
-            // テレポート後のエフェクト（戻り先）
-            spawnRewindTeleportFx(returnLoc);
-        }, delayTicks);
+                spawnRewindTeleportFx(finalTarget.getLocation());
+                finalTarget.teleport(returnLoc);
+                spawnRewindTeleportFx(returnLoc);
+            }, delayTicks);
+        }, 2L);
     }
 
     @Override

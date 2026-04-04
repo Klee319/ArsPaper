@@ -478,11 +478,20 @@ public class SpellContext {
             return;
         }
 
+        // 自己形態（target == caster）の場合、残留/伝播は無意味なので無効化
+        boolean isSelfTarget = target.equals(caster);
+
         for (int i = startIndex; i < groups.size(); i++) {
             EffectGroup group = groups.get(i);
             resetAugmentState();
             for (SpellAugment aug : group.augments) {
                 aug.modify(this);
+            }
+
+            // 自己形態では残留/伝播を無効化
+            if (isSelfTarget) {
+                lingerLevel = 0;
+                propagateChainCount = 0;
             }
 
             // Delay増強: 後続グループを遅延実行

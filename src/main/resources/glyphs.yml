@@ -153,7 +153,7 @@ glyphs:
       base-speed: 1.0               # 基本弾速
       reach-speed-bonus: 0.25        # 延伸1段あたりの弾速増加
       base-fuse-ticks: 20           # 基本信管時間(tick=1秒)
-      fuse-per-duration-level: 10   # 延長1段あたりの信管延長(tick=0.5秒)
+      fuse-per-duration-level: 20   # 延長1段あたりの信管延長(tick=1秒)
       base-burst-radius: 1.0        # 基本炸裂半径(ブロック)
       radius-per-aoe: 1.0          # 半径増加1段あたりの炸裂半径増加(ブロック)
       
@@ -691,6 +691,7 @@ glyphs:
       base-speed: 0.225                   # 馬の基本速度(-1=バニラランダム、0.225=バニラ平均)
       speed-boost-per-amplify: 0.05  # 増幅1段あたりの馬の速度増加
       max-speed-level: 3             # 馬の最大速度段数
+      max-summons-per-caster: 1      # 1人あたりの召喚上限
     unlock-cost:
       level: 10
       materials:
@@ -714,6 +715,7 @@ glyphs:
       duration-per-level: 200       # 延長1段あたりの持続増加(tick=5秒)
       base-wolf-count: 1            # 基本召喚数
       max-wolf-count: 7             # 最大召喚数
+      max-summons-per-caster: 4    # 1人あたりの召喚上限
       base-hp: 20.0                 # 基本HP
       hp-per-amplify: 8.0           # 増幅1段あたりのHP増加
     unlock-cost:
@@ -1328,6 +1330,7 @@ glyphs:
       max-summons: 7                # 最大召喚数
       base-duration-ticks: 300      # 基本召喚持続(tick=15秒)
       duration-per-level-ticks: 100 # 延長1段あたりの持続増加(tick=5秒)
+      max-summons-per-caster: 4    # 1人あたりの召喚上限
     unlock-cost:
       level: 40
       materials:
@@ -1352,6 +1355,7 @@ glyphs:
       duration-per-level: 100       # 延長1段あたりの持続増加(tick=5秒)
       base-health: 24.0             # 基本HP
       health-per-amplify: 8.0       # 増幅1段あたりのHP増加
+      max-summons-per-caster: 3    # 1人あたりの召喚上限
     unlock-cost:
       level: 40
       materials:
@@ -1375,6 +1379,7 @@ glyphs:
       duration-per-level-ticks: 100  # tick=5秒/段、延長1段あたり+5秒
       base-health: 30.0  # HP
       health-per-amplify: 10.0  # HP/段、増幅1段あたり+10.0HP
+      max-summons-per-caster: 1  # 1人あたりの召喚上限
     unlock-cost:
       level: 40
       materials:
@@ -1545,7 +1550,7 @@ glyphs:
   # 説明: XZ方向に範囲を広げる（3軸AOE）
   aoe:
     tier: 1
-    mana-cost: 15
+    mana-cost: 10
     params:
       per-stack: 1                   # 1個あたりのAOE幅増加量
     unlock-cost:
@@ -1557,7 +1562,7 @@ glyphs:
   # 説明: Y方向（上下）に範囲を広げる（3軸AOE）
   aoe_height:
     tier: 1
-    mana-cost: 15
+    mana-cost: 10
     params:
       per-stack: 1                   # 1個あたりの上下範囲増加量
     unlock-cost:
@@ -1569,7 +1574,7 @@ glyphs:
   # 説明: 面に垂直な方向に範囲を延長する（3軸AOE）
   aoe_vertical:
     tier: 1
-    mana-cost: 15
+    mana-cost: 10
     params:
       per-stack: 2                   # 1個あたりの奥行き増加量(2ブロック)
     unlock-cost:
@@ -1783,9 +1788,9 @@ glyphs:
       linger: 6
       propagate: 4
     params:
-      base-level: 0                 # 基本ポーションレベル(0=Lv1)
-      base-duration: 200
-      duration-per-level: 100
+      base-food-amount: 4           # 基本満腹回復量(空腹度1=0.5ゲージ)
+      food-per-amplify: 1           # 増幅1段あたりの追加回復量
+      max-food-amount: 6            # 満腹回復量の上限
     unlock-cost:
       level: 20
       materials:
@@ -1820,7 +1825,7 @@ glyphs:
     params:
       base-duration: 300             # 基本持続時間(tick=30秒)
       duration-per-level: 100        # 延長1段あたりの追加時間(tick=10秒)
-      scale-per-level: 0.5           # 増幅1段あたりのサイズ倍率(+50%)
+      scale-per-level: 0.25           # 増幅1段あたりのサイズ倍率(+50%)
       min-scale: 0.0625              # 最小スケール(MC制限)
       max-scale: 16.0                # 最大スケール(MC制限)
     max-augments:
@@ -1840,15 +1845,18 @@ glyphs:
   journey:
     tier: 3
     mana-cost: 500
+    # 増幅:体力増強レベル↑ | 減衰:最大体力減少
     max-augments:
       amplify: 6
-      duration_down: 2
+      dampen: 6
+      duration_down: 5
       extend_time: 6
       linger: 6
       propagate: 4
     params:
-      base-duration: 1200
-      duration-per-level: 400
+      base-duration: 3600
+      duration-per-level: 600
+      base-amplify-level: 0         # 初期増強レベル（設定可能）
     unlock-cost:
       level: 100
       materials:
@@ -1888,19 +1896,20 @@ glyphs:
     # 増幅:ダメージ↑ | 半径増加:索敵範囲↑ | 延長:持続時間↑ | 分裂:発射頻度↑
     params:
       base-damage: 4.0              # 1発あたりの基本ダメージ(HP、防御無視)
-      amplify-damage-bonus: 2.0     # 増幅1段あたりのダメージ増加(HP)
-      base-radius: 8.0              # 索敵範囲(ブロック)
+      amplify-damage-bonus: 1.0     # 増幅1段あたりのダメージ増加(HP)
+      base-radius: 5.0              # 索敵範囲(ブロック)
       radius-per-aoe: 1.0           # 半径増加1段あたりの索敵範囲増加(ブロック)
-      base-duration: 200            # 基本召喚時間(tick=10秒)
-      duration-per-level: 100       # 延長1段あたりの追加時間(tick=5秒)
+      base-duration: 180            # 基本召喚時間(tick=9秒)
+      duration-per-level: 60       # 延長1段あたりの追加時間(tick=3秒)
       base-fire-interval: 20        # 基本発射間隔(tick=1秒)
       fire-ticks: 60                # 炎上時間(tick=3秒)
+      max-summons-per-caster: 2     # 召喚者ごとの同時存在上限
     max-augments:
       amplify: 6
-      dampen: 1
+      dampen: 3
       aoe_radius: 6
       split: 4
-      duration_down: 1
+      duration_down: 2
       extend_time: 6
     unlock-cost:
       level: 50
@@ -1922,20 +1931,21 @@ glyphs:
     # 増幅:ダメージ↑ | 半径増加:索敵範囲↑ | 延長:持続時間↑ | 分裂:発射頻度↑
     params:
       base-damage: 4.0              # 1発あたりの基本ダメージ(HP、防御無視)
-      amplify-damage-bonus: 2.0     # 増幅1段あたりのダメージ増加(HP)
-      base-radius: 8.0              # 索敵範囲(ブロック)
+      amplify-damage-bonus: 1.0     # 増幅1段あたりのダメージ増加(HP)
+      base-radius: 5.0              # 索敵範囲(ブロック)
       radius-per-aoe: 1.0           # 半径増加1段あたりの索敵範囲増加(ブロック)
-      base-duration: 200            # 基本召喚時間(tick=10秒)
-      duration-per-level: 100       # 延長1段あたりの追加時間(tick=5秒)
+      base-duration: 180            # 基本召喚時間(tick=9秒)
+      duration-per-level: 60       # 延長1段あたりの追加時間(tick=3秒)
       base-fire-interval: 20        # 基本発射間隔(tick=1秒)
       freeze-ticks: 100             # 凍結時間(tick=7秒)
       snare-duration: 60            # 鈍足拘束時間(tick=3秒)
+      max-summons-per-caster: 2     # 召喚者ごとの同時存在上限
     max-augments:
       amplify: 6
-      dampen: 1
+      dampen: 3
       aoe_radius: 6
       split: 4
-      duration_down: 1
+      duration_down: 2
       extend_time: 6
     unlock-cost:
       level: 50
@@ -2212,6 +2222,7 @@ crush_map:
   LILY_OF_THE_VALLEY: WHITE_DYE
   # 羊毛 → 糸
   WHITE_WOOL: STRING
+  SNOW_BLOCK: SNOWBALL
   # その他
   GLOWSTONE: GLOWSTONE_DUST
   SEA_LANTERN: PRISMARINE_CRYSTALS
@@ -2230,22 +2241,19 @@ crush_map:
 # ============================================================
 # 交換グリフ エンティティペアマッピング
 # ============================================================
-# 交換グリフでエンティティに使用した際、ペアの種類に入れ替える（双方向）。
-# 各ペアは [エンティティA, エンティティB] の形式。A→B、B→A の双方向変換。
-# サーバー管理者が自由にペアを追加・変更可能。
+# 交換グリフでエンティティに使用した際、サイクル巡回で種類を入れ替える。
+# 各配列はサイクル巡回（A→B→C→...→A）。2要素=双方向ペア、3要素以上=循環。
+# サーバー管理者が自由にサイクルを追加・変更可能。
 entity_exchange_pairs:
   - [HOGLIN, ZOGLIN]
   - [PIGLIN, ZOMBIFIED_PIGLIN]
   - [VILLAGER, ZOMBIE_VILLAGER]
-  - [SKELETON, STRAY]
-  - [SKELETON, BOGGED]
-  - [SKELETON, PARCHED]
-  - [ZOMBIE, DROWNED]
-  - [ZOMBIE, HUSK]
+  - [SKELETON, STRAY, BOGGED]
+  - [ZOMBIE, DROWNED, HUSK]
   - [SPIDER, CAVE_SPIDER]
   - [SLIME, MAGMA_CUBE]
   - [BLAZE, BREEZE]
   - [COW, MOOSHROOM]
   - [CAT, OCELOT]
-  - [SILVER_FISH,ENDER_MITE]
-  - [COD,SALMON]
+  - [SILVERFISH, ENDERMITE]
+  - [COD, SALMON]

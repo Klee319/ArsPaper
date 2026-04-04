@@ -45,8 +45,13 @@ public class HarmEffect implements SpellEffect {
             PotionEffectType dotType = isUndead(target)
                 ? PotionEffectType.WITHER
                 : PotionEffectType.POISON;
-            target.addPotionEffect(new PotionEffect(
-                dotType, durationTicks, amplifier, false, true, true));
+            // 既に同レベル以上のDoTがある場合は再付与スキップ（旋回等の連続ヒットでカウンターリセットを防止）
+            org.bukkit.potion.PotionEffect existing = target.getPotionEffect(dotType);
+            if (existing == null || existing.getAmplifier() < amplifier
+                || (existing.getAmplifier() == amplifier && existing.getDuration() < durationTicks / 2)) {
+                target.addPotionEffect(new PotionEffect(
+                    dotType, durationTicks, amplifier, false, true, true));
+            }
         } else {
             // 通常: 直接ダメージ
             double baseDamage = config.getParam("harm", "base-damage", DEFAULT_BASE_DAMAGE);

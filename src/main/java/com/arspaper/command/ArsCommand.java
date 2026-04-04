@@ -45,7 +45,7 @@ public final class ArsCommand {
                             plugin.getItemRegistry().getAll().forEach(item ->
                                 builder.suggest(item.getItemId())
                             );
-                            for (String eid : new String[]{"mana_regen", "mana_boost", "share"}) {
+                            for (String eid : new String[]{"mana_regen", "mana_boost", "share", "soulbound"}) {
                                 for (int lv = 1; lv <= 3; lv++) {
                                     builder.suggest("enchant_book:" + eid + ":" + lv);
                                 }
@@ -106,6 +106,12 @@ public final class ArsCommand {
                         if (!(ctx.getSource().getSender() instanceof Player player)) return 0;
                         return executeManaInfo(plugin, player);
                     })
+                    .then(Commands.literal("notify")
+                        .executes(ctx -> {
+                            if (!(ctx.getSource().getSender() instanceof Player player)) return 0;
+                            return executeManaNotifyToggle(player);
+                        })
+                    )
                 )
                 .then(Commands.literal("cleanup")
                     .requires(src -> src.getSender().hasPermission("arspaper.admin"))
@@ -385,6 +391,19 @@ public final class ArsCommand {
         return 1;
     }
 
+    private static int executeManaNotifyToggle(Player player) {
+        var pdc = player.getPersistentDataContainer();
+        int current = pdc.getOrDefault(ManaKeys.MANA_NOTIFY_OFF, PersistentDataType.INTEGER, 0);
+        if (current == 0) {
+            pdc.set(ManaKeys.MANA_NOTIFY_OFF, PersistentDataType.INTEGER, 1);
+            player.sendMessage(Component.text("マナ不足の通知を無効にしました", NamedTextColor.YELLOW));
+        } else {
+            pdc.remove(ManaKeys.MANA_NOTIFY_OFF);
+            player.sendMessage(Component.text("マナ不足の通知を有効にしました", NamedTextColor.GREEN));
+        }
+        return 1;
+    }
+
     private static int executeManaInfo(ArsPaper plugin, Player player) {
         int current = plugin.getManaManager().getCurrentMana(player);
         int max = plugin.getManaManager().getMaxMana(player);
@@ -456,6 +475,9 @@ public final class ArsCommand {
         // マナ設定リロード（regenIntervalの変更はサーバ再起動が必要）
         com.arspaper.mana.ManaConfig newManaConfig = com.arspaper.mana.ManaConfig.fromConfig(plugin.getConfig());
         plugin.getManaManager().reloadConfig(newManaConfig);
+
+        // ソースリンク設定リロード
+        plugin.reloadSourcelinkConfig();
 
         // ルートチェスト設定リロード
         plugin.reloadLootConfig();

@@ -89,6 +89,20 @@ public class CutEffect implements SpellEffect {
         Player caster = context.getCaster();
         if (caster == null) return;
 
+        // カボチャ → くり抜きカボチャ（種ドロップ）
+        if (block.getType() == Material.PUMPKIN) {
+            BlockBreakEvent event = new BlockBreakEvent(block, caster);
+            Bukkit.getPluginManager().callEvent(event);
+            if (!event.isCancelled()) {
+                block.setType(Material.CARVED_PUMPKIN);
+                block.getWorld().dropItemNaturally(
+                    blockLocation.clone().add(0.5, 0.5, 0.5),
+                    new org.bukkit.inventory.ItemStack(Material.PUMPKIN_SEEDS, 4)
+                );
+            }
+            return;
+        }
+
         // ハサミ採取可能ブロックを破壊してドロップ
         if (SHEAR_BLOCKS.contains(block.getType())) {
             BlockBreakEvent event = new BlockBreakEvent(block, caster);

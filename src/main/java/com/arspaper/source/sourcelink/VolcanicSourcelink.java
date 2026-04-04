@@ -28,12 +28,9 @@ import java.util.Map;
 public class VolcanicSourcelink extends Sourcelink {
 
     /**
-     * 燃料アイテム → ソースポイント（バニラ燃焼時間に比例、10〜50範囲）
-     * stick(100tick)=10, coal(1600tick)=30, lava_bucket(20000tick)=50
+     * デフォルトの燃料アイテム → ソースポイント（設定ファイルが無い場合に使用）
      */
-    private static final Map<Material, Integer> FUEL_VALUES = Map.ofEntries(
-        // === バニラ燃焼時間基準: 石炭(1600t) = 5 ===
-        // 最低（1）: 棒、竹、カーペット、ハーフブロック、板材、原木 (50-300t)
+    private static final Map<Material, Integer> DEFAULT_FUEL_VALUES = Map.ofEntries(
         Map.entry(Material.STICK, 1),
         Map.entry(Material.BAMBOO, 1),
         Map.entry(Material.WHITE_CARPET, 1),
@@ -55,7 +52,6 @@ public class VolcanicSourcelink extends Sourcelink {
         Map.entry(Material.MANGROVE_PLANKS, 1),
         Map.entry(Material.CHERRY_PLANKS, 1),
         Map.entry(Material.BAMBOO_PLANKS, 1),
-        // 原木（3）
         Map.entry(Material.OAK_LOG, 3),
         Map.entry(Material.SPRUCE_LOG, 3),
         Map.entry(Material.BIRCH_LOG, 3),
@@ -64,20 +60,33 @@ public class VolcanicSourcelink extends Sourcelink {
         Map.entry(Material.DARK_OAK_LOG, 3),
         Map.entry(Material.MANGROVE_LOG, 3),
         Map.entry(Material.CHERRY_LOG, 3),
-        // 基準（5）: 石炭・木炭 (1600t)
         Map.entry(Material.CHARCOAL, 5),
         Map.entry(Material.COAL, 5),
-        // 高価値（10）: ブレイズロッド・乾燥昆布ブロック
         Map.entry(Material.BLAZE_ROD, 10),
         Map.entry(Material.DRIED_KELP_BLOCK, 10),
-        // 非常に高い（45）: 石炭ブロック (16000t = 10×石炭)
         Map.entry(Material.COAL_BLOCK, 45),
-        // 最高（100）: 溶岩バケツ (20000t = 12.5×石炭)
         Map.entry(Material.LAVA_BUCKET, 100)
     );
 
+    /** 実行時に使用する燃料値マップ（設定ファイルから読み込み可能） */
+    private Map<Material, Integer> fuelValues = DEFAULT_FUEL_VALUES;
+
     public VolcanicSourcelink(JavaPlugin plugin) {
         super(plugin, "volcanic_sourcelink");
+    }
+
+    /**
+     * デフォルトの燃料値マップを返す（設定ファイルが無い場合のフォールバック用）。
+     */
+    static Map<Material, Integer> getDefaultFuelValues() {
+        return DEFAULT_FUEL_VALUES;
+    }
+
+    /**
+     * 設定ファイルから読み込んだ燃料値マップを設定する。
+     */
+    public void setFuelValues(Map<Material, Integer> values) {
+        this.fuelValues = values != null ? values : DEFAULT_FUEL_VALUES;
     }
 
     @Override
@@ -124,15 +133,23 @@ public class VolcanicSourcelink extends Sourcelink {
 
     @Override
     public int getSourceValueForItem(org.bukkit.inventory.ItemStack item) {
-        if (item == null) return 0;
-        Integer value = FUEL_VALUES.get(item.getType());
+        if (item == null || isCustomItem(item)) return 0;
+        Integer value = fuelValues.get(item.getType());
         return value != null ? value : 0;
     }
 
     @Override
     public void onBlockInteract(Player player, Block block, TileState tileState) {
         ItemStack hand = player.getInventory().getItemInMainHand();
-        Integer sourceValue = FUEL_VALUES.get(hand.getType());
+        if (isCustomItem(hand)) {
+            // カスタムアイテムは燃料として使用不可
+            int buffer = getBuffer(tileState);
+            player.sendMessage(Component.text(
+                "ボルケニックソースリンク - 蓄積ソース: " + buffer, NamedTextColor.RED
+            ));
+            return;
+        }
+        Integer sourceValue = fuelValues.get(hand.getType());
 
         if (sourceValue != null) {
             int addCount = player.isSneaking() ? hand.getAmount() : 1;

@@ -42,25 +42,74 @@ public class JourneyEffect implements SpellEffect {
     public void applyToEntity(SpellContext context, LivingEntity target) {
         int baseDuration = (int) config.getParam("journey", "base-duration", BASE_DURATION);
         int durationPerLevel = (int) config.getParam("journey", "duration-per-level", DURATION_PER_LEVEL);
+        int baseAmplifyLevel = (int) config.getParam("journey", "base-amplify-level", 0.0);
         int duration = baseDuration + context.getDurationLevel() * durationPerLevel;
 
-        int amplifier = Math.max(0, context.getAmplifyLevel());
-        target.addPotionEffect(new PotionEffect(
-            PotionEffectType.HEALTH_BOOST, duration, amplifier, false, true, true));
+        int amplifyLevel = baseAmplifyLevel + context.getAmplifyLevel();
 
-        spawnJourneyFx(target.getLocation());
+        if (amplifyLevel >= 0) {
+            // 体力増強（最大HP増加）
+            target.addPotionEffect(new PotionEffect(
+                PotionEffectType.HEALTH_BOOST, duration, amplifyLevel, false, true, true));
 
-        // 1tick後にHP回復（ポーション適用後の属性更新を待つ）
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                if (target.isDead() || !target.isValid()) return;
-                AttributeInstance maxHealthAttr = target.getAttribute(Attribute.MAX_HEALTH);
-                if (maxHealthAttr == null) return;
-                double maxHealth = maxHealthAttr.getValue();
-                target.setHealth(Math.min(maxHealth, target.getHealth() + (amplifier + 1) * 4.0));
+            spawnJourneyFx(target.getLocation());
+
+            // 1tick後にHP回復（ポーション適用後の属性更新を待つ）
+            final int amp = amplifyLevel;
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    if (target.isDead() || !target.isValid()) return;
+                    AttributeInstance maxHealthAttr = target.getAttribute(Attribute.MAX_HEALTH);
+                    if (maxHealthAttr == null) return;
+                    double maxHealth = maxHealthAttr.getValue();
+                    target.setHealth(Math.min(maxHealth, target.getHealth() + (amp + 1) * 4.0));
+                }
+            }.runTaskLater(plugin, 1L);
+        } else {
+            // 減衰: 最大体力減少（Attribute Modifierで一時的に最大HPを下げる）
+            int reductionLevel = Math.abs(amplifyLevel);
+            // HEALTH_BOOST amplifier -1 は存在しないため、代替としてダメージ吸収の逆を使う
+            // 最大HP減少量 = reductionLevel × 4HP
+            org.bukkit.attribute.AttributeInstance maxHealthAttr = target.getAttribute(Attribute.MAX_HEALTH);
+            if (maxHealthAttr != null) {
+                org.bukkit.NamespacedKey modKey = new org.bukkit.NamespacedKey(plugin, "journey_debuff");
+                // 既存のmodifierがあれば除去
+                maxHealthAttr.getModifiers().stream()
+                    .filter(m -> m.getKey().equals(modKey))
+                    .forEach(maxHealthAttr::removeModifier);
+                // 最大HP減少
+                double reduction = reductionLevel * 4.0;
+                maxHealthAttr.addModifier(new org.bukkit.attribute.AttributeModifier(
+                    modKey, -reduction, org.bukkit.attribute.AttributeModifier.Operation.ADD_NUMBER));
+                // HP調整（最大HPを超えないように）
+                double newMax = maxHealthAttr.getValue();
+                if (target.getHealth() > newMax) {
+                    target.setHealth(Math.max(1, newMax));
+                }
+                // 持続時間後にModifier除去
+                new BukkitRunnable() {
+                    @Override
+                    public void run() {
+                        if (target.isDead() || !target.isValid()) return;
+                        org.bukkit.attribute.AttributeInstance attr = target.getAttribute(Attribute.MAX_HEALTH);
+                        if (attr != null) {
+                            attr.getModifiers().stream()
+                                .filter(m -> m.getKey().equals(modKey))
+                                .forEach(attr::removeModifier);
+                        }
+                    }
+                }.runTaskLater(plugin, duration);
             }
-        }.runTaskLater(plugin, 1L);
+            spawnDebuffFx(target.getLocation());
+        }
+    }
+
+    private void spawnDebuffFx(Location loc) {
+        loc.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR, loc.clone().add(0, 1.5, 0),
+            8, 0.3, 0.3, 0.3, 0.02);
+        loc.getWorld().playSound(loc, Sound.ENTITY_WITHER_HURT,
+            SoundCategory.PLAYERS, 0.4f, 1.5f);
     }
 
     @Override

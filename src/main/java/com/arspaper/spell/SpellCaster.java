@@ -102,7 +102,12 @@ public class SpellCaster {
             .getOrDefault(ManaKeys.THREAD_COST_REDUCTION, PersistentDataType.INTEGER, 0));
         int cost = Math.max(1, baseCost - (int) Math.round(baseCost * costReduction / 100.0));
         if (!manaManager.consumeMana(caster, cost)) {
-            caster.sendMessage(Component.text("マナが不足しています！", NamedTextColor.RED));
+            // マナ不足通知が無効化されていなければメッセージ表示
+            int notifyOff = caster.getPersistentDataContainer()
+                .getOrDefault(ManaKeys.MANA_NOTIFY_OFF, PersistentDataType.INTEGER, 0);
+            if (notifyOff == 0) {
+                caster.sendMessage(Component.text("マナが不足しています！", NamedTextColor.RED));
+            }
             return false;
         }
 

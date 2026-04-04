@@ -141,13 +141,15 @@ public class Waystone extends CustomBlock implements Listener {
     /**
      * チャットイベントで名前入力を受け取る。
      */
-    @EventHandler
+    @EventHandler(priority = org.bukkit.event.EventPriority.LOWEST)
     public void onChat(AsyncChatEvent event) {
         Player player = event.getPlayer();
         Location waystoneLocation = pendingNames.remove(player.getUniqueId());
         if (waystoneLocation == null) return;
 
         event.setCancelled(true);
+        // Discord連携プラグイン等への漏洩を防止
+        event.viewers().clear();
 
         String inputName = PlainTextComponentSerializer.plainText().serialize(event.message());
 

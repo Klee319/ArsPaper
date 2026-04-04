@@ -26,8 +26,9 @@ import java.util.*;
  * 使い方:
  * 1. 送信元ブロックを右クリック → 選択
  * 2. 送信先ブロックを右クリック → 接続確立
- * 3. スニーク+右クリック → 選択解除
- * 4. 空中を右クリック → 接続先一覧表示
+ * 3. スニーク+右クリック(ブロック) → そのブロックの全接続を削除
+ * 4. スニーク+右クリック(空中) → 選択解除
+ * 5. 空中を右クリック → 選択中ブロックの接続先一覧表示
  */
 public class Wand extends BaseCustomItem {
 
@@ -46,7 +47,7 @@ public class Wand extends BaseCustomItem {
 
     @Override
     public Material getBaseMaterial() {
-        return Material.STICK;
+        return Material.BLAZE_ROD;
     }
 
     @Override
@@ -65,8 +66,13 @@ public class Wand extends BaseCustomItem {
         event.setCancelled(true);
         Player player = event.getPlayer();
 
-        // スニーク → 選択解除
         if (player.isSneaking()) {
+            // スニーク+ブロック → 接続削除
+            if (event.getAction() == Action.RIGHT_CLICK_BLOCK && event.getClickedBlock() != null) {
+                handleDisconnect(player, event.getClickedBlock());
+                return;
+            }
+            // スニーク+空中 → 選択解除
             selectedSource.remove(player.getUniqueId());
             player.sendMessage(Component.text("選択を解除しました", NamedTextColor.GRAY));
             return;
@@ -135,6 +141,49 @@ public class Wand extends BaseCustomItem {
         }
     }
 
+    /**
+     * スニーク+右クリックでブロックの全接続を削除する。
+     */
+    private void handleDisconnect(Player player, Block block) {
+        if (!(block.getState() instanceof TileState tileState)) {
+            player.sendMessage(Component.text("有効なSourceブロックではありません！", NamedTextColor.RED));
+            return;
+        }
+
+        String blockId = tileState.getPersistentDataContainer()
+            .get(BlockKeys.CUSTOM_BLOCK_ID, PersistentDataType.STRING);
+        if (blockId == null) {
+            player.sendMessage(Component.text("カスタムブロックではありません！", NamedTextColor.RED));
+            return;
+        }
+
+        Location loc = block.getLocation();
+        SourceNetwork network = ArsPaper.getInstance().getSourceNetwork();
+
+        // 送信・受信両方の接続数を取得
+        Set<Location> outgoing = network.getConnections(loc);
+        Set<Location> incoming = network.getIncomingConnections(loc);
+        int totalConnections = outgoing.size() + incoming.size();
+
+        if (totalConnections == 0) {
+            player.sendMessage(Component.text(
+                formatLocation(loc) + " には接続がありません", NamedTextColor.GRAY
+            ));
+            return;
+        }
+
+        // 全接続を削除
+        network.disconnectAll(loc);
+        player.sendMessage(Component.text(
+            formatLocation(loc) + " の全接続を削除しました（" + totalConnections + "件）",
+            NamedTextColor.YELLOW
+        ));
+
+        // 削除エフェクト
+        Location center = loc.clone().add(0.5, 1.2, 0.5);
+        loc.getWorld().spawnParticle(Particle.SMOKE, center, 15, 0.3, 0.3, 0.3, 0.02);
+    }
+
     private void showConnectionInfo(Player player) {
         Location selected = selectedSource.get(player.getUniqueId());
         if (selected == null) {
@@ -145,19 +194,25 @@ public class Wand extends BaseCustomItem {
         }
 
         SourceNetwork network = ArsPaper.getInstance().getSourceNetwork();
-        Set<Location> connections = network.getConnections(selected);
+        Set<Location> outgoing = network.getConnections(selected);
+        Set<Location> incoming = network.getIncomingConnections(selected);
 
         player.sendMessage(Component.text(
-            "=== " + formatLocation(selected) + " の接続先 ===",
+            "=== " + formatLocation(selected) + " の接続情報 ===",
             NamedTextColor.GOLD
         ));
 
-        if (connections.isEmpty()) {
-            player.sendMessage(Component.text("  接続先なし", NamedTextColor.GRAY));
+        if (outgoing.isEmpty() && incoming.isEmpty()) {
+            player.sendMessage(Component.text("  接続なし", NamedTextColor.GRAY));
         } else {
-            for (Location loc : connections) {
+            for (Location loc : outgoing) {
                 player.sendMessage(Component.text(
-                    "  → " + formatLocation(loc), NamedTextColor.AQUA
+                    "  送信 → " + formatLocation(loc), NamedTextColor.AQUA
+                ));
+            }
+            for (Location loc : incoming) {
+                player.sendMessage(Component.text(
+                    "  受信 ← " + formatLocation(loc), NamedTextColor.GREEN
                 ));
             }
         }

@@ -43,6 +43,7 @@ public class SourceNetwork {
 
     /**
      * 送信元→送信先の接続を追加する。
+     * 逆方向の接続が既にある場合は自動削除する（相殺防止）。
      *
      * @return 接続に成功したか（距離チェック含む）
      */
@@ -52,6 +53,10 @@ public class SourceNetwork {
 
         LocationKey fromKey = LocationKey.of(from);
         LocationKey toKey = LocationKey.of(to);
+
+        // 自己接続を防止
+        if (fromKey.equals(toKey)) return false;
+
         connections.computeIfAbsent(fromKey, k -> new LinkedHashSet<>()).add(toKey);
         markDirtyAndSaveAsync();
         return true;
@@ -61,8 +66,9 @@ public class SourceNetwork {
      * 送信元からの全接続を除去する。
      */
     public void disconnect(Location from) {
-        connections.remove(LocationKey.of(from));
-        markDirtyAndSaveAsync();
+        if (connections.remove(LocationKey.of(from)) != null) {
+            markDirtyAndSaveAsync();
+        }
     }
 
     /**
@@ -76,8 +82,38 @@ public class SourceNetwork {
             if (targets.isEmpty()) {
                 connections.remove(fromKey);
             }
+            markDirtyAndSaveAsync();
         }
-        markDirtyAndSaveAsync();
+    }
+
+    /**
+     * 指定座標に関連する全接続（送信元・送信先両方）を除去する。
+     * ブロック破壊時に呼び出す。
+     */
+    public void disconnectAll(Location loc) {
+        LocationKey key = LocationKey.of(loc);
+        boolean changed = false;
+
+        // 送信元として登録されている接続を削除
+        if (connections.remove(key) != null) {
+            changed = true;
+        }
+
+        // 送信先として登録されている接続から削除
+        var iterator = connections.entrySet().iterator();
+        while (iterator.hasNext()) {
+            var entry = iterator.next();
+            if (entry.getValue().remove(key)) {
+                changed = true;
+                if (entry.getValue().isEmpty()) {
+                    iterator.remove();
+                }
+            }
+        }
+
+        if (changed) {
+            markDirtyAndSaveAsync();
+        }
     }
 
     /**
@@ -95,6 +131,21 @@ public class SourceNetwork {
         return result;
     }
 
+    /**
+     * 指定座標への接続元（逆引き）一覧を取得。
+     */
+    public Set<Location> getIncomingConnections(Location to) {
+        LocationKey toKey = LocationKey.of(to);
+        Set<Location> result = new LinkedHashSet<>();
+        for (var entry : connections.entrySet()) {
+            if (entry.getValue().contains(toKey)) {
+                Location loc = entry.getKey().toLocation();
+                if (loc != null) result.add(loc);
+            }
+        }
+        return result;
+    }
+
     private void startTransferTask() {
         transferTask = plugin.getServer().getScheduler().runTaskTimer(
             plugin, this::tickTransfer, TRANSFER_INTERVAL_TICKS, TRANSFER_INTERVAL_TICKS
@@ -102,12 +153,14 @@ public class SourceNetwork {
     }
 
     private void tickTransfer() {
+        // フェーズ1: 全転送を計算（net flowで相殺を回避）
+        // ペアごとの正味転送量を計算
+        Map<LocationKey, Map<LocationKey, Integer>> pendingTransfers = new LinkedHashMap<>();
+
         for (var entry : connections.entrySet()) {
             LocationKey fromKey = entry.getKey();
             Location fromLoc = fromKey.toLocation();
             if (fromLoc == null) continue;
-
-            // チャンクがロードされていない場合はスキップ
             if (!fromLoc.getWorld().isChunkLoaded(fromKey.x() >> 4, fromKey.z() >> 4)) continue;
 
             Block fromBlock = fromLoc.getBlock();
@@ -121,8 +174,6 @@ public class SourceNetwork {
             for (LocationKey toKey : entry.getValue()) {
                 Location toLoc = toKey.toLocation();
                 if (toLoc == null) continue;
-
-                // チャンクがロードされていない場合はスキップ
                 if (!toLoc.getWorld().isChunkLoaded(toKey.x() >> 4, toKey.z() >> 4)) continue;
 
                 Block toBlock = toLoc.getBlock();
@@ -133,14 +184,54 @@ public class SourceNetwork {
                     .getOrDefault(BlockKeys.SOURCE_AMOUNT, PersistentDataType.INTEGER, 0);
                 int toMax = SourceJar.MAX_SOURCE;
 
+                // 無限ソースジャーへの転送はスキップ
+                if (com.arspaper.block.impl.SourceJar.isInfinite(toTile)) continue;
+
                 int space = toMax - toAmount;
                 if (space <= 0) continue;
 
                 int transfer = Math.min(TRANSFER_AMOUNT, Math.min(available, space));
                 if (transfer <= 0) continue;
 
+                pendingTransfers.computeIfAbsent(fromKey, k -> new LinkedHashMap<>())
+                    .put(toKey, transfer);
+
+                available -= transfer;
+                if (available <= 0) break;
+            }
+        }
+
+        // フェーズ2: 転送を適用
+        for (var fromEntry : pendingTransfers.entrySet()) {
+            LocationKey fromKey = fromEntry.getKey();
+            Location fromLoc = fromKey.toLocation();
+            if (fromLoc == null) continue;
+
+            Block fromBlock = fromLoc.getBlock();
+            if (!(fromBlock.getState() instanceof TileState fromTile)) continue;
+
+            int fromAmount = fromTile.getPersistentDataContainer()
+                .getOrDefault(BlockKeys.SOURCE_AMOUNT, PersistentDataType.INTEGER, 0);
+
+            for (var toEntry : fromEntry.getValue().entrySet()) {
+                LocationKey toKey = toEntry.getKey();
+                int transfer = toEntry.getValue();
+
+                // 実際に利用可能な量で再制限
+                transfer = Math.min(transfer, fromAmount);
+                if (transfer <= 0) continue;
+
+                Location toLoc = toKey.toLocation();
+                if (toLoc == null) continue;
+
+                Block toBlock = toLoc.getBlock();
+                if (!(toBlock.getState() instanceof TileState toTile)) continue;
+
+                int toAmount = toTile.getPersistentDataContainer()
+                    .getOrDefault(BlockKeys.SOURCE_AMOUNT, PersistentDataType.INTEGER, 0);
+
                 fromTile.getPersistentDataContainer().set(
-                    BlockKeys.SOURCE_AMOUNT, PersistentDataType.INTEGER, available - transfer
+                    BlockKeys.SOURCE_AMOUNT, PersistentDataType.INTEGER, fromAmount - transfer
                 );
                 fromTile.update();
 
@@ -149,8 +240,8 @@ public class SourceNetwork {
                 );
                 toTile.update();
 
-                available -= transfer;
-                if (available <= 0) break;
+                fromAmount -= transfer;
+                if (fromAmount <= 0) break;
             }
         }
     }

@@ -124,10 +124,12 @@ public class SpellSettingsGui extends BaseGui {
                 HandlerList.unregisterAll(this);
             }
 
-            @EventHandler
+            @EventHandler(priority = org.bukkit.event.EventPriority.LOWEST)
             public void onChat(io.papermc.paper.event.player.AsyncChatEvent event) {
                 if (!event.getPlayer().getUniqueId().equals(playerUuid)) return;
                 event.setCancelled(true);
+                // Discord連携プラグイン等への漏洩を防止（受信者を空にする）
+                event.viewers().clear();
 
                 String message = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
                     .plainText().serialize(event.message());

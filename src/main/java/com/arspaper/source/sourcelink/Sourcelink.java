@@ -32,6 +32,16 @@ public abstract class Sourcelink extends CustomBlock {
     }
 
     /**
+     * アイテムがカスタムアイテム（PDC付き）かどうかを判定する。
+     * カスタムアイテムはソースリンクの燃料として使用不可。
+     */
+    protected static boolean isCustomItem(org.bukkit.inventory.ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return false;
+        return item.getItemMeta().getPersistentDataContainer()
+            .has(com.arspaper.item.ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING);
+    }
+
+    /**
      * 1回のティックで生成するSource量。
      * ブロックのTileStateを参照してバッファから排出等の判断が可能。
      * 0を返すと生成しない。

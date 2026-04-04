@@ -293,6 +293,20 @@ public class CustomItemListener implements Listener {
         }
     }
 
+    /**
+     * アレイ等のMobにカスタムアイテム（スペルブック等）を渡すのを防止する。
+     */
+    @EventHandler
+    public void onEntityInteract(org.bukkit.event.player.PlayerInteractEntityEvent event) {
+        if (event.getHand() != EquipmentSlot.HAND) return;
+        if (!(event.getRightClicked() instanceof org.bukkit.entity.Allay)) return;
+
+        ItemStack item = event.getPlayer().getInventory().getItemInMainHand();
+        if (item != null && PdcHelper.getCustomItemId(item).isPresent()) {
+            event.setCancelled(true);
+        }
+    }
+
     private boolean isMageArmor(ItemStack item) {
         if (item == null || item.getType().isAir() || !item.hasItemMeta()) return false;
         var pdc = item.getItemMeta().getPersistentDataContainer();

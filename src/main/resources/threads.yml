@@ -89,9 +89,9 @@ threads:
 
   hit_mana_recovery:
     display_name: "被弾マナ回復のスレッド"
-    recovery: 8
+    recovery: 10
     stackable: true
-    max: 8
+    max: 2
     recipe:
       core-item: "custom:thread_empty"
       pedestal-items:
@@ -103,9 +103,9 @@ threads:
 
   damage_mana_recovery:
     display_name: "攻撃マナ回復のスレッド"
-    recovery: 4
+    recovery: 5
     stackable: true
-    max: 8
+    max: 2
     recipe:
       core-item: "custom:thread_empty"
       pedestal-items:

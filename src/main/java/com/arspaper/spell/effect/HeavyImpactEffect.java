@@ -96,6 +96,9 @@ public class HeavyImpactEffect implements SpellEffect {
                     return;
                 }
 
+                // 同心円衝撃波演出を先行（hitIndexに応じて広がる）
+                spawnShockwaveRing(center, hitIndex, radius);
+
                 // ダメージ適用（PvP保護準拠）
                 double effectiveRadius = radius + 0.5;
                 Collection<LivingEntity> targets = center.getNearbyLivingEntities(effectiveRadius);
@@ -105,11 +108,11 @@ public class HeavyImpactEffect implements SpellEffect {
                     // 無敵時間を無視
                     entity.setNoDamageTicks(0);
                     double finalDamage = context.calculateSpellDamage(damagePerHit, entity);
+                    // ノックバック無効化（衝撃波は押し出さない）
+                    org.bukkit.util.Vector velocity = entity.getVelocity().clone();
                     entity.damage(finalDamage, caster);
+                    entity.setVelocity(velocity);
                 }
-
-                // 同心円衝撃波演出（hitIndexに応じて広がる）
-                spawnShockwaveRing(center, hitIndex, radius);
 
                 hitIndex++;
             }

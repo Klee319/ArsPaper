@@ -85,6 +85,8 @@ public class SolarEffect implements SpellEffect {
         center.getWorld().playSound(center, Sound.ITEM_FIRECHARGE_USE,
             SoundCategory.PLAYERS, 1.5f, 0.5f);
 
+        int maxSummons = (int) config.getParam("solar", "max-summons-per-caster", 2.0);
+
         BukkitTask task = new BukkitRunnable() {
             int ticks = 0;
 
@@ -119,10 +121,15 @@ public class SolarEffect implements SpellEffect {
                 }
             }
         }.runTaskTimer(plugin, 0L, 1L);
-        SpellTaskLimiter.register("solar", task);
+        SpellTaskLimiter.registerPerCaster("solar", casterUUID, task, maxSummons);
     }
 
     private void fireFlameProjectile(Location from, LivingEntity target, double damage, Player caster) {
+        // クリエイティブ/スペクテイターは対象外
+        if (target instanceof Player p
+            && (p.getGameMode() == org.bukkit.GameMode.CREATIVE
+                || p.getGameMode() == org.bukkit.GameMode.SPECTATOR)) return;
+
         Location targetLoc = target.getLocation().add(0, target.getHeight() / 2, 0);
 
         // 炎弾の軌跡パーティクル

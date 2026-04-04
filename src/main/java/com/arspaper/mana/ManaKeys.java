@@ -64,4 +64,7 @@ public final class ManaKeys {
 
     /** 累計マナ消費量（統計用） */
     public static final NamespacedKey TOTAL_MANA_CONSUMED = new NamespacedKey(NAMESPACE, "total_mana_consumed");
+
+    /** マナ不足通知を無効化するフラグ（1=無効） */
+    public static final NamespacedKey MANA_NOTIFY_OFF = new NamespacedKey(NAMESPACE, "mana_notify_off");
 }

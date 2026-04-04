@@ -34,6 +34,7 @@ import com.arspaper.source.sourcelink.AlchemicalSourcelink;
 import com.arspaper.source.sourcelink.BotanicalSourcelink;
 import com.arspaper.source.sourcelink.MycelialSourcelink;
 import com.arspaper.source.sourcelink.VitalicSourcelink;
+import com.arspaper.source.sourcelink.SourcelinkConfig;
 import com.arspaper.source.sourcelink.VolcanicSourcelink;
 import com.arspaper.spell.GlyphConfig;
 import com.arspaper.spell.PhantomBlockListener;
@@ -77,6 +78,7 @@ public class ArsPaper extends JavaPlugin {
     private ArmorManaListener armorManaListener;
     private ThreadConfig threadConfig;
     private com.arspaper.loot.LootTableListener lootTableListener;
+    private SourcelinkConfig sourcelinkConfig;
 
     @Override
     public void onEnable() {
@@ -171,7 +173,7 @@ public class ArsPaper extends JavaPlugin {
         }
 
         if (!currentVersion.equals(savedVersion)) {
-            String[] resourceFiles = {"glyphs.yml", "items.yml", "materials.yml", "threads.yml", "armors.yml"};
+            String[] resourceFiles = {"glyphs.yml", "items.yml", "materials.yml", "threads.yml", "armors.yml", "sourcelinks.yml"};
             for (String name : resourceFiles) {
                 java.io.File existing = new java.io.File(getDataFolder(), name);
                 if (existing.exists()) {
@@ -219,6 +221,9 @@ public class ArsPaper extends JavaPlugin {
 
         // スレッド設定
         threadConfig = new ThreadConfig(this);
+
+        // ソースリンク設定
+        sourcelinkConfig = new SourcelinkConfig(this);
 
         // カスタムアイテムレジストリ
         itemRegistry = new CustomItemRegistry();
@@ -443,8 +448,11 @@ public class ArsPaper extends JavaPlugin {
         ScribingTable scribingTable = new ScribingTable(this);
         SourceJar sourceJar = new SourceJar(this);
         VolcanicSourcelink volcanicSourcelink = new VolcanicSourcelink(this);
+        volcanicSourcelink.setFuelValues(sourcelinkConfig.getVolcanicMaterials());
         MycelialSourcelink mycelialSourcelink = new MycelialSourcelink(this);
+        mycelialSourcelink.setFoodValues(sourcelinkConfig.getMycelialMaterials());
         AlchemicalSourcelink alchemicalSourcelink = new AlchemicalSourcelink(this);
+        alchemicalSourcelink.setAlchemyValues(sourcelinkConfig.getAlchemicalMaterials());
         VitalicSourcelink vitalicSourcelink = new VitalicSourcelink(this);
         BotanicalSourcelink botanicalSourcelink = new BotanicalSourcelink(this);
         RitualCore ritualCore = new RitualCore(this);
@@ -609,6 +617,24 @@ public class ArsPaper extends JavaPlugin {
     public void reloadLootConfig() {
         if (lootTableListener != null) {
             lootTableListener.reloadConfig();
+        }
+    }
+
+    public SourcelinkConfig getSourcelinkConfig() {
+        return sourcelinkConfig;
+    }
+
+    public void reloadSourcelinkConfig() {
+        sourcelinkConfig.reload();
+        // 登録済みソースリンクに新しい値を適用
+        for (var block : blockRegistry.getAll()) {
+            if (block instanceof VolcanicSourcelink v) {
+                v.setFuelValues(sourcelinkConfig.getVolcanicMaterials());
+            } else if (block instanceof MycelialSourcelink m) {
+                m.setFoodValues(sourcelinkConfig.getMycelialMaterials());
+            } else if (block instanceof AlchemicalSourcelink a) {
+                a.setAlchemyValues(sourcelinkConfig.getAlchemicalMaterials());
+            }
         }
     }
 }

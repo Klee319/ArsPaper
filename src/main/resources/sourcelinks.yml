@@ -1,0 +1,138 @@
+# =============================================================================
+# Sourcelink Material Values Configuration
+# =============================================================================
+# Each sourcelink type has a "materials" section mapping Material names to
+# source point values. You can add, remove, or modify entries freely.
+#
+# Material names must match org.bukkit.Material enum values exactly.
+# =============================================================================
+
+# --- Volcanic Sourcelink (FURNACE) ---
+# Fuel items consumed to generate Source.
+# Reference: coal (1600 burn ticks) = 5 source points
+volcanic:
+  materials:
+    # Minimal (1): sticks, bamboo, carpets, slabs, planks
+    STICK: 1
+    BAMBOO: 1
+    WHITE_CARPET: 1
+    OAK_SLAB: 1
+    SPRUCE_SLAB: 1
+    BIRCH_SLAB: 1
+    JUNGLE_SLAB: 1
+    ACACIA_SLAB: 1
+    DARK_OAK_SLAB: 1
+    MANGROVE_SLAB: 1
+    CHERRY_SLAB: 1
+    BAMBOO_SLAB: 1
+    OAK_PLANKS: 1
+    SPRUCE_PLANKS: 1
+    BIRCH_PLANKS: 1
+    JUNGLE_PLANKS: 1
+    ACACIA_PLANKS: 1
+    DARK_OAK_PLANKS: 1
+    MANGROVE_PLANKS: 1
+    CHERRY_PLANKS: 1
+    BAMBOO_PLANKS: 1
+    # Logs (3)
+    OAK_LOG: 3
+    SPRUCE_LOG: 3
+    BIRCH_LOG: 3
+    JUNGLE_LOG: 3
+    ACACIA_LOG: 3
+    DARK_OAK_LOG: 3
+    MANGROVE_LOG: 3
+    CHERRY_LOG: 3
+    # Standard (5): coal, charcoal
+    CHARCOAL: 5
+    COAL: 5
+    # High (10): blaze rod, dried kelp block
+    BLAZE_ROD: 10
+    DRIED_KELP_BLOCK: 10
+    # Very high (45): coal block
+    COAL_BLOCK: 45
+    # Maximum (100): lava bucket
+    LAVA_BUCKET: 100
+
+# --- Mycelial Sourcelink (SMOKER) ---
+# Food items consumed to generate Source.
+# Reference: cooked beef = 10 source points
+mycelial:
+  materials:
+    # Raw / simple foods (1)
+    MELON_SLICE: 1
+    SWEET_BERRIES: 1
+    GLOW_BERRIES: 1
+    APPLE: 1
+    CARROT: 1
+    POTATO: 1
+    BEETROOT: 1
+    # Basic processed (3)
+    DRIED_KELP: 3
+    SPIDER_EYE: 3
+    COD: 3
+    SALMON: 3
+    CHICKEN: 3
+    MUTTON: 3
+    BEEF: 3
+    PORKCHOP: 3
+    # Medium (5)
+    TROPICAL_FISH: 5
+    RABBIT: 5
+    COOKIE: 5
+    BAKED_POTATO: 5
+    BREAD: 5
+    COOKED_COD: 5
+    COOKED_SALMON: 5
+    BEETROOT_SOUP: 5
+    COOKED_CHICKEN: 5
+    # Higher (7)
+    MUSHROOM_STEW: 7
+    SUSPICIOUS_STEW: 7
+    # Special (10)
+    POISONOUS_POTATO: 10
+    COOKED_MUTTON: 10
+    COOKED_PORKCHOP: 10
+    COOKED_BEEF: 10
+    # High (15)
+    COOKED_RABBIT: 15
+    GOLDEN_CARROT: 15
+    # Very high (30)
+    RABBIT_STEW: 30
+    PUMPKIN_PIE: 30
+    # Maximum (75)
+    GOLDEN_APPLE: 75
+
+# --- Alchemical Sourcelink (BLAST_FURNACE) ---
+# Brewing/alchemy materials consumed to generate Source.
+# Reference: blaze powder = 8 source points
+alchemical:
+  materials:
+    # Basic (1)
+    GLASS_BOTTLE: 1
+    SUGAR: 1
+    GUNPOWDER: 1
+    REDSTONE: 1
+    GLOWSTONE_DUST: 1
+    SPIDER_EYE: 1
+    # Standard brewing (3)
+    NETHER_WART: 3
+    FERMENTED_SPIDER_EYE: 3
+    GLISTERING_MELON_SLICE: 3
+    GOLDEN_CARROT: 3
+    PUFFERFISH: 3
+    MAGMA_CREAM: 3
+    # Rare (8)
+    BLAZE_POWDER: 8
+    RABBIT_FOOT: 8
+    PHANTOM_MEMBRANE: 8
+    TURTLE_HELMET: 8
+    # Very rare (15)
+    GHAST_TEAR: 15
+    EXPERIENCE_BOTTLE: 15
+    # Potions
+    POTION: 5
+    SPLASH_POTION: 8
+    LINGERING_POTION: 10
+    # Maximum (30)
+    DRAGON_BREATH: 30

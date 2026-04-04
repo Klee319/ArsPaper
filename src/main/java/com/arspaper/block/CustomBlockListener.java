@@ -1,5 +1,7 @@
 package com.arspaper.block;
 
+import com.arspaper.ArsPaper;
+import com.arspaper.item.ItemKeys;
 import com.arspaper.source.SourcelinkTickTask;
 import com.arspaper.source.sourcelink.Sourcelink;
 import com.arspaper.util.PdcHelper;
@@ -147,6 +149,9 @@ public class CustomBlockListener implements Listener {
             sourcelinkTickTask.removeSourcelink(block.getLocation());
         }
 
+        // Sourceネットワーク接続をクリーンアップ（送信元・送信先両方）
+        ArsPaper.getInstance().getSourceNetwork().disconnectAll(block.getLocation());
+
         // クリエイティブモードではカスタムアイテムもドロップしない
         if (event.getPlayer().getGameMode() == GameMode.CREATIVE) {
             return;
@@ -245,6 +250,9 @@ public class CustomBlockListener implements Listener {
         if (cb instanceof Sourcelink) {
             sourcelinkTickTask.removeSourcelink(block.getLocation());
         }
+
+        // Sourceネットワーク接続をクリーンアップ（爆発破壊時）
+        ArsPaper.getInstance().getSourceNetwork().disconnectAll(block.getLocation());
 
         // CreativeSourceJar: original_block_idが保持されている場合はそちらでドロップ生成
         String originalId = pdc.get(
@@ -374,7 +382,44 @@ public class CustomBlockListener implements Listener {
         if (blockId == null) return;
 
         Optional<CustomBlock> customBlock = registry.get(blockId);
-        if (customBlock.isEmpty() || !(customBlock.get() instanceof Sourcelink sourcelink)) return;
+        if (customBlock.isEmpty()) return;
+
+        // ソースジャーへのソースベリー投入
+        if (customBlock.get() instanceof com.arspaper.block.impl.SourceJar sourceJar) {
+            ItemStack item = event.getItem();
+            if (item.hasItemMeta()) {
+                String customItemId = item.getItemMeta().getPersistentDataContainer()
+                    .get(ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING);
+                if ("source_berry".equals(customItemId)) {
+                    int sourcePerBerry = 100; // ソースベリー1個=100ソース
+                    if (!com.arspaper.block.impl.SourceJar.isInfinite(destTile)) {
+                        int current = com.arspaper.block.impl.SourceJar.getSourceAmount(destTile);
+                        if (current < com.arspaper.block.impl.SourceJar.MAX_SOURCE) {
+                            com.arspaper.block.impl.SourceJar.addSource(destTile, sourcePerBerry);
+                            event.setCancelled(true);
+                            // ホッパー側のアイテムを1個減らす
+                            Material itemType = item.getType();
+                            org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+                                for (int i = 0; i < event.getSource().getSize(); i++) {
+                                    ItemStack slot = event.getSource().getItem(i);
+                                    if (slot != null && slot.getType() == itemType) {
+                                        slot.setAmount(slot.getAmount() - 1);
+                                        break;
+                                    }
+                                }
+                            });
+                            return;
+                        }
+                    }
+                }
+            }
+            // ソースジャーに対応しないアイテム → 入れさせない
+            event.setCancelled(true);
+            return;
+        }
+
+        // ソースリンクへの移動
+        if (!(customBlock.get() instanceof Sourcelink sourcelink)) return;
 
         // ソースリンクへの移動 → アイテムをソース変換
         ItemStack item = event.getItem();

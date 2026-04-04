@@ -52,6 +52,17 @@ public class SummonWolvesEffect implements SpellEffect {
         Player caster = context.getCaster();
         if (caster == null) return;
 
+        // 召喚上限チェック
+        int maxSummons = (int) config.getParam("summon_wolves", "max-summons-per-caster", 4.0);
+        long currentCount = countSummonedEntities(caster);
+        if (currentCount >= maxSummons) {
+            caster.sendMessage(net.kyori.adventure.text.Component.text(
+                "召喚オオカミの上限に達しています (" + maxSummons + "体)",
+                net.kyori.adventure.text.format.NamedTextColor.RED));
+            context.setCancelled(true);
+            return;
+        }
+
         int baseDurationTicks = (int) config.getParam("summon_wolves", "base-duration-ticks", DEFAULT_BASE_DURATION_TICKS);
         int durationPerLevel = (int) config.getParam("summon_wolves", "duration-per-level", DEFAULT_DURATION_PER_LEVEL);
         int baseWolfCount = (int) config.getParam("summon_wolves", "base-wolf-count", DEFAULT_BASE_WOLF_COUNT);
@@ -109,6 +120,17 @@ public class SummonWolvesEffect implements SpellEffect {
                 }
             }
         }, duration);
+    }
+
+    private long countSummonedEntities(Player caster) {
+        org.bukkit.NamespacedKey summonedKey = new org.bukkit.NamespacedKey(plugin, "summoned");
+        org.bukkit.NamespacedKey summonerKey = new org.bukkit.NamespacedKey(plugin, "summoner_uuid");
+        String casterUuid = caster.getUniqueId().toString();
+        return caster.getWorld().getEntities().stream()
+            .filter(e -> e instanceof org.bukkit.entity.LivingEntity le
+                && le.getPersistentDataContainer().has(summonedKey, org.bukkit.persistence.PersistentDataType.BYTE)
+                && casterUuid.equals(le.getPersistentDataContainer().get(summonerKey, org.bukkit.persistence.PersistentDataType.STRING)))
+            .count();
     }
 
     private void spawnSummonFx(Location loc) {

@@ -47,11 +47,11 @@ items:
       type: shaped
       shape:
         - "  G"
-        - " S "
-        - "S  "
+        - " B "
+        - "B  "
       ingredients:
         G: GOLD_INGOT
-        S: STICK
+        B: BLAZE_ROD
 
   # ----------------------------------------------------------
   # 刻印台

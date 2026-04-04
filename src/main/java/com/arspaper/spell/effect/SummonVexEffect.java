@@ -53,6 +53,19 @@ public class SummonVexEffect implements SpellEffect {
 
     private void spawnVexAt(SpellContext context, Location spawnLoc) {
         Player caster = context.getCaster();
+        if (caster == null) return;
+
+        // 召喚上限チェック
+        int maxSummonsPerCaster = (int) config.getParam("summon_vex", "max-summons-per-caster", 3.0);
+        long currentCount = countSummonedEntities(caster);
+        if (currentCount >= maxSummonsPerCaster) {
+            caster.sendMessage(net.kyori.adventure.text.Component.text(
+                "召喚ヴェックスの上限に達しています (" + maxSummonsPerCaster + "体)",
+                net.kyori.adventure.text.format.NamedTextColor.RED));
+            context.setCancelled(true);
+            return;
+        }
+
         int durationLevel = context.getDurationLevel();
         int baseDuration = (int) config.getParam("summon_vex", "base-duration-ticks", (double) BASE_DURATION_TICKS);
         int durationPerLevel = (int) config.getParam("summon_vex", "duration-per-level", (double) DURATION_PER_LEVEL_TICKS);
@@ -143,6 +156,17 @@ public class SummonVexEffect implements SpellEffect {
                 vex.remove();
             }
         }, durationTicks);
+    }
+
+    private long countSummonedEntities(Player caster) {
+        org.bukkit.NamespacedKey summonedKey = new org.bukkit.NamespacedKey(plugin, "summoned");
+        org.bukkit.NamespacedKey summonerKey = new org.bukkit.NamespacedKey(plugin, "summoner_uuid");
+        String casterUuid = caster.getUniqueId().toString();
+        return caster.getWorld().getEntities().stream()
+            .filter(e -> e instanceof org.bukkit.entity.LivingEntity le
+                && le.getPersistentDataContainer().has(summonedKey, org.bukkit.persistence.PersistentDataType.BYTE)
+                && casterUuid.equals(le.getPersistentDataContainer().get(summonerKey, org.bukkit.persistence.PersistentDataType.STRING)))
+            .count();
     }
 
     private void spawnSummonVexFx(Location loc) {

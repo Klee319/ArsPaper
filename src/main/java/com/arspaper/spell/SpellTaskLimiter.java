@@ -50,6 +50,18 @@ public final class SpellTaskLimiter {
         register(effectKey, task, DEFAULT_MAX_TASKS);
     }
 
+    /**
+     * 召喚者別にタスクを登録する。召喚者ごとに独立した上限を適用。
+     * @param effectKey エフェクト識別子（例: "solar"）
+     * @param casterUUID 召喚者UUID
+     * @param task 登録するBukkitTask
+     * @param maxTasks 最大同時稼働数（召喚者別）
+     */
+    public static void registerPerCaster(String effectKey, java.util.UUID casterUUID, BukkitTask task, int maxTasks) {
+        String key = effectKey + ":" + casterUUID.toString();
+        register(key, task, maxTasks);
+    }
+
     /** プラグイン無効化時に全タスクをキャンセル */
     public static void cleanupAll() {
         ACTIVE_TASKS.values().forEach(queue -> {

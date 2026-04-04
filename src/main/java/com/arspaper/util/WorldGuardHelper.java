@@ -17,6 +17,8 @@ public final class WorldGuardHelper {
     private static boolean available = false;
     private static Method adaptMethod;
     private static Object pvpFlag;
+    private static Object buildFlag;
+    private static Method wrapPlayerMethod;
 
     private WorldGuardHelper() {}
 
@@ -58,6 +60,42 @@ public final class WorldGuardHelper {
         return true;
     }
 
+    /**
+     * 指定プレイヤーが指定位置でブロック操作（回転等）が許可されているか確認する。
+     * WorldGuardが無い場合はtrueを返す。
+     */
+    public static boolean canBuild(org.bukkit.entity.Player player, Location location) {
+        if (!initialized) {
+            initialized = true;
+            available = initialize();
+        }
+        if (!available) return true;
+
+        try {
+            Object worldGuard = Class.forName("com.sk89q.worldguard.WorldGuard")
+                .getMethod("getInstance").invoke(null);
+            Object platform = worldGuard.getClass().getMethod("getPlatform").invoke(worldGuard);
+            Object container = platform.getClass().getMethod("getRegionContainer").invoke(platform);
+            Object query = container.getClass().getMethod("createQuery").invoke(container);
+
+            Object wgLocation = adaptMethod.invoke(null, location);
+            Object wgPlayer = wrapPlayerMethod.invoke(null, player);
+
+            Class<?> stateFlagClass = Class.forName("com.sk89q.worldguard.protection.flags.StateFlag");
+            Object flagArray = Array.newInstance(stateFlagClass, 1);
+            Array.set(flagArray, 0, buildFlag);
+
+            for (Method m : query.getClass().getMethods()) {
+                if (m.getName().equals("testState") && m.getParameterCount() == 3) {
+                    return (boolean) m.invoke(query, wgLocation, wgPlayer, flagArray);
+                }
+            }
+        } catch (Exception e) {
+            // WorldGuard API呼び出しエラー - 許可として扱う
+        }
+        return true;
+    }
+
     private static boolean initialize() {
         try {
             if (Bukkit.getPluginManager().getPlugin("WorldGuard") == null) return false;
@@ -66,6 +104,10 @@ public final class WorldGuardHelper {
                 .getMethod("adapt", Location.class);
             pvpFlag = Class.forName("com.sk89q.worldguard.protection.flags.Flags")
                 .getField("PVP").get(null);
+            buildFlag = Class.forName("com.sk89q.worldguard.protection.flags.Flags")
+                .getField("BUILD").get(null);
+            wrapPlayerMethod = Class.forName("com.sk89q.worldguard.bukkit.WorldGuardPlugin")
+                .getMethod("wrapPlayer", org.bukkit.entity.Player.class);
 
             return true;
         } catch (Exception e) {

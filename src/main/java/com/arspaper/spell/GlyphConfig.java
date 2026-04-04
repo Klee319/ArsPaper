@@ -248,7 +248,7 @@ public class GlyphConfig {
         Map.entry("hex",             Set.of("amplify", "dampen", "extend_time", "duration_down", "linger", "propagate")),
         Map.entry("glide",           Set.of("extend_time", "duration_down")),
         Map.entry("shield",          Set.of("amplify", "extend_time", "duration_down", "linger")),
-        Map.entry("journey",         Set.of("amplify", "extend_time", "duration_down", "propagate", "linger")),
+        Map.entry("journey",         Set.of("amplify", "dampen", "extend_time", "duration_down", "propagate", "linger")),
         Map.entry("solar",           Set.of("amplify", "dampen", "aoe_radius", "extend_time", "duration_down", "split")),
         Map.entry("lunar",           Set.of("amplify", "dampen", "aoe_radius", "extend_time", "duration_down", "split")),
         Map.entry("sonic_boom",      Set.of("amplify", "dampen", "split", "pierce")),

@@ -84,6 +84,8 @@ public class LunarEffect implements SpellEffect {
         int cfgFireInterval = (int) config.getParam("lunar", "base-fire-interval", (double) BASE_FIRE_INTERVAL);
         int fireInterval = Math.max(5, cfgFireInterval / Math.max(1, shotsPerVolley));
 
+        int maxSummons = (int) config.getParam("lunar", "max-summons-per-caster", 2.0);
+
         // 召喚音
         center.getWorld().playSound(center, Sound.BLOCK_RESPAWN_ANCHOR_DEPLETE,
             SoundCategory.PLAYERS, 1.2f, 1.8f);
@@ -122,10 +124,15 @@ public class LunarEffect implements SpellEffect {
                 }
             }
         }.runTaskTimer(plugin, 0L, 1L);
-        SpellTaskLimiter.register("lunar", task);
+        SpellTaskLimiter.registerPerCaster("lunar", casterUUID, task, maxSummons);
     }
 
     private void fireFrostProjectile(Location from, LivingEntity target, double damage) {
+        // クリエイティブ/スペクテイターは対象外
+        if (target instanceof Player p
+            && (p.getGameMode() == org.bukkit.GameMode.CREATIVE
+                || p.getGameMode() == org.bukkit.GameMode.SPECTATOR)) return;
+
         Location targetLoc = target.getLocation().add(0, target.getHeight() / 2, 0);
 
         // 凍結弾の軌跡パーティクル

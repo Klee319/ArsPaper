@@ -35,9 +35,11 @@ public class SaturationEffect implements SpellEffect {
 
         int baseFoodAmount = (int) config.getParam("saturation", "base-food-amount", 4.0);
         int foodPerAmplify = (int) config.getParam("saturation", "food-per-amplify", 1.0);
+        int maxFoodAmount = (int) config.getParam("saturation", "max-food-amount", 6.0);
         int amplifyLevel = context.getAmplifyLevel();
 
-        int amount = baseFoodAmount + Math.abs(amplifyLevel) * foodPerAmplify;
+        int amount = Math.min(maxFoodAmount,
+            baseFoodAmount + Math.abs(amplifyLevel) * foodPerAmplify);
 
         if (amplifyLevel >= 0) {
             // 満腹度回復

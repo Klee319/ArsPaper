@@ -8,6 +8,7 @@ import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.PrepareAnvilEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -19,6 +20,7 @@ import org.bukkit.persistence.PersistentDataType;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Logger;
 
 /**
  * 金床でカスタムエンチャント本をメイジアーマー/スペルブックに適用するリスナー。
@@ -32,27 +34,71 @@ public class EnchantBookListener implements Listener {
     /**
      * 金床にアイテムがセットされた時、結果スロットにプレビューを表示する。
      */
-    @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST)
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onPrepareAnvil(PrepareAnvilEvent event) {
+        try {
+            handlePrepareAnvil(event);
+        } catch (Exception e) {
+            com.arspaper.ArsPaper.getInstance().getLogger().warning(
+                "[Anvil] Exception in PrepareAnvilEvent: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    private void handlePrepareAnvil(PrepareAnvilEvent event) {
+        Logger log = com.arspaper.ArsPaper.getInstance().getLogger();
         AnvilInventory anvil = event.getInventory();
-        ItemStack target = anvil.getItem(0);
-        ItemStack book = anvil.getItem(1);
+        ItemStack slot0 = anvil.getItem(0);
+        ItemStack slot1 = anvil.getItem(1);
+
+        log.info("[Anvil-Debug] PrepareAnvil fired: slot0=" + (slot0 != null ? slot0.getType() : "null")
+            + ", slot1=" + (slot1 != null ? slot1.getType() : "null"));
 
         // エンチャント本同士の合成をブロック（レベル加算防止）
-        if (isEnchantBook(target) && isEnchantBook(book)) {
+        if (isEnchantBook(slot0) && isEnchantBook(slot1)) {
             event.setResult(null);
             return;
         }
 
-        if (!isEnchantBook(book)) return;
+        // スロットの向きを検出: どちらがエンチャント本でどちらがターゲットか
+        ItemStack target;
+        ItemStack book;
+        if (isEnchantBook(slot1)) {
+            target = slot0;
+            book = slot1;
+        } else if (isEnchantBook(slot0)) {
+            target = slot1;
+            book = slot0;
+        } else {
+            log.info("[Anvil-Debug] No enchant book detected. slot0 isEB=" + isEnchantBook(slot0)
+                + ", slot1 isEB=" + isEnchantBook(slot1));
+            return; // エンチャント本がない
+        }
+
+        if (target == null || target.getType().isAir()) {
+            log.info("[Anvil-Debug] Target is null or air");
+            return;
+        }
+
         boolean isArmor = isMageArmor(target);
         boolean isSpellBook = isSpellBook(target);
-        boolean isDamageable = target != null && target.getItemMeta() instanceof org.bukkit.inventory.meta.Damageable;
+        boolean isDamageable = target.getItemMeta() instanceof org.bukkit.inventory.meta.Damageable;
 
-        if (!isArmor && !isSpellBook && !isDamageable) return;
+        log.info("[Anvil-Debug] Target: " + target.getType() + " isArmor=" + isArmor
+            + " isSpellBook=" + isSpellBook + " isDamageable=" + isDamageable);
+
+        if (!isArmor && !isSpellBook && !isDamageable) {
+            log.info("[Anvil-Debug] Target is not armor, spellbook, or damageable - skipping");
+            return;
+        }
 
         // エンチャント本からエンチャントを読み取る
-        EnchantmentStorageMeta bookMeta = (EnchantmentStorageMeta) book.getItemMeta();
+        if (!(book.getItemMeta() instanceof EnchantmentStorageMeta bookMeta)) {
+            log.info("[Anvil-Debug] Book meta is not EnchantmentStorageMeta: " + book.getItemMeta().getClass().getName());
+            return;
+        }
+
+        log.info("[Anvil-Debug] Stored enchants: " + bookMeta.getStoredEnchants());
 
         for (String enchantId : new String[]{"mana_regen", "mana_boost", "soulbound", "share"}) {
             // 適用対象フィルタ
@@ -61,8 +107,13 @@ public class EnchantBookListener implements Listener {
             if (!"share".equals(enchantId) && !"soulbound".equals(enchantId) && !isArmor) continue;
 
             Enchantment enchant = ArsEnchantments.getFromId(enchantId);
-            if (enchant == null) continue;
+            if (enchant == null) {
+                log.info("[Anvil-Debug] Enchant lookup returned null for: " + enchantId);
+                continue;
+            }
             int level = bookMeta.getStoredEnchantLevel(enchant);
+            log.info("[Anvil-Debug] " + enchantId + " storedLevel=" + level
+                + " existingLevel=" + target.getEnchantmentLevel(enchant));
             if (level <= 0) continue;
 
             if ("share".equals(enchantId)) level = 1;
@@ -88,24 +139,24 @@ public class EnchantBookListener implements Listener {
                 lore.add(Component.text(loreText, NamedTextColor.LIGHT_PURPLE)
                     .decoration(TextDecoration.ITALIC, false));
                 meta.lore(lore);
+
+                // 累積ペナルティをリセット（バニラの"Too Expensive"回避）
+                if (meta instanceof org.bukkit.inventory.meta.Repairable repairable) {
+                    repairable.setRepairCost(0);
+                }
             });
-            // Bukkit Enchantment APIでエンチャント適用（MAX_LEVELを超えないよう制限）
+            // Bukkit Enchantment APIでエンチャント適用
             result.addUnsafeEnchantment(enchant, Math.min(finalLevel, ArsEnchantments.MAX_LEVEL));
 
             event.setResult(result);
-            com.arspaper.ArsPaper.getInstance().getLogger().info(
-                "[Anvil] Applied " + enchantId + " Lv" + finalLevel + " to " + target.getType());
-            // 回生エンチャントは付けなおしを考慮してコスト10固定
-            if ("soulbound".equals(enchantId)) {
-                result.editMeta(meta -> {
-                    if (meta instanceof org.bukkit.inventory.meta.Repairable repairable) {
-                        repairable.setRepairCost(0); // 累積ペナルティをリセット
-                    }
-                });
-                anvil.setRepairCost(10);
-            } else {
-                anvil.setRepairCost(1);
-            }
+
+            // コスト設定: 回生は10、それ以外は1
+            int repairCost = "soulbound".equals(enchantId) ? 10 : 1;
+            anvil.setRepairCost(repairCost);
+            anvil.setMaximumRepairCost(100); // "Too Expensive" 回避
+
+            log.info("[Anvil] Applied " + enchantId + " Lv" + finalLevel
+                + " to " + target.getType() + " (cost=" + repairCost + ")");
             return;
         }
     }
@@ -128,8 +179,11 @@ public class EnchantBookListener implements Listener {
             com.arspaper.ArsPaper.getInstance(),
             () -> anvilCooldown.remove(player.getUniqueId()), 5L);
 
-        ItemStack book = anvil.getItem(1);
-        if (!isEnchantBook(book)) return;
+        // スロット0またはスロット1のエンチャント本を検出
+        ItemStack book = isEnchantBook(anvil.getItem(1)) ? anvil.getItem(1)
+            : isEnchantBook(anvil.getItem(0)) ? anvil.getItem(0)
+            : null;
+        if (book == null) return;
 
         // カスタムエンチャントが実際に適用されたか確認
         boolean hasCustomEnchant = false;
@@ -143,10 +197,7 @@ public class EnchantBookListener implements Listener {
         if (!hasCustomEnchant) return;
 
         // エンチャント本を消費
-        ItemStack bookSlot = anvil.getItem(1);
-        if (bookSlot != null) {
-            bookSlot.setAmount(bookSlot.getAmount() - 1);
-        }
+        book.setAmount(book.getAmount() - 1);
 
         // 取り出し後にボーナス再計算をスケジュール（防具の場合のみ）
         if (isMageArmor(result)) {

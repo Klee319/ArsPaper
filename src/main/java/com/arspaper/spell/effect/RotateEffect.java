@@ -18,6 +18,8 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -85,22 +87,31 @@ public class RotateEffect implements SpellEffect {
                     }
                 }, lockTicks);
             } else if (target instanceof Player player) {
-                // プレイヤー: 視点のみ毎tickロック（移動は許可）
-                BukkitTask lockTask = new BukkitRunnable() {
-                    private int elapsed = 0;
+                // 統合版(Geyser)プレイヤーはsetRotationで動けなくなるため代替処理
+                if (isBedrockPlayer(player)) {
+                    // 鈍足+盲目で疑似拘束
+                    player.addPotionEffect(new PotionEffect(
+                        PotionEffectType.SLOWNESS, lockTicks, 3, false, false, true));
+                    player.addPotionEffect(new PotionEffect(
+                        PotionEffectType.BLINDNESS, lockTicks, 0, false, false, true));
+                } else {
+                    // Java版: 視点のみ毎tickロック（移動は許可）
+                    BukkitTask lockTask = new BukkitRunnable() {
+                        private int elapsed = 0;
 
-                    @Override
-                    public void run() {
-                        elapsed++;
-                        if (elapsed > lockTicks || !player.isOnline() || player.isDead()) {
-                            activeLocks.remove(this);
-                            cancel();
-                            return;
+                        @Override
+                        public void run() {
+                            elapsed++;
+                            if (elapsed > lockTicks || !player.isOnline() || player.isDead()) {
+                                activeLocks.remove(this);
+                                cancel();
+                                return;
+                            }
+                            player.setRotation(lockedYaw, lockedPitch);
                         }
-                        player.setRotation(lockedYaw, lockedPitch);
-                    }
-                }.runTaskTimer(plugin, 1L, 1L);
-                activeLocks.add(lockTask);
+                    }.runTaskTimer(plugin, 1L, 1L);
+                    activeLocks.add(lockTask);
+                }
             }
         }
 
@@ -114,6 +125,10 @@ public class RotateEffect implements SpellEffect {
     public void applyToBlock(SpellContext context, Location blockLocation) {
         Block block = blockLocation.getBlock();
         if (block.getType().isAir()) return;
+
+        // WorldGuard保護チェック
+        Player caster = context.getCaster();
+        if (caster != null && !com.arspaper.util.WorldGuardHelper.canBuild(caster, blockLocation)) return;
 
         BlockData data = block.getBlockData();
         int amp = context.getAmplifyLevel();
@@ -177,6 +192,21 @@ public class RotateEffect implements SpellEffect {
             case WEST  -> counterClockwise ? BlockFace.SOUTH : BlockFace.NORTH;
             default    -> face;
         };
+    }
+
+    /**
+     * FloodgateプラグインでBedrock版プレイヤーか判定する。
+     * Floodgateが無い場合はfalse。
+     */
+    private static boolean isBedrockPlayer(Player player) {
+        try {
+            Class<?> floodgateApi = Class.forName("org.geysermc.floodgate.api.FloodgateApi");
+            Object instance = floodgateApi.getMethod("getInstance").invoke(null);
+            return (boolean) floodgateApi.getMethod("isFloodgatePlayer", java.util.UUID.class)
+                .invoke(instance, player.getUniqueId());
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     @Override

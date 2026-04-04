@@ -28,42 +28,52 @@ import java.util.Map;
 public class AlchemicalSourcelink extends Sourcelink {
 
     /**
-     * 醸造・錬金素材 → ソースポイント（希少度基準）
-     * 基準: 石炭=5相当。ネザーウォート=3、ブレイズパウダー=8
+     * デフォルトの醸造・錬金素材 → ソースポイント（設定ファイルが無い場合に使用）
      */
-    private static final Map<Material, Integer> ALCHEMY_VALUES = Map.ofEntries(
-        // 最低（1）: 基本素材
+    private static final Map<Material, Integer> DEFAULT_ALCHEMY_VALUES = Map.ofEntries(
         Map.entry(Material.GLASS_BOTTLE, 1),
         Map.entry(Material.SUGAR, 1),
         Map.entry(Material.GUNPOWDER, 1),
         Map.entry(Material.REDSTONE, 1),
         Map.entry(Material.GLOWSTONE_DUST, 1),
         Map.entry(Material.SPIDER_EYE, 1),
-        // 低（3）: 標準醸造素材
         Map.entry(Material.NETHER_WART, 3),
         Map.entry(Material.FERMENTED_SPIDER_EYE, 3),
         Map.entry(Material.GLISTERING_MELON_SLICE, 3),
         Map.entry(Material.GOLDEN_CARROT, 3),
         Map.entry(Material.PUFFERFISH, 3),
         Map.entry(Material.MAGMA_CREAM, 3),
-        // 中（8）: 希少素材
         Map.entry(Material.BLAZE_POWDER, 8),
         Map.entry(Material.RABBIT_FOOT, 8),
         Map.entry(Material.PHANTOM_MEMBRANE, 8),
         Map.entry(Material.TURTLE_HELMET, 8),
-        // 高（15）: レア素材
         Map.entry(Material.GHAST_TEAR, 15),
         Map.entry(Material.EXPERIENCE_BOTTLE, 15),
-        // ポーション系
         Map.entry(Material.POTION, 5),
         Map.entry(Material.SPLASH_POTION, 8),
         Map.entry(Material.LINGERING_POTION, 10),
-        // 最高（30）: 最希少
         Map.entry(Material.DRAGON_BREATH, 30)
     );
 
+    /** 実行時に使用する錬金素材値マップ（設定ファイルから読み込み可能） */
+    private Map<Material, Integer> alchemyValues = DEFAULT_ALCHEMY_VALUES;
+
     public AlchemicalSourcelink(JavaPlugin plugin) {
         super(plugin, "alchemical_sourcelink");
+    }
+
+    /**
+     * デフォルトの錬金素材値マップを返す（設定ファイルが無い場合のフォールバック用）。
+     */
+    static Map<Material, Integer> getDefaultAlchemyValues() {
+        return DEFAULT_ALCHEMY_VALUES;
+    }
+
+    /**
+     * 設定ファイルから読み込んだ錬金素材値マップを設定する。
+     */
+    public void setAlchemyValues(Map<Material, Integer> values) {
+        this.alchemyValues = values != null ? values : DEFAULT_ALCHEMY_VALUES;
     }
 
     @Override
@@ -111,14 +121,21 @@ public class AlchemicalSourcelink extends Sourcelink {
     @Override
     public int getSourceValueForItem(org.bukkit.inventory.ItemStack item) {
         if (item == null) return 0;
-        Integer value = ALCHEMY_VALUES.get(item.getType());
+        Integer value = alchemyValues.get(item.getType());
         return value != null ? value : 0;
     }
 
     @Override
     public void onBlockInteract(Player player, Block block, TileState tileState) {
         ItemStack hand = player.getInventory().getItemInMainHand();
-        Integer sourceValue = ALCHEMY_VALUES.get(hand.getType());
+        if (isCustomItem(hand)) {
+            int buffer = getBuffer(tileState);
+            player.sendMessage(Component.text(
+                "アルケミカルソースリンク - 蓄積ソース: " + buffer, NamedTextColor.DARK_PURPLE
+            ));
+            return;
+        }
+        Integer sourceValue = alchemyValues.get(hand.getType());
 
         if (sourceValue != null) {
             int addCount = player.isSneaking() ? hand.getAmount() : 1;
