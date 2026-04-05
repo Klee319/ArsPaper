@@ -2,6 +2,7 @@ package com.arspaper.mana;
 
 import com.arspaper.ArsPaper;
 import com.arspaper.item.impl.Wand;
+import com.arspaper.world.WorldSettingsManager;
 import net.kyori.adventure.bossbar.BossBar;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
@@ -77,12 +78,22 @@ public class ManaManager implements Listener {
     }
 
     public int getMaxMana(Player player) {
+        // ワールド別固定マナが設定されている場合はそれを返す
+        WorldSettingsManager wsm = ArsPaper.getInstance().getWorldSettingsManager();
+        if (wsm != null) {
+            var worldMana = wsm.getWorldMana(player.getWorld().getName());
+            if (worldMana.hasFixedMax()) {
+                return worldMana.fixMax();
+            }
+        }
+
         PersistentDataContainer pdc = player.getPersistentDataContainer();
         int glyphBonus = pdc.getOrDefault(ManaKeys.GLYPH_MANA_BONUS, PersistentDataType.INTEGER, 0);
         int armorBonus = pdc.getOrDefault(ManaKeys.ARMOR_MANA_BONUS, PersistentDataType.INTEGER, 0);
         int threadBonus = pdc.getOrDefault(ManaKeys.THREAD_MANA_BONUS, PersistentDataType.INTEGER, 0);
         int enchantBonus = pdc.getOrDefault(ManaKeys.ENCHANT_MANA_BONUS, PersistentDataType.INTEGER, 0);
-        return config.defaultMaxMana() + glyphBonus + armorBonus + threadBonus + enchantBonus;
+        int worldBonus = (wsm != null) ? wsm.getWorldMana(player.getWorld().getName()).maxBonus() : 0;
+        return config.defaultMaxMana() + glyphBonus + armorBonus + threadBonus + enchantBonus + worldBonus;
     }
 
     /**
@@ -150,12 +161,22 @@ public class ManaManager implements Listener {
     }
 
     private int getRegenRate(Player player) {
+        // ワールド別固定回復量が設定されている場合はそれを返す
+        WorldSettingsManager wsm = ArsPaper.getInstance().getWorldSettingsManager();
+        if (wsm != null) {
+            var worldMana = wsm.getWorldMana(player.getWorld().getName());
+            if (worldMana.hasFixedRegen()) {
+                return worldMana.fixRegen();
+            }
+        }
+
         PersistentDataContainer pdc = player.getPersistentDataContainer();
         int baseRate = pdc.getOrDefault(ManaKeys.REGEN_RATE, PersistentDataType.INTEGER, config.defaultRegenRate());
         int threadBonus = pdc.getOrDefault(ManaKeys.THREAD_REGEN_BONUS, PersistentDataType.INTEGER, 0);
         int enchantBonus = pdc.getOrDefault(ManaKeys.ENCHANT_REGEN_BONUS, PersistentDataType.INTEGER, 0);
         int armorBonus = pdc.getOrDefault(ManaKeys.ARMOR_REGEN_BONUS, PersistentDataType.INTEGER, 0);
-        return baseRate + threadBonus + enchantBonus + armorBonus;
+        int worldBonus = (wsm != null) ? wsm.getWorldMana(player.getWorld().getName()).regenBonus() : 0;
+        return baseRate + threadBonus + enchantBonus + armorBonus + worldBonus;
     }
 
     private void tickRegeneration() {

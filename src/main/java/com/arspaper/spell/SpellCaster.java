@@ -4,6 +4,7 @@ import com.arspaper.ArsPaper;
 import com.arspaper.mana.ManaKeys;
 import com.arspaper.mana.ManaManager;
 import com.arspaper.spell.form.BeamForm;
+import com.arspaper.world.WorldSettingsManager;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonParser;
 import net.kyori.adventure.text.Component;
@@ -65,6 +66,14 @@ public class SpellCaster {
         // グリフ解放チェック: 共有エンチャント付きでない場合のみ
         if (!sharedSpell && !checkGlyphsUnlocked(caster, recipe)) {
             caster.sendMessage(Component.text("未解放のグリフが含まれています！", NamedTextColor.RED));
+            return false;
+        }
+
+        // ワールド別スペルBANチェック
+        String bannedName = checkSpellBanned(caster, recipe);
+        if (bannedName != null) {
+            caster.sendMessage(Component.text(
+                bannedName + " はこのワールドでは使用禁止です！", NamedTextColor.RED));
             return false;
         }
 
@@ -145,6 +154,22 @@ public class SpellCaster {
     public void invalidateGlyphCache(UUID playerId) {
         glyphCache.remove(playerId);
         glyphCacheExpiry.remove(playerId);
+    }
+
+    /**
+     * スペル内にワールドでBANされたグリフが含まれるかチェック。
+     * @return BANされたグリフの表示名（なければnull）
+     */
+    private String checkSpellBanned(Player caster, SpellRecipe recipe) {
+        WorldSettingsManager wsm = ArsPaper.getInstance().getWorldSettingsManager();
+        if (wsm == null) return null;
+        String worldName = caster.getWorld().getName();
+        for (SpellComponent comp : recipe.getComponents()) {
+            if (wsm.isSpellBanned(worldName, comp.getId().toString())) {
+                return comp.getDisplayName();
+            }
+        }
+        return null;
     }
 
     /**

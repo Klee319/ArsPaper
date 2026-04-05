@@ -47,7 +47,7 @@ public final class ArsCommand {
                             );
                             for (String eid : new String[]{"mana_regen", "mana_boost", "share", "soulbound"}) {
                                 for (int lv = 1; lv <= 3; lv++) {
-                                    builder.suggest("enchant_book:" + eid + ":" + lv);
+                                    builder.suggest("enchant_book." + eid + "." + lv);
                                 }
                             }
                             return builder.buildFuture();
@@ -60,7 +60,7 @@ public final class ArsCommand {
                                 return 0;
                             }
                             String itemId = StringArgumentType.getString(ctx, "itemId");
-                            if (itemId.startsWith("enchant_book:")) return executeGiveEnchantBook(player, itemId);
+                            if (itemId.startsWith("enchant_book.")) return executeGiveEnchantBook(player, itemId);
                             return executeGive(plugin, player, itemId, 1);
                         })
                         // /ars give <itemId> <count>
@@ -73,7 +73,7 @@ public final class ArsCommand {
                                 }
                                 String itemId = StringArgumentType.getString(ctx, "itemId");
                                 int count = IntegerArgumentType.getInteger(ctx, "count");
-                                if (itemId.startsWith("enchant_book:")) return executeGiveEnchantBook(player, itemId);
+                                if (itemId.startsWith("enchant_book.")) return executeGiveEnchantBook(player, itemId);
                                 return executeGive(plugin, player, itemId, count);
                             })
                             // /ars give <itemId> <count> <player>
@@ -94,7 +94,7 @@ public final class ArsCommand {
                                             Component.text("プレイヤーが見つかりません: " + targetName, NamedTextColor.RED));
                                         return 0;
                                     }
-                                    if (itemId.startsWith("enchant_book:")) return executeGiveEnchantBook(target, itemId);
+                                    if (itemId.startsWith("enchant_book.")) return executeGiveEnchantBook(target, itemId);
                                     return executeGive(plugin, target, itemId, count);
                                 })
                             )
@@ -219,6 +219,57 @@ public final class ArsCommand {
                         .executes(ctx -> executeRankingMana(plugin, ctx.getSource().getSender()))
                     )
                 )
+                .then(Commands.literal("world")
+                    .requires(src -> src.getSender().hasPermission("arspaper.admin"))
+                    .then(Commands.literal("ban")
+                        .executes(ctx -> {
+                            if (!(ctx.getSource().getSender() instanceof Player player)) return 0;
+                            return executeWorldBan(plugin, player);
+                        })
+                    )
+                    .then(Commands.literal("maxmana")
+                        .then(Commands.argument("value", IntegerArgumentType.integer(-1000, 10000))
+                            .executes(ctx -> {
+                                if (!(ctx.getSource().getSender() instanceof Player player)) return 0;
+                                int value = IntegerArgumentType.getInteger(ctx, "value");
+                                return executeWorldManaSetting(plugin, player, "maxmana", value);
+                            })
+                        )
+                    )
+                    .then(Commands.literal("maxrgmana")
+                        .then(Commands.argument("value", IntegerArgumentType.integer(-1000, 10000))
+                            .executes(ctx -> {
+                                if (!(ctx.getSource().getSender() instanceof Player player)) return 0;
+                                int value = IntegerArgumentType.getInteger(ctx, "value");
+                                return executeWorldManaSetting(plugin, player, "maxrgmana", value);
+                            })
+                        )
+                    )
+                    .then(Commands.literal("fixmana")
+                        .then(Commands.argument("value", IntegerArgumentType.integer(-1, 100000))
+                            .executes(ctx -> {
+                                if (!(ctx.getSource().getSender() instanceof Player player)) return 0;
+                                int value = IntegerArgumentType.getInteger(ctx, "value");
+                                return executeWorldManaSetting(plugin, player, "fixmana", value);
+                            })
+                        )
+                    )
+                    .then(Commands.literal("fixrgmana")
+                        .then(Commands.argument("value", IntegerArgumentType.integer(-1, 10000))
+                            .executes(ctx -> {
+                                if (!(ctx.getSource().getSender() instanceof Player player)) return 0;
+                                int value = IntegerArgumentType.getInteger(ctx, "value");
+                                return executeWorldManaSetting(plugin, player, "fixrgmana", value);
+                            })
+                        )
+                    )
+                    .then(Commands.literal("info")
+                        .executes(ctx -> {
+                            if (!(ctx.getSource().getSender() instanceof Player player)) return 0;
+                            return executeWorldInfo(plugin, player);
+                        })
+                    )
+                )
                 .then(Commands.literal("spell")
                     .then(Commands.literal("list")
                         .executes(ctx -> {
@@ -261,11 +312,11 @@ public final class ArsCommand {
     }
 
     private static int executeGiveEnchantBook(Player player, String spec) {
-        // enchant_book:<enchantId>:<level>
-        String[] parts = spec.split(":");
+        // enchant_book.enchantId.level
+        String[] parts = spec.split("\\.");
         if (parts.length < 3) {
             player.sendMessage(Component.text(
-                "形式: enchant_book:<enchantId>:<level> (例: enchant_book:mana_regen:1)", NamedTextColor.RED));
+                "形式: enchant_book.<enchantId>.<level> (例: enchant_book.mana_regen.1)", NamedTextColor.RED));
             return 0;
         }
         String enchantId = parts[1];
@@ -323,7 +374,14 @@ public final class ArsCommand {
         int armorManaBonus = pdc.getOrDefault(ManaKeys.ARMOR_MANA_BONUS, PersistentDataType.INTEGER, 0);
         int threadManaBonus = pdc.getOrDefault(ManaKeys.THREAD_MANA_BONUS, PersistentDataType.INTEGER, 0);
         int enchantManaBonus = pdc.getOrDefault(ManaKeys.ENCHANT_MANA_BONUS, PersistentDataType.INTEGER, 0);
-        int totalMana = baseMana + glyphBonus + armorManaBonus + threadManaBonus + enchantManaBonus;
+        // === ワールド補正 ===
+        var worldMana = plugin.getWorldSettingsManager().getWorldMana(player.getWorld().getName());
+        int worldManaBonus = worldMana.maxBonus();
+        int worldRegenBonus = worldMana.regenBonus();
+
+        int totalMana = worldMana.hasFixedMax()
+            ? worldMana.fixMax()
+            : baseMana + glyphBonus + armorManaBonus + threadManaBonus + enchantManaBonus + worldManaBonus;
         int currentMana = plugin.getManaManager().getCurrentMana(player);
 
         // === マナ回復 ===
@@ -331,7 +389,9 @@ public final class ArsCommand {
         int threadRegenBonus = pdc.getOrDefault(ManaKeys.THREAD_REGEN_BONUS, PersistentDataType.INTEGER, 0);
         int enchantRegenBonus = pdc.getOrDefault(ManaKeys.ENCHANT_REGEN_BONUS, PersistentDataType.INTEGER, 0);
         int armorRegenBonus = pdc.getOrDefault(ManaKeys.ARMOR_REGEN_BONUS, PersistentDataType.INTEGER, 0);
-        int totalRegen = baseRegen + threadRegenBonus + enchantRegenBonus + armorRegenBonus;
+        int totalRegen = worldMana.hasFixedRegen()
+            ? worldMana.fixRegen()
+            : baseRegen + threadRegenBonus + enchantRegenBonus + armorRegenBonus + worldRegenBonus;
 
         // === スレッド特殊ボーナス ===
         int costReduction = pdc.getOrDefault(ManaKeys.THREAD_COST_REDUCTION, PersistentDataType.INTEGER, 0);
@@ -351,6 +411,10 @@ public final class ArsCommand {
             player.sendMessage(Component.text("  スレッド: +" + threadManaBonus, NamedTextColor.GRAY));
         if (enchantManaBonus > 0)
             player.sendMessage(Component.text("  エンチャント: +" + enchantManaBonus, NamedTextColor.GRAY));
+        if (worldMana.hasFixedMax())
+            player.sendMessage(Component.text("  ワールド固定: " + worldMana.fixMax(), NamedTextColor.YELLOW));
+        else if (worldManaBonus != 0)
+            player.sendMessage(Component.text("  ワールド: " + (worldManaBonus >= 0 ? "+" : "") + worldManaBonus, NamedTextColor.GRAY));
 
         // 回復
         double regenInterval = config.regenIntervalTicks() / 20.0;
@@ -364,6 +428,10 @@ public final class ArsCommand {
             player.sendMessage(Component.text("  スレッド: +" + threadRegenBonus, NamedTextColor.GRAY));
         if (enchantRegenBonus > 0)
             player.sendMessage(Component.text("  エンチャント: +" + enchantRegenBonus, NamedTextColor.GRAY));
+        if (worldMana.hasFixedRegen())
+            player.sendMessage(Component.text("  ワールド固定: " + worldMana.fixRegen(), NamedTextColor.YELLOW));
+        else if (worldRegenBonus != 0)
+            player.sendMessage(Component.text("  ワールド: " + (worldRegenBonus >= 0 ? "+" : "") + worldRegenBonus, NamedTextColor.GRAY));
 
         // スレッド特殊
         if (costReduction > 0) {
@@ -439,7 +507,7 @@ public final class ArsCommand {
 
         // reset: 設定ファイルをデフォルトに上書き復元
         if (resetDefaults) {
-            String[] ymlFiles = {"config.yml", "glyphs.yml", "items.yml", "materials.yml", "armors.yml", "threads.yml"};
+            String[] ymlFiles = {"config.yml", "glyphs.yml", "items.yml", "materials.yml", "armors.yml", "threads.yml", "ban.yml"};
             for (String yml : ymlFiles) {
                 plugin.saveResource(yml, true); // true = 上書き
             }
@@ -481,6 +549,9 @@ public final class ArsCommand {
 
         // ルートチェスト設定リロード
         plugin.reloadLootConfig();
+
+        // ワールド別設定リロード
+        plugin.getWorldSettingsManager().load();
 
         long elapsed = System.currentTimeMillis() - start;
         sender.sendMessage(Component.text(
@@ -781,6 +852,83 @@ public final class ArsCommand {
         if (n >= 1_000_000) return String.format("%.1fM", n / 1_000_000.0);
         if (n >= 1_000) return String.format("%.1fK", n / 1_000.0);
         return String.valueOf(n);
+    }
+
+    private static int executeWorldBan(ArsPaper plugin, Player player) {
+        String worldName = player.getWorld().getName();
+        new com.arspaper.gui.SpellBanGui(player, plugin, worldName).open();
+        return 1;
+    }
+
+    private static int executeWorldManaSetting(ArsPaper plugin, Player player, String type, int value) {
+        String worldName = player.getWorld().getName();
+        var wsm = plugin.getWorldSettingsManager();
+        String label;
+
+        switch (type) {
+            case "maxmana" -> {
+                wsm.setWorldManaMaxBonus(worldName, value);
+                label = "最大マナ補正";
+            }
+            case "maxrgmana" -> {
+                wsm.setWorldManaRegenBonus(worldName, value);
+                label = "回復量補正";
+            }
+            case "fixmana" -> {
+                wsm.setWorldManaFixMax(worldName, value);
+                label = "固定最大マナ" + (value < 0 ? " (無効)" : "");
+            }
+            case "fixrgmana" -> {
+                wsm.setWorldManaFixRegen(worldName, value);
+                label = "固定回復量" + (value < 0 ? " (無効)" : "");
+            }
+            default -> {
+                return 0;
+            }
+        }
+
+        player.sendMessage(Component.text(
+            worldName + " の" + label + "を " + value + " に設定しました", NamedTextColor.GREEN));
+        return 1;
+    }
+
+    private static int executeWorldInfo(ArsPaper plugin, Player player) {
+        String worldName = player.getWorld().getName();
+        var wsm = plugin.getWorldSettingsManager();
+        var mana = wsm.getWorldMana(worldName);
+        var bans = wsm.getBannedSpells(worldName);
+
+        player.sendMessage(Component.text("═══ ワールド設定: " + worldName + " ═══", NamedTextColor.GOLD));
+
+        // マナ設定
+        player.sendMessage(Component.text("マナ補正:", NamedTextColor.AQUA));
+        if (mana.hasFixedMax()) {
+            player.sendMessage(Component.text("  固定最大マナ: " + mana.fixMax(), NamedTextColor.WHITE));
+        } else {
+            player.sendMessage(Component.text("  最大マナ補正: " + (mana.maxBonus() >= 0 ? "+" : "") + mana.maxBonus(), NamedTextColor.WHITE));
+        }
+        if (mana.hasFixedRegen()) {
+            player.sendMessage(Component.text("  固定回復量: " + mana.fixRegen(), NamedTextColor.WHITE));
+        } else {
+            player.sendMessage(Component.text("  回復量補正: " + (mana.regenBonus() >= 0 ? "+" : "") + mana.regenBonus(), NamedTextColor.WHITE));
+        }
+
+        // BAN設定
+        if (bans.isEmpty()) {
+            player.sendMessage(Component.text("BAN: なし", NamedTextColor.GREEN));
+        } else {
+            player.sendMessage(Component.text("BAN (" + bans.size() + "件):", NamedTextColor.RED));
+            StringBuilder sb = new StringBuilder("  ");
+            for (String key : bans) {
+                var comp = plugin.getSpellRegistry().get(key);
+                if (comp != null) {
+                    if (sb.length() > 2) sb.append(", ");
+                    sb.append(comp.getDisplayName());
+                }
+            }
+            player.sendMessage(Component.text(sb.toString(), NamedTextColor.GRAY));
+        }
+        return 1;
     }
 
     private static int executeSpellSet(ArsPaper plugin, Player player, int slot, String spellDef) {

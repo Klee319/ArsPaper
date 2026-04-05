@@ -79,6 +79,7 @@ public class ArsPaper extends JavaPlugin {
     private ThreadConfig threadConfig;
     private com.arspaper.loot.LootTableListener lootTableListener;
     private SourcelinkConfig sourcelinkConfig;
+    private com.arspaper.world.WorldSettingsManager worldSettingsManager;
 
     @Override
     public void onEnable() {
@@ -209,6 +210,9 @@ public class ArsPaper extends JavaPlugin {
         // マナマネージャー
         ManaConfig manaConfig = ManaConfig.fromConfig(getConfig());
         manaManager = new ManaManager(this, manaConfig);
+
+        // ワールド別設定マネージャー
+        worldSettingsManager = new com.arspaper.world.WorldSettingsManager(this);
 
         // スペルキャスター（シングルトン）
         spellCaster = new SpellCaster(manaManager);
@@ -618,6 +622,10 @@ public class ArsPaper extends JavaPlugin {
         if (lootTableListener != null) {
             lootTableListener.reloadConfig();
         }
+    }
+
+    public com.arspaper.world.WorldSettingsManager getWorldSettingsManager() {
+        return worldSettingsManager;
     }
 
     public SourcelinkConfig getSourcelinkConfig() {
