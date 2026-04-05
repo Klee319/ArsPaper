@@ -156,6 +156,10 @@ public class WorldSettingsManager {
      * ワールドのBAN設定をトグルする。
      * @return トグル後の状態（true=BAN, false=解除）
      */
+    /**
+     * ワールドのBAN設定をトグルする。保存は呼び出し元で行う。
+     * @return トグル後の状態（true=BAN, false=解除）
+     */
     public boolean toggleWorldBan(String worldName, String spellKey) {
         Set<String> bans = worldBannedSpells.computeIfAbsent(worldName, k -> new HashSet<>());
         boolean nowBanned;
@@ -166,7 +170,6 @@ public class WorldSettingsManager {
             bans.add(spellKey);
             nowBanned = true;
         }
-        saveSettings();
         return nowBanned;
     }
 

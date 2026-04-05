@@ -78,13 +78,14 @@ public class ManaManager implements Listener {
     }
 
     public int getMaxMana(Player player) {
-        // ワールド別固定マナが設定されている場合はそれを返す
         WorldSettingsManager wsm = ArsPaper.getInstance().getWorldSettingsManager();
-        if (wsm != null) {
-            var worldMana = wsm.getWorldMana(player.getWorld().getName());
-            if (worldMana.hasFixedMax()) {
-                return worldMana.fixMax();
-            }
+        WorldSettingsManager.WorldManaSettings worldMana = (wsm != null)
+            ? wsm.getWorldMana(player.getWorld().getName())
+            : WorldSettingsManager.WorldManaSettings.EMPTY;
+
+        // ワールド別固定マナが設定されている場合はそれを返す
+        if (worldMana.hasFixedMax()) {
+            return worldMana.fixMax();
         }
 
         PersistentDataContainer pdc = player.getPersistentDataContainer();
@@ -92,8 +93,7 @@ public class ManaManager implements Listener {
         int armorBonus = pdc.getOrDefault(ManaKeys.ARMOR_MANA_BONUS, PersistentDataType.INTEGER, 0);
         int threadBonus = pdc.getOrDefault(ManaKeys.THREAD_MANA_BONUS, PersistentDataType.INTEGER, 0);
         int enchantBonus = pdc.getOrDefault(ManaKeys.ENCHANT_MANA_BONUS, PersistentDataType.INTEGER, 0);
-        int worldBonus = (wsm != null) ? wsm.getWorldMana(player.getWorld().getName()).maxBonus() : 0;
-        return config.defaultMaxMana() + glyphBonus + armorBonus + threadBonus + enchantBonus + worldBonus;
+        return config.defaultMaxMana() + glyphBonus + armorBonus + threadBonus + enchantBonus + worldMana.maxBonus();
     }
 
     /**
@@ -161,13 +161,14 @@ public class ManaManager implements Listener {
     }
 
     private int getRegenRate(Player player) {
-        // ワールド別固定回復量が設定されている場合はそれを返す
         WorldSettingsManager wsm = ArsPaper.getInstance().getWorldSettingsManager();
-        if (wsm != null) {
-            var worldMana = wsm.getWorldMana(player.getWorld().getName());
-            if (worldMana.hasFixedRegen()) {
-                return worldMana.fixRegen();
-            }
+        WorldSettingsManager.WorldManaSettings worldMana = (wsm != null)
+            ? wsm.getWorldMana(player.getWorld().getName())
+            : WorldSettingsManager.WorldManaSettings.EMPTY;
+
+        // ワールド別固定回復量が設定されている場合はそれを返す
+        if (worldMana.hasFixedRegen()) {
+            return worldMana.fixRegen();
         }
 
         PersistentDataContainer pdc = player.getPersistentDataContainer();
@@ -175,8 +176,7 @@ public class ManaManager implements Listener {
         int threadBonus = pdc.getOrDefault(ManaKeys.THREAD_REGEN_BONUS, PersistentDataType.INTEGER, 0);
         int enchantBonus = pdc.getOrDefault(ManaKeys.ENCHANT_REGEN_BONUS, PersistentDataType.INTEGER, 0);
         int armorBonus = pdc.getOrDefault(ManaKeys.ARMOR_REGEN_BONUS, PersistentDataType.INTEGER, 0);
-        int worldBonus = (wsm != null) ? wsm.getWorldMana(player.getWorld().getName()).regenBonus() : 0;
-        return baseRate + threadBonus + enchantBonus + armorBonus + worldBonus;
+        return baseRate + threadBonus + enchantBonus + armorBonus + worldMana.regenBonus();
     }
 
     private void tickRegeneration() {
@@ -231,12 +231,16 @@ public class ManaManager implements Listener {
 
     @EventHandler
     public void onPlayerChangedWorld(PlayerChangedWorldEvent event) {
-        // ディメンション移動後にBossBar再表示
+        // ディメンション移動後にBossBar再表示（ワールド別マナ補正でmax変動する場合にクランプ）
         Player player = event.getPlayer();
-        int current = getCurrentMana(player);
         int max = getMaxMana(player);
-        BossBar bar = barDisplay.update(player.getUniqueId(), current, max);
-        player.showBossBar(bar);
+        int current = getCurrentMana(player);
+        if (current > max) {
+            setCurrentMana(player, max);
+        } else {
+            BossBar bar = barDisplay.update(player.getUniqueId(), current, max);
+            player.showBossBar(bar);
+        }
     }
 
     @EventHandler

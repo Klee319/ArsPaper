@@ -331,7 +331,7 @@ public final class ArsCommand {
         var enchant = com.arspaper.enchant.ArsEnchantments.getFromId(enchantId);
         if (enchant == null) {
             player.sendMessage(Component.text(
-                "不明なエンチャント: " + enchantId + " (mana_regen/mana_boost/share)", NamedTextColor.RED));
+                "不明なエンチャント: " + enchantId + " (mana_regen/mana_boost/share/soulbound)", NamedTextColor.RED));
             return 0;
         }
 
@@ -375,7 +375,10 @@ public final class ArsCommand {
         int threadManaBonus = pdc.getOrDefault(ManaKeys.THREAD_MANA_BONUS, PersistentDataType.INTEGER, 0);
         int enchantManaBonus = pdc.getOrDefault(ManaKeys.ENCHANT_MANA_BONUS, PersistentDataType.INTEGER, 0);
         // === ワールド補正 ===
-        var worldMana = plugin.getWorldSettingsManager().getWorldMana(player.getWorld().getName());
+        var wsm = plugin.getWorldSettingsManager();
+        var worldMana = (wsm != null)
+            ? wsm.getWorldMana(player.getWorld().getName())
+            : com.arspaper.world.WorldSettingsManager.WorldManaSettings.EMPTY;
         int worldManaBonus = worldMana.maxBonus();
         int worldRegenBonus = worldMana.regenBonus();
 

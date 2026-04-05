@@ -118,6 +118,12 @@ public class SpellBanGui extends BaseGui {
     }
 
     @Override
+    public void onClose(Player player) {
+        // GUI閉じた時にまとめて保存
+        plugin.getWorldSettingsManager().saveSettings();
+    }
+
+    @Override
     public boolean onClick(int slot, Player clicker, InventoryClickEvent event) {
         // 前のページ
         if (slot == 45 && page > 0) {
