@@ -1,0 +1,25 @@
+# Gradle
+.gradle/
+build/
+gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# Claude Code
+.claude/
+CLAUDE.md
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Wiki (submodule or separate repo)
+wiki-repo/
+
+# Misc
+*.log
+run/
