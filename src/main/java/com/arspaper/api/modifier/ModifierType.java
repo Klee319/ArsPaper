@@ -10,9 +10,16 @@ package com.arspaper.api.modifier;
  *   MATERIAL_REDUCTION_CHANCE             : 加算 → clamp(0,1) で確率判定
  */
 public enum ModifierType {
-    /** 最大マナ加算。整数 (1.0=+1) として丸める。 */
+    /**
+     * 最大マナ加算。ArsPaperの最大マナは整数管理のため、合計 (sum) を round して整数に丸める。
+     * 例: 30.4 と 20.3 を加算→ round(50.7) = 51 が反映される。
+     */
     MAX_MANA,
-    /** マナ回復速度加算。整数 (1.0=+1) として丸める。 */
+    /**
+     * マナ回復速度加算。ArsPaperの回復は 1tickあたり整数値のため、
+     * 合計を round して整数に丸める (fractional rate は非対応)。
+     * 細粒度な調整が必要な場合は regen-interval-ticks を縮める方針。
+     */
     REGEN_RATE,
     /** マナ消費削減割合 (0-1)。 */
     MANA_COST_MULT,

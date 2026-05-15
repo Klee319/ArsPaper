@@ -44,18 +44,18 @@ public final class SpellDamageDispatcher {
         List<String> glyphs = new ArrayList<>();
         if (recipe != null) {
             for (SpellComponent c : recipe.getComponents()) {
-                glyphs.add(c.getId().toString());
+                // 仕様§6.2: glyphId は namespace 抜きの key 部分
+                glyphs.add(c.getId().getKey());
             }
         }
 
-        ArsSpellDamageEvent ev = new ArsSpellDamageEvent(target, caster, glyphs, effectId, baseDamage);
-        Bukkit.getPluginManager().callEvent(ev);
-        if (ev.isCancelled()) return new Result(true, 0.0);
-
-        // Magic damage marker (5 tick TTL)
+        // Magic damage marker (5 tick TTL) — 仕様§6.2: ArsSpellDamageEvent発火直前に attach
         if (caster != null) {
             MagicDamageMarker.attach(ArsAPI.plugin(), target, caster);
         }
+        ArsSpellDamageEvent ev = new ArsSpellDamageEvent(target, caster, glyphs, effectId, baseDamage);
+        Bukkit.getPluginManager().callEvent(ev);
+        if (ev.isCancelled()) return new Result(true, 0.0);
         return new Result(false, ev.getDamage());
     }
 }

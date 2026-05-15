@@ -32,6 +32,9 @@ public final class ApiBootstrap implements Listener {
 
     public void register() {
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
+        // 作業台クラフトのArsRecipeCraftPre/Post Event発火を担う
+        plugin.getServer().getPluginManager().registerEvents(
+            new com.arspaper.api.internal.RecipeCraftDispatcher(), plugin);
         // 起動時にオンラインプレイヤーがいたら読み込み(リロード対策)
         for (Player p : plugin.getServer().getOnlinePlayers()) {
             playerDataStore.load(p);

@@ -85,7 +85,9 @@ public class RitualManager {
 
         RitualRecipe recipe = matchOpt.get();
 
-        // ArsAPI: ArsRitualPreEvent 発火 (cancellable)
+        // ArsAPI: ArsRitualPreEvent 発火 (cancellable + setRequiredMaterials を消費に反映)
+        // overrideIngredients=null の場合は recipe.pedestalItems() を使う既存挙動
+        final List<RitualIngredient> overrideIngredients;
         if (com.arspaper.api.ArsAPI.isInitialized()) {
             java.util.List<org.bukkit.inventory.ItemStack> _matStacks = new java.util.ArrayList<>();
             for (RitualIngredient ing : recipe.pedestalItems()) {
@@ -100,7 +102,16 @@ public class RitualManager {
                     "儀式がキャンセルされました", NamedTextColor.RED));
                 return;
             }
-            // setRequiredMaterials 反映は現状参考情報のみ（消費パスは既存ロジック維持）。
+            // 仕様§6.5: setRequiredMaterials 反映 (消費対象を override する)
+            java.util.List<org.bukkit.inventory.ItemStack> modified = _pre.getRequiredMaterials();
+            if (modified.size() != recipe.pedestalItems().size()
+                    || !sameContents(modified, recipe.pedestalItems())) {
+                overrideIngredients = convertStacksToIngredients(modified);
+            } else {
+                overrideIngredients = null;
+            }
+        } else {
+            overrideIngredients = null;
         }
 
         // Source予約消費（TOCTOU防止: チェックと消費を一体化）
@@ -236,8 +247,9 @@ public class RitualManager {
 
                 // Source消費は予約済み（アニメーション前に消費済み）
 
-                // Pedestalの素材を消費（再検証後のPedestalを使用）
-                consumePedestalItems(revalidatePedestals, recipe.pedestalItems());
+                // Pedestalの素材を消費（再検証後のPedestalを使用、API override が来ていればそれを優先）
+                consumePedestalItems(revalidatePedestals,
+                    overrideIngredients != null ? overrideIngredients : recipe.pedestalItems());
 
                 // effectType分岐
                 if (!recipe.isCraftType()) {
@@ -489,6 +501,40 @@ public class RitualManager {
                 }
             }
         }
+    }
+
+    /** ItemStack リストと RitualIngredient リストが同一構成か (順序問わない) を判定する。 */
+    private static boolean sameContents(List<org.bukkit.inventory.ItemStack> stacks,
+                                         List<RitualIngredient> ings) {
+        if (stacks.size() != ings.size()) return false;
+        List<String> a = new java.util.ArrayList<>();
+        for (org.bukkit.inventory.ItemStack s : stacks) {
+            String id = com.arspaper.api.ArsAPI.getItemId(s);
+            a.add(id != null ? "custom:" + id : s.getType().name());
+        }
+        List<String> b = new java.util.ArrayList<>();
+        for (RitualIngredient ing : ings) {
+            b.add(ing.isCustom() ? "custom:" + ing.materialOrCustomId() : ing.materialOrCustomId());
+        }
+        java.util.Collections.sort(a);
+        java.util.Collections.sort(b);
+        return a.equals(b);
+    }
+
+    /** ItemStack リスト → RitualIngredient リスト変換 (API override 反映用)。 */
+    private static List<RitualIngredient> convertStacksToIngredients(
+            List<org.bukkit.inventory.ItemStack> stacks) {
+        List<RitualIngredient> out = new java.util.ArrayList<>();
+        for (org.bukkit.inventory.ItemStack s : stacks) {
+            if (s == null || s.getType().isAir()) continue;
+            String customId = com.arspaper.api.ArsAPI.getItemId(s);
+            if (customId != null) {
+                out.add(RitualIngredient.ofCustom(customId));
+            } else {
+                out.add(RitualIngredient.ofMaterial(s.getType()));
+            }
+        }
+        return out;
     }
 
     private void consumePedestalItems(List<PedestalInfo> pedestals, List<RitualIngredient> requiredItems) {

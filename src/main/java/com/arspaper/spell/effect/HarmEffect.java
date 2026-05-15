@@ -61,7 +61,7 @@ public class HarmEffect implements SpellEffect {
 
             // ArsAPI: ArsSpellDamageEvent + magic damage marker
             var result = com.arspaper.api.internal.SpellDamageDispatcher
-                .dispatch(context, target, id.toString(), damage);
+                .dispatch(context, target, id.getKey(), damage);
             if (result.cancelled()) return;
             target.damage(result.damage(), context.getCaster());
         }

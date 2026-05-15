@@ -3,9 +3,14 @@ package com.arspaper.api;
 import com.arspaper.api.modifier.ArsModifier;
 import com.arspaper.api.modifier.ModifierStore;
 import com.arspaper.api.modifier.ModifierType;
+import com.arspaper.mana.ManaKeys;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonParser;
 import org.bukkit.NamespacedKey;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
+import org.bukkit.persistence.PersistentDataContainer;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
@@ -89,13 +94,18 @@ public final class ArsPlayerDataStore {
 
     /** ファイルから unlock 状態 + (有効な場合) modifier を読み込む。 */
     public void load(Player player) {
-        load(player.getUniqueId());
+        File file = playerFile(player.getUniqueId());
+        if (!file.exists()) return;
+        loadInternal(player.getUniqueId(), file, player);
     }
 
     public void load(UUID uuid) {
         File file = playerFile(uuid);
         if (!file.exists()) return;
+        loadInternal(uuid, file, plugin.getServer().getPlayer(uuid));
+    }
 
+    private void loadInternal(UUID uuid, File file, Player onlinePlayer) {
         YamlConfiguration cfg;
         try {
             cfg = YamlConfiguration.loadConfiguration(file);
@@ -108,6 +118,29 @@ public final class ArsPlayerDataStore {
         Set<String> recipes = new HashSet<>(cfg.getStringList("unlocked-recipes"));
         unlockedRituals.computeIfAbsent(uuid, k -> ConcurrentHashMap.newKeySet()).addAll(rituals);
         unlockedRecipes.computeIfAbsent(uuid, k -> ConcurrentHashMap.newKeySet()).addAll(recipes);
+
+        // 仕様§10.1: unlocked-glyphs を yml に保存しておく
+        // PDC ManaKeys.UNLOCKED_GLYPHS が権威データ。yml に entry があり PDC が空なら復元する。
+        if (onlinePlayer != null && onlinePlayer.isOnline()) {
+            List<String> ymlGlyphs = cfg.getStringList("unlocked-glyphs");
+            if (!ymlGlyphs.isEmpty()) {
+                PersistentDataContainer pdc = onlinePlayer.getPersistentDataContainer();
+                String existing = pdc.get(ManaKeys.UNLOCKED_GLYPHS, PersistentDataType.STRING);
+                Set<String> pdcSet = new HashSet<>();
+                if (existing != null) {
+                    try {
+                        JsonParser.parseString(existing).getAsJsonArray()
+                            .forEach(el -> pdcSet.add(el.getAsString()));
+                    } catch (Exception ignored) {}
+                }
+                if (pdcSet.isEmpty()) {
+                    // PDC 側が空 → yml から復元
+                    JsonArray arr = new JsonArray();
+                    ymlGlyphs.forEach(arr::add);
+                    pdc.set(ManaKeys.UNLOCKED_GLYPHS, PersistentDataType.STRING, arr.toString());
+                }
+            }
+        }
 
         if (persistModifiers) {
             List<ArsModifier> mods = new ArrayList<>();
@@ -151,6 +184,26 @@ public final class ArsPlayerDataStore {
         Set<String> recipes = unlockedRecipes.get(uuid);
         if (rituals != null) cfg.set("unlocked-rituals", new ArrayList<>(rituals));
         if (recipes != null) cfg.set("unlocked-recipes", new ArrayList<>(recipes));
+
+        // 仕様§10.1: PDC の unlocked-glyphs を yml にミラーする (運用ツールが yml を読めるように)
+        Player online = plugin.getServer().getPlayer(uuid);
+        if (online != null && online.isOnline()) {
+            String json = online.getPersistentDataContainer()
+                .get(ManaKeys.UNLOCKED_GLYPHS, PersistentDataType.STRING);
+            if (json != null) {
+                List<String> ymlGlyphs = new ArrayList<>();
+                try {
+                    JsonParser.parseString(json).getAsJsonArray()
+                        .forEach(el -> ymlGlyphs.add(el.getAsString()));
+                } catch (Exception e) {
+                    plugin.getLogger().warning(
+                        "Failed to mirror unlocked-glyphs to yml for " + uuid + ": " + e.getMessage());
+                }
+                if (!ymlGlyphs.isEmpty()) {
+                    cfg.set("unlocked-glyphs", ymlGlyphs);
+                }
+            }
+        }
 
         if (persistModifiers) {
             List<ArsModifier> mods = modifierStore.snapshot(uuid);

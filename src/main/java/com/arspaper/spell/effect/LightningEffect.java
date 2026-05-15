@@ -59,7 +59,7 @@ public class LightningEffect implements SpellEffect {
 
             damage = context.calculateSpellDamage(damage, target);
             var result = com.arspaper.api.internal.SpellDamageDispatcher
-                .dispatch(context, target, "arspaper:lightning", damage);
+                .dispatch(context, target, "lightning", damage);
             if (result.cancelled()) return;
             target.damage(result.damage(), context.getCaster());
 

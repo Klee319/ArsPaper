@@ -136,47 +136,68 @@ public class ScribingTableGui extends BaseGui {
             return true;
         }
 
+        // 元コスト
+        GlyphConfig glyphConfig = plugin.getGlyphConfig();
+        String glyphKey = component.getId().getKey();
+        int levelCost = glyphConfig.getUnlockLevel(glyphKey);
+        java.util.Map<Material, Integer> materials =
+            new java.util.LinkedHashMap<>(glyphConfig.getUnlockMaterials(glyphKey));
+
         // ArsAPI: ArsGlyphUnlockRequestEvent 発火（外部から削減/cancel可能）
-        GlyphConfig _gc = plugin.getGlyphConfig();
-        int _baseLevel = _gc.getUnlockLevel(glyphKeyForCheck);
-        java.util.List<ItemStack> _materials = new java.util.ArrayList<>();
-        for (var _e : _gc.getUnlockMaterials(glyphKeyForCheck).entrySet()) {
-            _materials.add(new ItemStack(_e.getKey(), _e.getValue()));
-        }
         if (com.arspaper.api.ArsAPI.isInitialized()) {
+            java.util.List<ItemStack> _materials = new java.util.ArrayList<>();
+            for (var _e : materials.entrySet()) {
+                _materials.add(new ItemStack(_e.getKey(), _e.getValue()));
+            }
             com.arspaper.api.event.ArsGlyphUnlockRequestEvent _req =
                 new com.arspaper.api.event.ArsGlyphUnlockRequestEvent(
-                    clicker, component.getId().toString(), _materials, _baseLevel);
+                    clicker, glyphKey, _materials, levelCost);
             org.bukkit.Bukkit.getPluginManager().callEvent(_req);
             if (_req.isCancelled()) {
                 clicker.sendMessage(Component.text(
                     "解放が中断されました", NamedTextColor.RED));
                 return true;
             }
-            // 注意: 削減後のmaterials/levelCostは現状未使用。アニメーション側で消費する
-            // 既存コストを使うため、Event はモニタリング目的のみで動作する。
-            // ※ MATERIAL_REDUCTION_CHANCE は ArsAPI 経由で SpellCraftingGui 等で適用予定。
+            // 修正後のコストを採用（仕様§6.3: setMaterialsToConsume / setLevelCost を反映）
+            levelCost = _req.getLevelCost();
+            materials = new java.util.LinkedHashMap<>();
+            for (ItemStack _is : _req.getMaterialsToConsume()) {
+                if (_is == null || _is.getType().isAir() || _is.getAmount() <= 0) continue;
+                materials.merge(_is.getType(), _is.getAmount(), Integer::sum);
+            }
+            // 修正後のコストで再度在庫/レベルをチェック
+            if (clicker.getLevel() < levelCost) {
+                clicker.sendMessage(Component.text(
+                    "レベルが不足しています！必要: " + levelCost, NamedTextColor.RED));
+                return true;
+            }
+            for (var entry : materials.entrySet()) {
+                int count = countVanillaItems(clicker, entry.getKey());
+                if (count < entry.getValue()) {
+                    clicker.sendMessage(Component.text(
+                        "素材が不足しています！", NamedTextColor.RED));
+                    return true;
+                }
+            }
         }
 
         unlocking = true;
 
-        // 経験値レベルはアニメーション完了後に消費（中断時のXPロスを防止）
-        GlyphConfig glyphConfig = plugin.getGlyphConfig();
-        String glyphKey = component.getId().getKey();
-        int levelCost = glyphConfig.getUnlockLevel(glyphKey);
-        java.util.Map<Material, Integer> materials = glyphConfig.getUnlockMaterials(glyphKey);
+        // 以降は修正後の levelCost / materials を使う（final 化）
+        final int finalLevelCost = levelCost;
+        final java.util.Map<Material, Integer> finalMaterials = materials;
 
         // アンロックアニメーション開始（GUI閉じ→素材消費→軌道演出→XP消費→アンロック完了）
         GlyphUnlockAnimation.play(
             plugin, clicker, component, tableLocation,
-            materials, levelCost, unlocked,
+            finalMaterials, finalLevelCost, unlocked,
             () -> {
                 // アニメーション完了後にXPを再検証（TOCTOU防止）
-                if (clicker.getLevel() < levelCost) {
+                if (clicker.getLevel() < finalLevelCost) {
                     clicker.sendMessage(Component.text(
                         "経験値レベルが不足しています！アンロックに失敗しました。", NamedTextColor.RED));
                     // 素材は既に消費済みのため返還（インベントリ満杯時は足元にドロップ）
-                    for (var entry : materials.entrySet()) {
+                    for (var entry : finalMaterials.entrySet()) {
                         java.util.Map<Integer, ItemStack> overflow =
                             clicker.getInventory().addItem(new ItemStack(entry.getKey(), entry.getValue()));
                         overflow.values().forEach(item ->
@@ -184,7 +205,7 @@ public class ScribingTableGui extends BaseGui {
                     }
                     return;
                 }
-                clicker.setLevel(clicker.getLevel() - levelCost);
+                clicker.setLevel(clicker.getLevel() - finalLevelCost);
                 saveUnlockedGlyphs(unlocked);
 
                 // ArsAPI: ArsGlyphUnlockedEvent 発火
@@ -192,7 +213,7 @@ public class ScribingTableGui extends BaseGui {
                     plugin.getSpellCaster().invalidateGlyphCache(clicker.getUniqueId());
                     org.bukkit.Bukkit.getPluginManager().callEvent(
                         new com.arspaper.api.event.ArsGlyphUnlockedEvent(
-                            clicker, component.getId().toString(),
+                            clicker, component.getId().getKey(),
                             com.arspaper.api.event.UnlockSource.PLAYER_CRAFT));
                 }
             }

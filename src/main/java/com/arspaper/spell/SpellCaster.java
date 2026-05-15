@@ -116,9 +116,10 @@ public class SpellCaster {
             java.util.List<String> glyphIds = new java.util.ArrayList<>();
             String primaryEffectId = null;
             for (SpellComponent comp : recipe.getComponents()) {
-                glyphIds.add(comp.getId().toString());
+                // 仕様§6.1: glyphId は namespace 抜きの key 部分 ("harm"/"projectile" 等)
+                glyphIds.add(comp.getId().getKey());
                 if (primaryEffectId == null && comp instanceof SpellEffect) {
-                    primaryEffectId = comp.getId().toString();
+                    primaryEffectId = comp.getId().getKey();
                 }
             }
             com.arspaper.api.event.ArsSpellCastEvent castEvent =

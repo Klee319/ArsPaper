@@ -69,42 +69,61 @@ public final class ArsAPI {
     // ============================================================
 
     public static boolean isGlyphUnlocked(Player p, String glyphId) {
-        return getUnlockedGlyphs(p).contains(glyphId);
+        return readGlyphSet(p).contains(normalizeGlyphId(glyphId));
     }
 
     public static void unlockGlyph(Player p, String glyphId) {
         ensureInit();
+        String normalized = normalizeGlyphId(glyphId);
         Set<String> set = readGlyphSet(p);
-        if (set.add(glyphId)) {
+        if (set.add(normalized)) {
             writeGlyphSet(p, set);
             plugin.getSpellCaster().invalidateGlyphCache(p.getUniqueId());
             plugin.getServer().getPluginManager().callEvent(
-                new ArsGlyphUnlockedEvent(p, glyphId, UnlockSource.API));
+                new ArsGlyphUnlockedEvent(p, stripNamespace(normalized), UnlockSource.API));
         }
     }
 
     public static void lockGlyph(Player p, String glyphId) {
         ensureInit();
+        String normalized = normalizeGlyphId(glyphId);
         Set<String> set = readGlyphSet(p);
-        if (set.remove(glyphId)) {
+        if (set.remove(normalized)) {
             writeGlyphSet(p, set);
             plugin.getSpellCaster().invalidateGlyphCache(p.getUniqueId());
             plugin.getServer().getPluginManager().callEvent(
-                new ArsGlyphLockedEvent(p, glyphId, LockSource.API));
+                new ArsGlyphLockedEvent(p, stripNamespace(normalized), LockSource.API));
         }
     }
 
     public static Set<String> getUnlockedGlyphs(Player p) {
-        return Collections.unmodifiableSet(readGlyphSet(p));
+        // 仕様§5: 返り値は plain key (namespace 抜き)
+        Set<String> out = new HashSet<>();
+        for (String s : readGlyphSet(p)) out.add(stripNamespace(s));
+        return Collections.unmodifiableSet(out);
     }
 
     public static Set<String> getAllGlyphIds() {
         ensureInit();
         Set<String> ids = new HashSet<>();
         for (SpellComponent c : plugin.getSpellRegistry().getAll()) {
-            ids.add(c.getId().toString());
+            // 仕様§5: plain key で返す
+            ids.add(c.getId().getKey());
         }
         return Collections.unmodifiableSet(ids);
+    }
+
+    /** 入力 glyphId を内部 PDC 形式 ("arspaper:key") に正規化する。 */
+    private static String normalizeGlyphId(String glyphId) {
+        if (glyphId == null) return "";
+        return glyphId.contains(":") ? glyphId : "arspaper:" + glyphId;
+    }
+
+    /** 内部 PDC 形式 ("arspaper:key") から key 部のみ取り出す。 */
+    private static String stripNamespace(String fullId) {
+        if (fullId == null) return "";
+        int colon = fullId.indexOf(':');
+        return colon >= 0 ? fullId.substring(colon + 1) : fullId;
     }
 
     public static @Nullable String getGlyphIdFromItem(ItemStack item) {
