@@ -110,6 +110,28 @@ public class SpellCaster {
         int costReduction = Math.min(100, caster.getPersistentDataContainer()
             .getOrDefault(ManaKeys.THREAD_COST_REDUCTION, PersistentDataType.INTEGER, 0));
         int cost = Math.max(1, baseCost - (int) Math.round(baseCost * costReduction / 100.0));
+
+        // ArsAPI: ArsSpellCastEvent 発火 (cancellable + manaCost 改竄反映)
+        if (com.arspaper.api.ArsAPI.isInitialized()) {
+            java.util.List<String> glyphIds = new java.util.ArrayList<>();
+            String primaryEffectId = null;
+            for (SpellComponent comp : recipe.getComponents()) {
+                glyphIds.add(comp.getId().toString());
+                if (primaryEffectId == null && comp instanceof SpellEffect) {
+                    primaryEffectId = comp.getId().toString();
+                }
+            }
+            com.arspaper.api.event.ArsSpellCastEvent castEvent =
+                new com.arspaper.api.event.ArsSpellCastEvent(
+                    caster, glyphIds, primaryEffectId == null ? "" : primaryEffectId,
+                    cost, 0.0);
+            org.bukkit.Bukkit.getPluginManager().callEvent(castEvent);
+            if (castEvent.isCancelled()) {
+                return false;
+            }
+            cost = Math.max(0, (int) Math.round(castEvent.getManaCost()));
+        }
+
         if (!manaManager.consumeMana(caster, cost)) {
             // マナ不足通知が無効化されていなければメッセージ表示
             int notifyOff = caster.getPersistentDataContainer()
@@ -207,6 +229,9 @@ public class SpellCaster {
             JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
             arr.forEach(el -> unlocked.add(el.getAsString()));
         } catch (Exception e) {
+            ArsPaper.getInstance().getLogger().warning(
+                "Corrupted UNLOCKED_GLYPHS PDC for player " + player.getName()
+                + ": " + e.getMessage());
             return Set.of();
         }
 

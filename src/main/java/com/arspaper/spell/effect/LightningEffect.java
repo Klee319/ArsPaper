@@ -58,7 +58,10 @@ public class LightningEffect implements SpellEffect {
             }
 
             damage = context.calculateSpellDamage(damage, target);
-            target.damage(damage, context.getCaster());
+            var result = com.arspaper.api.internal.SpellDamageDispatcher
+                .dispatch(context, target, "arspaper:lightning", damage);
+            if (result.cancelled()) return;
+            target.damage(result.damage(), context.getCaster());
 
             // Shockedステータス: Slowness I を付与
             int shockedBase = (int) config.getParam("lightning", "shocked-base-ticks", (double) SHOCKED_BASE_TICKS);

@@ -148,6 +148,15 @@ public class LingerEffect implements SpellEffect {
         activeZones.clear();
     }
 
+    /** LingerForm 等から呼ばれる外部トラッキングAPI。シャットダウン時にcleanupAllで一括キャンセルされる。 */
+    public static void trackZoneTask(BukkitTask task) {
+        if (task != null) activeZones.add(task);
+    }
+
+    public static void untrackZoneTask(BukkitTask task) {
+        if (task != null) activeZones.remove(task);
+    }
+
     /**
      * LingerAugmentから呼び出される静的ゾーン開始メソッド。
      * LingerEffectのインスタンスなしでゾーンを生成する。

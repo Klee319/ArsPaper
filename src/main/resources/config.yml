@@ -22,6 +22,16 @@ geyser:
   # リソースパック未使用のGeyserサーバーではtrueにすること
   disable-custom-model-data: true
 
+# ArsAPI (外部プラグイン連携: ValhallaMMO/EliteMobs等)
+api:
+  # APIを有効化するか（無効化時は内部のイベント発火を抑止）
+  enabled: true
+  # デバッグ用: 発火される全Eventをログ出力する
+  event-log: false
+  # ModifierをサーバーリスタートでもPDC/ymlに永続化するか
+  # falseの場合、外部プラグイン側が再ログイン時に毎回再適用する想定
+  modifier-persistence: false
+
 # カスタムエンチャント定数
 # 金床でメイジ防具に適用した際のボーナス値
 enchantments:

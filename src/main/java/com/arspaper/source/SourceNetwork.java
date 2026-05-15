@@ -33,7 +33,7 @@ public class SourceNetwork {
     private final JavaPlugin plugin;
     private final Map<LocationKey, Set<LocationKey>> connections = new HashMap<>();
     private BukkitTask transferTask;
-    private boolean dirty = false;
+    private volatile boolean dirty = false;
 
     public SourceNetwork(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -182,7 +182,7 @@ public class SourceNetwork {
 
                 int toAmount = toTile.getPersistentDataContainer()
                     .getOrDefault(BlockKeys.SOURCE_AMOUNT, PersistentDataType.INTEGER, 0);
-                int toMax = SourceJar.MAX_SOURCE;
+                int toMax = SourceJar.getCapacity(toTile);
 
                 // 無限ソースジャーへの転送はスキップ
                 if (com.arspaper.block.impl.SourceJar.isInfinite(toTile)) continue;

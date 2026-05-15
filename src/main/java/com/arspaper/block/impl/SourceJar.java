@@ -20,17 +20,23 @@ import java.util.List;
 
 /**
  * Source Jar - Sourceを貯蔵するブロック。
- * バニラのBARREL（樽）をベースに使用。
- * 最大10,000 Sourceを貯蔵可能。
+ * バニラのDECORATED_POTをベースに使用。
+ * 標準容量: 10,000 (LargeSourceJarで100,000、GreaterSourceJarで1,000,000まで拡張可能)。
  *
  * 右クリックで貯蔵量を確認。
  */
 public class SourceJar extends CustomBlock {
 
-    public static final int MAX_SOURCE = 10000;
+    /** 標準ソース瓶の容量（後方互換のため定数として維持）。 */
+    public static final int MAX_SOURCE = 10_000;
 
     public SourceJar(JavaPlugin plugin) {
         super(plugin, "source_jar");
+    }
+
+    /** サブクラスからカスタムIDを渡すためのコンストラクタ。 */
+    protected SourceJar(JavaPlugin plugin, String id) {
+        super(plugin, id);
     }
 
     @Override
@@ -49,17 +55,30 @@ public class SourceJar extends CustomBlock {
         return 200002;
     }
 
+    /** このブロック種別の最大容量。サブクラスでオーバーライドして拡張tierを実装する。 */
+    public int getCapacity() {
+        return MAX_SOURCE;
+    }
+
+    /** lore表示用の色。サブクラスで上書き可能。 */
+    protected NamedTextColor getStorageColor() {
+        return NamedTextColor.AQUA;
+    }
+
     @Override
     public ItemStack createItemStack() {
         ItemStack item = super.createItemStack();
-        item.editMeta(meta ->
+        item.editMeta(meta -> {
+            meta.getPersistentDataContainer().set(
+                ITEM_CAPACITY_KEY, PersistentDataType.INTEGER, getCapacity()
+            );
             meta.lore(List.of(
                 Component.text("魔法のソースエネルギーを貯蔵", NamedTextColor.GRAY)
                     .decoration(TextDecoration.ITALIC, false),
-                Component.text("ソース: 0 / " + MAX_SOURCE, NamedTextColor.AQUA)
+                Component.text("ソース: 0 / " + getCapacity(), getStorageColor())
                     .decoration(TextDecoration.ITALIC, false)
-            ))
-        );
+            ));
+        });
         return item;
     }
 
@@ -72,28 +91,31 @@ public class SourceJar extends CustomBlock {
 
     /** Source量をItemStackのPDCに保存するキー */
     private static final NamespacedKey ITEM_SOURCE_KEY = new NamespacedKey("arspaper", "stored_source");
+    /** 容量をItemStackのPDCに保存するキー（tier識別用） */
+    private static final NamespacedKey ITEM_CAPACITY_KEY = new NamespacedKey("arspaper", "stored_capacity");
 
     @Override
     public void onBlockPlaced(Player player, Block block, TileState tileState) {
-        // 設置に使ったアイテムからSource量を復元
-        // BlockPlaceEvent時点ではアイテムが既に消費されている場合があるため、
-        // 両手をチェックし、ITEM_SOURCE_KEYを持つアイテムを探す
+        // 設置に使ったアイテムからSource量と容量を復元
         int restoredSource = 0;
+        int restoredCapacity = getCapacity();
         for (ItemStack hand : new ItemStack[]{
                 player.getInventory().getItemInMainHand(),
                 player.getInventory().getItemInOffHand()}) {
             if (hand != null && hand.hasItemMeta()) {
-                Integer stored = hand.getItemMeta().getPersistentDataContainer()
-                    .get(ITEM_SOURCE_KEY, PersistentDataType.INTEGER);
-                if (stored != null && stored > 0) {
-                    restoredSource = stored;
+                PersistentDataContainer itemPdc = hand.getItemMeta().getPersistentDataContainer();
+                Integer storedCap = itemPdc.get(ITEM_CAPACITY_KEY, PersistentDataType.INTEGER);
+                Integer stored = itemPdc.get(ITEM_SOURCE_KEY, PersistentDataType.INTEGER);
+                if (storedCap != null || stored != null) {
+                    if (storedCap != null) restoredCapacity = storedCap;
+                    if (stored != null) restoredSource = stored;
                     break;
                 }
             }
         }
-        tileState.getPersistentDataContainer().set(
-            BlockKeys.SOURCE_AMOUNT, PersistentDataType.INTEGER, restoredSource
-        );
+        PersistentDataContainer pdc = tileState.getPersistentDataContainer();
+        pdc.set(BlockKeys.SOURCE_AMOUNT, PersistentDataType.INTEGER, restoredSource);
+        pdc.set(BlockKeys.SOURCE_CAPACITY, PersistentDataType.INTEGER, restoredCapacity);
         tileState.update();
     }
 
@@ -101,16 +123,16 @@ public class SourceJar extends CustomBlock {
     public ItemStack createDropWithData(TileState tileState) {
         ItemStack drop = super.createDropWithData(tileState);
         int source = getSourceAmount(tileState);
+        int capacity = getCapacity(tileState);
+        NamedTextColor color = getStorageColor();
         drop.editMeta(meta -> {
-            // Source量をアイテムPDCに保存
-            meta.getPersistentDataContainer().set(
-                ITEM_SOURCE_KEY, PersistentDataType.INTEGER, source
-            );
-            // Lore に現在のSource量を反映
+            PersistentDataContainer itemPdc = meta.getPersistentDataContainer();
+            itemPdc.set(ITEM_SOURCE_KEY, PersistentDataType.INTEGER, source);
+            itemPdc.set(ITEM_CAPACITY_KEY, PersistentDataType.INTEGER, capacity);
             meta.lore(List.of(
                 Component.text("魔法のソースエネルギーを貯蔵", NamedTextColor.GRAY)
                     .decoration(TextDecoration.ITALIC, false),
-                Component.text("ソース: " + source + " / " + MAX_SOURCE, NamedTextColor.AQUA)
+                Component.text("ソース: " + source + " / " + capacity, color)
                     .decoration(TextDecoration.ITALIC, false)
             ));
         });
@@ -122,6 +144,8 @@ public class SourceJar extends CustomBlock {
 
     @Override
     public void onBlockInteract(Player player, Block block, TileState tileState) {
+        int capacity = getCapacity(tileState);
+
         // ソースベリーを持っている場合: Source追加
         ItemStack hand = player.getInventory().getItemInMainHand();
         if (hand.hasItemMeta()) {
@@ -129,16 +153,16 @@ public class SourceJar extends CustomBlock {
                 .get(ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING);
             if ("source_berry".equals(customId) && !isInfinite(tileState)) {
                 int currentSource = getSourceAmount(tileState);
-                if (currentSource >= MAX_SOURCE) {
+                if (currentSource >= capacity) {
                     player.sendMessage(Component.text("ソースジャーは満タンです", NamedTextColor.YELLOW));
                     return;
                 }
 
                 // ベリー消費 + Source追加
                 hand.setAmount(hand.getAmount() - 1);
-                int added = setSourceAmount(tileState, currentSource + SOURCE_PER_BERRY) - currentSource;
+                int added = addSource(tileState, SOURCE_PER_BERRY);
                 player.sendMessage(Component.text(
-                    "ソースを" + added + "追加しました (" + getSourceAmount(tileState) + "/" + MAX_SOURCE + ")",
+                    "ソースを" + added + "追加しました (" + getSourceAmount(tileState) + "/" + capacity + ")",
                     NamedTextColor.AQUA));
                 player.playSound(player.getLocation(),
                     org.bukkit.Sound.BLOCK_BREWING_STAND_BREW,
@@ -152,12 +176,12 @@ public class SourceJar extends CustomBlock {
         // 通常の右クリック: 貯蔵量表示
         if (isInfinite(tileState)) {
             player.sendMessage(Component.text(
-                "ソース: \u221E (無限)", NamedTextColor.LIGHT_PURPLE
+                "ソース: ∞ (無限)", NamedTextColor.LIGHT_PURPLE
             ));
         } else {
             int source = getSourceAmount(tileState);
             player.sendMessage(Component.text(
-                "ソース: " + source + " / " + MAX_SOURCE, NamedTextColor.AQUA
+                "ソース: " + source + " / " + capacity, NamedTextColor.AQUA
             ));
         }
     }
@@ -171,10 +195,19 @@ public class SourceJar extends CustomBlock {
     }
 
     /**
-     * TileStateからSource量を取得。無限の場合は常にMAX_SOURCE。
+     * TileStateの最大容量を取得する。未設定なら標準値（MAX_SOURCE）。
+     * Tier情報を読み出すための統一API。
+     */
+    public static int getCapacity(TileState tileState) {
+        return tileState.getPersistentDataContainer()
+            .getOrDefault(BlockKeys.SOURCE_CAPACITY, PersistentDataType.INTEGER, MAX_SOURCE);
+    }
+
+    /**
+     * TileStateからSource量を取得。無限の場合は常に容量上限。
      */
     public static int getSourceAmount(TileState tileState) {
-        if (isInfinite(tileState)) return MAX_SOURCE;
+        if (isInfinite(tileState)) return getCapacity(tileState);
         return tileState.getPersistentDataContainer()
             .getOrDefault(BlockKeys.SOURCE_AMOUNT, PersistentDataType.INTEGER, 0);
     }
@@ -185,7 +218,8 @@ public class SourceJar extends CustomBlock {
      * @return 実際に設定された量
      */
     public static int setSourceAmount(TileState tileState, int amount) {
-        int clamped = Math.clamp(amount, 0, MAX_SOURCE);
+        int capacity = getCapacity(tileState);
+        int clamped = Math.clamp(amount, 0, capacity);
         tileState.getPersistentDataContainer().set(
             BlockKeys.SOURCE_AMOUNT, PersistentDataType.INTEGER, clamped
         );
@@ -200,7 +234,8 @@ public class SourceJar extends CustomBlock {
      */
     public static int addSource(TileState tileState, int amount) {
         int current = getSourceAmount(tileState);
-        int added = Math.min(amount, MAX_SOURCE - current);
+        int capacity = getCapacity(tileState);
+        int added = Math.min(amount, capacity - current);
         if (added > 0) {
             setSourceAmount(tileState, current + added);
         }

@@ -206,7 +206,9 @@ public class RitualCore extends CustomBlock {
             try {
                 return ItemStack.deserializeBytes(data);
             } catch (Exception e) {
-                // デシリアライズ失敗時は後方互換にフォールバック
+                com.arspaper.ArsPaper.getInstance().getLogger().warning(
+                    "Failed to deserialize stored core item (data length=" + data.length
+                    + "), falling back to legacy: " + e.getMessage());
             }
         }
         // 後方互換: Material名+カスタムID+スペルデータから再生成

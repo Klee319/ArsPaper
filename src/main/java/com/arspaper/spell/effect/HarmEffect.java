@@ -58,7 +58,12 @@ public class HarmEffect implements SpellEffect {
             double amplifyBonus = config.getParam("harm", "amplify-bonus", DEFAULT_AMPLIFY_BONUS);
             double damage = Math.max(0, baseDamage + context.getAmplifyLevel() * amplifyBonus);
             damage = context.calculateSpellDamage(damage, target);
-            target.damage(damage, context.getCaster());
+
+            // ArsAPI: ArsSpellDamageEvent + magic damage marker
+            var result = com.arspaper.api.internal.SpellDamageDispatcher
+                .dispatch(context, target, id.toString(), damage);
+            if (result.cancelled()) return;
+            target.damage(result.damage(), context.getCaster());
         }
         SpellFxUtil.spawnHarmFx(target.getLocation());
     }

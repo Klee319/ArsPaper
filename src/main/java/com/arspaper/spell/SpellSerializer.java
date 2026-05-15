@@ -72,15 +72,22 @@ public final class SpellSerializer {
      * JSON配列 → 複数スロットのスペルリスト。
      */
     public static List<SpellRecipe> deserializeSlots(String json, SpellRegistry registry) {
-        JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
-        List<SpellRecipe> slots = new ArrayList<>();
-        for (JsonElement el : arr) {
-            if (el.isJsonNull()) {
-                slots.add(null);
-            } else {
-                slots.add(deserialize(GSON.toJson(el), registry));
+        try {
+            JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
+            List<SpellRecipe> slots = new ArrayList<>();
+            for (JsonElement el : arr) {
+                if (el.isJsonNull()) {
+                    slots.add(null);
+                } else {
+                    slots.add(deserialize(GSON.toJson(el), registry));
+                }
             }
+            return slots;
+        } catch (Exception e) {
+            com.arspaper.ArsPaper.getInstance().getLogger().warning(
+                "Failed to deserialize spell slots JSON (length="
+                + (json == null ? 0 : json.length()) + "): " + e.getMessage());
+            return java.util.Collections.emptyList();
         }
-        return slots;
     }
 }

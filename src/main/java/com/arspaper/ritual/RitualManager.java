@@ -85,6 +85,24 @@ public class RitualManager {
 
         RitualRecipe recipe = matchOpt.get();
 
+        // ArsAPI: ArsRitualPreEvent 発火 (cancellable)
+        if (com.arspaper.api.ArsAPI.isInitialized()) {
+            java.util.List<org.bukkit.inventory.ItemStack> _matStacks = new java.util.ArrayList<>();
+            for (RitualIngredient ing : recipe.pedestalItems()) {
+                _matStacks.add(ing.toItemStack());
+            }
+            com.arspaper.api.event.ArsRitualPreEvent _pre =
+                new com.arspaper.api.event.ArsRitualPreEvent(
+                    player, recipe.id(), coreLocation, _matStacks);
+            org.bukkit.Bukkit.getPluginManager().callEvent(_pre);
+            if (_pre.isCancelled()) {
+                player.sendMessage(Component.text(
+                    "儀式がキャンセルされました", NamedTextColor.RED));
+                return;
+            }
+            // setRequiredMaterials 反映は現状参考情報のみ（消費パスは既存ロジック維持）。
+        }
+
         // Source予約消費（TOCTOU防止: チェックと消費を一体化）
         // アニメーション中に他の儀式がSourceを使い切るのを防ぐため、先に消費する
         final boolean sourceReserved;
@@ -115,6 +133,21 @@ public class RitualManager {
 
             @Override
             public void run() {
+                try {
+                    doRun();
+                } catch (Exception e) {
+                    // 儀式タスク内の例外で activatingRituals がロックされ続けるのを防ぐ
+                    cancel();
+                    activatingRituals.remove(coreLocation.getBlock().getLocation());
+                    refundSource(coreLocation, sourceReserved ? recipe.sourceRequired() : 0);
+                    ArsPaper.getInstance().getLogger().log(java.util.logging.Level.WARNING,
+                        "Ritual task failed for recipe " + recipe.id() + " at " + coreLocation, e);
+                    player.sendMessage(Component.text(
+                        "儀式中にエラーが発生したため中断しました", NamedTextColor.RED));
+                }
+            }
+
+            private void doRun() {
                 ticks++;
 
                 if (ticks <= TOTAL_TICKS) {
@@ -225,11 +258,14 @@ public class RitualManager {
                     playRitualCompleteEffects(coreLocation);
                     player.sendMessage(Component.text(
                         "儀式完了: " + recipe.name() + "！", NamedTextColor.GREEN));
+                    firePostEvent(player, recipe, coreLocation, true);
                 } else {
                     // craft タイプ（従来のアイテム生成）
                     ItemStack result = resolveResult(recipe);
                     if (result == null) {
                         player.sendMessage(Component.text("儀式の結果が無効です！", NamedTextColor.RED));
+                        refundSource(coreLocation, sourceReserved ? recipe.sourceRequired() : 0);
+                        firePostEvent(player, recipe, coreLocation, false);
                         return;
                     }
 
@@ -314,9 +350,19 @@ public class RitualManager {
 
                     player.sendMessage(Component.text(
                         "儀式完了: " + recipe.name() + "！", NamedTextColor.GREEN));
+                    firePostEvent(player, recipe, coreLocation, true);
                 }
             }
         }.runTaskTimer(ArsPaper.getInstance(), 1L, 1L);
+    }
+
+    /** ArsAPI: 儀式完了 post-event を発火する共通ヘルパ。 */
+    private void firePostEvent(Player player, RitualRecipe recipe, Location coreLocation, boolean successful) {
+        if (com.arspaper.api.ArsAPI.isInitialized()) {
+            org.bukkit.Bukkit.getPluginManager().callEvent(
+                new com.arspaper.api.event.ArsRitualPostEvent(
+                    player, recipe.id(), coreLocation, successful));
+        }
     }
 
     /**

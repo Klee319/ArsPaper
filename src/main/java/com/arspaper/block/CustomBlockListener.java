@@ -394,15 +394,17 @@ public class CustomBlockListener implements Listener {
                     int sourcePerBerry = 100; // ソースベリー1個=100ソース
                     if (!com.arspaper.block.impl.SourceJar.isInfinite(destTile)) {
                         int current = com.arspaper.block.impl.SourceJar.getSourceAmount(destTile);
-                        if (current < com.arspaper.block.impl.SourceJar.MAX_SOURCE) {
+                        int cap = com.arspaper.block.impl.SourceJar.getCapacity(destTile);
+                        if (current < cap) {
                             com.arspaper.block.impl.SourceJar.addSource(destTile, sourcePerBerry);
                             event.setCancelled(true);
-                            // ホッパー側のアイテムを1個減らす
-                            Material itemType = item.getType();
+                            // ホッパー側のアイテムを1個減らす (isSimilar で PDC を含む完全一致)
+                            final ItemStack matchTemplate = item.clone();
+                            matchTemplate.setAmount(1);
                             org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
                                 for (int i = 0; i < event.getSource().getSize(); i++) {
                                     ItemStack slot = event.getSource().getItem(i);
-                                    if (slot != null && slot.getType() == itemType) {
+                                    if (slot != null && slot.isSimilar(matchTemplate)) {
                                         slot.setAmount(slot.getAmount() - 1);
                                         break;
                                     }
@@ -428,12 +430,13 @@ public class CustomBlockListener implements Listener {
             // ホッパーは1個ずつ移動するためそのまま消費してバッファに追加
             sourcelink.addToBuffer(destState.getBlock(), sourceValue);
             event.setCancelled(true);
-            // ホッパー側のアイテムを1個減らす（次tickで反映）
-            Material itemType = item.getType();
+            // ホッパー側のアイテムを1個減らす（次tickで反映、isSimilar で PDC を含む完全一致）
+            final ItemStack matchTemplate = item.clone();
+            matchTemplate.setAmount(1);
             org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
                 for (int i = 0; i < event.getSource().getSize(); i++) {
                     ItemStack slot = event.getSource().getItem(i);
-                    if (slot != null && slot.getType() == itemType) {
+                    if (slot != null && slot.isSimilar(matchTemplate)) {
                         slot.setAmount(slot.getAmount() - 1);
                         break;
                     }

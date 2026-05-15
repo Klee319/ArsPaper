@@ -81,7 +81,8 @@ public class LingerForm implements SpellForm {
         double zoneRadius = config.getParam("linger", "zone-radius", ZONE_RADIUS);
         int totalDuration = Math.max(zoneTickInterval, context.getLingerLevel() * ticksPerLevel);
 
-        new BukkitRunnable() {
+        final org.bukkit.scheduler.BukkitTask[] taskHolder = new org.bukkit.scheduler.BukkitTask[1];
+        taskHolder[0] = new BukkitRunnable() {
             private int elapsed = 0;
 
             @Override
@@ -90,6 +91,7 @@ public class LingerForm implements SpellForm {
 
                 if (elapsed > totalDuration || !caster.isOnline()) {
                     cancel();
+                    com.arspaper.spell.effect.LingerEffect.untrackZoneTask(taskHolder[0]);
                     return;
                 }
 
@@ -109,6 +111,7 @@ public class LingerForm implements SpellForm {
                 blockContext.resolveOnBlock(center.getBlock().getLocation());
             }
         }.runTaskTimer(plugin, 0L, zoneTickInterval);
+        com.arspaper.spell.effect.LingerEffect.trackZoneTask(taskHolder[0]);
     }
 
     /**

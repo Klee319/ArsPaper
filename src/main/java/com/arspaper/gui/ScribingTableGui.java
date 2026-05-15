@@ -124,8 +124,38 @@ public class ScribingTableGui extends BaseGui {
         // 二重クリック防止（アニメーション進行中は拒否）
         if (unlocking) return true;
 
+        // external-unlock-only グリフは筆記台クラフトを拒否（API経由のみ）
+        String glyphKeyForCheck = component.getId().getKey();
+        if (plugin.getGlyphConfig().isExternalUnlockOnly(glyphKeyForCheck)) {
+            clicker.sendMessage(Component.text(
+                "このグリフは通常の方法では解放できません", NamedTextColor.RED));
+            return true;
+        }
+
         if (!checkUnlockCost(clicker, component)) {
             return true;
+        }
+
+        // ArsAPI: ArsGlyphUnlockRequestEvent 発火（外部から削減/cancel可能）
+        GlyphConfig _gc = plugin.getGlyphConfig();
+        int _baseLevel = _gc.getUnlockLevel(glyphKeyForCheck);
+        java.util.List<ItemStack> _materials = new java.util.ArrayList<>();
+        for (var _e : _gc.getUnlockMaterials(glyphKeyForCheck).entrySet()) {
+            _materials.add(new ItemStack(_e.getKey(), _e.getValue()));
+        }
+        if (com.arspaper.api.ArsAPI.isInitialized()) {
+            com.arspaper.api.event.ArsGlyphUnlockRequestEvent _req =
+                new com.arspaper.api.event.ArsGlyphUnlockRequestEvent(
+                    clicker, component.getId().toString(), _materials, _baseLevel);
+            org.bukkit.Bukkit.getPluginManager().callEvent(_req);
+            if (_req.isCancelled()) {
+                clicker.sendMessage(Component.text(
+                    "解放が中断されました", NamedTextColor.RED));
+                return true;
+            }
+            // 注意: 削減後のmaterials/levelCostは現状未使用。アニメーション側で消費する
+            // 既存コストを使うため、Event はモニタリング目的のみで動作する。
+            // ※ MATERIAL_REDUCTION_CHANCE は ArsAPI 経由で SpellCraftingGui 等で適用予定。
         }
 
         unlocking = true;
@@ -156,6 +186,15 @@ public class ScribingTableGui extends BaseGui {
                 }
                 clicker.setLevel(clicker.getLevel() - levelCost);
                 saveUnlockedGlyphs(unlocked);
+
+                // ArsAPI: ArsGlyphUnlockedEvent 発火
+                if (com.arspaper.api.ArsAPI.isInitialized()) {
+                    plugin.getSpellCaster().invalidateGlyphCache(clicker.getUniqueId());
+                    org.bukkit.Bukkit.getPluginManager().callEvent(
+                        new com.arspaper.api.event.ArsGlyphUnlockedEvent(
+                            clicker, component.getId().toString(),
+                            com.arspaper.api.event.UnlockSource.PLAYER_CRAFT));
+                }
             }
         );
         return true;

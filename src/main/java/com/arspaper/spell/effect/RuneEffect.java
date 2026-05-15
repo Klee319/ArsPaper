@@ -22,6 +22,18 @@ public class RuneEffect implements SpellEffect {
     private final GlyphConfig config;
     private final JavaPlugin plugin;
 
+    /** サーバーシャットダウン時にキャンセルするためのアクティブなルーンタスク一覧。 */
+    private static final java.util.Set<org.bukkit.scheduler.BukkitTask> activeRuneTasks =
+        java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /** ArsPaper#onDisable から呼ぶ。全アクティブなルーンタスクをキャンセル。 */
+    public static void cleanupAll() {
+        for (org.bukkit.scheduler.BukkitTask task : activeRuneTasks) {
+            if (!task.isCancelled()) task.cancel();
+        }
+        activeRuneTasks.clear();
+    }
+
     public RuneEffect(JavaPlugin plugin, GlyphConfig config) {
         this.id = new NamespacedKey(plugin, "rune");
         this.config = config;
@@ -113,10 +125,13 @@ public class RuneEffect implements SpellEffect {
                 }
             }
         };
-        detectRunnable.runTaskTimer(plugin, 1L, 4L); // 4tickごとにスキャン（パフォーマンス最適化）
+        org.bukkit.scheduler.BukkitTask detectTask =
+            detectRunnable.runTaskTimer(plugin, 1L, 4L); // 4tickごとにスキャン（パフォーマンス最適化）
+        activeRuneTasks.add(detectTask);
 
         plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
             detectRunnable.cancel();
+            activeRuneTasks.remove(detectTask);
             spawnRuneFadeFx(runeLoc);
         }, lifetime);
     }

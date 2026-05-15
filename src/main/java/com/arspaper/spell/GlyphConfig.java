@@ -53,6 +53,7 @@ public class GlyphConfig {
 
             int tier = section.getInt("tier", 1);
             int manaCost = section.getInt("mana-cost", 10);
+            boolean externalUnlockOnly = section.getBoolean("external-unlock-only", false);
 
             int unlockLevel = 5;
             Map<Material, Integer> unlockMaterials = new LinkedHashMap<>();
@@ -91,7 +92,7 @@ public class GlyphConfig {
                 }
             }
 
-            newData.put(key, new GlyphData(tier, manaCost, unlockLevel, unlockMaterials, compatibleEffects, params, maxAugments));
+            newData.put(key, new GlyphData(tier, manaCost, unlockLevel, unlockMaterials, compatibleEffects, params, maxAugments, externalUnlockOnly));
         }
 
         // アトミックに差し替え（volatile書き込み）
@@ -401,7 +402,14 @@ public class GlyphConfig {
 
     private record GlyphData(int tier, int manaCost, int unlockLevel, Map<Material, Integer> unlockMaterials,
                               List<String> compatibleEffects,
-                              Map<String, Double> params, Map<String, Integer> maxAugments) {}
+                              Map<String, Double> params, Map<String, Integer> maxAugments,
+                              boolean externalUnlockOnly) {}
+
+    /** glyphs.yml の external-unlock-only フラグを取得する。 */
+    public boolean isExternalUnlockOnly(String glyphKey) {
+        GlyphData data = glyphData.get(glyphKey);
+        return data != null && data.externalUnlockOnly;
+    }
 
     // ============================================================
     // 交換グリフ ブロックティアマッピング

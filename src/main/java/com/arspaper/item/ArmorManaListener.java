@@ -102,15 +102,24 @@ public class ArmorManaListener implements Listener {
         }
     }
 
+    /** プレイヤーごとに保留中の recalc タスク。連続呼び出しをデバウンスする。 */
+    private final java.util.Map<java.util.UUID, org.bukkit.scheduler.BukkitTask> pendingRecalc =
+        new java.util.concurrent.ConcurrentHashMap<>();
+
     private void scheduleRecalc(Player player) {
-        new BukkitRunnable() {
+        java.util.UUID uuid = player.getUniqueId();
+        org.bukkit.scheduler.BukkitTask old = pendingRecalc.remove(uuid);
+        if (old != null && !old.isCancelled()) old.cancel();
+        org.bukkit.scheduler.BukkitTask task = new BukkitRunnable() {
             @Override
             public void run() {
+                pendingRecalc.remove(uuid);
                 if (player.isOnline()) {
                     recalculateArmorBonus(player);
                 }
             }
         }.runTaskLater(plugin, 1L);
+        pendingRecalc.put(uuid, task);
     }
 
     /**
@@ -237,7 +246,11 @@ public class ArmorManaListener implements Listener {
                         }
                     }
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                com.arspaper.ArsPaper.getInstance().getLogger().warning(
+                    "Failed to parse thread_slots JSON (length="
+                    + threadSlotsJson.length() + "): " + e.getMessage());
+            }
         } else {
             String oldThreadId = pdc.get(ItemKeys.THREAD_TYPE, PersistentDataType.STRING);
             if (oldThreadId != null) {

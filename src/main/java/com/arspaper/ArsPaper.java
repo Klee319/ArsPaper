@@ -80,6 +80,7 @@ public class ArsPaper extends JavaPlugin {
     private com.arspaper.loot.LootTableListener lootTableListener;
     private SourcelinkConfig sourcelinkConfig;
     private com.arspaper.world.WorldSettingsManager worldSettingsManager;
+    private com.arspaper.api.ApiBootstrap apiBootstrap;
 
     @Override
     public void onEnable() {
@@ -89,7 +90,10 @@ public class ArsPaper extends JavaPlugin {
         com.arspaper.util.JaTranslations.load(getLogger());
 
         initRegistries();
+        // ArsAPI 初期化（リスナー登録前に行う）
+        apiBootstrap = new com.arspaper.api.ApiBootstrap(this);
         registerListeners();
+        apiBootstrap.register();
         registerCommands();
 
         // 統合レシピ読み込み（アイテム登録後）
@@ -124,6 +128,9 @@ public class ArsPaper extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (apiBootstrap != null) {
+            apiBootstrap.shutdown();
+        }
         if (manaManager != null) {
             manaManager.shutdown();
         }
@@ -151,6 +158,7 @@ public class ArsPaper extends JavaPlugin {
         LingerEffect.cleanupAll();
         BeamForm.cleanupAll();
         RotateEffect.cleanupAll();
+        com.arspaper.spell.effect.RuneEffect.cleanupAll();
         GlideEffect.restoreAll();
         BounceEffect.cleanupAll();
         ScaleEffect.cleanupAll();
@@ -463,10 +471,16 @@ public class ArsPaper extends JavaPlugin {
         Pedestal pedestal = new Pedestal(this);
 
         CreativeSourceJar creativeSourceJar = new CreativeSourceJar(this);
+        com.arspaper.block.impl.LargeSourceJar largeSourceJar =
+            new com.arspaper.block.impl.LargeSourceJar(this);
+        com.arspaper.block.impl.GreaterSourceJar greaterSourceJar =
+            new com.arspaper.block.impl.GreaterSourceJar(this);
         Waystone waystone = new Waystone(this);
 
         blockRegistry.register(scribingTable);
         blockRegistry.register(sourceJar);
+        blockRegistry.register(largeSourceJar);
+        blockRegistry.register(greaterSourceJar);
         blockRegistry.register(creativeSourceJar);
         blockRegistry.register(volcanicSourcelink);
         blockRegistry.register(mycelialSourcelink);
@@ -480,6 +494,8 @@ public class ArsPaper extends JavaPlugin {
         // カスタムブロックもアイテムとして取得できるようにする
         itemRegistry.register(scribingTable);
         itemRegistry.register(sourceJar);
+        itemRegistry.register(largeSourceJar);
+        itemRegistry.register(greaterSourceJar);
         itemRegistry.register(creativeSourceJar);
         itemRegistry.register(volcanicSourcelink);
         itemRegistry.register(mycelialSourcelink);

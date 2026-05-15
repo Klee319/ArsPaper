@@ -246,4 +246,15 @@ public class RecipeManager {
     public Map<NamespacedKey, Object> getRegisteredRecipes() {
         return registeredRecipes;
     }
+
+    /**
+     * 登録済みレシピのID（NamespacedKey の文字列表現）集合を返す。ArsAPI用。
+     */
+    public java.util.Set<String> getRegisteredRecipeIds() {
+        java.util.Set<String> ids = new java.util.HashSet<>();
+        for (NamespacedKey key : registeredRecipes.keySet()) {
+            ids.add(key.toString());
+        }
+        return ids;
+    }
 }

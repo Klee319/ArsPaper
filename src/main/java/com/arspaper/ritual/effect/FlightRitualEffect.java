@@ -41,7 +41,14 @@ public class FlightRitualEffect implements RitualEffect, Listener {
         int durationSeconds = DEFAULT_DURATION_SECONDS;
         String durationParam = recipe.effectParams().get("duration");
         if (durationParam != null) {
-            try { durationSeconds = Integer.parseInt(durationParam); } catch (NumberFormatException ignored) {}
+            try {
+                durationSeconds = Integer.parseInt(durationParam);
+            } catch (NumberFormatException e) {
+                com.arspaper.ArsPaper.getInstance().getLogger().warning(
+                    "Invalid 'duration' param for flight ritual (recipe="
+                    + recipe.id() + ", value='" + durationParam + "'), using default "
+                    + DEFAULT_DURATION_SECONDS + "s");
+            }
         }
 
         // PDCに終了時刻を保存

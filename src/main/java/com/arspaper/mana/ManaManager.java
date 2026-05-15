@@ -29,6 +29,7 @@ public class ManaManager implements Listener {
     private volatile ManaConfig config;
     private final ManaBarDisplay barDisplay;
     private final BukkitTask regenTask;
+    private final BukkitTask statsFlushTask;
     private static final NamespacedKey DEBUG_MODE_KEY = new NamespacedKey("arspaper", "debug_mode");
     private final RankingCache rankingCache;
 
@@ -51,7 +52,7 @@ public class ManaManager implements Listener {
         );
 
         // 統計フラッシュタスク（5分ごとにバッファをPDCへ書き込み）
-        plugin.getServer().getScheduler().runTaskTimer(
+        this.statsFlushTask = plugin.getServer().getScheduler().runTaskTimer(
             plugin, this::flushManaStats, STATS_FLUSH_INTERVAL, STATS_FLUSH_INTERVAL
         );
     }
@@ -93,7 +94,12 @@ public class ManaManager implements Listener {
         int armorBonus = pdc.getOrDefault(ManaKeys.ARMOR_MANA_BONUS, PersistentDataType.INTEGER, 0);
         int threadBonus = pdc.getOrDefault(ManaKeys.THREAD_MANA_BONUS, PersistentDataType.INTEGER, 0);
         int enchantBonus = pdc.getOrDefault(ManaKeys.ENCHANT_MANA_BONUS, PersistentDataType.INTEGER, 0);
-        return config.defaultMaxMana() + glyphBonus + armorBonus + threadBonus + enchantBonus + worldMana.maxBonus();
+        int apiBonus = 0;
+        if (com.arspaper.api.ArsAPI.isInitialized()) {
+            apiBonus = (int) Math.round(com.arspaper.api.ArsAPI.sumModifier(
+                player.getUniqueId(), com.arspaper.api.modifier.ModifierType.MAX_MANA));
+        }
+        return config.defaultMaxMana() + glyphBonus + armorBonus + threadBonus + enchantBonus + worldMana.maxBonus() + apiBonus;
     }
 
     /**
@@ -114,12 +120,27 @@ public class ManaManager implements Listener {
 
     public boolean consumeMana(Player player, int amount) {
         if (isInfiniteMana(player)) return true;
+        // API: MANA_COST_MULT 加算→ final = max(0, 1 - sum) で乗算
+        int effective = amount;
+        if (com.arspaper.api.ArsAPI.isInitialized() && amount > 0) {
+            double mult = com.arspaper.api.ArsAPI.sumModifier(
+                player.getUniqueId(), com.arspaper.api.modifier.ModifierType.MANA_COST_MULT);
+            double finalMul = Math.max(0.0, 1.0 - mult);
+            effective = Math.max(0, (int) Math.round(amount * finalMul));
+
+            // 確率0コスト
+            double chance = com.arspaper.api.ArsAPI.sumModifier(
+                player.getUniqueId(),
+                com.arspaper.api.modifier.ModifierType.MANA_COST_REDUCTION_CHANCE);
+            if (chance > 0.0 && Math.random() < Math.min(1.0, chance)) {
+                effective = 0;
+            }
+        }
         int current = getCurrentMana(player);
-        if (current < amount) return false;
-        setCurrentMana(player, current - amount);
-        // 累計マナ消費量をバッファに記録（PDC書き込みは定期フラッシュで行う）
-        if (amount > 0) {
-            manaConsumedBuffer.merge(player.getUniqueId(), (long) amount, Long::sum);
+        if (current < effective) return false;
+        if (effective > 0) {
+            setCurrentMana(player, current - effective);
+            manaConsumedBuffer.merge(player.getUniqueId(), (long) effective, Long::sum);
         }
         return true;
     }
@@ -160,6 +181,11 @@ public class ManaManager implements Listener {
         player.showBossBar(bar);
     }
 
+    /** ArsAPI公開用: regen rate を返す（外部からの参照を許可するための公開ラッパ）。 */
+    public int getRegenRateForApi(Player player) {
+        return getRegenRate(player);
+    }
+
     private int getRegenRate(Player player) {
         WorldSettingsManager wsm = ArsPaper.getInstance().getWorldSettingsManager();
         WorldSettingsManager.WorldManaSettings worldMana = (wsm != null)
@@ -176,7 +202,12 @@ public class ManaManager implements Listener {
         int threadBonus = pdc.getOrDefault(ManaKeys.THREAD_REGEN_BONUS, PersistentDataType.INTEGER, 0);
         int enchantBonus = pdc.getOrDefault(ManaKeys.ENCHANT_REGEN_BONUS, PersistentDataType.INTEGER, 0);
         int armorBonus = pdc.getOrDefault(ManaKeys.ARMOR_REGEN_BONUS, PersistentDataType.INTEGER, 0);
-        return baseRate + threadBonus + enchantBonus + armorBonus + worldMana.regenBonus();
+        int apiBonus = 0;
+        if (com.arspaper.api.ArsAPI.isInitialized()) {
+            apiBonus = (int) Math.round(com.arspaper.api.ArsAPI.sumModifier(
+                player.getUniqueId(), com.arspaper.api.modifier.ModifierType.REGEN_RATE));
+        }
+        return baseRate + threadBonus + enchantBonus + armorBonus + worldMana.regenBonus() + apiBonus;
     }
 
     private void tickRegeneration() {
@@ -310,6 +341,9 @@ public class ManaManager implements Listener {
     public void shutdown() {
         if (regenTask != null) {
             regenTask.cancel();
+        }
+        if (statsFlushTask != null) {
+            statsFlushTask.cancel();
         }
         // シャットダウン前にバッファをフラッシュ
         flushManaStats();

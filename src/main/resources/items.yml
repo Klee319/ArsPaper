@@ -70,7 +70,7 @@ items:
         B: BOOKSHELF
 
   # ----------------------------------------------------------
-  # ソースジャー
+  # ソースジャー (標準: 10,000)
   # ----------------------------------------------------------
   source_jar:
     recipe:
@@ -83,6 +83,38 @@ items:
       ingredients:
         G: BRICK
         S: "custom:source_berry"
+
+  # ----------------------------------------------------------
+  # 大型ソースジャー (容量: 100,000)
+  # ----------------------------------------------------------
+  large_source_jar:
+    recipe:
+      method: workbench
+      type: shaped
+      shape:
+        - "GJG"
+        - "JSJ"
+        - "GJG"
+      ingredients:
+        J: "custom:source_jar"
+        G: "custom:source_gem"
+        S: "custom:source_gem_block"
+
+  # ----------------------------------------------------------
+  # 極大ソースジャー (容量: 1,000,000)
+  # ----------------------------------------------------------
+  greater_source_jar:
+    recipe:
+      method: workbench
+      type: shaped
+      shape:
+        - "GLG"
+        - "LSL"
+        - "GLG"
+      ingredients:
+        L: "custom:large_source_jar"
+        G: "custom:source_gem_block"
+        S: NETHER_STAR
 
   # ----------------------------------------------------------
   # 台座 (x2)

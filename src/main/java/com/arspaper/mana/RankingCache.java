@@ -75,7 +75,8 @@ public class RankingCache {
                 cache.putAll(loaded);
             }
         } catch (Exception e) {
-            // 読み込み失敗は無視（次回保存時に復旧）
+            logger.warning("ランキングキャッシュ読み込みに失敗 (" + cacheFile + "): "
+                + e.getClass().getSimpleName() + ": " + e.getMessage());
         }
     }
 
