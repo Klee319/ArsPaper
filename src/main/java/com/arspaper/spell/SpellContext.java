@@ -601,11 +601,15 @@ public class SpellContext {
         resetAugmentState();
     }
 
+    /** 軌跡モードのエンティティ検出半径（弾道近傍の敵を捕捉する範囲）。 */
+    private static final double TRACE_ENTITY_RADIUS = 1.5;
+
     /**
-     * 軌跡モード用: 飛行経路上のブロックにEffectチェーンを実行する。
+     * 軌跡モード（ブロックのみ）: 飛行経路上のブロックにEffectチェーンを実行する。
+     * Beam用: 本体側でエンティティをスキャン済みなのでブロックのみで十分。
      * allowsTraceRepeating() == false のエフェクトはスキップする。
      */
-    public void resolveOnBlockTrace(Location blockLocation) {
+    public void resolveTraceBlock(Location blockLocation) {
         Player caster = getCaster();
         if (caster == null) return;
 
@@ -619,6 +623,52 @@ public class SpellContext {
                 aug.modify(this);
             }
             group.effect.applyToBlock(this, blockLocation);
+        }
+        resetAugmentState();
+    }
+
+    /**
+     * 軌跡モード（ブロック+エンティティ）: 経路上のブロックに加え、
+     * 近傍エンティティにも Effect チェーンを適用する。Projectile用。
+     *
+     * @param blockLocation 弾道上の現在ブロック
+     * @param processedEntities 1trace内で重複適用を防ぐためのUUID集合（呼び出し側で保持）
+     */
+    public void resolveTrace(Location blockLocation, java.util.Set<UUID> processedEntities) {
+        Player caster = getCaster();
+        if (caster == null) return;
+
+        this.secondaryInvocation = true;
+
+        List<EffectGroup> groups = buildEffectGroups();
+
+        // ブロック対象（applyToBlock 側で空気/種別判定はEffect自身が行う）
+        for (EffectGroup group : groups) {
+            if (!group.effect.allowsTraceRepeating()) continue;
+            resetAugmentState();
+            for (SpellAugment aug : group.augments) {
+                aug.modify(this);
+            }
+            group.effect.applyToBlock(this, blockLocation);
+        }
+
+        // エンティティ対象（経路ぞいの未処理 LivingEntity、casterを除外、1trace中1回まで）
+        java.util.Collection<LivingEntity> nearby = blockLocation.getWorld()
+            .getNearbyLivingEntities(
+                blockLocation.clone().add(0.5, 0.5, 0.5),
+                TRACE_ENTITY_RADIUS);
+        for (LivingEntity entity : nearby) {
+            if (entity.equals(caster)) continue;
+            if (!processedEntities.add(entity.getUniqueId())) continue;
+            if (!isValidAoeTarget(entity, caster)) continue;
+            for (EffectGroup group : groups) {
+                if (!group.effect.allowsTraceRepeating()) continue;
+                resetAugmentState();
+                for (SpellAugment aug : group.augments) {
+                    aug.modify(this);
+                }
+                group.effect.applyToEntity(this, entity);
+            }
         }
         resetAugmentState();
     }

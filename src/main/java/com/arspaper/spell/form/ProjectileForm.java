@@ -71,6 +71,7 @@ public class ProjectileForm implements SpellForm {
             new BukkitRunnable() {
                 private int ticks = 0;
                 private final java.util.Set<Location> processedBlocks = new java.util.HashSet<>();
+                private final java.util.Set<java.util.UUID> processedEntities = new java.util.HashSet<>();
 
                 @Override
                 public void run() {
@@ -83,12 +84,12 @@ public class ProjectileForm implements SpellForm {
                         SpellFxUtil.spawnProjectileTrail(projectile.getLocation());
                     }
 
-                    // 軌跡モード: 飛行経路上のブロックにも効果適用（召喚系等はスキップ）
+                    // 軌跡モード: 経路ブロック + 近傍エンティティに効果適用（召喚系等はスキップ）
                     if (traceMode) {
                         Location blockLoc = projectile.getLocation().getBlock().getLocation();
                         if (processedBlocks.add(blockLoc)) {
                             SpellContext trailCtx = projectileContext.copy();
-                            trailCtx.resolveOnBlockTrace(blockLoc);
+                            trailCtx.resolveTrace(blockLoc, processedEntities);
                         }
                     }
                 }
