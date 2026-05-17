@@ -1902,16 +1902,17 @@ glyphs:
 
   # [伝播] (propagate)
   propagate:
-    tier: 2
+    tier: 3
     mana-cost: 25
     params:
       targets-per-stack: 2           # 1個あたりのチェーン対象数
     unlock-cost:
-      level: 20
+      level: 40
       materials:
         GRASS_BLOCK: 16
         MOSS_BLOCK: 16
         PODZOL: 16
+        SCULK_CATALYST: 1
 
   # [連射] (rapid_fire)
   rapid_fire:
