@@ -67,11 +67,12 @@ public class ProjectileForm implements SpellForm {
             projectile.setGlowing(true);
 
             // 軌跡パーティクル + 軌跡エフェクト（タイムアウト付き）
+            // 経路上の敵への作用は pierce 増強が collision-based で担当する。
+            // trace はブロック処理のみ（空中設置・AOEスキャン系で活きる）。
             boolean traceMode = projectileContext.isTraceActive();
             new BukkitRunnable() {
                 private int ticks = 0;
                 private final java.util.Set<Location> processedBlocks = new java.util.HashSet<>();
-                private final java.util.Set<java.util.UUID> processedEntities = new java.util.HashSet<>();
 
                 @Override
                 public void run() {
@@ -84,12 +85,12 @@ public class ProjectileForm implements SpellForm {
                         SpellFxUtil.spawnProjectileTrail(projectile.getLocation());
                     }
 
-                    // 軌跡モード: 経路ブロック + 近傍エンティティに効果適用（召喚系等はスキップ）
+                    // 軌跡モード: 経路上のブロックに効果適用（召喚系等はスキップ）
                     if (traceMode) {
                         Location blockLoc = projectile.getLocation().getBlock().getLocation();
                         if (processedBlocks.add(blockLoc)) {
                             SpellContext trailCtx = projectileContext.copy();
-                            trailCtx.resolveTrace(blockLoc, processedEntities);
+                            trailCtx.resolveTrace(blockLoc);
                         }
                     }
                 }

@@ -179,7 +179,7 @@ public class BeamForm implements SpellForm {
         }
 
         // 軌跡モード: ビーム軌道上のブロックに効果を適用
-        // (エンティティは下記のビーム本体スキャンで処理されるため、軌跡ではブロックのみ)
+        // (エンティティは pierce 増強 + ビーム本体スキャンで処理されるため、軌跡ではブロックのみ)
         if (context.isTraceActive()) {
             Set<Location> processedBlocks = new HashSet<>();
             for (double dist = 1.0; dist <= effectiveRange; dist += 1.0) {
@@ -187,7 +187,7 @@ public class BeamForm implements SpellForm {
                 Location blockLoc = point.getBlock().getLocation();
                 if (processedBlocks.add(blockLoc)) {
                     SpellContext trailCtx = context.copy();
-                    trailCtx.resolveTraceBlock(blockLoc);
+                    trailCtx.resolveTrace(blockLoc);
                 }
             }
         }

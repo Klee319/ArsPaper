@@ -601,15 +601,21 @@ public class SpellContext {
         resetAugmentState();
     }
 
-    /** 軌跡モードのエンティティ検出半径（弾道近傍の敵を捕捉する範囲）。 */
-    private static final double TRACE_ENTITY_RADIUS = 1.5;
-
     /**
-     * 軌跡モード（ブロックのみ）: 飛行経路上のブロックにEffectチェーンを実行する。
-     * Beam用: 本体側でエンティティをスキャン済みなのでブロックのみで十分。
-     * allowsTraceRepeating() == false のエフェクトはスキップする。
+     * 軌跡モード: 飛行経路上のブロックに Effect チェーンを実行する。
+     *
+     * 設計方針:
+     * - 経路上の<b>敵</b>への発動は <code>pierce</code> (貫通) Augment が
+     *   collision-based で担当する。trace は仕様の重複を避け、
+     *   <b>経路の幾何形状に沿ったブロック処理</b>のみを担う。
+     * - 主な用途: 空中設置スペル (仮想ブロック / 光明 / 設置 / 水生成) や、
+     *   ブロック中心からの周辺AOEスキャン系 (収穫 / 回収 / 成長)、
+     *   エンティティAOE系 (引寄 / 突風 等)。
+     * - 破壊系 (break / cut 等) は空気を early-return するため弾道経路では機能しない。
+     *   トンネル掘りは <code>aoe</code> (範囲[幅/高さ/法線]) を使う想定。
+     * - <code>allowsTraceRepeating() == false</code> のエフェクトは負荷/仕様意図により除外。
      */
-    public void resolveTraceBlock(Location blockLocation) {
+    public void resolveTrace(Location blockLocation) {
         Player caster = getCaster();
         if (caster == null) return;
 
@@ -623,52 +629,6 @@ public class SpellContext {
                 aug.modify(this);
             }
             group.effect.applyToBlock(this, blockLocation);
-        }
-        resetAugmentState();
-    }
-
-    /**
-     * 軌跡モード（ブロック+エンティティ）: 経路上のブロックに加え、
-     * 近傍エンティティにも Effect チェーンを適用する。Projectile用。
-     *
-     * @param blockLocation 弾道上の現在ブロック
-     * @param processedEntities 1trace内で重複適用を防ぐためのUUID集合（呼び出し側で保持）
-     */
-    public void resolveTrace(Location blockLocation, java.util.Set<UUID> processedEntities) {
-        Player caster = getCaster();
-        if (caster == null) return;
-
-        this.secondaryInvocation = true;
-
-        List<EffectGroup> groups = buildEffectGroups();
-
-        // ブロック対象（applyToBlock 側で空気/種別判定はEffect自身が行う）
-        for (EffectGroup group : groups) {
-            if (!group.effect.allowsTraceRepeating()) continue;
-            resetAugmentState();
-            for (SpellAugment aug : group.augments) {
-                aug.modify(this);
-            }
-            group.effect.applyToBlock(this, blockLocation);
-        }
-
-        // エンティティ対象（経路ぞいの未処理 LivingEntity、casterを除外、1trace中1回まで）
-        java.util.Collection<LivingEntity> nearby = blockLocation.getWorld()
-            .getNearbyLivingEntities(
-                blockLocation.clone().add(0.5, 0.5, 0.5),
-                TRACE_ENTITY_RADIUS);
-        for (LivingEntity entity : nearby) {
-            if (entity.equals(caster)) continue;
-            if (!processedEntities.add(entity.getUniqueId())) continue;
-            if (!isValidAoeTarget(entity, caster)) continue;
-            for (EffectGroup group : groups) {
-                if (!group.effect.allowsTraceRepeating()) continue;
-                resetAugmentState();
-                for (SpellAugment aug : group.augments) {
-                    aug.modify(this);
-                }
-                group.effect.applyToEntity(this, entity);
-            }
         }
         resetAugmentState();
     }
