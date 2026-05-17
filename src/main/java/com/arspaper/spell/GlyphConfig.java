@@ -182,7 +182,7 @@ public class GlyphConfig {
         // wall は未登録（廃止済み）
         // beam: エンティティは全貫通（INT_MAX）、pierceはソリッドブロック貫通用
         Map.entry("beam",       Set.of("split", "aoe_radius", "rapid_fire", "trace", "extend_reach", "shrink_reach", "pierce")),
-        Map.entry("burst",      Set.of("pierce", "split", "aoe_radius", "extend_reach", "shrink_reach", "extend_time", "duration_down")),
+        Map.entry("burst",      Set.of("pierce", "split", "aoe_radius", "extend_reach", "shrink_reach", "extend_time", "duration_down", "rapid_fire")),
         // === Effects - Tier 1 ===
         // aoe = 範囲[水平]/[垂直]（方向性あり: 破壊/設置系）
         // aoe_radius = 半径増加（エリア系エフェクト用。伝播と排他）
