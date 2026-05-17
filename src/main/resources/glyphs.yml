@@ -70,7 +70,6 @@ glyphs:
       pierce: 4
       split: 4
       rapid_fire: 4
-      trace: 1
     unlock-cost:
       level: 5
       materials:
@@ -196,7 +195,6 @@ glyphs:
       extend_reach: 6
       shrink_reach: 4
       pierce: 4
-      trace: 1
     unlock-cost:
       level: 40
       materials:
@@ -2109,18 +2107,6 @@ glyphs:
         NETHER_STAR: 1
         PRISMARINE_SHARD: 64
 
-  # [軌跡] (trace)
-  trace:
-    tier: 3
-    mana-cost: 50
-    # 投射/照射互換
-    # 飛行経路上にも効果を適用
-    unlock-cost:
-      level: 40
-      materials:
-        SHULKER_SHELL: 4
-        ENDER_EYE: 16
-        SNOWBALL: 16
 
 
 # ============================================================

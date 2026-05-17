@@ -109,8 +109,6 @@ public class FireworkEffect implements SpellEffect {
             .build();
     }
 
-    @Override
-    public boolean allowsTraceRepeating() { return false; }
 
     @Override
     public NamespacedKey getId() { return id; }

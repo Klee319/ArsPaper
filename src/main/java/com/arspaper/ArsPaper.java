@@ -400,9 +400,8 @@ public class ArsPaper extends JavaPlugin {
         var linger = new LingerAugment(this, glyphConfig);
         spellRegistry.register(linger);
 
-        // --- 投射制御（連射 / 軌跡 / 遅延）---
+        // --- 投射制御（連射 / 遅延）---
         spellRegistry.register(new TrailAugment(this, glyphConfig));
-        spellRegistry.register(new TraceAugment(this, glyphConfig));
         var delay = new DelayAugment(this, glyphConfig);
         spellRegistry.register(delay);
 

@@ -178,20 +178,6 @@ public class BeamForm implements SpellForm {
             }
         }
 
-        // 軌跡モード: ビーム軌道上のブロックに効果を適用
-        // (エンティティは pierce 増強 + ビーム本体スキャンで処理されるため、軌跡ではブロックのみ)
-        if (context.isTraceActive()) {
-            Set<Location> processedBlocks = new HashSet<>();
-            for (double dist = 1.0; dist <= effectiveRange; dist += 1.0) {
-                Location point = eyeOrigin.clone().add(direction.clone().multiply(dist));
-                Location blockLoc = point.getBlock().getLocation();
-                if (processedBlocks.add(blockLoc)) {
-                    SpellContext trailCtx = context.copy();
-                    trailCtx.resolveTrace(blockLoc);
-                }
-            }
-        }
-
         // エンティティヒット処理
         // ビーム半径内の全エンティティを後続効果の対象にする。
         // 貫通なし: ビーム中心線上は最初の1体のみ。半径内の周辺エンティティは全て対象。

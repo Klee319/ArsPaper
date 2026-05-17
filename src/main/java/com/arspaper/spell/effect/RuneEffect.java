@@ -195,8 +195,6 @@ public class RuneEffect implements SpellEffect {
         loc.getWorld().spawnParticle(Particle.ENCHANT, loc, 10, 0.3, 0.1, 0.3, 0.3);
     }
 
-    @Override
-    public boolean allowsTraceRepeating() { return false; }
 
     @Override public NamespacedKey getId() { return id; }
     @Override public String getDisplayName() { return "罠術"; }

@@ -101,8 +101,6 @@ public class LightningEffect implements SpellEffect {
         return false;
     }
 
-    @Override
-    public boolean allowsTraceRepeating() { return false; }
 
     @Override
     public NamespacedKey getId() { return id; }

@@ -139,8 +139,6 @@ public class FangsEffect implements SpellEffect {
             SoundCategory.PLAYERS, 0.8f, 1.0f);
     }
 
-    @Override
-    public boolean allowsTraceRepeating() { return true; }
 
     @Override
     public NamespacedKey getId() { return id; }

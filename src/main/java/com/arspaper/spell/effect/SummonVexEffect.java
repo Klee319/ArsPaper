@@ -186,8 +186,6 @@ public class SummonVexEffect implements SpellEffect {
     @Override
     public boolean handlesAoeInternally() { return true; }
 
-    @Override
-    public boolean allowsTraceRepeating() { return false; }
 
     @Override
     public NamespacedKey getId() { return id; }

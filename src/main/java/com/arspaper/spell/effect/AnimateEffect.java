@@ -147,8 +147,6 @@ public class AnimateEffect implements SpellEffect {
             SoundCategory.PLAYERS, 0.6f, 0.8f);
     }
 
-    @Override
-    public boolean allowsTraceRepeating() { return false; }
 
     @Override
     public NamespacedKey getId() { return id; }

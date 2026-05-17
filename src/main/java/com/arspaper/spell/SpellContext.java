@@ -62,7 +62,6 @@ public class SpellContext {
     private int lingerLevel = 0;            // 残留レベル（1個=5秒、0=無効）
     private int delayTicks = 0;             // 遅延ティック
     private int rapidFireLevel = 0;         // 連射レベル（CT短縮）
-    private boolean traceActive = false;     // 軌跡（経路上に効果適用）
     private int propagateChainCount = 0;     // 伝播（エンティティヒット時に周辺の敵にチェーン、1段=3体）
     private boolean inPropagateChain = false; // チェーン中フラグ（無限再帰防止）
     private int reachLevel = 0;              // 延伸（射程/距離延長）
@@ -260,8 +259,6 @@ public class SpellContext {
     public int getRapidFireLevel() { return rapidFireLevel; }
     public void setRapidFireLevel(int rapidFireLevel) { this.rapidFireLevel = rapidFireLevel; }
 
-    public boolean isTraceActive() { return traceActive; }
-    public void setTraceActive(boolean traceActive) { this.traceActive = traceActive; }
 
     public int getPropagateChainCount() { return propagateChainCount; }
     public void setPropagateChainCount(int count) { this.propagateChainCount = count; }
@@ -286,7 +283,6 @@ public class SpellContext {
         copy.aoeHeightLevel = this.aoeHeightLevel;
         copy.aoeVerticalLevel = this.aoeVerticalLevel;
         copy.aoeRadiusLevel = this.aoeRadiusLevel;
-        copy.traceActive = this.traceActive;
         copy.propagateChainCount = this.propagateChainCount;
         copy.inPropagateChain = this.inPropagateChain;
         copy.reachLevel = this.reachLevel;
@@ -602,38 +598,6 @@ public class SpellContext {
     }
 
     /**
-     * 軌跡モード: 飛行経路上のブロックに Effect チェーンを実行する。
-     *
-     * 設計方針:
-     * - 経路上の<b>敵</b>への発動は <code>pierce</code> (貫通) Augment が
-     *   collision-based で担当する。trace は仕様の重複を避け、
-     *   <b>経路の幾何形状に沿ったブロック処理</b>のみを担う。
-     * - 主な用途: 空中設置スペル (仮想ブロック / 光明 / 設置 / 水生成) や、
-     *   ブロック中心からの周辺AOEスキャン系 (収穫 / 回収 / 成長)、
-     *   エンティティAOE系 (引寄 / 突風 等)。
-     * - 破壊系 (break / cut 等) は空気を early-return するため弾道経路では機能しない。
-     *   トンネル掘りは <code>aoe</code> (範囲[幅/高さ/法線]) を使う想定。
-     * - <code>allowsTraceRepeating() == false</code> のエフェクトは負荷/仕様意図により除外。
-     */
-    public void resolveTrace(Location blockLocation) {
-        Player caster = getCaster();
-        if (caster == null) return;
-
-        this.secondaryInvocation = true; // 軌跡経由 → パーティクル削減
-
-        List<EffectGroup> groups = buildEffectGroups();
-        for (EffectGroup group : groups) {
-            if (!group.effect.allowsTraceRepeating()) continue;
-            resetAugmentState();
-            for (SpellAugment aug : group.augments) {
-                aug.modify(this);
-            }
-            group.effect.applyToBlock(this, blockLocation);
-        }
-        resetAugmentState();
-    }
-
-    /**
      * ヒット対象にEffectチェーンを実行する（ブロック対象）。
      */
     public void resolveOnBlock(Location blockLocation) {
@@ -863,7 +827,6 @@ public class SpellContext {
         wallPattern = false;
         lingerLevel = 0;
         delayTicks = 0;
-        traceActive = false;
         propagateChainCount = 0;
         inPropagateChain = false;
         reachLevel = 0;

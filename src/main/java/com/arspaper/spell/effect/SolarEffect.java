@@ -179,8 +179,6 @@ public class SolarEffect implements SpellEffect {
     @Override
     public boolean handlesAoeInternally() { return true; }
 
-    @Override
-    public boolean allowsTraceRepeating() { return false; }
 
     @Override public NamespacedKey getId() { return id; }
     @Override public String getDisplayName() { return "日輪"; }

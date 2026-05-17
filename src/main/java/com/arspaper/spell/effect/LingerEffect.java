@@ -228,8 +228,6 @@ public class LingerEffect implements SpellEffect {
         return Math.max(tickInterval, context.getLingerLevel() * ticksPerLevel);
     }
 
-    @Override
-    public boolean allowsTraceRepeating() { return false; }
 
     @Override
     public NamespacedKey getId() { return id; }

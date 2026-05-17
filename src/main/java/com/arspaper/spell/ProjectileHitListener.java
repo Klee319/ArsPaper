@@ -70,7 +70,7 @@ public class ProjectileHitListener implements Listener {
             int pierceRemaining = getPierceRemaining(event);
 
             SpellFxUtil.spawnImpactBurst(target.getLocation());
-            // 貫通時にオリジナルcontextのForm-level状態(trace等)が破壊されるのを防止
+            // 貫通時にオリジナルcontextのForm-level状態が破壊されるのを防止
             SpellContext hitContext = context.copy();
             hitContext.resolveOnEntity(target);
 

@@ -188,8 +188,6 @@ public class LunarEffect implements SpellEffect {
     @Override
     public boolean handlesAoeInternally() { return true; }
 
-    @Override
-    public boolean allowsTraceRepeating() { return false; }
 
     @Override public NamespacedKey getId() { return id; }
     @Override public String getDisplayName() { return "月輪"; }

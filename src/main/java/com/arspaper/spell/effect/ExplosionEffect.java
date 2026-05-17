@@ -103,8 +103,6 @@ public class ExplosionEffect implements SpellEffect {
             spread, spread, spread, 0.03);
     }
 
-    @Override
-    public boolean allowsTraceRepeating() { return false; }
 
     @Override
     public NamespacedKey getId() { return id; }
