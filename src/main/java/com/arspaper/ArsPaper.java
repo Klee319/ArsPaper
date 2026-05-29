@@ -149,6 +149,14 @@ public class ArsPaper extends JavaPlugin {
         if (ritualManager != null) {
             ritualManager.shutdown();
         }
+        // 開いているバックパックを強制保存（サーバー停止時のロスト防止）
+        for (org.bukkit.entity.Player online : getServer().getOnlinePlayers()) {
+            try {
+                com.arspaper.gui.BackpackGui.saveIfOpen(online);
+            } catch (Exception e) {
+                getLogger().warning("[Backpack] 保存失敗 (" + online.getName() + "): " + e.getMessage());
+            }
+        }
         // 飛行スレッドタスクをクリーンアップ
         ArmorManaListener.cleanupFlightThread();
         // IgniteEffectの火炎タスクをクリーンアップ

@@ -386,65 +386,61 @@ public class CustomBlockListener implements Listener {
 
         // ソースジャーへのソースベリー投入
         if (customBlock.get() instanceof com.arspaper.block.impl.SourceJar sourceJar) {
+            // このブロックへのホッパー投入はバニラ移動を常に抑止（アイテム消失防止）
+            event.setCancelled(true);
             ItemStack item = event.getItem();
             if (item.hasItemMeta()) {
                 String customItemId = item.getItemMeta().getPersistentDataContainer()
                     .get(ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING);
-                if ("source_berry".equals(customItemId)) {
-                    int sourcePerBerry = 100; // ソースベリー1個=100ソース
-                    if (!com.arspaper.block.impl.SourceJar.isInfinite(destTile)) {
-                        int current = com.arspaper.block.impl.SourceJar.getSourceAmount(destTile);
-                        int cap = com.arspaper.block.impl.SourceJar.getCapacity(destTile);
-                        if (current < cap) {
-                            com.arspaper.block.impl.SourceJar.addSource(destTile, sourcePerBerry);
-                            event.setCancelled(true);
-                            // ホッパー側のアイテムを1個減らす (isSimilar で PDC を含む完全一致)
-                            final ItemStack matchTemplate = item.clone();
-                            matchTemplate.setAmount(1);
-                            org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
-                                for (int i = 0; i < event.getSource().getSize(); i++) {
-                                    ItemStack slot = event.getSource().getItem(i);
-                                    if (slot != null && slot.isSimilar(matchTemplate)) {
-                                        slot.setAmount(slot.getAmount() - 1);
-                                        break;
-                                    }
-                                }
-                            });
-                            return;
-                        }
+                if ("source_berry".equals(customItemId)
+                        && !com.arspaper.block.impl.SourceJar.isInfinite(destTile)) {
+                    int current = com.arspaper.block.impl.SourceJar.getSourceAmount(destTile);
+                    int cap = com.arspaper.block.impl.SourceJar.getCapacity(destTile);
+                    // 増殖防止: アイテムを1個減算できたことを確認してからSourceを加算する
+                    if (current < cap && removeSingleMatchingItem(event.getSource(), item)) {
+                        int sourcePerBerry = 100; // ソースベリー1個=100ソース
+                        com.arspaper.block.impl.SourceJar.addSource(destTile, sourcePerBerry);
                     }
                 }
             }
-            // ソースジャーに対応しないアイテム → 入れさせない
-            event.setCancelled(true);
             return;
         }
 
         // ソースリンクへの移動
         if (!(customBlock.get() instanceof Sourcelink sourcelink)) return;
 
-        // ソースリンクへの移動 → アイテムをソース変換
+        // ソースリンクへの移動 → アイテムをソース変換（バニラ移動は常に抑止）
+        event.setCancelled(true);
         ItemStack item = event.getItem();
         int sourceValue = sourcelink.getSourceValueForItem(item);
-        if (sourceValue > 0) {
-            // ホッパーは1個ずつ移動するためそのまま消費してバッファに追加
+        // 増殖防止: アイテムを1個減算できたことを確認してからバッファに追加する
+        if (sourceValue > 0 && removeSingleMatchingItem(event.getSource(), item)) {
             sourcelink.addToBuffer(destState.getBlock(), sourceValue);
-            event.setCancelled(true);
-            // ホッパー側のアイテムを1個減らす（次tickで反映、isSimilar で PDC を含む完全一致）
-            final ItemStack matchTemplate = item.clone();
-            matchTemplate.setAmount(1);
-            org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
-                for (int i = 0; i < event.getSource().getSize(); i++) {
-                    ItemStack slot = event.getSource().getItem(i);
-                    if (slot != null && slot.isSimilar(matchTemplate)) {
-                        slot.setAmount(slot.getAmount() - 1);
-                        break;
-                    }
-                }
-            });
-        } else {
-            // 対応しないアイテム → ソースリンクに入れさせない
-            event.setCancelled(true);
         }
+    }
+
+    /**
+     * 移動元インベントリからテンプレートに一致するアイテムを同期的に1個だけ減算する。
+     * Source加算前にこの戻り値を確認することで、加算回数 > 減算回数のズレによる
+     * アイテム消費なしのSource増殖を防止する。
+     *
+     * @return 1個減らせた場合 true
+     */
+    private boolean removeSingleMatchingItem(org.bukkit.inventory.Inventory source, ItemStack template) {
+        ItemStack match = template.clone();
+        match.setAmount(1);
+        for (int i = 0; i < source.getSize(); i++) {
+            ItemStack slot = source.getItem(i);
+            if (slot != null && slot.isSimilar(match)) {
+                int newAmount = slot.getAmount() - 1;
+                if (newAmount <= 0) {
+                    source.setItem(i, null);
+                } else {
+                    slot.setAmount(newAmount);
+                }
+                return true;
+            }
+        }
+        return false;
     }
 }

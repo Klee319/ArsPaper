@@ -162,7 +162,11 @@ public class EnchantBookListener implements Listener {
     }
 
     /**
-     * 金床の結果スロットからアイテムを取り出した時、素材を消費する。
+     * 金床の結果スロットからアイテムを取り出した時の処理。
+     *
+     * カスタムエンチャント適用結果に限り、イベントをキャンセルして結果付与・素材消費・
+     * XP徴収を完全に手動制御する。バニラの金床消費処理と併用すると、結果スロットの
+     * カスタム結果に対してバニラが入力スロットを別途消費し、本が二重に減る（ロスト）ため。
      */
     @EventHandler
     public void onAnvilClick(InventoryClickEvent event) {
@@ -173,19 +177,7 @@ public class EnchantBookListener implements Listener {
         ItemStack result = event.getCurrentItem();
         if (result == null || result.getType().isAir()) return;
 
-        // 連打防止
-        if (!anvilCooldown.add(player.getUniqueId())) return;
-        org.bukkit.Bukkit.getScheduler().runTaskLater(
-            com.arspaper.ArsPaper.getInstance(),
-            () -> anvilCooldown.remove(player.getUniqueId()), 5L);
-
-        // スロット0またはスロット1のエンチャント本を検出
-        ItemStack book = isEnchantBook(anvil.getItem(1)) ? anvil.getItem(1)
-            : isEnchantBook(anvil.getItem(0)) ? anvil.getItem(0)
-            : null;
-        if (book == null) return;
-
-        // カスタムエンチャントが実際に適用されたか確認
+        // カスタムエンチャントが実際に適用された結果か確認（そうでなければバニラ処理に委ねる）
         boolean hasCustomEnchant = false;
         for (String enchantId : new String[]{"mana_regen", "mana_boost", "soulbound", "share"}) {
             Enchantment enchant = ArsEnchantments.getFromId(enchantId);
@@ -196,8 +188,67 @@ public class EnchantBookListener implements Listener {
         }
         if (!hasCustomEnchant) return;
 
-        // エンチャント本を消費
-        book.setAmount(book.getAmount() - 1);
+        // 本とターゲットのスロット位置を特定
+        int bookSlot = isEnchantBook(anvil.getItem(1)) ? 1
+            : isEnchantBook(anvil.getItem(0)) ? 0 : -1;
+        if (bookSlot == -1) return;
+        int targetSlot = bookSlot == 1 ? 0 : 1;
+        ItemStack book = anvil.getItem(bookSlot);
+        if (book == null) return;
+
+        // ここからは完全手動制御。二重消費を防ぐためバニラのクリック処理を抑止する。
+        event.setCancelled(true);
+
+        // 連打防止（キャンセル確定後にチェックし、ブロック時は何も起きない）
+        if (!anvilCooldown.add(player.getUniqueId())) return;
+        org.bukkit.Bukkit.getScheduler().runTaskLater(
+            com.arspaper.ArsPaper.getInstance(),
+            () -> anvilCooldown.remove(player.getUniqueId()), 5L);
+
+        // 結果の受け取り方を決定（通常クリック=カーソル / シフト=インベントリ）。
+        // それ以外のクリック（数字キー・ドロップ等）はキャンセルのみで何もしない。
+        boolean shift = event.isShiftClick();
+        boolean normalPickup = event.getClick() == org.bukkit.event.inventory.ClickType.LEFT
+            || event.getClick() == org.bukkit.event.inventory.ClickType.RIGHT;
+        if (!shift && !normalPickup) return;
+
+        // カーソルに別アイテムがある場合は通常受け取り不可
+        ItemStack cursor = event.getCursor();
+        boolean cursorOccupied = !shift && cursor != null && !cursor.getType().isAir();
+        if (cursorOccupied) return;
+
+        // XPコストを徴収（クリエイティブは免除）
+        int cost = anvil.getRepairCost();
+        boolean chargeXp = player.getGameMode() != org.bukkit.GameMode.CREATIVE;
+        if (chargeXp && player.getLevel() < cost) {
+            return; // レベル不足 → 何も消費しない
+        }
+
+        // 結果をプレイヤーへ渡す（渡せなかった場合は消費せず中断）
+        ItemStack toGive = result.clone();
+        if (shift) {
+            java.util.Map<Integer, ItemStack> leftover = player.getInventory().addItem(toGive);
+            if (!leftover.isEmpty()) {
+                return; // インベントリ満杯 → 消費せず中断
+            }
+        } else {
+            player.setItemOnCursor(toGive);
+        }
+
+        // 受け渡し成功 → XPと入力スロットを消費
+        if (chargeXp) {
+            player.setLevel(player.getLevel() - cost);
+        }
+        anvil.setItem(targetSlot, null);
+        int newBookAmount = book.getAmount() - 1;
+        if (newBookAmount <= 0) {
+            anvil.setItem(bookSlot, null);
+        } else {
+            ItemStack newBook = book.clone();
+            newBook.setAmount(newBookAmount);
+            anvil.setItem(bookSlot, newBook);
+        }
+        player.updateInventory();
 
         // 取り出し後にボーナス再計算をスケジュール（防具の場合のみ）
         if (isMageArmor(result)) {

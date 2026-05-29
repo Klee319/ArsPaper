@@ -1,14 +1,20 @@
 package com.arspaper.util;
 
+import com.arspaper.block.BlockKeys;
+import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Rotation;
+import org.bukkit.World;
+import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
+import org.bukkit.block.TileState;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.GlowItemFrame;
 import org.bukkit.entity.ItemFrame;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.persistence.PersistentDataType;
 
 /**
  * 不可視エンティティによるアイテム表示ユーティリティ。
@@ -21,6 +27,63 @@ public final class ItemFrameHelper {
     private static final String HEAD_DISPLAY_TAG = "arspaper_head_display";
 
     private ItemFrameHelper() {}
+
+    // ========================================
+    // 孤児表示エンティティの回収
+    // ========================================
+
+    /** ArsPaperの表示用エンティティ（ItemFrame/ArmorStand）かどうか。 */
+    public static boolean isArsDisplay(Entity entity) {
+        return entity.getScoreboardTags().contains(MARKER_TAG)
+            || entity.getScoreboardTags().contains(HEAD_DISPLAY_TAG);
+    }
+
+    /**
+     * 表示エンティティの足元（同ブロックと直下）にカスタムブロックが存在するか。
+     * WorldEdit等でブロックだけ消されると表示エンティティが孤児化するため、
+     * アンカーとなるカスタムブロックの有無で孤児判定する。
+     */
+    private static boolean hasCustomBlockAnchor(Entity entity) {
+        Location loc = entity.getLocation();
+        for (int dy = 0; dy >= -1; dy--) {
+            Block block = loc.clone().add(0, dy, 0).getBlock();
+            if (block.getState() instanceof TileState tile
+                && tile.getPersistentDataContainer().has(BlockKeys.CUSTOM_BLOCK_ID, PersistentDataType.STRING)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * チャンク内の孤児表示エンティティ（アンカーのカスタムブロックが消えたもの）を除去する。
+     * @return 除去数
+     */
+    public static int reapOrphansInChunk(Chunk chunk) {
+        int removed = 0;
+        for (Entity entity : chunk.getEntities()) {
+            if (isArsDisplay(entity) && !hasCustomBlockAnchor(entity)) {
+                entity.remove();
+                removed++;
+            }
+        }
+        return removed;
+    }
+
+    /**
+     * ワールド内の孤児表示エンティティを除去する（/ars cleanup 用）。
+     * @return 除去数
+     */
+    public static int reapOrphansInWorld(World world) {
+        int removed = 0;
+        for (Entity entity : world.getEntities()) {
+            if (isArsDisplay(entity) && !hasCustomBlockAnchor(entity)) {
+                entity.remove();
+                removed++;
+            }
+        }
+        return removed;
+    }
 
     // ========================================
     // ItemFrame方式（Pedestal等フラットブロック用）

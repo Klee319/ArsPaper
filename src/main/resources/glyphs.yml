@@ -556,6 +556,7 @@ glyphs:
       base-hp: 90.0                # ゴーレムの基本HP
       hp-per-amplify: 30.0          # 増幅1段あたりのHP増加
       base-spawn-count: 1
+      max-summons-per-caster: 4     # 1人あたりの同時召喚上限(増殖・サーバー負荷防止)
     unlock-cost:
       level: 20
       materials:

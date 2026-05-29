@@ -484,14 +484,19 @@ public final class ArsCommand {
 
     private static int executeCleanup(Player player) {
         int removed = 0;
+        // 旧BlockDisplayModule方式（DISPLAY_MARKER PDC）の残留ArmorStandを除去
         for (ArmorStand stand : player.getWorld().getEntitiesByClass(ArmorStand.class)) {
             if (stand.getPersistentDataContainer().has(BlockKeys.DISPLAY_MARKER)) {
                 stand.remove();
                 removed++;
             }
         }
+        // 現行のItemFrameHelper方式（scoreboardタグ）で孤児化した表示エンティティを除去。
+        // アンカーのカスタムブロックが残っている表示は除去しない。
+        removed += com.arspaper.util.ItemFrameHelper.reapOrphansInWorld(player.getWorld());
+
         player.sendMessage(Component.text(
-            "ArsPaper表示用ArmorStandを" + removed + "体除去しました", NamedTextColor.GREEN));
+            "ArsPaper表示用エンティティを" + removed + "体除去しました", NamedTextColor.GREEN));
         return 1;
     }
 
@@ -568,15 +573,9 @@ public final class ArsCommand {
             return 0;
         }
 
-        // 装備中の防具からバックパックスレッドを検索
-        for (org.bukkit.inventory.ItemStack armor : player.getInventory().getArmorContents()) {
-            if (armor != null && BackpackGui.countBackpackThreads(armor) > 0) {
-                BackpackGui.open(player, armor);
-                return 1;
-            }
-        }
-        player.sendMessage(Component.text("バックパックスレッドが装備されていません", NamedTextColor.RED));
-        return 0;
+        // backpackスレッドを持つ部位を開く（複数なら部位選択GUI、1つなら直接）
+        BackpackGui.openForPlayer(player);
+        return 1;
     }
 
     private static int executePvpToggle(ArsPaper plugin, CommandSender sender, String state) {

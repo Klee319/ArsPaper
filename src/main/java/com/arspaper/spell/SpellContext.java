@@ -327,6 +327,31 @@ public class SpellContext {
     private static final double MAX_AOE_RADIUS = 10.0;
 
     /**
+     * 有害（攻撃・状態異常・強制移動）系Effectのキー集合。
+     * これらは主対象がPVP保護されたプレイヤー（または発動者所有のペット）の場合、
+     * ダメージ系と同様にブロックする。ダメージ系はEntityDamageEventでも防がれるが、
+     * 状態異常付与など非ダメージのデバフはイベントを経由しないため、主対象パスで
+     * 明示的にガードする必要がある。
+     * ここに無いEffect（回復・支援・自己バフ・ブロック操作系）は味方への適用を許容する。
+     */
+    private static final java.util.Set<String> HOSTILE_EFFECT_KEYS = java.util.Set.of(
+        "harm", "freeze", "snare", "levitate", "gravity", "hex", "wither",
+        "ignite", "scorch", "cold_snap", "bubble", "fangs", "crush", "crush_wave",
+        "cut", "launch", "knockback", "pull", "wind_burst", "windshear",
+        "sonic_boom", "heavy_impact", "toss", "bounce", "gale", "flare",
+        "lightning", "explosion", "fell", "lunar", "solar", "dispel", "cry");
+
+    /**
+     * 主対象への有害効果適用をブロックすべきか判定する。
+     * 発動者自身は対象外。通常のMob（PvE）は常に許容される（isValidAoeTargetがtrueを返す）。
+     */
+    private boolean isBlockedHostileEffect(SpellEffect effect, LivingEntity target, Player caster) {
+        if (!HOSTILE_EFFECT_KEYS.contains(effect.getId().getKey())) return false;
+        if (target.equals(caster)) return false;
+        return !isValidAoeTarget(target, caster);
+    }
+
+    /**
      * EffectGroupを構築する。
      * Ars Nouveau準拠: Effectの後ろに続くAugmentがそのEffectを強化する。
      */
@@ -396,8 +421,16 @@ public class SpellContext {
     }
 
     private void resolveGroupsOnEntityNoAoe(List<EffectGroup> groups, int startIndex, LivingEntity target) {
+        Player caster = getCaster();
+        if (caster == null) return;
         for (int i = startIndex; i < groups.size(); i++) {
             EffectGroup group = groups.get(i);
+
+            // 主対象パスのPVP/味方ガード: 有害効果は保護対象へ適用しない（ダメージ同様）
+            if (isBlockedHostileEffect(group.effect, target, caster)) {
+                continue;
+            }
+
             resetAugmentState();
             for (SpellAugment aug : group.augments) {
                 aug.modify(this);
@@ -479,6 +512,12 @@ public class SpellContext {
 
         for (int i = startIndex; i < groups.size(); i++) {
             EffectGroup group = groups.get(i);
+
+            // 主対象パスのPVP/味方ガード: 有害効果は保護対象へ適用しない（ダメージ同様）
+            if (isBlockedHostileEffect(group.effect, target, caster)) {
+                continue;
+            }
+
             resetAugmentState();
             for (SpellAugment aug : group.augments) {
                 aug.modify(this);

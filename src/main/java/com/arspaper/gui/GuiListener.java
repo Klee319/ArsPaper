@@ -1,6 +1,5 @@
 package com.arspaper.gui;
 
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -51,30 +50,10 @@ public class GuiListener implements Listener {
             return;
         }
 
-        // バックパックGUI: タイトルで判別し、装備中の防具PDCにデータ保存
-        if (event.getPlayer() instanceof Player player && event.getView().title() != null) {
-            String title = PlainTextComponentSerializer.plainText().serialize(event.getView().title());
-            if ("バックパック".equals(title)) {
-                // getArmorContents()はコピーを返すため、直接スロットを参照して書き戻す
-                org.bukkit.inventory.PlayerInventory inv = player.getInventory();
-                org.bukkit.inventory.ItemStack[] armorSlots = {
-                    inv.getHelmet(), inv.getChestplate(), inv.getLeggings(), inv.getBoots()
-                };
-                for (int s = 0; s < armorSlots.length; s++) {
-                    org.bukkit.inventory.ItemStack armor = armorSlots[s];
-                    if (armor != null && BackpackGui.countBackpackThreads(armor) > 0) {
-                        BackpackGui.saveBackpackContents(armor, event.getInventory());
-                        // editMetaで変更されたItemStackを装備スロットに書き戻す
-                        switch (s) {
-                            case 0 -> inv.setHelmet(armor);
-                            case 1 -> inv.setChestplate(armor);
-                            case 2 -> inv.setLeggings(armor);
-                            case 3 -> inv.setBoots(armor);
-                        }
-                        break;
-                    }
-                }
-            }
+        // バックパックGUI: Holder型で判別し、対象スロットの防具へ無条件保存（未マッチ時は返却）
+        if (event.getInventory().getHolder(false) instanceof BackpackHolder holder
+                && event.getPlayer() instanceof Player player) {
+            BackpackGui.saveOnClose(player, holder, event.getInventory());
         }
     }
 }

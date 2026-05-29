@@ -141,6 +141,9 @@ public class BlockParticleTask extends BukkitRunnable implements Listener {
                     .add(state.getLocation());
             }
         }
+
+        // 孤児化した表示エンティティ（WorldEdit等でブロックだけ消されたもの）を回収
+        com.arspaper.util.ItemFrameHelper.reapOrphansInChunk(chunk);
     }
 
     private void spawnParticleForBlock(Location loc, String blockId) {

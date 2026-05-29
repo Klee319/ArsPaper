@@ -59,18 +59,47 @@ public class AnimateEffect implements SpellEffect {
      */
     private void spawnGolemAt(SpellContext context, Location spawnLoc) {
         Player caster = context.getCaster();
+        if (caster == null) return;
+
+        // 召喚上限チェック（無制限召喚によるエンティティ増殖・タスク累積・サーバー負荷を防止）
+        int maxSummonsPerCaster = (int) config.getParam("animate", "max-summons-per-caster", 4.0);
+        long currentCount = countSummonedEntities(caster);
+        if (currentCount >= maxSummonsPerCaster) {
+            caster.sendMessage(net.kyori.adventure.text.Component.text(
+                "召喚ゴーレムの上限に達しています (" + maxSummonsPerCaster + "体)",
+                net.kyori.adventure.text.format.NamedTextColor.RED));
+            context.setCancelled(true);
+            return;
+        }
+
         int durationLevel = context.getDurationLevel();
         int baseDuration = (int) config.getParam("animate", "base-duration-ticks", BASE_DURATION_TICKS);
         int durationPerLevel = (int) config.getParam("animate", "duration-per-level-ticks", DURATION_PER_LEVEL_TICKS);
         int durationTicks = Math.max(1, baseDuration + durationLevel * durationPerLevel);
         int baseSpawnCount = (int) config.getParam("animate", "base-spawn-count", 1.0);
-        int spawnCount = baseSpawnCount + context.getAoeRadiusLevel();
+        // 残り召喚枠に収まるようにクランプ（上限超過召喚を防止）
+        int remaining = (int) Math.max(0, maxSummonsPerCaster - currentCount);
+        int spawnCount = Math.min(baseSpawnCount + context.getAoeRadiusLevel(), remaining);
 
         for (int i = 0; i < spawnCount; i++) {
             double offsetX = (i == 0) ? 0 : (Math.random() * 4 - 2);
             double offsetZ = (i == 0) ? 0 : (Math.random() * 4 - 2);
             spawnSingleGolem(context, caster, spawnLoc.clone().add(offsetX, 0, offsetZ), durationTicks);
         }
+    }
+
+    /**
+     * この発動者が召喚した有効なエンティティ数を数える（上限管理用）。
+     * 召喚系Effect共通の "summoned" + "summoner_uuid" マーカーで集計する。
+     */
+    private long countSummonedEntities(Player caster) {
+        NamespacedKey summonedKey = new NamespacedKey(plugin, "summoned");
+        NamespacedKey summonerKey = new NamespacedKey(plugin, "summoner_uuid");
+        String casterUuid = caster.getUniqueId().toString();
+        return caster.getLocation().getNearbyLivingEntities(128).stream()
+            .filter(e -> e.getPersistentDataContainer().has(summonedKey, PersistentDataType.BYTE)
+                && casterUuid.equals(e.getPersistentDataContainer().get(summonerKey, PersistentDataType.STRING)))
+            .count();
     }
 
     private void spawnSingleGolem(SpellContext context, Player caster, Location spawnLoc, int durationTicks) {
@@ -80,11 +109,18 @@ public class AnimateEffect implements SpellEffect {
 
         IronGolem golem = spawnLoc.getWorld().spawn(safeLocation, IronGolem.class, g -> {
             g.setPlayerCreated(true);
+            // サーバー再起動で除去タスクが消えても永久残留しないようにする
+            g.setPersistent(false);
 
-            // 召喚モブマーカー
+            // 召喚モブマーカー + 召喚者UUID（上限管理・ターゲット制御に使用）
             g.getPersistentDataContainer().set(
                 new NamespacedKey(plugin, "summoned"),
                 PersistentDataType.BYTE, (byte) 1);
+            if (caster != null) {
+                g.getPersistentDataContainer().set(
+                    new NamespacedKey(plugin, "summoner_uuid"),
+                    PersistentDataType.STRING, caster.getUniqueId().toString());
+            }
 
             // HPをAmplifyで強化
             int amplifyLevel = context.getAmplifyLevel();
