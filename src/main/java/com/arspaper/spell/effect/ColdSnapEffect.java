@@ -47,9 +47,8 @@ public class ColdSnapEffect implements SpellEffect {
         double amplifyBonus = config.getParam("cold_snap", "amplify-bonus", AMPLIFY_BONUS);
         double damage = Math.max(0, baseDamage + context.getAmplifyLevel() * amplifyBonus);
 
-        Player caster = context.getCaster();
-        damage = context.calculateSpellDamage(damage, target);
-        target.damage(damage, caster);
+        // 対称パイプラインへ供給し最終ダメージを適用
+        context.dealSpellDamage(target, damage);
 
         spawnColdSnapFx(target.getLocation());
     }

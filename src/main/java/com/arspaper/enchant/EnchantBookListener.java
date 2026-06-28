@@ -1,5 +1,6 @@
 package com.arspaper.enchant;
 
+import com.arspaper.integration.TrinityForgeBridge;
 import com.arspaper.item.ArmorManaListener;
 import com.arspaper.item.ItemKeys;
 import net.kyori.adventure.text.Component;
@@ -148,6 +149,13 @@ public class EnchantBookListener implements Listener {
             // Bukkit Enchantment APIでエンチャント適用
             result.addUnsafeEnchantment(enchant, Math.min(finalLevel, ArsEnchantments.MAX_LEVEL));
 
+            // soulbind の真実を ItemData に統一: 付与時に bindType=SOULBOUND を書く。
+            // owner はプレビュー段階では未確定なため null（取得時に最初の取得者で確定）。
+            // ArsEnchantments の soulbound は回生エフェクトのフラグとして併存させる。
+            if ("soulbound".equals(enchantId)) {
+                result.editMeta(m -> TrinityForgeBridge.bindSoulbound(m, null));
+            }
+
             event.setResult(result);
 
             // コスト設定: 回生は10、それ以外は1
@@ -198,6 +206,12 @@ public class EnchantBookListener implements Listener {
 
         // エンチャント本を消費
         book.setAmount(book.getAmount() - 1);
+
+        // soulbind の所有者を最初の取得者で確定（真実=ItemData の owner）。
+        // 付与プレビュー時に bindType=SOULBOUND は書き済み。ここで owner を上書き確定する。
+        if (ArsEnchantments.hasSoulbound(result)) {
+            result.editMeta(m -> TrinityForgeBridge.bindSoulbound(m, player.getUniqueId()));
+        }
 
         // 取り出し後にボーナス再計算をスケジュール（防具の場合のみ）
         if (isMageArmor(result)) {

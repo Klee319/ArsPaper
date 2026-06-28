@@ -40,7 +40,8 @@ public class FlareEffect implements SpellEffect {
         double baseDamage = config.getParam("flare", "base-damage", BASE_DAMAGE);
         double amplifyBonus = config.getParam("flare", "amplify-bonus", AMPLIFY_BONUS);
         double damage = baseDamage + context.getAmplifyLevel() * amplifyBonus;
-        target.damage(damage, context.getCaster());
+        // 対称パイプラインへ供給し最終ダメージを適用
+        context.dealSpellDamage(target, damage);
 
         spawnFlareFx(target.getLocation());
     }

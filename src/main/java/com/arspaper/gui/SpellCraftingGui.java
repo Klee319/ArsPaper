@@ -263,6 +263,11 @@ public class SpellCraftingGui extends BaseGui {
      * 追加可能ならnullを返す。
      */
     private String getDisableReason(SpellComponent comp) {
+        // 使用ゲート(α): 使用に必要なperkを満たさないglyphは組み込み不可
+        if (!plugin.getSpellCaster().hasGlyphPermission(viewer, comp.getId().getKey())) {
+            return "使用権限がありません（perk未所持）";
+        }
+
         if (firstEmptySlot() < 0) {
             return "スペルが満杯です";
         }
@@ -555,6 +560,16 @@ public class SpellCraftingGui extends BaseGui {
             return;
         }
 
+        // 使用ゲート(α): perk未所持のglyphが含まれていれば保存拒否（保険）
+        for (SpellComponent comp : compacted) {
+            if (!plugin.getSpellCaster().hasGlyphPermission(clicker, comp.getId().getKey())) {
+                clicker.sendMessage(Component.text(
+                    "使用権限のないグリフが含まれています: " + comp.getDisplayName(), NamedTextColor.RED));
+                clicker.playSound(clicker.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
+                return;
+            }
+        }
+
         // 互換性チェック
         String compatError = validateCompatibility();
         if (compatError != null) {
@@ -611,9 +626,14 @@ public class SpellCraftingGui extends BaseGui {
             .get(ManaKeys.UNLOCKED_GLYPHS, PersistentDataType.STRING);
         if (json == null) return new HashSet<>();
 
-        JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
         Set<String> result = new HashSet<>();
-        arr.forEach(el -> result.add(el.getAsString()));
+        try {
+            JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
+            arr.forEach(el -> result.add(el.getAsString()));
+        } catch (Exception e) {
+            // PDC が破損している場合は空集合にフォールバック（SpellCaster.getCachedGlyphs と同方針）
+            return new HashSet<>();
+        }
         return result;
     }
 

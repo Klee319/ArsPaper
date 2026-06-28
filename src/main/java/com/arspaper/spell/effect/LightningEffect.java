@@ -57,8 +57,8 @@ public class LightningEffect implements SpellEffect {
                 damage += wetBonus;
             }
 
-            damage = context.calculateSpellDamage(damage, target);
-            target.damage(damage, context.getCaster());
+            // 対称パイプラインへ供給し最終ダメージを適用
+            context.dealSpellDamage(target, damage);
 
             // Shockedステータス: Slowness I を付与
             int shockedBase = (int) config.getParam("lightning", "shocked-base-ticks", (double) SHOCKED_BASE_TICKS);

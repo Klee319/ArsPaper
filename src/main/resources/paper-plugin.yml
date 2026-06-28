@@ -6,6 +6,15 @@ description: Ars Nouveau-inspired magic plugin for Paper servers
 api-version: "1.21"
 author: Klee319
 
+# TrinityForge 統合アドオンを先にロードし、クラスパスを結合する。
+# 魔法ダメージを対称ダメージパイプライン(magicalFinalDamage)へ供給するため必須。
+dependencies:
+  server:
+    TrinityForge:
+      load: BEFORE
+      required: true
+      join-classpath: true
+
 permissions:
   arspaper.use:
     description: Basic ArsPaper usage

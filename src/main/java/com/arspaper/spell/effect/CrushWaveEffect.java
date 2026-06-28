@@ -45,9 +45,8 @@ public class CrushWaveEffect implements SpellEffect {
             damage *= config.getParam("crush_wave", "water-multiplier", WATER_MULTIPLIER);
         }
 
-        Player caster = context.getCaster();
-        damage = context.calculateSpellDamage(damage, target);
-        target.damage(damage, caster);
+        // 対称パイプラインへ供給し最終ダメージを適用
+        context.dealSpellDamage(target, damage);
         spawnCrushWaveFx(target.getLocation());
     }
 

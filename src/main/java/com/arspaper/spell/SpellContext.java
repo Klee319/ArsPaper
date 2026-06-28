@@ -163,13 +163,44 @@ public class SpellContext {
     public int getDurationTicks() { return durationLevel * 200; }
 
     /**
+     * スペル基礎ダメージを TrinityForge の対称ダメージパイプラインへ供給し、
+     * 返ってきた最終魔法ダメージを MAGIC ダメージソースで対象に適用する。
+     *
+     * <p>増強(Amplify)/減衰(Dampen) は呼び出し側で {@code spellBase} に内包済みであることが前提
+     * （MAGIC_BALANCE §2 の層分離: 増減グリフはデフォルト魔法ダメージの内側に閉じる）。
+     * 触媒・装備由来の会心/貫通等は TrinityForge 側の {@code AttackStats} が担当する。
+     *
+     * <p>バニラの攻撃力上昇/弱体化/耐性ポーション補正はここでは適用しない。
+     * COMBAT §5 の通り、それらは対称パイプライン側（防御率/守備力/耐性）へ一本化される。
+     *
+     * @param target    ダメージ対象
+     * @param spellBase スペル基礎ダメージ（Ars攻撃力 + 増減グリフを内包済み・最低0）
+     */
+    public void dealSpellDamage(LivingEntity target, double spellBase) {
+        Player caster = getCaster();
+        if (caster == null || target == null || spellBase <= 0) {
+            return;
+        }
+        double finalDamage = com.arspaper.integration.TrinityForgeBridge
+            .magicalFinalDamage(casterUuid, target, spellBase);
+        if (finalDamage <= 0) {
+            return;
+        }
+        com.arspaper.integration.TrinityForgeBridge.applyMagicDamage(target, caster, finalDamage);
+    }
+
+    /**
      * スペルダメージを攻撃力上昇/弱体化/耐性で補正して返す。
      * 1レベルにつき10%の乗算。
      *
      * @param baseDamage 基本ダメージ（Amplify等で計算済み）
      * @param target ダメージ対象
      * @return 補正後ダメージ（最低0）
+     * @deprecated 魔法ダメージは {@link #dealSpellDamage(LivingEntity, double)} 経由で
+     *             TrinityForge 対称パイプラインに供給すること。本メソッドは旧式の自前補正で、
+     *             対称パイプラインを通らないため新規利用は禁止。
      */
+    @Deprecated
     public double calculateSpellDamage(double baseDamage, LivingEntity target) {
         double damage = baseDamage;
         Player caster = getCaster();

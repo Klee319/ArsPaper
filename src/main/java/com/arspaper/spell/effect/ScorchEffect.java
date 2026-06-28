@@ -45,9 +45,8 @@ public class ScorchEffect implements SpellEffect {
             damage *= config.getParam("scorch", "fire-multiplier", FIRE_MULTIPLIER);
         }
 
-        Player caster = context.getCaster();
-        damage = context.calculateSpellDamage(damage, target);
-        target.damage(damage, caster);
+        // 対称パイプラインへ供給し最終ダメージを適用
+        context.dealSpellDamage(target, damage);
         spawnScorchFx(target.getLocation());
     }
 

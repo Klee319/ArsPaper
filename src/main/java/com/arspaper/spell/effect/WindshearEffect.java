@@ -42,8 +42,8 @@ public class WindshearEffect implements SpellEffect {
         double amplifyBonus = config.getParam("windshear", "amplify-bonus", AMPLIFY_BONUS);
         double damage = baseDamage + amplifyBonus * context.getAmplifyLevel() + heightBonus;
 
-        damage = context.calculateSpellDamage(damage, target);
-        target.damage(damage, context.getCaster());
+        // 対称パイプラインへ供給し最終ダメージを適用
+        context.dealSpellDamage(target, damage);
 
         Location loc = target.getLocation().add(0, 1, 0);
         loc.getWorld().spawnParticle(Particle.CLOUD, loc, 20, 0.4, 0.4, 0.4, 0.15);

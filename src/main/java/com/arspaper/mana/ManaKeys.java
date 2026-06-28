@@ -50,6 +50,12 @@ public final class ManaKeys {
     /** 防具によるマナリジェンボーナス（config防具用） */
     public static final NamespacedKey ARMOR_REGEN_BONUS = new NamespacedKey(NAMESPACE, "armor_regen_bonus");
 
+    /** 装備由来のマナ最大値%上昇（スレッド等を合算した値, %） */
+    public static final NamespacedKey THREAD_MANA_MAX_PERCENT = new NamespacedKey(NAMESPACE, "thread_mana_max_percent");
+
+    /** 装備由来のマナ回復速度%上昇（スレッド等を合算した値, %） */
+    public static final NamespacedKey THREAD_REGEN_PERCENT = new NamespacedKey(NAMESPACE, "thread_regen_percent");
+
     /** 被ダメ時マナ回復量（config防具用） */
     public static final NamespacedKey ARMOR_HIT_MANA_RECOVERY = new NamespacedKey(NAMESPACE, "armor_hit_mana_recovery");
 

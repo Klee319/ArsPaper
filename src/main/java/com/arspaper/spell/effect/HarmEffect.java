@@ -57,8 +57,8 @@ public class HarmEffect implements SpellEffect {
             double baseDamage = config.getParam("harm", "base-damage", DEFAULT_BASE_DAMAGE);
             double amplifyBonus = config.getParam("harm", "amplify-bonus", DEFAULT_AMPLIFY_BONUS);
             double damage = Math.max(0, baseDamage + context.getAmplifyLevel() * amplifyBonus);
-            damage = context.calculateSpellDamage(damage, target);
-            target.damage(damage, context.getCaster());
+            // 増減グリフを内包した基礎ダメージを対称パイプラインへ供給し、最終ダメージを適用。
+            context.dealSpellDamage(target, damage);
         }
         SpellFxUtil.spawnHarmFx(target.getLocation());
     }

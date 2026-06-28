@@ -26,6 +26,12 @@ import java.util.List;
  * 4. Loreから回生の表示を除去
  *
  * 再度付けたい場合は儀式でエンチャント本を作り直して金床で適用する。
+ *
+ * <p>バインドの真実(所有者・バインド種別)は TrinityForge の ItemData PDC
+ * ({@code bindType=SOULBOUND} + owner UUID) に一本化している。
+ * このリスナーが扱う ArsEnchantments soulbound は「回生エフェクト」のフラグとして併存し、
+ * 耐久復活の発火条件にのみ使う。所有者判定が必要になった場合は
+ * {@code TrinityForgeBridge.soulboundOwner(meta)} を参照すること。
  */
 public class SoulboundListener implements Listener {
 

@@ -1,0 +1,23 @@
+# ============================================================
+# ArsPaper Usage Gate (使用ゲート / UNLOCK Model Y)
+# ============================================================
+# グリフの入手(scribe = 筆記台での解放)は自由だが、
+# 使用には対応する perk の所持が必要、という制限を定義する。
+#
+# perk の所持判定は TrinityForge 統合アドオンの
+# PlayerData.heldPerks() のエントリと一致するかで行う。
+#
+# 書式:
+#   glyph-perks:
+#     <glyph-key>: "<必要な perk ID>"
+#
+# - <glyph-key> は glyph の NamespacedKey のキー部分（例: fireball, heal）。
+# - 未定義の glyph はゲート無し（自由に使用可）。
+# - このマップが空 = 全 glyph 自由使用。
+# - TrinityForge 未ロード時は安全側（ゲート無効=使用可）に倒す。
+# ============================================================
+
+glyph-perks:
+  # 例（コメントアウト中。必要に応じて有効化する）:
+  # fireball: "perk.fire_mage"
+  # heal: "perk.cleric"

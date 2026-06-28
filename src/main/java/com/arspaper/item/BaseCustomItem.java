@@ -1,6 +1,7 @@
 package com.arspaper.item;
 
 import com.arspaper.ArsPaper;
+import com.arspaper.integration.TrinityForgeBridge;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -49,6 +50,27 @@ public abstract class BaseCustomItem {
     /** エンチャントオーラを表示するかどうか（防具はfalseにオーバーライド） */
     public boolean hasEnchantGlow() { return true; }
 
+    /**
+     * 厳選の既定品質(0-5)。サブクラスやドロップ経路で上書きして固定品質を指定できる。
+     * {@link #usesQualityRoll()} が false の場合はこの値がそのまま書き込まれる。
+     */
+    protected int defaultQuality() { return 0; }
+
+    /**
+     * 品質を selection.yml の分布から抽選するか。
+     * false（既定）なら {@link #defaultQuality()} を使う。
+     * サブクラスやドロップ経路で true にすると分布抽選が有効になる。
+     */
+    protected boolean usesQualityRoll() { return false; }
+
+    /** 生成時の品質を決定する（抽選 or 既定値）。常に 0-5 にクランプして返す。 */
+    protected int rollQuality() {
+        if (usesQualityRoll()) {
+            return SelectionConfig.get().rollQuality(defaultQuality());
+        }
+        return SelectionConfig.clamp(defaultQuality());
+    }
+
     /** アイテムスタックを新規生成 */
     public ItemStack createItemStack() {
         ItemStack item = new ItemStack(getBaseMaterial());
@@ -65,6 +87,11 @@ public abstract class BaseCustomItem {
                 PersistentDataType.STRING,
                 itemId
             );
+            // 厳選: 生成毎にユニークな rollSeed と品質(0-5)を TrinityForge ItemData(PDC) へ追記。
+            // ステ値はベイクせず、TrinityForge 側が rollSeed + quality + テーブルから live 導出する。
+            // TrinityForge 未ロード時は no-op（既存 PDC は壊さない）。
+            long rollSeed = java.util.concurrent.ThreadLocalRandom.current().nextLong();
+            TrinityForgeBridge.writeItemRoll(meta, rollSeed, rollQuality());
             // エンチャントオーラ（防具以外のカスタムアイテムに光沢を付与）
             if (hasEnchantGlow()) {
                 meta.addEnchant(Enchantment.UNBREAKING, 1, true);

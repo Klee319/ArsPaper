@@ -12,6 +12,8 @@ repositories {
 
 dependencies {
     compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
+    // TrinityForge 統合アドオン API（ビルド済みjar・compileOnly。実行時はサーバーが先にロード）
+    compileOnly(files("libs/TrinityForge.jar"))
 }
 
 java {

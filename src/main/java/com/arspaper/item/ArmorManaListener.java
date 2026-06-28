@@ -127,6 +127,8 @@ public class ArmorManaListener implements Listener {
         int totalEnchantMana = 0;
         int totalEnchantRegen = 0;
         int totalCostReduction = 0;
+        int totalMaxPercent = 0;
+        int totalRegenPercent = 0;
         boolean hasFlightThread = false;
         Set<PotionEffectType> activeThreadPotions = new HashSet<>();
 
@@ -178,6 +180,8 @@ public class ArmorManaListener implements Listener {
                 totalThreadMana += threadConfig.getManaBonus(thread);
                 totalThreadRegen += threadConfig.getRegenBonus(thread);
                 totalCostReduction += threadConfig.getCostReduction(thread);
+                totalMaxPercent += threadConfig.getManaMaxPercent(thread);
+                totalRegenPercent += threadConfig.getRegenPercent(thread);
                 totalHitRecovery += threadConfig.getHitManaRecovery(thread);
                 totalDamageRecovery += threadConfig.getDamageManaRecovery(thread);
                 if (thread.hasPotionEffect()) {
@@ -200,6 +204,8 @@ public class ArmorManaListener implements Listener {
         playerPdc.set(ManaKeys.ENCHANT_MANA_BONUS, PersistentDataType.INTEGER, totalEnchantMana);
         playerPdc.set(ManaKeys.ENCHANT_REGEN_BONUS, PersistentDataType.INTEGER, totalEnchantRegen);
         playerPdc.set(ManaKeys.THREAD_COST_REDUCTION, PersistentDataType.INTEGER, totalCostReduction);
+        playerPdc.set(ManaKeys.THREAD_MANA_MAX_PERCENT, PersistentDataType.INTEGER, totalMaxPercent);
+        playerPdc.set(ManaKeys.THREAD_REGEN_PERCENT, PersistentDataType.INTEGER, totalRegenPercent);
 
         updatePotionEffects(player, activeThreadPotions);
 

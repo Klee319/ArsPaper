@@ -30,11 +30,15 @@ public class RitualManager {
     private static final int PEDESTAL_DISTANCE = 2;
     private final RitualRecipeRegistry recipeRegistry;
     private final RitualEffectRegistry effectRegistry;
+    /** 儀式の perk 解放ゲート + 修繕儀式コスト設定の参照。 */
+    private final com.arspaper.recipe.UnlockGate unlockGate;
     private final Set<Location> activatingRituals = new HashSet<>();
 
-    public RitualManager(RitualRecipeRegistry recipeRegistry, RitualEffectRegistry effectRegistry) {
+    public RitualManager(RitualRecipeRegistry recipeRegistry, RitualEffectRegistry effectRegistry,
+                         com.arspaper.recipe.UnlockGate unlockGate) {
         this.recipeRegistry = recipeRegistry;
         this.effectRegistry = effectRegistry;
+        this.unlockGate = unlockGate;
     }
 
     /** シャットダウン時にアクティブ儀式のロックを解放する。 */
@@ -85,19 +89,37 @@ public class RitualManager {
 
         RitualRecipe recipe = matchOpt.get();
 
+        // perk 解放ゲート（Source消費前にチェック）。
+        // 必要 perk 未所持なら中止し、Sourceは消費しない。
+        if (!unlockGate.hasRitualPermission(player, recipe.id())) {
+            player.sendMessage(Component.text("この儀式を行う権限がありません", NamedTextColor.RED));
+            player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, SoundCategory.PLAYERS, 1.0f, 0.5f);
+            return;
+        }
+
+        // 修繕儀式の有効/無効 + 追加 Source コスト（設定駆動）。
+        boolean isRepair = "repair".equals(recipe.effectType());
+        if (isRepair && !unlockGate.isRepairEnabled()) {
+            player.sendMessage(Component.text("修繕の儀式は現在無効化されています", NamedTextColor.RED));
+            player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, SoundCategory.PLAYERS, 1.0f, 0.5f);
+            return;
+        }
+        int extraSource = isRepair ? unlockGate.repairExtraSourceCost() : 0;
+        int totalSourceRequired = recipe.sourceRequired() + extraSource;
+
         // Source予約消費（TOCTOU防止: チェックと消費を一体化）
         // アニメーション中に他の儀式がSourceを使い切るのを防ぐため、先に消費する
-        final boolean sourceReserved;
-        if (recipe.sourceRequired() > 0) {
-            if (!consumeSourceFromNearby(coreLocation, recipe.sourceRequired())) {
+        final int reservedSource;
+        if (totalSourceRequired > 0) {
+            if (!consumeSourceFromNearby(coreLocation, totalSourceRequired)) {
                 player.sendMessage(Component.text(
-                    "ソースが不足しています！必要量: " + recipe.sourceRequired(), NamedTextColor.RED));
+                    "ソースが不足しています！必要量: " + totalSourceRequired, NamedTextColor.RED));
                 player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, SoundCategory.PLAYERS, 1.0f, 0.5f);
                 return;
             }
-            sourceReserved = true;
+            reservedSource = totalSourceRequired;
         } else {
-            sourceReserved = false;
+            reservedSource = 0;
         }
 
         // アニメーション付き儀式実行（3秒）
@@ -176,7 +198,7 @@ public class RitualManager {
                 Block revalidateBlock = coreLocation.getBlock();
                 if (!(revalidateBlock.getState() instanceof TileState revalidateCore)) {
                     player.sendMessage(Component.text("儀式が中断されました！", NamedTextColor.RED));
-                    refundSource(coreLocation, sourceReserved ? recipe.sourceRequired() : 0);
+                    refundSource(coreLocation, reservedSource);
                     return;
                 }
                 RitualIngredient revalidateCoreItem = RitualCore.getCoreIngredient(revalidateCore);
@@ -188,7 +210,7 @@ public class RitualManager {
                 Optional<RitualRecipe> revalidateMatch = recipeRegistry.findMatch(revalidateCoreItem, revalidateIngredients);
                 if (revalidateMatch.isEmpty() || !revalidateMatch.get().equals(recipe)) {
                     player.sendMessage(Component.text("素材が変更されたため儀式が失敗しました！", NamedTextColor.RED));
-                    refundSource(coreLocation, sourceReserved ? recipe.sourceRequired() : 0);
+                    refundSource(coreLocation, reservedSource);
                     return;
                 }
 
@@ -196,7 +218,7 @@ public class RitualManager {
                 if (!recipe.isCraftType()) {
                     Optional<RitualEffect> preValidateEffect = effectRegistry.get(recipe.effectType());
                     if (preValidateEffect.isPresent() && !preValidateEffect.get().validate(coreLocation, player, recipe)) {
-                        refundSource(coreLocation, sourceReserved ? recipe.sourceRequired() : 0);
+                        refundSource(coreLocation, reservedSource);
                         return;
                     }
                 }

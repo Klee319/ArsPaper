@@ -67,6 +67,7 @@ public class ArsPaper extends JavaPlugin {
     private SourceNetwork sourceNetwork;
     private SourcelinkTickTask sourcelinkTickTask;
     private RecipeManager recipeManager;
+    private com.arspaper.recipe.UnlockGate unlockGate;
     private RitualRecipeRegistry ritualRecipeRegistry;
     private RitualEffectRegistry ritualEffectRegistry;
     private RitualManager ritualManager;
@@ -117,7 +118,11 @@ public class ArsPaper extends JavaPlugin {
         // 儀式レシピ読み込み（UnifiedRecipeLoaderから）
         ritualRecipeRegistry = new RitualRecipeRegistry(this);
         ritualRecipeRegistry.registerRecipes(recipeLoader.getRitualRecipes());
-        ritualManager = new RitualManager(ritualRecipeRegistry, ritualEffectRegistry);
+        ritualManager = new RitualManager(ritualRecipeRegistry, ritualEffectRegistry, unlockGate);
+
+        if (!com.arspaper.integration.TrinityForgeBridge.isAvailable()) {
+            getLogger().severe("TrinityForge が見つかりません。魔法ダメージの対称パイプライン供給と全perkゲートが無効化されます（fail-open）。");
+        }
 
         getLogger().info("ArsPaper enabled!");
     }
@@ -228,6 +233,9 @@ public class ArsPaper extends JavaPlugin {
 
         // ソースリンク設定
         sourcelinkConfig = new SourcelinkConfig(this);
+
+        // 解放ゲート（レシピ/儀式 perk ゲート + 修繕儀式コスト設定）
+        unlockGate = new com.arspaper.recipe.UnlockGate(this);
 
         // カスタムアイテムレジストリ
         itemRegistry = new CustomItemRegistry();
@@ -502,6 +510,7 @@ public class ArsPaper extends JavaPlugin {
         pluginManager.registerEvents(new ProjectileHitListener(), this);
         pluginManager.registerEvents(new GuiListener(), this);
         pluginManager.registerEvents(manaManager, this);
+        pluginManager.registerEvents(new com.arspaper.mana.ManaRecoveryListener(manaManager), this);
         armorManaListener = new ArmorManaListener(this);
         pluginManager.registerEvents(armorManaListener, this);
         pluginManager.registerEvents(new SourceBerryListener(this), this);
@@ -512,6 +521,8 @@ public class ArsPaper extends JavaPlugin {
         pluginManager.registerEvents(new com.arspaper.spell.SpellBindListener(), this);
         lootTableListener = new com.arspaper.loot.LootTableListener(this);
         pluginManager.registerEvents(lootTableListener, this);
+        // クラフトレシピの perk 解放ゲート
+        pluginManager.registerEvents(new com.arspaper.recipe.RecipeUnlockGate(unlockGate), this);
 
         // SpellEffectリスナー登録（Listener実装のEffectのみ）
         for (var component : spellRegistry.getAll()) {
@@ -555,6 +566,10 @@ public class ArsPaper extends JavaPlugin {
 
     public RecipeManager getRecipeManager() {
         return recipeManager;
+    }
+
+    public com.arspaper.recipe.UnlockGate getUnlockGate() {
+        return unlockGate;
     }
 
     public RitualManager getRitualManager() {

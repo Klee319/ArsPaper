@@ -1,0 +1,35 @@
+# ============================================================
+# ArsPaper Unlock Gate (解放ゲート / UNLOCK Model)
+# ============================================================
+# TrinityForge 統合アドオンの perk 所持状況で、
+# クラフトレシピ・儀式レシピの解放を制御する。
+#
+# perk の所持判定は PlayerData.heldPerks() のエントリと一致するかで行う。
+# 未定義のレシピ/儀式はゲート無し（解放=従来通り使用可）。
+# TrinityForge 未ロード時は安全側（ゲート無効=使用可）に倒す。
+# ============================================================
+
+# レシピID → 必要 perk ID。
+# レシピID は登録時の NamespacedKey のキー部分（items.yml の id、
+# 防具レシピは "armor_<itemId>"）。未定義 = ゲート無し。
+# このマップが空 = 全レシピ自由クラフト（既存挙動を壊さない）。
+recipe-perks:
+  # 例（コメントアウト中。必要に応じて有効化する）:
+  # waystone: "perk.explorer"
+
+# 儀式レシピID → 必要 perk ID。
+# 儀式レシピID は RitualRecipe.id()（items.yml/materials.yml/threads.yml の id）。
+# 未定義 = ゲート無し。空マップ = 全儀式自由実行。
+ritual-perks:
+  # 例（コメントアウト中。必要に応じて有効化する）:
+  # summon_ritual: "perk.summoner"
+
+# 修繕儀式（Ars 鍛冶「修復の儀式」）の設定。
+# バニラ修繕は別 fork で廃止されるが、Ars の修繕儀式は許可する。
+# 無限修繕の抜け道を防ぐため、追加 Source コストで重くできる。
+repair-ritual:
+  # false にすると修繕儀式自体を無効化する。
+  enabled: true
+  # 修繕儀式の既存 Source コストへの上乗せ量（0 = 据え置き）。
+  # 儀式レシピ側の source: でも基礎コストは調整可能。これはさらに上乗せする値。
+  extra-source-cost: 0

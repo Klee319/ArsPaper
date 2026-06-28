@@ -22,6 +22,8 @@ public class ThreadConfig {
     private final Map<String, Integer> hitRecovery = new HashMap<>();
     private final Map<String, Integer> damageRecovery = new HashMap<>();
     private final Map<String, Integer> costReduction = new HashMap<>();
+    private final Map<String, Integer> manaMaxPercent = new HashMap<>();
+    private final Map<String, Integer> regenPercent = new HashMap<>();
     private final Map<String, Integer> backpackSlots = new HashMap<>();
 
     public ThreadConfig(JavaPlugin plugin) {
@@ -37,6 +39,8 @@ public class ThreadConfig {
         hitRecovery.clear();
         damageRecovery.clear();
         costReduction.clear();
+        manaMaxPercent.clear();
+        regenPercent.clear();
         backpackSlots.clear();
         load();
     }
@@ -84,6 +88,12 @@ public class ThreadConfig {
             if (section.contains("cost-reduction")) {
                 costReduction.put(key, section.getInt("cost-reduction"));
             }
+            if (section.contains("mana-max-percent")) {
+                manaMaxPercent.put(key, section.getInt("mana-max-percent"));
+            }
+            if (section.contains("regen-percent")) {
+                regenPercent.put(key, section.getInt("regen-percent"));
+            }
             if (section.contains("slots")) {
                 backpackSlots.put(key, section.getInt("slots"));
             }
@@ -123,6 +133,16 @@ public class ThreadConfig {
     /** マナコスト削減% */
     public int getCostReduction(ThreadType type) {
         return costReduction.getOrDefault(type.getId(), type.getCostReductionPercent());
+    }
+
+    /** マナ最大値%上昇（threads.yml mana-max-percent, 未設定=0） */
+    public int getManaMaxPercent(ThreadType type) {
+        return manaMaxPercent.getOrDefault(type.getId(), 0);
+    }
+
+    /** マナ回復速度%上昇（threads.yml regen-percent, 未設定=0） */
+    public int getRegenPercent(ThreadType type) {
+        return regenPercent.getOrDefault(type.getId(), 0);
     }
 
     /** バックパックスロット数 */

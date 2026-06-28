@@ -520,6 +520,16 @@ public final class ArsCommand {
         // config.yml リロード
         plugin.reloadConfig();
 
+        // form別クールダウン / 使用ゲート リロード
+        plugin.getSpellCaster().reloadFormCooldowns();
+        plugin.getSpellCaster().reloadUsageGate();
+
+        // 解放ゲート（レシピ/儀式 perk + 修繕儀式コスト）リロード
+        plugin.getUnlockGate().reload();
+
+        // 厳選（selection）設定リロード
+        com.arspaper.item.SelectionConfig.reload();
+
         // エンチャント定数リロード
         com.arspaper.enchant.ArsEnchantments.loadConfig(plugin.getConfig());
 
@@ -982,6 +992,14 @@ public final class ArsCommand {
         SpellRecipe recipe = new SpellRecipe(spellName, components);
         if (!recipe.isValid()) {
             player.sendMessage(Component.text("無効なスペルです！先頭はFormである必要があります", NamedTextColor.RED));
+            return 0;
+        }
+
+        // 使用ゲート(α): perk未所持のグリフが含まれていれば組み込み不可
+        String missingPerkGlyph = plugin.getSpellCaster().firstMissingPerkGlyph(player, recipe);
+        if (missingPerkGlyph != null) {
+            player.sendMessage(Component.text(
+                "使用権限のないグリフが含まれています: " + missingPerkGlyph, NamedTextColor.RED));
             return 0;
         }
 

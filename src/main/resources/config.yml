@@ -6,6 +6,18 @@
 # グリフの設定は glyphs.yml で管理する。
 # ============================================================
 
+# ============================================================
+# form別クールダウン (MAGIC_BALANCE)
+# ============================================================
+# 形態(form)ごとに独立したクールダウン秒数を設定する。
+# プレイヤー × form 単位で独立してCTが管理される。
+# - 0 または未定義 = 従来のクールダウン（連射増強で短縮される計算CT）にフォールバック。
+# - キーは form の NamespacedKey のキー部分（例: projectile, beam, touch, self,
+#   underfoot, overhead, burst, orbit）。
+form-cooldowns:
+  projectile: 0
+  self: 0
+
 mana:
   # 初期マナ上限（装備/スレッド/エンチャント/グリフ解放で増加）
   default-max: 100
@@ -15,6 +27,25 @@ mana:
   regen-interval-ticks: 20
   # グリフ1つ解放ごとのマナ上限ボーナス
   per-glyph-unlock-bonus: 5
+  # マナ最大値%上昇の上限（%）。装備由来の%上昇（threads.yml: mana-max-percent）をここでクランプ
+  max-percent-cap: 100
+  # 戦闘/非発動時のマナ回復（本サーバ仕様, COMBAT §3.4）。
+  # 数値は全て安全デフォルト（0=無効）。バランス調整フェーズで設定する。
+  recovery:
+    # 被弾時: 最大マナに対する%回復
+    on-hit-percent: 0
+    # 被弾時: 固定値回復
+    on-hit-flat: 0
+    # 攻撃時: 最大マナに対する%回復
+    on-attack-percent: 0
+    # 攻撃時: 固定値回復
+    on-attack-flat: 0
+    # 最後の詠唱からこの秒数以上経過で「非発動」とみなす
+    idle-seconds: 5
+    # 非発動時の回復ボーナス: 1回復tickごとに最大マナに対する%を加算
+    idle-bonus-percent: 0
+    # 非発動時の回復ボーナス: 1回復tickごとに固定値を加算
+    idle-bonus-flat: 0
 
 # Geyser (統合版) 互換設定
 geyser:

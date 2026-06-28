@@ -124,8 +124,8 @@ public class SonicBoomEffect implements SpellEffect {
             double distSq = closest.distanceSquared(nearby.getLocation().add(0, 1, 0).toVector());
             if (distSq > hitRadius * hitRadius) continue;
 
-            double finalDamage = context.calculateSpellDamage(damage, nearby);
-            nearby.damage(finalDamage, caster);
+            // 対称パイプラインへ供給し最終ダメージを適用
+            context.dealSpellDamage(nearby, damage);
         }
 
         // ビジュアル: ソニックブームパーティクル

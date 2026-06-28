@@ -13,6 +13,7 @@ import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataType;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -28,14 +29,71 @@ public class SpellCaster {
     private static final long DEFAULT_COOLDOWN_MS = 500; // 0.5秒
     private static final long MIN_COOLDOWN_MS = 100;    // 最低CT
     private static final long CACHE_TTL_MS = 5000;      // グリフキャッシュ有効期間
+    /** form非取得時に使う単一CTのformキー（従来挙動互換）。 */
+    private static final String GLOBAL_FORM_KEY = "_global_";
 
     private final ManaManager manaManager;
-    private final Map<UUID, Long> cooldowns = new ConcurrentHashMap<>();
+    /** form別クールダウン。キー = playerUuid + ":" + formKey。 */
+    private final Map<String, Long> cooldowns = new ConcurrentHashMap<>();
     private final Map<UUID, Set<String>> glyphCache = new ConcurrentHashMap<>();
     private final Map<UUID, Long> glyphCacheExpiry = new ConcurrentHashMap<>();
+    /** form別CT秒数(ms換算)。config.yml の form-cooldowns から設定駆動で読み込む。 */
+    private volatile Map<String, Long> formCooldownMs = Map.of();
+    /** 使用ゲート（perk所持→glyph使用許可）。 */
+    private final UsageGate usageGate;
 
     public SpellCaster(ManaManager manaManager) {
         this.manaManager = manaManager;
+        this.usageGate = new UsageGate(ArsPaper.getInstance());
+        reloadFormCooldowns();
+    }
+
+    /**
+     * config.yml の form-cooldowns セクションを再読み込みする。
+     * 秒数(>0)が設定されたformのみ採用し、ms換算で保持する。
+     * 0/未定義は従来の計算CTにフォールバックする（cast内で解決）。
+     */
+    public void reloadFormCooldowns() {
+        Map<String, Long> newMap = new HashMap<>();
+        var section = ArsPaper.getInstance().getConfig()
+            .getConfigurationSection("form-cooldowns");
+        if (section != null) {
+            for (String formKey : section.getKeys(false)) {
+                double seconds = section.getDouble(formKey, 0);
+                if (seconds > 0) {
+                    newMap.put(formKey, (long) (seconds * 1000));
+                }
+            }
+        }
+        this.formCooldownMs = Map.copyOf(newMap);
+    }
+
+    /**
+     * usage-gate.yml を再読み込みする。
+     */
+    public void reloadUsageGate() {
+        usageGate.reload();
+    }
+
+    /**
+     * 指定glyphの使用権限をプレイヤーが満たすか（使用ゲート判定）。
+     * @param glyphKey NamespacedKey.getKey() の文字列
+     */
+    public boolean hasGlyphPermission(Player player, String glyphKey) {
+        return usageGate.hasPermission(player, glyphKey);
+    }
+
+    /**
+     * recipe内で使用権限を満たさない最初のglyphの表示名を返す。
+     * 全て許可されていればnull。
+     */
+    public String firstMissingPerkGlyph(Player player, SpellRecipe recipe) {
+        for (SpellComponent comp : recipe.getComponents()) {
+            if (!usageGate.hasPermission(player, comp.getId().getKey())) {
+                return comp.getDisplayName();
+            }
+        }
+        return null;
     }
 
     /**
@@ -77,6 +135,16 @@ public class SpellCaster {
             return false;
         }
 
+        // 使用ゲート(β): perk未所持のglyphが含まれていれば不発（マナ消費前）。
+        // 仕様(UNLOCK §2.2 Model Y)では glyph入手は自由・使用にperk必要。
+        // 共有スペルでも使用者本人のperkゲートは常に効かせる（glyph解放チェックとは分離）。
+        String missingGlyph = firstMissingPerkGlyph(caster, recipe);
+        if (missingGlyph != null) {
+            caster.sendMessage(Component.text(
+                "このグリフを使う権限がありません: " + missingGlyph, NamedTextColor.RED));
+            return false;
+        }
+
         // 連射レベルを計算（Form直後のrapid_fire増強をカウント）
         int rapidFireLevel = 0;
         SpellForm form = recipe.getForm();
@@ -100,15 +168,21 @@ public class SpellCaster {
         long cooldownMs = Math.max(MIN_COOLDOWN_MS,
             DEFAULT_COOLDOWN_MS - rapidFireLevel * 100L);
 
+        // form別CTを解決。form-cooldownsに秒数(>0)が設定されていればそれを使用、
+        // 未設定/0なら上記の従来計算CTにフォールバックする。
+        String formKey = (form != null) ? form.getId().getKey() : GLOBAL_FORM_KEY;
+        long effectiveCooldownMs = resolveFormCooldownMs(formKey, cooldownMs);
+        String cooldownKey = caster.getUniqueId() + ":" + formKey;
+
         long now = System.currentTimeMillis();
-        Long lastCast = cooldowns.get(caster.getUniqueId());
-        if (lastCast != null && now - lastCast < cooldownMs) {
+        Long lastCast = cooldowns.get(cooldownKey);
+        if (lastCast != null && now - lastCast < effectiveCooldownMs) {
             return false;
         }
 
         int baseCost = recipe.getTotalManaCost();
-        int costReduction = Math.min(100, caster.getPersistentDataContainer()
-            .getOrDefault(ManaKeys.THREAD_COST_REDUCTION, PersistentDataType.INTEGER, 0));
+        // マナ消費量低下%の合算はManaManagerに集約（THREAD_COST_REDUCTION＋将来の装備由来削減）。
+        int costReduction = manaManager.getCostReductionPercent(caster);
         int cost = Math.max(1, baseCost - (int) Math.round(baseCost * costReduction / 100.0));
         if (!manaManager.consumeMana(caster, cost)) {
             // マナ不足通知が無効化されていなければメッセージ表示
@@ -120,7 +194,9 @@ public class SpellCaster {
             return false;
         }
 
-        cooldowns.put(caster.getUniqueId(), now);
+        cooldowns.put(cooldownKey, now);
+        // 非発動（idle）回復ボーナス判定用に最終詠唱時刻を記録
+        manaManager.touchCast(caster);
 
         SpellContext context = new SpellContext(caster, recipe);
         context.applyFormAugments();
@@ -130,7 +206,7 @@ public class SpellCaster {
         // エフェクトがキャンセルした場合、マナを返還
         if (context.isCancelled()) {
             manaManager.addMana(caster, cost);
-            cooldowns.remove(caster.getUniqueId());
+            cooldowns.remove(cooldownKey);
             return false;
         }
 
@@ -142,10 +218,21 @@ public class SpellCaster {
 
     /**
      * プレイヤーのクールダウンをクリアする（ログアウト時用）。
+     * form別キー（playerUuid + ":" + formKey）を全て除去する。
      */
     public void clearCooldown(UUID playerId) {
-        cooldowns.remove(playerId);
+        String prefix = playerId + ":";
+        cooldowns.keySet().removeIf(key -> key.startsWith(prefix));
         invalidateGlyphCache(playerId);
+    }
+
+    /**
+     * 指定formの実効CT(ms)を解決する。
+     * form-cooldownsに秒数(>0)が設定されていればそれを、なければfallbackを返す。
+     */
+    private long resolveFormCooldownMs(String formKey, long fallbackMs) {
+        Long configured = formCooldownMs.get(formKey);
+        return (configured != null && configured > 0) ? configured : fallbackMs;
     }
 
     /**

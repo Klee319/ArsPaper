@@ -36,6 +36,10 @@ public class ManaManager implements Listener {
     private final java.util.Map<UUID, Long> manaConsumedBuffer = new java.util.concurrent.ConcurrentHashMap<>();
     private static final int STATS_FLUSH_INTERVAL = 6000; // 5分ごとにPDCへフラッシュ
 
+    /** 最終詠唱時刻（エポックミリ秒）。非発動（idle）回復ボーナス判定に使用する。 */
+    private final java.util.Map<UUID, Long> lastCastTime = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final int PERCENT_DIVISOR = 100;
+
     public ManaManager(JavaPlugin plugin, ManaConfig config) {
         this.plugin = plugin;
         this.config = config;
@@ -93,7 +97,43 @@ public class ManaManager implements Listener {
         int armorBonus = pdc.getOrDefault(ManaKeys.ARMOR_MANA_BONUS, PersistentDataType.INTEGER, 0);
         int threadBonus = pdc.getOrDefault(ManaKeys.THREAD_MANA_BONUS, PersistentDataType.INTEGER, 0);
         int enchantBonus = pdc.getOrDefault(ManaKeys.ENCHANT_MANA_BONUS, PersistentDataType.INTEGER, 0);
-        return config.defaultMaxMana() + glyphBonus + armorBonus + threadBonus + enchantBonus + worldMana.maxBonus();
+        int fixedMax = config.defaultMaxMana() + glyphBonus + armorBonus + threadBonus + enchantBonus + worldMana.maxBonus();
+
+        // %上昇（装備由来）を固定値合計に乗算。上限はconfigでクランプ。デフォルト0%なら従来挙動。
+        int maxPercent = Math.min(
+            pdc.getOrDefault(ManaKeys.THREAD_MANA_MAX_PERCENT, PersistentDataType.INTEGER, 0),
+            config.maxPercentCap());
+        if (maxPercent <= 0) return fixedMax;
+        return fixedMax + (int) Math.round(fixedMax * maxPercent / (double) PERCENT_DIVISOR);
+    }
+
+    /**
+     * マナ消費量低下%の合算値を返す（0-100）。
+     * 現状はスレッド由来（THREAD_COST_REDUCTION, ArmorManaListenerが装備の合算値を書込）を集約する。
+     * 装備/防具由来の追加削減源も将来ここに合算する集約点。
+     */
+    public int getCostReductionPercent(Player player) {
+        int threadReduction = player.getPersistentDataContainer()
+            .getOrDefault(ManaKeys.THREAD_COST_REDUCTION, PersistentDataType.INTEGER, 0);
+        return Math.min(PERCENT_DIVISOR, threadReduction);
+    }
+
+    /**
+     * 詠唱時刻を記録する（SpellCasterから発動成立時に呼ばれる）。
+     * 非発動（idle）回復ボーナスの判定に使用する。
+     */
+    public void touchCast(Player player) {
+        lastCastTime.put(player.getUniqueId(), System.currentTimeMillis());
+    }
+
+    /**
+     * idle-seconds 以上詠唱していなければ非発動（idle）とみなす。
+     * 一度も詠唱していない場合も非発動扱い。
+     */
+    private boolean isIdle(Player player) {
+        Long last = lastCastTime.get(player.getUniqueId());
+        if (last == null) return true;
+        return System.currentTimeMillis() - last >= config.idleSeconds() * 1000L;
     }
 
     /**
@@ -176,7 +216,25 @@ public class ManaManager implements Listener {
         int threadBonus = pdc.getOrDefault(ManaKeys.THREAD_REGEN_BONUS, PersistentDataType.INTEGER, 0);
         int enchantBonus = pdc.getOrDefault(ManaKeys.ENCHANT_REGEN_BONUS, PersistentDataType.INTEGER, 0);
         int armorBonus = pdc.getOrDefault(ManaKeys.ARMOR_REGEN_BONUS, PersistentDataType.INTEGER, 0);
-        return baseRate + threadBonus + enchantBonus + armorBonus + worldMana.regenBonus();
+        int flatRate = baseRate + threadBonus + enchantBonus + armorBonus + worldMana.regenBonus();
+
+        // 回復速度%上昇（装備由来）を固定値合計に乗算。デフォルト0%なら従来挙動。
+        int regenPercent = pdc.getOrDefault(ManaKeys.THREAD_REGEN_PERCENT, PersistentDataType.INTEGER, 0);
+        if (regenPercent <= 0) return flatRate;
+        return flatRate + (int) Math.round(flatRate * regenPercent / (double) PERCENT_DIVISOR);
+    }
+
+    /**
+     * 非発動（idle）時の回復ボーナス量を返す（固定値＋最大値に対する%）。
+     * idleでない、または設定が0の場合は0。
+     */
+    private int getIdleRecoveryBonus(Player player, int max) {
+        if (!isIdle(player)) return 0;
+        int bonus = config.idleBonusFlat();
+        if (config.idleBonusPercent() > 0) {
+            bonus += (int) Math.round(max * config.idleBonusPercent() / (double) PERCENT_DIVISOR);
+        }
+        return bonus;
     }
 
     private void tickRegeneration() {
@@ -185,7 +243,7 @@ public class ManaManager implements Listener {
             int max = getMaxMana(player);
             if (current >= max) continue;
 
-            int regenRate = getRegenRate(player);
+            int regenRate = getRegenRate(player) + getIdleRecoveryBonus(player, max);
             int newMana = Math.min(current + regenRate, max);
             setCurrentMana(player, newMana);
         }
@@ -247,6 +305,7 @@ public class ManaManager implements Listener {
     public void onPlayerQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
         flushPlayerStats(player);
+        lastCastTime.remove(player.getUniqueId());
         rankingCache.updatePlayer(player, getTotalManaConsumed(player));
         rankingCache.save();
         BossBar bar = barDisplay.get(player.getUniqueId());
