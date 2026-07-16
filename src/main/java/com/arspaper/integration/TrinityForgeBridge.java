@@ -124,8 +124,38 @@ public final class TrinityForgeBridge {
             warnUnavailableOnce();
             return spellBase;
         }
-        // service が spellBase を defaultDamage として注入し、触媒 AttackStats を別レイヤーで加味する。
-        return service.magicalFinalDamage(casterUuid, victim, spellBase, resolveCatalystStats(catalyst));
+        // ハイブリッド設計: 魔法基礎ダメージ = グリフ基礎ダメージ(spellBase) × 触媒の攻撃力(attack-power)。
+        // 触媒に attack-power が定義されていなければ係数 1.0（グリフダメージ据え置き＝従来挙動）。
+        double effectiveBase = spellBase * catalystAttackPowerFactor(catalyst);
+        // service が effectiveBase を defaultDamage として注入し、触媒 AttackStats(会心/貫通)を別レイヤーで加味する。
+        return service.magicalFinalDamage(casterUuid, victim, effectiveBase, resolveCatalystStats(catalyst));
+    }
+
+    /**
+     * 触媒の攻撃力(attack-power)を「グリフ基礎ダメージへの倍率」として返す（ハイブリッド設計）。
+     *
+     * <p>触媒に attack-power が定義されていない（{@code <= 0}）場合は {@code 1.0}（グリフダメージ据え置き）。
+     * {@code null} / resolver未初期化 / 例外時も {@code 1.0} にフォールバックし、attack-power 未設定の
+     * 触媒では従来どおりグリフダメージがそのまま基礎ダメージになる（挙動不変）。
+     */
+    private static double catalystAttackPowerFactor(ItemStack catalyst) {
+        if (catalyst == null) {
+            return 1.0;
+        }
+        try {
+            TrinityForge tf = TrinityForge.getInstance();
+            if (tf == null) {
+                return 1.0;
+            }
+            WeaponAttackStatResolver resolver = tf.weaponAttackStats();
+            if (resolver == null) {
+                return 1.0;
+            }
+            double power = resolver.attackPowerOf(catalyst);
+            return power > 0 ? power : 1.0;
+        } catch (Throwable t) {
+            return 1.0;
+        }
     }
 
     /**
