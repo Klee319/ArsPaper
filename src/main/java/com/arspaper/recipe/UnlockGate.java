@@ -88,6 +88,20 @@ public final class UnlockGate {
     }
 
     /**
+     * レシピが perk ゲートの対象かどうかをプレイヤー非依存で判定する。
+     *
+     * <p>Crafterブロック等、クラフト主体のプレイヤーを特定できない自動化経路で使用する。
+     * ゲート対象（recipe-perksに定義あり）なら true を返し、呼び出し側は
+     * fail-closed（キャンセル）で扱う。
+     *
+     * @param recipeId レシピID（NamespacedKey のキー部分）
+     */
+    public boolean isRecipeGated(String recipeId) {
+        String requiredPerk = recipePerks.get(recipeId);
+        return requiredPerk != null && !requiredPerk.isBlank();
+    }
+
+    /**
      * 指定儀式レシピの解放をプレイヤーが満たすか判定する。
      *
      * @param player   対象プレイヤー

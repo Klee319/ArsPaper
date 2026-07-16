@@ -49,6 +49,10 @@ public class SpellWand extends BaseCustomItem {
         return wandTier.getCustomModelData();
     }
 
+    /** 触媒(完成品): 厳選(quality/rollSeed)の対象とする。 */
+    @Override
+    protected boolean usesQualityRoll() { return true; }
+
     @Override
     public ItemStack createItemStack() {
         ItemStack item = super.createItemStack();
@@ -109,7 +113,8 @@ public class SpellWand extends BaseCustomItem {
             return;
         }
 
-        ArsPaper.getInstance().getSpellCaster().cast(player, slots.get(0));
+        // 触媒＝詠唱に使ったワンド ItemStack（会心/貫通を魔法ダメージへ連携）。
+        ArsPaper.getInstance().getSpellCaster().cast(player, slots.get(0), item);
     }
 
     public WandTier getWandTier() {

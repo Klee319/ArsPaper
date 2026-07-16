@@ -259,7 +259,13 @@ public class GlyphConfig {
         Map.entry("intangible",      Set.of("aoe", "extend_time", "duration_down")),
         Map.entry("rewind",          Set.of("extend_time", "duration_down")),
         Map.entry("fangs",           Set.of("amplify", "dampen", "aoe_radius")),
-        Map.entry("advanced_break",  Set.of("aoe", "extract", "fortune"))
+        Map.entry("advanced_break",  Set.of("aoe", "extract", "fortune")),
+        // === 追加分（旧・孤立エフェクト）互換設定は暫定 ===
+        // flare: 焦熱(scorch)類似のダメージ系。sense_magic: 持続バフ。toss: 数量増幅。
+        // reset は増強なし（AUGMENT_COMPAT未登録＝全augment非互換）。
+        Map.entry("flare",           Set.of("amplify", "dampen", "linger", "propagate")),
+        Map.entry("sense_magic",     Set.of("extend_time", "duration_down")),
+        Map.entry("toss",            Set.of("amplify"))
     );
 
     /**
@@ -337,6 +343,9 @@ public class GlyphConfig {
         Map.entry("gale",          ENTITY_FORMS),
         Map.entry("journey",       ENTITY_FORMS),
         Map.entry("scale",         ENTITY_FORMS),
+        // 追加分（旧・孤立エフェクト）: applyToBlockがNoOpのためエンティティ対象フォームのみ
+        Map.entry("flare",         ENTITY_FORMS),
+        Map.entry("sense_magic",   ENTITY_FORMS),
 
         // === Block-only: applyToEntityがNoOp → self/orbit非互換 ===
         Map.entry("break",         BLOCK_FORMS),

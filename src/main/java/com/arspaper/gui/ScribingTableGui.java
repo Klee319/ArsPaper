@@ -155,7 +155,11 @@ public class ScribingTableGui extends BaseGui {
                     return;
                 }
                 clicker.setLevel(clicker.getLevel() - levelCost);
-                saveUnlockedGlyphs(unlocked);
+                // アニメーション中（約3秒）に他経路でUNLOCKED_GLYPHSが書き換わっている可能性があるため、
+                // 開始前スナップショット(unlocked)ではなく最新PDCを読み直してマージし、並行書込みの上書きを防ぐ。
+                Set<String> fresh = getUnlockedGlyphs();
+                fresh.add(component.getId().toString());
+                saveUnlockedGlyphs(fresh);
             }
         );
         return true;

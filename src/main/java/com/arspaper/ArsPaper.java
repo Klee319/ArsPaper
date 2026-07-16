@@ -85,6 +85,8 @@ public class ArsPaper extends JavaPlugin {
     @Override
     public void onEnable() {
         instance = this;
+        // TrinityForge のホットリロード後に古いサービスを掴み続けないよう、再有効化時にキャッシュを破棄して再解決させる。
+        com.arspaper.integration.TrinityForgeBridge.reset();
         updateResourceFiles();
         saveDefaultConfig();
         com.arspaper.util.JaTranslations.load(getLogger());
@@ -184,9 +186,18 @@ public class ArsPaper extends JavaPlugin {
                 java.io.File existing = new java.io.File(getDataFolder(), name);
                 if (existing.exists()) {
                     java.io.File backup = new java.io.File(getDataFolder(), name + ".bak");
-                    if (backup.exists()) backup.delete();
-                    existing.renameTo(backup);
-                    getLogger().info("Backed up " + name + " → " + name + ".bak");
+                    // Files.move は失敗時に IOException を投げるため、サイレントな失敗を防ぐ。
+                    // バックアップに失敗した場合は既存ファイルを保持し、上書き抽出をスキップして可視化する。
+                    try {
+                        java.nio.file.Files.move(existing.toPath(), backup.toPath(),
+                            java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                        getLogger().info("Backed up " + name + " → " + name + ".bak");
+                    } catch (java.io.IOException e) {
+                        getLogger().warning("Failed to back up " + name + " ("
+                            + existing.getPath() + "): " + e.getMessage()
+                            + " — 既存ファイルを保持し、このファイルの更新をスキップします");
+                        continue;
+                    }
                 }
                 saveResource(name, false);
             }
@@ -289,6 +300,7 @@ public class ArsPaper extends JavaPlugin {
         spellRegistry.register(new HeavyImpactEffect(this, glyphConfig));// T3: ヘビーインパクト
         spellRegistry.register(new SolarEffect(this, glyphConfig));      // T3: 日輪
         spellRegistry.register(new LunarEffect(this, glyphConfig));      // T3: 月輪
+        spellRegistry.register(new FlareEffect(this, glyphConfig));      // T2: 閃炎（炎上中の対象にバースト）
 
         // ===== Effects - 移動/ユーティリティ =====
         spellRegistry.register(new LaunchEffect(this, glyphConfig));     // T1: 打ち上げ
@@ -310,6 +322,7 @@ public class ArsPaper extends JavaPlugin {
         spellRegistry.register(new DispelEffect(this, glyphConfig));     // T2: 解呪
         spellRegistry.register(new JourneyEffect(this, glyphConfig));    // T3: 旅路の魔法
         spellRegistry.register(new ScaleEffect(this, glyphConfig));      // T2: スケール
+        spellRegistry.register(new SenseMagicEffect(this, glyphConfig)); // T2: 魔力感知（発光+暗視）
 
         // ===== Effects - ブロック操作 =====
         spellRegistry.register(new BreakEffect(this, glyphConfig));      // T1: 破壊
@@ -348,6 +361,8 @@ public class ArsPaper extends JavaPlugin {
         spellRegistry.register(new SummonUndeadEffect(this, glyphConfig));// T3: 不死召喚
         spellRegistry.register(new SummonVexEffect(this, glyphConfig));  // T3: ヴェックス召喚
         spellRegistry.register(new SummonDecoyEffect(this, glyphConfig));// T3: デコイ召喚
+        spellRegistry.register(new TossEffect(this, glyphConfig));       // T1: 投擲（インベントリからアイテム投出）
+        spellRegistry.register(new ResetEffect(this, glyphConfig));      // T1: 初期化（チェーンリセット・演出）
 
         // ===== Augments — 対ペアで登録（GUI表示順 = 登録順）=====
         // filterAndSortPaletteで超増強がベースの直後に自動配置される

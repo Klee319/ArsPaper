@@ -1,6 +1,7 @@
 package com.arspaper.gui;
 
 import com.arspaper.ArsPaper;
+import com.arspaper.block.BlockKeys;
 import com.arspaper.mana.ManaKeys;
 import com.arspaper.spell.SpellComponent;
 import net.kyori.adventure.text.Component;
@@ -106,6 +107,10 @@ public class GlyphUnlockAnimation {
                 as.setBasePlate(false);
                 as.setCanPickupItems(false);
                 as.addScoreboardTag(CLEANUP_TAG);
+                // /ars cleanup（DISPLAY_MARKER PDC基準で除去）でクラッシュ時の孤立残骸も回収できるよう、
+                // ブロック表示用と同じマーカーを付与する。
+                as.getPersistentDataContainer().set(
+                        BlockKeys.DISPLAY_MARKER, PersistentDataType.STRING, CLEANUP_TAG);
                 // 腕を表示して右手にアイテムを持たせる
                 as.setArms(true);
                 as.setRightArmPose(new EulerAngle(Math.toRadians(-90), 0, 0));
@@ -285,7 +290,9 @@ public class GlyphUnlockAnimation {
     ) {
         // 経験値レベル消費はtryPayUnlockCostで既に行われている
 
-        // グリフをアンロック済みに追加
+        // グリフをアンロック済みに追加。
+        // 実際の永続化(saveCallback)は最新PDCを読み直してマージするため、ここでのsnapshot更新に依存しない
+        // （アニメーション中の並行書込みを上書きしないようにするため）。
         unlocked.add(component.getId().toString());
         saveCallback.run();
 

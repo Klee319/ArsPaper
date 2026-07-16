@@ -87,11 +87,15 @@ public abstract class BaseCustomItem {
                 PersistentDataType.STRING,
                 itemId
             );
-            // 厳選: 生成毎にユニークな rollSeed と品質(0-5)を TrinityForge ItemData(PDC) へ追記。
+            // 厳選: usesQualityRoll()==true の装備・完成品系のみ、生成毎にユニークな rollSeed と
+            // 品質(0-5)を TrinityForge ItemData(PDC) へ追記する。
             // ステ値はベイクせず、TrinityForge 側が rollSeed + quality + テーブルから live 導出する。
+            // 素材系サブクラス（消耗品・中間素材等）はここをスキップし、PDC差によるスタック不能化を防ぐ。
             // TrinityForge 未ロード時は no-op（既存 PDC は壊さない）。
-            long rollSeed = java.util.concurrent.ThreadLocalRandom.current().nextLong();
-            TrinityForgeBridge.writeItemRoll(meta, rollSeed, rollQuality());
+            if (usesQualityRoll()) {
+                long rollSeed = java.util.concurrent.ThreadLocalRandom.current().nextLong();
+                TrinityForgeBridge.writeItemRoll(meta, rollSeed, rollQuality());
+            }
             // エンチャントオーラ（防具以外のカスタムアイテムに光沢を付与）
             if (hasEnchantGlow()) {
                 meta.addEnchant(Enchantment.UNBREAKING, 1, true);

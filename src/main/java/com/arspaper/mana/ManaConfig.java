@@ -22,7 +22,11 @@ public record ManaConfig(
     // 非発動（idle）判定秒数と、idle時の回復ボーナス（最大値に対する%＋固定値）
     int idleSeconds,
     int idleBonusPercent,
-    int idleBonusFlat
+    int idleBonusFlat,
+    // ARS_MAGIC(魔法柱スキル)へのEXP付与量（TrinityForge連携）。
+    // amount = arsMagicExpPerCast + arsMagicExpPerMana * (その詠唱の実消費マナ)。
+    double arsMagicExpPerCast,
+    double arsMagicExpPerMana
 ) {
     public static ManaConfig fromConfig(FileConfiguration config) {
         return new ManaConfig(
@@ -39,7 +43,10 @@ public record ManaConfig(
             clampFlat(config.getInt("mana.recovery.on-attack-flat", 0)),
             clampFlat(config.getInt("mana.recovery.idle-seconds", 5)),
             clampPercent(config.getInt("mana.recovery.idle-bonus-percent", 0)),
-            clampFlat(config.getInt("mana.recovery.idle-bonus-flat", 0))
+            clampFlat(config.getInt("mana.recovery.idle-bonus-flat", 0)),
+            // ARS_MAGIC EXP: 負値は0にクランプ（暫定デフォルトは要バランス調整）。
+            clampNonNegative(config.getDouble("ars-magic.exp-per-cast", 2.0)),
+            clampNonNegative(config.getDouble("ars-magic.exp-per-mana", 0.1))
         );
     }
 
@@ -51,5 +58,10 @@ public record ManaConfig(
     /** flat系・秒数設定を 0以上にクランプする。 */
     private static int clampFlat(int value) {
         return Math.max(0, value);
+    }
+
+    /** double設定を 0以上にクランプする。 */
+    private static double clampNonNegative(double value) {
+        return Math.max(0.0, value);
     }
 }

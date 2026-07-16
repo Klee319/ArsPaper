@@ -46,6 +46,10 @@ public class MageArmor extends BaseCustomItem {
     @Override
     public boolean hasEnchantGlow() { return false; }
 
+    /** 装備完成品: 厳選(quality/rollSeed)の対象とする。 */
+    @Override
+    protected boolean usesQualityRoll() { return true; }
+
     @Override
     public Component getDisplayName() {
         return buildTieredArmorName(armorTier, armorSlot);

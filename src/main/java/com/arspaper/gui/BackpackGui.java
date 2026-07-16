@@ -47,20 +47,17 @@ public class BackpackGui {
 
         int slots = Math.min(backpackCount, 2); // 最大2段(54スロット)
         int rows = slots * 3; // 1バックパック=3行
-        Inventory inv = Bukkit.createInventory(null, rows * 9,
+        // BackpackHolderに防具ItemStack参照を持たせ、タイトル文字列ではなくholder型でGUIを判別する。
+        BackpackHolder holder = new BackpackHolder(armorItem);
+        Inventory inv = Bukkit.createInventory(holder, rows * 9,
             Component.text("バックパック", NamedTextColor.DARK_GREEN));
+        holder.setInventory(inv);
 
         // PDCからデータ復元
         loadBackpackContents(armorItem, inv);
 
-        // GUI閉じ時にデータ保存するためのリスナーは GuiListener で処理
-        // armorItem参照を保持するためにPDCマーカーを使用
+        // GUI閉じ時のデータ保存は GuiListener.onInventoryClose（BackpackHolder判別）で処理する。
         player.openInventory(inv);
-
-        // 遅延保存タスク: GUIが閉じられた時にデータを保存
-        Bukkit.getScheduler().runTaskLater(ArsPaper.getInstance(), () -> {
-            // プレイヤーがまだこのGUIを開いていたら、閉じた時に保存される
-        }, 1L);
     }
 
     /**
@@ -91,22 +88,40 @@ public class BackpackGui {
             .get(BACKPACK_DATA_KEY, PersistentDataType.STRING);
         if (json == null) return;
 
+        List<String> serialized;
         try {
-            List<String> serialized = GSON.fromJson(json, new TypeToken<List<String>>(){}.getType());
-            if (serialized == null) return;
+            serialized = GSON.fromJson(json, new TypeToken<List<String>>(){}.getType());
+        } catch (Exception e) {
+            // JSON自体の解析に失敗した場合のみ全体を諦める（個別スロットは下で個別救済）。
+            ArsPaper.getInstance().getLogger().warning(
+                "バックパックデータのJSON解析に失敗しました: " + e.getMessage());
+            return;
+        }
+        if (serialized == null) return;
 
-            for (String entry : serialized) {
-                int colonIdx = entry.indexOf(':');
-                if (colonIdx < 0) continue;
-                int slot = Integer.parseInt(entry.substring(0, colonIdx));
+        for (String entry : serialized) {
+            int colonIdx = entry.indexOf(':');
+            if (colonIdx < 0) continue;
+            int slot;
+            try {
+                slot = Integer.parseInt(entry.substring(0, colonIdx));
+            } catch (NumberFormatException e) {
+                ArsPaper.getInstance().getLogger().warning(
+                    "バックパックのスロット番号解析に失敗しました (entry=" + entry + "): " + e.getMessage());
+                continue;
+            }
+            // スロット単位でデシリアライズ。失敗してもそのスロットのみスキップし、他スロットは保持する
+            // （旧実装は1件の失敗で全体を空扱いし、次回保存で全消失していた）。
+            try {
                 byte[] data = java.util.Base64.getDecoder().decode(entry.substring(colonIdx + 1));
                 ItemStack item = ItemStack.deserializeBytes(data);
                 if (slot < inv.getSize()) {
                     inv.setItem(slot, item);
                 }
+            } catch (Exception e) {
+                ArsPaper.getInstance().getLogger().warning(
+                    "バックパックのスロット " + slot + " の復元に失敗したためスキップします: " + e.getMessage());
             }
-        } catch (Exception e) {
-            // デシリアライズ失敗時は空のバックパックとして扱う
         }
     }
 

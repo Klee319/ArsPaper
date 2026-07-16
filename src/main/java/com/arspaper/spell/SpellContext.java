@@ -9,6 +9,7 @@ import org.bukkit.Location;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Tameable;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.ArrayList;
@@ -39,6 +40,11 @@ public class SpellContext {
     private final UUID casterUuid;
     private final SpellRecipe recipe;
     private final List<SpellComponent> components;
+    /**
+     * 詠唱に使った触媒（ワンド/スペルブック）の ItemStack。会心/貫通を魔法ダメージへ連携するために保持する。
+     * 儀式・タレット等の非プレイヤー詠唱では特定できないため {@code null}（従来どおり plain(0) フォールバック）。
+     */
+    private final ItemStack catalyst;
 
     // === キャンセルフラグ（エフェクトがマナ消費なしで中止する場合に使用） ===
     private boolean cancelled = false;
@@ -77,15 +83,34 @@ public class SpellContext {
     public void setHitFace(org.bukkit.block.BlockFace hitFace) { this.hitFace = hitFace; }
 
     public SpellContext(Player caster, SpellRecipe recipe) {
+        this(caster, recipe, null);
+    }
+
+    /**
+     * 触媒付きコンテキスト。触媒（ワンド/スペルブック）の会心/貫通を魔法ダメージへ連携する。
+     *
+     * @param catalyst 詠唱に使った触媒 ItemStack。特定不能なら {@code null}
+     */
+    public SpellContext(Player caster, SpellRecipe recipe, ItemStack catalyst) {
         this.casterUuid = caster.getUniqueId();
         this.recipe = recipe;
         this.components = recipe.getComponents();
+        // 生成毎に呼び出し側スタックへ影響しないよう防御的コピー（不変扱い）。
+        this.catalyst = (catalyst != null) ? catalyst.clone() : null;
     }
 
     private SpellContext(SpellContext other) {
         this.casterUuid = other.casterUuid;
         this.recipe = other.recipe;
         this.components = other.components;
+        this.catalyst = other.catalyst;
+    }
+
+    /**
+     * 詠唱に使った触媒 ItemStack を返す。非プレイヤー詠唱等で特定できない場合は {@code null}。
+     */
+    public ItemStack getCatalyst() {
+        return catalyst;
     }
 
     public Player getCaster() {
@@ -181,8 +206,10 @@ public class SpellContext {
         if (caster == null || target == null || spellBase <= 0) {
             return;
         }
+        // 触媒（ワンド/スペルブック）の会心/貫通を対称パイプラインへ連携する。
+        // catalyst==null（儀式/タレット等の非プレイヤー詠唱）では plain(0) フォールバック。
         double finalDamage = com.arspaper.integration.TrinityForgeBridge
-            .magicalFinalDamage(casterUuid, target, spellBase);
+            .magicalFinalDamage(casterUuid, target, spellBase, catalyst);
         if (finalDamage <= 0) {
             return;
         }

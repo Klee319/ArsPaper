@@ -104,7 +104,19 @@ public class SpellCaster {
      * @return 発動に成功したかどうか
      */
     public boolean cast(Player caster, SpellRecipe recipe) {
-        return cast(caster, recipe, false);
+        return cast(caster, recipe, false, null);
+    }
+
+    /**
+     * スペルを発動する（触媒付き）。触媒（ワンド/スペルブック）の会心/貫通を魔法ダメージへ連携する。
+     *
+     * @param caster   術者
+     * @param recipe   スペル構成
+     * @param catalyst 詠唱に使った触媒 ItemStack。特定不能なら {@code null}
+     * @return 発動に成功したかどうか
+     */
+    public boolean cast(Player caster, SpellRecipe recipe, org.bukkit.inventory.ItemStack catalyst) {
+        return cast(caster, recipe, false, catalyst);
     }
 
     /**
@@ -116,6 +128,20 @@ public class SpellCaster {
      * @return 発動に成功したかどうか
      */
     public boolean cast(Player caster, SpellRecipe recipe, boolean sharedSpell) {
+        return cast(caster, recipe, sharedSpell, null);
+    }
+
+    /**
+     * スペルを発動する（触媒付き）。
+     *
+     * @param caster 術者
+     * @param recipe スペル構成
+     * @param sharedSpell 共有エンチャント付きの場合true（グリフチェックをスキップ）
+     * @param catalyst 詠唱に使った触媒 ItemStack。特定不能なら {@code null}（従来どおり plain(0) フォールバック）
+     * @return 発動に成功したかどうか
+     */
+    public boolean cast(Player caster, SpellRecipe recipe, boolean sharedSpell,
+                        org.bukkit.inventory.ItemStack catalyst) {
         if (recipe == null || !recipe.isValid()) {
             caster.sendMessage(Component.text("無効なスペルです！", NamedTextColor.RED));
             return false;
@@ -198,7 +224,7 @@ public class SpellCaster {
         // 非発動（idle）回復ボーナス判定用に最終詠唱時刻を記録
         manaManager.touchCast(caster);
 
-        SpellContext context = new SpellContext(caster, recipe);
+        SpellContext context = new SpellContext(caster, recipe, catalyst);
         context.applyFormAugments();
         SpellForm spellForm = recipe.getForm();
         spellForm.cast(caster, context);
@@ -210,10 +236,42 @@ public class SpellCaster {
             return false;
         }
 
+        // ARS_MAGIC(魔法柱スキル)へEXPを付与（TrinityForge連携）。
+        // 到達条件＝詠唱成功確定点: 全perkゲート通過・マナ消費成立(consumeMana==true)・
+        // スペル発動後にエフェクトがキャンセルしていない（上のisCancelled分岐でreturn済み）。
+        // 誤付与防止の担保:
+        //  - 非プレイヤー詠唱（儀式/タレット等）: これらはSpellCaster.castを経由せず、
+        //    本メソッドのcaster型はPlayer固定のため、そもそもここには到達しない。
+        //  - マナ不足/CT中/各ゲート不通過: いずれも上流でreturnしており未到達。
+        //  - 二重付与なし: 1回のcast成功につき1回のみ呼ばれる（cost = 実消費マナ）。
+        grantArsMagicExp(caster, cost);
+
         // アクションバーにスペル名を表示
         caster.sendActionBar(Component.text("§d" + recipe.getName()));
 
         return true;
+    }
+
+    /**
+     * ARS_MAGIC カスタムスキルへEXPを付与する（プレイヤー詠唱成功時のみ）。
+     * amount = ars-magic.exp-per-cast + ars-magic.exp-per-mana * cost（config駆動）。
+     *
+     * <p>TrinityForge未ロード（{@code TrinityForge.getInstance()==null}）時は呼ばない（fail-open）。
+     * ValhallaMMO不在/ARS_MAGIC未登録/amount<=0 は {@code ArsBridge.grantMagicExp} が内部でno-op化し、
+     * 例外も内部で握るため、ここでの追加ハンドリングは不要。
+     *
+     * @param player 詠唱に成功したプレイヤー
+     * @param cost   その詠唱で実際に消費したマナ量
+     */
+    private void grantArsMagicExp(Player player, int cost) {
+        com.trinityforge.TrinityForge tf = com.trinityforge.TrinityForge.getInstance();
+        if (tf == null) {
+            return; // TF未ロード: 付与しない（例外を出さない）
+        }
+        var manaConfig = manaManager.getConfig();
+        double amount = manaConfig.arsMagicExpPerCast()
+            + manaConfig.arsMagicExpPerMana() * cost;
+        com.trinityforge.bridge.valhalla.ArsBridge.grantMagicExp(tf, player, amount);
     }
 
     /**

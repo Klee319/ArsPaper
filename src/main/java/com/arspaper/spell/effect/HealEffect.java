@@ -38,13 +38,10 @@ public class HealEffect implements SpellEffect {
         double amount = Math.max(1, baseHeal + context.getAmplifyLevel() * amplifyBonus);
 
         if (isUndead(target)) {
-            // アンデッドにはマジックダメージ
-            Player caster = context.getCaster();
-            if (caster != null) {
-                target.damage(amount, caster);
-            } else {
-                target.damage(amount);
-            }
+            // アンデッドにはマジックダメージ。
+            // 増強(amplify)は amount 算出に既に内包済みのため、対称パイプラインへの
+            // 二重適用を避けるためここでは加算しない（他Effectと同じ dealSpellDamage 経路）。
+            context.dealSpellDamage(target, amount);
         } else {
             // 通常エンティティ・プレイヤーを回復
             double maxHealth = target.getMaxHealth();

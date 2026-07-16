@@ -1467,6 +1467,74 @@ glyphs:
         DIAMOND_BLOCK: 2
 
   # ============================================================
+  # Effects（効果）- 追加分（旧・孤立エフェクトの登録）
+  # ※ 以下のtier/mana-cost/unlock-cost/params/max-augmentsは全て暫定値。
+  #    バランス調整フェーズで見直す想定。
+  # ============================================================
+
+  # 説明: 炎上中の対象にバーストダメージを与える（焦熱の閃光版）
+  flare:
+    tier: 2
+    mana-cost: 25
+    # 増幅:バーストダメージ↑(+2.5HP/段) | 減衰:ダメージ↓
+    # 対象が炎上中の場合のみ発動する（焦熱scorchと類似の互換設定）
+    max-augments:
+      amplify: 6
+      dampen: 1
+      linger: 6
+      propagate: 4
+    params:
+      base-damage: 6.0             # 基本バーストダメージ(HP、暫定)
+      amplify-bonus: 2.5           # 増幅1段あたりのダメージ増加(HP、暫定)
+    unlock-cost:
+      level: 20
+      materials:
+        BLAZE_POWDER: 8
+        FIRE_CHARGE: 4
+
+  # 説明: 対象に発光と暗視を付与し魔法的存在を感知する
+  sense_magic:
+    tier: 2
+    mana-cost: 30
+    # 延長:発光/暗視の持続延長(+160tick/段) | 短縮:持続短縮
+    max-augments:
+      extend_time: 6
+      duration_down: 2
+    params:
+      base-duration-ticks: 600           # 発光の基本持続(tick=30秒、暫定)
+      duration-per-level: 160            # 延長1段あたりの持続増加(tick=8秒、暫定)
+      night-vision-duration-ticks: 400   # 暗視の基本持続(tick=20秒、暫定)
+    unlock-cost:
+      level: 15
+      materials:
+        SPIDER_EYE: 8
+        GLOWSTONE_DUST: 16
+
+  # 説明: インベントリのアイテムを投出する（コンテナには挿入）
+  toss:
+    tier: 1
+    mana-cost: 15
+    # 増幅:投出数量↑(1 + 増幅段、スタック上限内) | 接触形態とは非互換（コード側で除外）
+    max-augments:
+      amplify: 6
+    unlock-cost:
+      level: 10
+      materials:
+        DISPENSER: 1
+        DROPPER: 1
+
+  # 説明: スペルチェーンをリセットする（演出のみのプレースホルダー）
+  reset:
+    tier: 1
+    mana-cost: 5
+    # 増強不可。視覚的フィードバックのみ提供する
+    unlock-cost:
+      level: 5
+      materials:
+        REDSTONE: 8
+        QUARTZ: 4
+
+  # ============================================================
   # Augments（増強）- 汎用性の高い順にソート
   # ============================================================
 

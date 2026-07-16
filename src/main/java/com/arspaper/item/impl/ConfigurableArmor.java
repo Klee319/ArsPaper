@@ -63,6 +63,10 @@ public class ConfigurableArmor extends BaseCustomItem {
         return setConfig.hasEnchantGlow();
     }
 
+    /** 装備完成品: 厳選(quality/rollSeed)の対象とする。 */
+    @Override
+    protected boolean usesQualityRoll() { return true; }
+
     @Override
     public ItemStack createItemStack() {
         ItemStack item = super.createItemStack();

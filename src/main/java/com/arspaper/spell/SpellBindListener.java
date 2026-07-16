@@ -93,7 +93,8 @@ public class SpellBindListener implements Listener {
 
         // 共有エンチャントチェック: 魔導書にshareエンチャントがあればグリフチェックをスキップ
         boolean sharedSpell = ArsEnchantments.hasShareEnchant(bookItem);
-        ArsPaper.getInstance().getSpellCaster().cast(player, recipe, sharedSpell);
+        // 触媒＝スペルの本体であるスペルブック ItemStack（会心/貫通を魔法ダメージへ連携）。
+        ArsPaper.getInstance().getSpellCaster().cast(player, recipe, sharedSpell, bookItem);
     }
 
     /**

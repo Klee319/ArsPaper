@@ -30,22 +30,28 @@ mana:
   # マナ最大値%上昇の上限（%）。装備由来の%上昇（threads.yml: mana-max-percent）をここでクランプ
   max-percent-cap: 100
   # 戦闘/非発動時のマナ回復（本サーバ仕様, COMBAT §3.4）。
-  # 数値は全て安全デフォルト（0=無効）。バランス調整フェーズで設定する。
+  # 以下は控えめな暫定デフォルト（要バランス調整）。%は最大マナに対する割合。
   recovery:
-    # 被弾時: 最大マナに対する%回復
-    on-hit-percent: 0
+    # 被弾時: 最大マナに対する%回復（暫定: 3% = 最大100で3マナ）
+    on-hit-percent: 3
     # 被弾時: 固定値回復
     on-hit-flat: 0
-    # 攻撃時: 最大マナに対する%回復
-    on-attack-percent: 0
+    # 攻撃時: 最大マナに対する%回復（暫定: 3%。※近接攻撃のみ、スペル命中は対象外）
+    on-attack-percent: 3
     # 攻撃時: 固定値回復
     on-attack-flat: 0
     # 最後の詠唱からこの秒数以上経過で「非発動」とみなす
     idle-seconds: 5
-    # 非発動時の回復ボーナス: 1回復tickごとに最大マナに対する%を加算
-    idle-bonus-percent: 0
+    # 非発動時の回復ボーナス: 1回復tickごとに最大マナに対する%を加算（暫定: 1%）
+    idle-bonus-percent: 1
     # 非発動時の回復ボーナス: 1回復tickごとに固定値を加算
     idle-bonus-flat: 0
+
+# ARS_MAGIC(魔法柱スキル)へのEXP付与(TrinityForge連携)。呪文詠唱成功ごとに付与。
+# 「使い込み」でレベルが上がり combat level の魔法柱になる。数値は暫定・要バランス調整。
+ars-magic:
+  exp-per-cast: 2.0     # 詠唱1回あたりの基礎EXP
+  exp-per-mana: 0.1     # 消費マナ1あたりの追加EXP
 
 # Geyser (統合版) 互換設定
 geyser:

@@ -85,6 +85,10 @@ public class SpellBook extends BaseCustomItem {
         return bookTier.getCustomModelData();
     }
 
+    /** 触媒(完成品): 厳選(quality/rollSeed)の対象とする。 */
+    @Override
+    protected boolean usesQualityRoll() { return true; }
+
     @Override
     public ItemStack createItemStack() {
         ItemStack item = super.createItemStack();
@@ -230,7 +234,8 @@ public class SpellBook extends BaseCustomItem {
 
         SpellRecipe recipe = slots.get(slot);
         boolean sharedSpell = com.arspaper.enchant.ArsEnchantments.hasShareEnchant(item);
-        ArsPaper.getInstance().getSpellCaster().cast(player, recipe, sharedSpell);
+        // 触媒＝詠唱に使ったスペルブック ItemStack（会心/貫通を魔法ダメージへ連携）。
+        ArsPaper.getInstance().getSpellCaster().cast(player, recipe, sharedSpell, item);
     }
 
     private void switchSlot(Player player, ItemStack item) {

@@ -5,6 +5,10 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
+
+import java.util.EnumSet;
+import java.util.Set;
 
 /**
  * 本サーバ仕様の戦闘時マナ回復（COMBAT §3.4）を担うリスナー。
@@ -17,6 +21,21 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 public class ManaRecoveryListener implements Listener {
 
     private static final int PERCENT_DIVISOR = 100;
+
+    /**
+     * 攻撃時マナ回復の対象とする近接攻撃のDamageCause。
+     *
+     * <p>TrinityForgeBridge#applyMagicDamage は cause=MAGIC の DamageSource で
+     * caster を causing/direct entity に設定するため、スペル命中も
+     * damager=Player の EntityDamageByEntityEvent として観測される。
+     * ここを近接攻撃のcauseのみに限定することで、スペル命中による
+     * 攻撃時マナ回復の誘発（自己還流的な無限詠唱の芽）を防ぐ。
+     */
+    private static final Set<EntityDamageEvent.DamageCause> MELEE_ATTACK_CAUSES = EnumSet.of(
+        EntityDamageEvent.DamageCause.ENTITY_ATTACK,
+        EntityDamageEvent.DamageCause.ENTITY_SWEEP_ATTACK
+    );
+
     private final ManaManager manaManager;
 
     public ManaRecoveryListener(ManaManager manaManager) {
@@ -35,12 +54,18 @@ public class ManaRecoveryListener implements Listener {
     }
 
     /**
-     * 攻撃時マナ回復: プレイヤーがエンティティにダメージを与えた時に設定分を回復。
+     * 攻撃時マナ回復: プレイヤーが近接攻撃でエンティティにダメージを与えた時に設定分を回復。
+     *
+     * <p>MONITORで最終確定後に判定し、getFinalDamage()&gt;0のみ回復対象とする
+     * （後続ハンドラでのキャンセル/ダメージ無効化を確実に反映するため）。
+     * cause判定でスペル由来（MAGIC等）のダメージは対象外とする。
      */
-    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onPlayerDealDamage(EntityDamageByEntityEvent event) {
         if (event.isCancelled()) return;
         if (!(event.getDamager() instanceof Player player)) return;
+        if (!MELEE_ATTACK_CAUSES.contains(event.getCause())) return;
+        if (event.getFinalDamage() <= 0) return;
         ManaConfig config = manaManager.getConfig();
         recover(player, config.onAttackPercent(), config.onAttackFlat());
     }

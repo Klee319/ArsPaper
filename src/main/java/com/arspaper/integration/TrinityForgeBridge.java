@@ -3,9 +3,11 @@ package com.arspaper.integration;
 import com.trinityforge.TrinityForge;
 import com.trinityforge.combat.AttackStats;
 import com.trinityforge.combat.SymmetricCombatService;
+import com.trinityforge.combat.WeaponAttackStatResolver;
 import com.trinityforge.pdc.BindType;
 import com.trinityforge.pdc.ItemData;
 import org.bukkit.Bukkit;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.damage.DamageSource;
 import org.bukkit.damage.DamageType;
@@ -69,7 +71,22 @@ public final class TrinityForgeBridge {
     }
 
     /**
-     * スペル基礎ダメージを対称パイプラインへ供給し、最終魔法ダメージを返す。
+     * キャッシュした {@link SymmetricCombatService} と未ロード警告フラグを破棄する。
+     *
+     * <p>TrinityForge のホットリロード後はサービスインスタンスが差し替わるため、
+     * キャッシュを無効化して次回 {@link #combatService()} で再解決させる。
+     * ArsPaper の onEnable から呼ぶことで、再有効化のたびに最新サービスへ追従する。
+     */
+    public static void reset() {
+        cachedService = null;
+        unavailableLogged = false;
+    }
+
+    /**
+     * スペル基礎ダメージを対称パイプラインへ供給し、最終魔法ダメージを返す（触媒なし）。
+     *
+     * <p>儀式・タレット等の非プレイヤー詠唱など触媒 ItemStack が特定できない経路向け。
+     * 触媒由来の会心/貫通は乗らず、{@link AttackStats#plain(0)} 相当で計算する。
      *
      * @param casterUuid 詠唱者UUID
      * @param victim     被弾エンティティ（{@code PersistentDataHolder}）
@@ -77,14 +94,65 @@ public final class TrinityForgeBridge {
      * @return 8stepパイプライン後の最終ダメージ。サービス未ロード時は {@code spellBase} をそのまま返す
      */
     public static double magicalFinalDamage(UUID casterUuid, LivingEntity victim, double spellBase) {
+        return magicalFinalDamage(casterUuid, victim, spellBase, null);
+    }
+
+    /**
+     * スペル基礎ダメージを対称パイプラインへ供給し、触媒の攻撃ステを乗せた最終魔法ダメージを返す。
+     *
+     * <p>触媒（ワンド/スペルブック）の会心・貫通等は {@link WeaponAttackStatResolver#forItem} で
+     * {@link AttackStats} に導出し、対称パイプラインへ供給する。増減グリフ(Amplify/Dampen)は
+     * 呼び出し側で {@code spellBase} に内包済み・会心/貫通はTF側という層分離を維持するため、
+     * ここでは {@code spellBase} に触媒ステを二重計上しない（TF側 AttackStats が別レイヤーで加味する）。
+     *
+     * <p>フォールバック（挙動不変の安全策）:
+     * <ul>
+     *   <li>TF未ロード（{@link #combatService()}==null）→ {@code spellBase} を素通し（fail-open）。</li>
+     *   <li>触媒が {@code null} / 取得失敗 / resolver未初期化 → {@link AttackStats#plain(0)} 相当で計算。</li>
+     * </ul>
+     *
+     * @param casterUuid 詠唱者UUID
+     * @param victim     被弾エンティティ（{@code PersistentDataHolder}）
+     * @param spellBase  スペル基礎ダメージ（Ars攻撃力 + 増減グリフを内包済み）
+     * @param catalyst   詠唱に使った触媒 ItemStack（ワンド/スペルブック）。特定不能なら {@code null}
+     * @return 8stepパイプライン後の最終ダメージ。サービス未ロード時は {@code spellBase} をそのまま返す
+     */
+    public static double magicalFinalDamage(UUID casterUuid, LivingEntity victim, double spellBase,
+                                            ItemStack catalyst) {
         SymmetricCombatService service = combatService();
         if (service == null) {
             warnUnavailableOnce();
             return spellBase;
         }
-        // 触媒の攻撃ステ（会心/貫通等）は現状未連携のため plain(0)。
-        // service が spellBase を defaultDamage として注入し、最終ダメージを計算する。
-        return service.magicalFinalDamage(casterUuid, victim, spellBase, AttackStats.plain(0));
+        // service が spellBase を defaultDamage として注入し、触媒 AttackStats を別レイヤーで加味する。
+        return service.magicalFinalDamage(casterUuid, victim, spellBase, resolveCatalystStats(catalyst));
+    }
+
+    /**
+     * 触媒 ItemStack から攻撃ステ（会心/貫通等）を導出する。
+     *
+     * <p>触媒が {@code null}、resolver未初期化、または導出失敗時は {@link AttackStats#plain(0)} を返す。
+     * {@code forItem} は null/AIR/導出失敗を自身で plain(0) にフォールバックするが、
+     * resolver 自体の未初期化（onEnable前）や例外に備えて多重に安全側へ倒す。
+     */
+    private static AttackStats resolveCatalystStats(ItemStack catalyst) {
+        if (catalyst == null) {
+            return AttackStats.plain(0);
+        }
+        try {
+            TrinityForge tf = TrinityForge.getInstance();
+            if (tf == null) {
+                return AttackStats.plain(0);
+            }
+            WeaponAttackStatResolver resolver = tf.weaponAttackStats();
+            if (resolver == null) {
+                return AttackStats.plain(0);
+            }
+            AttackStats stats = resolver.forItem(catalyst);
+            return stats != null ? stats : AttackStats.plain(0);
+        } catch (Throwable t) {
+            return AttackStats.plain(0);
+        }
     }
 
     /**
@@ -103,6 +171,11 @@ public final class TrinityForgeBridge {
             victim.damage(finalDamage, source);
         } catch (Throwable t) {
             // 古い API などで DamageSource が使えない場合のフォールバック。
+            // ENTITY_ATTACK を発火させるため TrinityForge の CombatListener に再傍受され、
+            // 物理パイプラインで二重処理される恐れがある。誤射を可視化するため SEVERE で記録する。
+            Bukkit.getLogger().severe(
+                "[ArsPaper] MAGIC DamageSource の適用に失敗し ENTITY_ATTACK フォールバックを使用しました。"
+                    + "TrinityForge による二重処理の恐れがあります: " + t);
             victim.damage(finalDamage, caster);
         }
     }

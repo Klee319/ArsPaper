@@ -29,6 +29,7 @@ public class ManaManager implements Listener {
     private volatile ManaConfig config;
     private final ManaBarDisplay barDisplay;
     private final BukkitTask regenTask;
+    private final BukkitTask statsFlushTask;
     private static final NamespacedKey DEBUG_MODE_KEY = new NamespacedKey("arspaper", "debug_mode");
     private final RankingCache rankingCache;
 
@@ -54,8 +55,9 @@ public class ManaManager implements Listener {
             config.regenIntervalTicks()
         );
 
-        // 統計フラッシュタスク（5分ごとにバッファをPDCへ書き込み）
-        plugin.getServer().getScheduler().runTaskTimer(
+        // 統計フラッシュタスク（5分ごとにバッファをPDCへ書き込み）。
+        // shutdown() で確実に停止できるようハンドルを保持する。
+        this.statsFlushTask = plugin.getServer().getScheduler().runTaskTimer(
             plugin, this::flushManaStats, STATS_FLUSH_INTERVAL, STATS_FLUSH_INTERVAL
         );
     }
@@ -369,6 +371,9 @@ public class ManaManager implements Listener {
     public void shutdown() {
         if (regenTask != null) {
             regenTask.cancel();
+        }
+        if (statsFlushTask != null) {
+            statsFlushTask.cancel();
         }
         // シャットダウン前にバッファをフラッシュ
         flushManaStats();
