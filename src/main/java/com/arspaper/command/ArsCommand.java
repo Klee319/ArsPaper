@@ -188,13 +188,6 @@ public final class ArsCommand {
                         return StatusCommands.executeBackpack(ctx.getSource().getSender());
                     })
                 )
-                .then(Commands.literal("recipes")
-                    .executes(ctx -> {
-                        if (!(ctx.getSource().getSender() instanceof Player player)) return 0;
-                        new com.arspaper.gui.RecipeBrowserGui(player).open();
-                        return 1;
-                    })
-                )
                 .then(Commands.literal("status")
                     .executes(ctx -> {
                         if (!(ctx.getSource().getSender() instanceof Player player)) return 0;

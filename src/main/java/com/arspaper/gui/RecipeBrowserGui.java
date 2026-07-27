@@ -26,7 +26,11 @@ import java.util.Set;
 
 /**
  * レシピ一覧GUI。全ての作業台レシピと儀式レシピを閲覧できる。
- * /ars recipes で開く。
+ * {@code /tf recipes} で開く(2026-07-28: 入口を TrinityForge 側へ一本化し、{@code /ars recipes} は
+ * 削除した。TF は ArsPaper にコンパイル依存できないため、TF 側は
+ * {@code com.trinityforge.integration.ars.ArsRecipeBrowserBridge} からリフレクションで
+ * このクラスを生成し {@code open()} を呼ぶ — <b>コンストラクタと open() のシグネチャを変えると
+ * TF 側が無言で fail-soft に落ちる</b>ので注意)。
  *
  * <p><b>2026-07-27 改修（素材⇔レシピ相互ジャンプ / ソート / 絞り込み / 名前検索）:</b>
  * <ul>
@@ -135,8 +139,7 @@ public class RecipeBrowserGui extends BaseGui {
             Component.text("閉じる", NamedTextColor.RED)));
         inventory.setItem(BTN_SORT, createButton(Material.HOPPER,
             Component.text("並べ替え: " + sortMode.label(), NamedTextColor.AQUA),
-            List.of(detailText("クリックで切り替え", NamedTextColor.DARK_GRAY),
-                detailText("種別=item-stats の使用スキル(無ければ素材)", NamedTextColor.DARK_GRAY))));
+            sortLore(sortMode)));
         inventory.setItem(BTN_FILTER, createButton(
             filterMode == RecipeBrowserFilter.FilterMode.LOCKED ? Material.IRON_BARS : Material.LIME_DYE,
             Component.text("表示: " + filterMode.label(), NamedTextColor.AQUA),
@@ -887,6 +890,7 @@ public class RecipeBrowserGui extends BaseGui {
         for (Map.Entry<NamespacedKey, Object> recipeEntry : plugin.getRecipeManager().getRegisteredRecipes().entrySet()) {
             RecipeEntry entry = workbenchEntryOf(recipeEntry.getKey().getKey(), recipeEntry.getValue());
             if (entry == null || !seenIds.add(entry.id)) continue; // 重複排除
+            applyForwardSpecTokens(recipeEntry.getKey(), entry);
             entries.add(entry);
         }
 
@@ -934,6 +938,39 @@ public class RecipeBrowserGui extends BaseGui {
             applySortKeys(entry);
         }
         return entries;
+    }
+
+    /**
+     * Ars 自身が登録した作業台レシピの素材表示を、Bukkit の {@code RecipeChoice} ではなく<b>元config
+     * (materials.yml / items.yml)の素材トークン</b>で上書きする(2026-07-28 バグ修正)。
+     *
+     * <p><b>なぜ必要か</b>: {@link com.arspaper.recipe.RecipeManager#resolveIngredient} は
+     * {@code custom:<id>} も {@code list:<id>} も、意図的に「型のみ照合」の
+     * {@link org.bukkit.inventory.RecipeChoice.MaterialChoice} へ倒している(ExactChoice だと PDC 付きの
+     * 実物と isSimilar 不一致でクラフトが無言失敗するため)。その結果 {@link #describeChoice} は
+     * MaterialChoice の<b>先頭Materialの名前しか復元できず</b>、
+     * 例えば {@code custom:coal_block_3x} が素の {@code COAL_BLOCK} として表示されていた
+     * (ジュエリーコアのレシピが「圧縮ブロックではない」と見えていた実バグ)。{@code list:} も
+     * 先頭1種だけの表示に潰れる。元configのトークンなら {@code custom:}/{@code list:} のまま復元でき、
+     * {@link #createIngredientDisplay} が正しい実アイテム/リスト表示を組める。
+     *
+     * <p>shape も必ず spec 由来へ揃えること — Bukkit の {@code getShape()} はパターン文字を振り直すため、
+     * config由来の ingredientMap と Bukkit由来の shape を混ぜると全スロットが不一致になり素材が
+     * 1つも描画されなくなる(TFカタログ経路で既に踏んだ罠。{@code catalogWorkbenchShape} のコメント参照)。
+     *
+     * <p>逆(解体)レシピは {@code forwardDataByKey} に載らないので素通しになるが、あちらの素材は
+     * {@code ExactChoice} で登録されており {@link #describeChoice} が {@code custom:<id>} を
+     * 正しく復元できるため、この上書きは不要。
+     */
+    private void applyForwardSpecTokens(NamespacedKey key, RecipeEntry entry) {
+        var data = ArsPaper.getInstance().getRecipeManager().forwardRecipeData(key);
+        if (data == null || data.ingredients() == null || data.ingredients().isEmpty()) {
+            return;
+        }
+        entry.ingredientMap = new HashMap<>(data.ingredients());
+        entry.shape = data.shape() == null || data.shape().isEmpty()
+            ? List.of()
+            : List.copyOf(data.shape());
     }
 
     /** item-stats の use-skill / use-level を並べ替えキーとして取り込む（未設定なら空/0のまま）。 */
@@ -1151,6 +1188,22 @@ public class RecipeBrowserGui extends BaseGui {
 
     private static Component detailText(String text, NamedTextColor color) {
         return Component.text(text, color).decoration(TextDecoration.ITALIC, false);
+    }
+
+    /**
+     * 並べ替えボタンの lore を組み立てる(純粋関数)。TF図鑑の {@code CollectionGui#sortButton}
+     * と同じ形式: 1行目は操作案内、続けて全モードを列挙し現在選択中のものだけ
+     * {@code "▶ "} 前置＋緑、残りは補足行(種別の定義)。
+     */
+    static List<Component> sortLore(RecipeBrowserFilter.SortMode current) {
+        List<Component> lore = new ArrayList<>();
+        lore.add(detailText("クリックで次の並び順へ", NamedTextColor.GRAY));
+        for (RecipeBrowserFilter.SortMode mode : RecipeBrowserFilter.SortMode.values()) {
+            lore.add(detailText((mode == current ? "▶ " : "  ") + mode.label(),
+                mode == current ? NamedTextColor.GREEN : NamedTextColor.DARK_GRAY));
+        }
+        lore.add(detailText("種別=item-stats の使用スキル(無ければ素材)", NamedTextColor.DARK_GRAY));
+        return lore;
     }
 
     private String localize(String materialOrCustom) {

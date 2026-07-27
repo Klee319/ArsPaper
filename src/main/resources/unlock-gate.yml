@@ -17,11 +17,18 @@
 # TrinityForgeBridge.tfRecipeGatePerks() / tfRitualGatePerks()（skilltree 由来）と
 # union(OR) 判定する。サーバー運用で fork 側だけ一時的に上書きしたい場合のみ追記する。
 #
-# ▼ 未 gate（対象未実装のため）: skilltree の以下の「解放」は ArsPaper 側に実体が無い。
-#   実装後に該当スキルツリー yml (skilltree/*.yml) のノード dedicated-effects: または（一時的に）ここへ追記する。
-#   - ソースジェム武器コーティング / 上位ソースジャー / 各種コア（ウッド/ベジタブル/ミート/ジュエリー）
-#     ※ tf_core_* カタログアイテム自体は TrinityForge に残す（削除しない）。
-#   - バニラ防具・道具クラフト（石/鉄/ダイヤ/ネザライト, SMITHING A〜D）= TF 側機構で ArsPaper 外
+# ▼ 2026-07-28 更新: 上の「未 gate（対象未実装のため）」リストは実態と合っていなかったので訂正した。
+#   - 各種コア（tf_core_wood / vegetable / meat / jewelry）と上位ソースジャー(source_gem_block)、
+#     圧縮食料(compressed_*)は materials.yml に method: workbench の実体があり、TF skilltree 側に
+#     recipe: ゲートが置かれていて**現に機能している**（未 gate ではない）。
+#   - バニラ防具・道具クラフト（石/鉄/ダイヤ/ネザライト, SMITHING A〜D）のゲートは撤去された。
+#     道具・防具側に既に使用可能レベルがあり二重ティアゲートが無意味だったため
+#     （理由は TrinityForge skilltree/smithing.yml のヘッダコメント参照）。
+#   - 儀式アイテム（enchant_book_* / volcanic_sourcelink）は TF skilltree で誤って recipe: 側に
+#     置かれていた。ArsPaper は儀式を ritualPerks / tfRitualGatePerks でしか照合しない
+#     （UnlockGate#hasRitualPermission）ので無言で常時解放だった → ritual: へ修正済み。
+#   ▼ 依然として未 gate（ArsPaper 側に実体が無い or TF 側機構）:
+#   - ソースジェム武器コーティング
 #   - 村人職（司祭/鍛冶師/司書取引）, 解体(SMITHING B-3-upper), スレッド欄拡張(ARS_SMITHING E)
 # ============================================================
 
