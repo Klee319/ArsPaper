@@ -506,6 +506,37 @@ public final class TrinityForgeBridge {
     }
 
     /**
+     * アイテムの使用要件 (use-skill / use-level) を「値として」取り出す (2026-07-27 レシピGUI ソート用)。
+     *
+     * <p>{@link #useRequirementDenial(Player, ItemStack)} が「特定プレイヤーが使えるか」を返すのに対し、
+     * こちらはプレイヤー非依存に要件そのものを返す。レシピ一覧の「種別順(スキル種別)」「使用可能レベル順」は
+     * 閲覧者によって並びが変わってはいけないため、判定ではなく値が要る。
+     *
+     * @return 要件なし / TF未ロード / 例外時は {@code null}(fail-open: 呼び出し側は「要件なし」として扱う)
+     */
+    public static ItemUseGate itemUseGate(ItemStack item) {
+        if (item == null || item.getType().isAir()) {
+            return null;
+        }
+        try {
+            TrinityForge tf = TrinityForge.getInstance();
+            if (tf == null || tf.config() == null) {
+                return null;
+            }
+            return com.trinityforge.progression.UseRequirementResolver
+                    .resolve(item, tf.config().itemStats())
+                    .map(r -> new ItemUseGate(r.skill(), r.level()))
+                    .orElse(null);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /** {@link #itemUseGate(ItemStack)} の戻り値。{@code skill} は空文字になり得る。 */
+    public record ItemUseGate(String skill, int level) {
+    }
+
+    /**
      * True when {@code actor} may use {@code item} under TrinityForge ownership rules.
      * Fail-open when TF is absent or the item has no ownership bind.
      */

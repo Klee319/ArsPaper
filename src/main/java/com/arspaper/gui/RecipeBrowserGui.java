@@ -15,31 +15,98 @@ import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.ShapelessRecipe;
 import org.bukkit.persistence.PersistentDataType;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * レシピ一覧GUI。全ての作業台レシピと儀式レシピを閲覧できる。
  * /ars recipes で開く。
+ *
+ * <p><b>2026-07-27 改修（素材⇔レシピ相互ジャンプ / ソート / 絞り込み / 名前検索）:</b>
+ * <ul>
+ *   <li>詳細画面で<b>素材</b>をクリック → その素材を作るレシピへ飛ぶ（1件なら直接その詳細、
+ *       複数なら絞り込み一覧）。</li>
+ *   <li>詳細画面で<b>完成品</b>をクリック → それを素材に使うレシピの一覧。</li>
+ *   <li>並べ替え(名前 / 種別 / 使用可能レベル)・解放状態の絞り込み・ワイルドカード名前検索。
+ *       並べ替えと絞り込みは<b>別のボタン</b>（ユーザー確定仕様）。</li>
+ * </ul>
+ * 並べ替え・絞り込みのロジック自体は {@link RecipeBrowserFilter}、1件分のデータは
+ * {@link RecipeEntry} に切り出してある。
+ *
+ * <p>検索入力にチャットを使うのは、砧(anvil)GUI 方式が Bedrock/Geyser で
+ * どう見えるかをこちらで実機確認できないため。チャット入力なら Java/Bedrock で同じ挙動になる。
  */
 public class RecipeBrowserGui extends BaseGui {
 
     private static final int ITEMS_PER_PAGE = 28; // 4行×7列
     private static final int ITEM_START = 10;
     private static final int BTN_PREV = 45;
-    private static final int BTN_NEXT = 53;
+    private static final int BTN_SORT = 46;
+    private static final int BTN_FILTER = 47;
+    private static final int BTN_SEARCH = 48;
     private static final int BTN_CLOSE = 49;
+    private static final int BTN_RELATED_CLEAR = 50;
+    private static final int BTN_NEXT = 53;
+    /** 詳細画面: 完成品スロット（ここをクリックすると「これを使うレシピ」一覧へ）。 */
+    private static final int DETAIL_RESULT_SLOT = 15;
+    /** 詳細画面: 戻るボタン。 */
+    private static final int DETAIL_BACK_SLOT = 49;
+    /** 検索をクリアするための入力トークン。 */
+    private static final String SEARCH_CLEAR_TOKEN = "-";
+    /** チャット検索入力のタイムアウト(tick)。 */
+    private static final long SEARCH_TIMEOUT_TICKS = 600L;
+
+    /** 3×3 グリッドのGUIスロット（行×列）。素材クリック判定にも使う。 */
+    private static final int[][] GRID_SLOTS = {{10, 11, 12}, {19, 20, 21}, {28, 29, 30}};
+    /** TrinityForge カタログレシピの NamespacedKey 接頭辞（TF {@code CatalogRecipeRegistrar} と対）。 */
+    private static final String CATALOG_KEY_PREFIX = "catalog_";
 
     private final List<RecipeEntry> allRecipes;
+    /** 現在の並べ替え・絞り込み・検索・関連表示を適用した後の表示対象。 */
+    private List<RecipeEntry> visible;
     private int currentPage = 0;
+
+    private RecipeBrowserFilter.SortMode sortMode = RecipeBrowserFilter.SortMode.DEFAULT;
+    private RecipeBrowserFilter.FilterMode filterMode = RecipeBrowserFilter.FilterMode.ALL;
+    private String searchTerm = "";
+
+    /**
+     * 関連レシピ表示（素材/完成品クリック由来の絞り込み）。null なら通常の全件一覧。
+     *
+     * @param token   突き合わせに使う素材トークン({@code custom:<id>} / Material名)
+     * @param label   表示用の日本語名
+     * @param usage   true = このアイテムを「使う」レシピ / false = このアイテムを「作る」レシピ
+     */
+    private record RelatedView(String token, String label, boolean usage) {
+    }
+
+    private RelatedView related = null;
+
+    /** 素材ジャンプで潜った詳細画面の履歴（戻るボタンで1つずつ浮上する）。 */
+    private final Deque<RecipeEntry> detailHistory = new ArrayDeque<>();
 
     public RecipeBrowserGui(Player viewer) {
         super(viewer, 6, Component.text("レシピ一覧", NamedTextColor.DARK_PURPLE)
             .decoration(TextDecoration.ITALIC, false));
         this.allRecipes = collectAllRecipes();
+        this.visible = this.allRecipes;
+        refresh();
+    }
+
+    /** 並べ替え・絞り込み・検索・関連表示を適用し直す(描画はしない)。 */
+    private void refresh() {
+        List<RecipeEntry> base = related == null ? allRecipes : relatedEntries(related);
+        this.visible = RecipeBrowserFilter.arrange(base, sortMode, filterMode, searchTerm, this::isUnlocked);
+        int totalPages = Math.max(1, (int) Math.ceil((double) visible.size() / ITEMS_PER_PAGE));
+        if (currentPage > totalPages - 1) {
+            currentPage = totalPages - 1;
+        }
     }
 
     @Override
@@ -47,37 +114,72 @@ public class RecipeBrowserGui extends BaseGui {
         inventory.clear();
         fillBorder(Material.GRAY_STAINED_GLASS_PANE);
 
-        int totalPages = Math.max(1, (int) Math.ceil((double) allRecipes.size() / ITEMS_PER_PAGE));
+        int totalPages = Math.max(1, (int) Math.ceil((double) visible.size() / ITEMS_PER_PAGE));
         currentPage = Math.min(currentPage, totalPages - 1);
 
         int startIndex = currentPage * ITEMS_PER_PAGE;
         int slot = ITEM_START;
-        for (int i = startIndex; i < allRecipes.size() && slot < 44; i++) {
+        for (int i = startIndex; i < visible.size() && slot < 44; i++) {
             // 枠を避ける（左右端はスキップ）
             if (slot % 9 == 0 || slot % 9 == 8) {
                 slot++;
                 i--;
                 continue;
             }
-            RecipeEntry entry = allRecipes.get(i);
+            RecipeEntry entry = visible.get(i);
             inventory.setItem(slot, createRecipeButton(entry));
             slot++;
         }
 
-        // ページ情報
         inventory.setItem(BTN_CLOSE, createButton(Material.DARK_OAK_DOOR,
             Component.text("閉じる", NamedTextColor.RED)));
+        inventory.setItem(BTN_SORT, createButton(Material.HOPPER,
+            Component.text("並べ替え: " + sortMode.label(), NamedTextColor.AQUA),
+            List.of(detailText("クリックで切り替え", NamedTextColor.DARK_GRAY),
+                detailText("種別=item-stats の使用スキル(無ければ素材)", NamedTextColor.DARK_GRAY))));
+        inventory.setItem(BTN_FILTER, createButton(
+            filterMode == RecipeBrowserFilter.FilterMode.LOCKED ? Material.IRON_BARS : Material.LIME_DYE,
+            Component.text("表示: " + filterMode.label(), NamedTextColor.AQUA),
+            List.of(detailText("クリックで切り替え（並べ替えとは独立）", NamedTextColor.DARK_GRAY))));
+        inventory.setItem(BTN_SEARCH, createButton(
+            searchTerm.isEmpty() ? Material.SPYGLASS : Material.WRITABLE_BOOK,
+            Component.text(searchTerm.isEmpty() ? "名前検索" : "検索中: " + searchTerm, NamedTextColor.YELLOW),
+            List.of(detailText("クリックしてチャットに入力", NamedTextColor.DARK_GRAY),
+                detailText("ワイルドカード: * と ? が使える", NamedTextColor.DARK_GRAY),
+                detailText("「" + SEARCH_CLEAR_TOKEN + "」で検索解除", NamedTextColor.DARK_GRAY))));
 
-        if (totalPages > 1) {
-            inventory.setItem(BTN_PREV, currentPage > 0
-                ? createButton(Material.ARROW, Component.text("前のページ", NamedTextColor.WHITE))
-                : createButton(Material.GRAY_STAINED_GLASS_PANE, Component.text("")));
-            inventory.setItem(BTN_NEXT, currentPage < totalPages - 1
-                ? createButton(Material.ARROW, Component.text("次のページ", NamedTextColor.WHITE))
-                : createButton(Material.GRAY_STAINED_GLASS_PANE, Component.text("")));
-            inventory.setItem(4, createButton(Material.PAPER,
-                Component.text("ページ " + (currentPage + 1) + " / " + totalPages, NamedTextColor.WHITE)));
+        if (related != null) {
+            inventory.setItem(BTN_RELATED_CLEAR, createButton(Material.BARRIER,
+                Component.text("← 全レシピに戻る", NamedTextColor.YELLOW)));
         }
+
+        inventory.setItem(BTN_PREV, currentPage > 0
+            ? createButton(Material.ARROW, Component.text("前のページ", NamedTextColor.WHITE))
+            : createButton(Material.GRAY_STAINED_GLASS_PANE, Component.text("")));
+        inventory.setItem(BTN_NEXT, currentPage < totalPages - 1
+            ? createButton(Material.ARROW, Component.text("次のページ", NamedTextColor.WHITE))
+            : createButton(Material.GRAY_STAINED_GLASS_PANE, Component.text("")));
+        inventory.setItem(4, createHeaderItem(totalPages));
+    }
+
+    /** 見出し（ページ番号 + 現在の関連表示/検索状態）。 */
+    private ItemStack createHeaderItem(int totalPages) {
+        List<Component> lore = new ArrayList<>();
+        lore.add(detailText("表示 " + visible.size() + " 件 / 全 " + allRecipes.size() + " 件",
+            NamedTextColor.GRAY));
+        if (related != null) {
+            lore.add(detailText(related.usage()
+                ? "「" + related.label() + "」を使うレシピ"
+                : "「" + related.label() + "」を作るレシピ", NamedTextColor.LIGHT_PURPLE));
+        }
+        if (!searchTerm.isEmpty()) {
+            lore.add(detailText("検索: " + searchTerm, NamedTextColor.YELLOW));
+        }
+        lore.add(detailText("並べ替え: " + sortMode.label(), NamedTextColor.DARK_GRAY));
+        lore.add(detailText("表示: " + filterMode.label(), NamedTextColor.DARK_GRAY));
+        return createButton(Material.PAPER,
+            Component.text("ページ " + (currentPage + 1) + " / " + totalPages, NamedTextColor.WHITE),
+            lore);
     }
 
     /** 詳細GUI表示中かどうか */
@@ -87,15 +189,36 @@ public class RecipeBrowserGui extends BaseGui {
     @Override
     public boolean onClick(int slot, Player clicker, InventoryClickEvent event) {
         if (detailMode) {
-            // 詳細GUIから一覧に戻る（どこクリックしても戻る）
-            detailMode = false;
-            detailEntry = null;
-            render();
-            return true;
+            return onDetailClick(slot, clicker);
         }
 
         if (slot == BTN_CLOSE) {
             clicker.closeInventory();
+            return true;
+        }
+        if (slot == BTN_SORT) {
+            sortMode = sortMode.next();
+            currentPage = 0;
+            refresh();
+            render();
+            return true;
+        }
+        if (slot == BTN_FILTER) {
+            filterMode = filterMode.next();
+            currentPage = 0;
+            refresh();
+            render();
+            return true;
+        }
+        if (slot == BTN_SEARCH) {
+            promptSearch(clicker);
+            return true;
+        }
+        if (slot == BTN_RELATED_CLEAR && related != null) {
+            related = null;
+            currentPage = 0;
+            refresh();
+            render();
             return true;
         }
         if (slot == BTN_PREV && currentPage > 0) {
@@ -103,7 +226,7 @@ public class RecipeBrowserGui extends BaseGui {
             render();
             return true;
         }
-        int totalPages = Math.max(1, (int) Math.ceil((double) allRecipes.size() / ITEMS_PER_PAGE));
+        int totalPages = Math.max(1, (int) Math.ceil((double) visible.size() / ITEMS_PER_PAGE));
         if (slot == BTN_NEXT && currentPage < totalPages - 1) {
             currentPage++;
             render();
@@ -115,10 +238,248 @@ public class RecipeBrowserGui extends BaseGui {
         if (clicked != null && !clicked.isRitual) {
             detailMode = true;
             detailEntry = clicked;
+            detailHistory.clear();
             renderDetail();
             return true;
         }
         return true;
+    }
+
+    /**
+     * 詳細画面のクリック処理。素材スロット→そのアイテムを作るレシピへ、
+     * 完成品スロット→それを使うレシピ一覧へ、戻る→履歴を1つ浮上（無ければ一覧へ）。
+     */
+    private boolean onDetailClick(int slot, Player clicker) {
+        if (slot == DETAIL_BACK_SLOT) {
+            if (!detailHistory.isEmpty()) {
+                detailEntry = detailHistory.pop();
+                renderDetail();
+            } else {
+                detailMode = false;
+                detailEntry = null;
+                render();
+            }
+            return true;
+        }
+        if (detailEntry == null) {
+            detailMode = false;
+            render();
+            return true;
+        }
+        if (slot == DETAIL_RESULT_SLOT) {
+            showUsages(detailEntry.resultToken, clicker);
+            return true;
+        }
+        String ingredient = ingredientTokenAtSlot(detailEntry, slot);
+        if (ingredient != null) {
+            jumpToProducers(ingredient, clicker);
+        }
+        return true;
+    }
+
+    /** 詳細画面の3×3グリッドのスロットに置かれている素材トークンを返す（無ければ null）。 */
+    private String ingredientTokenAtSlot(RecipeEntry entry, int slot) {
+        if (!entry.shape.isEmpty()) {
+            for (int row = 0; row < entry.shape.size() && row < 3; row++) {
+                String rowStr = entry.shape.get(row);
+                for (int col = 0; col < rowStr.length() && col < 3; col++) {
+                    if (GRID_SLOTS[row][col] != slot) continue;
+                    char c = rowStr.charAt(col);
+                    if (c == ' ') return null;
+                    return entry.ingredientMap.get(String.valueOf(c));
+                }
+            }
+            return null;
+        }
+        int idx = 0;
+        for (String ing : entry.ingredientMap.values()) {
+            if (idx >= 9) break;
+            if (GRID_SLOTS[idx / 3][idx % 3] == slot) return ing;
+            idx++;
+        }
+        return null;
+    }
+
+    /**
+     * 素材クリック: そのアイテムを作るレシピへ飛ぶ。
+     * 1件だけ（かつ作業台レシピ）ならその詳細を直接開き、複数なら絞り込み一覧を出す。
+     */
+    private void jumpToProducers(String token, Player clicker) {
+        List<RecipeEntry> producers = producersOf(token);
+        String label = localize(token);
+        if (producers.isEmpty()) {
+            clicker.sendMessage(Component.text("「" + label + "」を作るレシピは登録されていません",
+                NamedTextColor.GRAY));
+            return;
+        }
+        if (producers.size() == 1 && !producers.get(0).isRitual) {
+            if (detailEntry != null) detailHistory.push(detailEntry);
+            detailEntry = producers.get(0);
+            renderDetail();
+            return;
+        }
+        openRelated(new RelatedView(token, label, false));
+    }
+
+    /** 完成品クリック: そのアイテムを素材に使うレシピ一覧へ。 */
+    private void showUsages(String token, Player clicker) {
+        if (token == null) {
+            return;
+        }
+        String label = localize(token);
+        if (usersOf(token).isEmpty()) {
+            clicker.sendMessage(Component.text("「" + label + "」を素材に使うレシピはありません",
+                NamedTextColor.GRAY));
+            return;
+        }
+        openRelated(new RelatedView(token, label, true));
+    }
+
+    /** 関連レシピ表示へ切り替える（詳細モードは抜ける）。 */
+    private void openRelated(RelatedView view) {
+        related = view;
+        detailMode = false;
+        detailEntry = null;
+        detailHistory.clear();
+        currentPage = 0;
+        refresh();
+        render();
+    }
+
+    /** 関連表示の対象レシピ。 */
+    private List<RecipeEntry> relatedEntries(RelatedView view) {
+        return view.usage() ? usersOf(view.token()) : producersOf(view.token());
+    }
+
+    /** {@code token} を作るレシピ。 */
+    private List<RecipeEntry> producersOf(String token) {
+        List<RecipeEntry> result = new ArrayList<>();
+        for (RecipeEntry entry : allRecipes) {
+            if (tokenSatisfies(entry.resultToken, token)) {
+                result.add(entry);
+            }
+        }
+        return result;
+    }
+
+    /** {@code token} を素材に使うレシピ。 */
+    private List<RecipeEntry> usersOf(String token) {
+        List<RecipeEntry> result = new ArrayList<>();
+        for (RecipeEntry entry : allRecipes) {
+            for (String ing : entry.ingredientTokens()) {
+                if (tokenSatisfies(token, ing)) {
+                    result.add(entry);
+                    break;
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * {@code candidate}(具体的なアイテム) が {@code requirement}(素材要求) を満たすか。
+     * {@code requirement} が {@code list:<id>}(TF素材互換リスト)なら、そのメンバかどうかで判定する。
+     */
+    private boolean tokenSatisfies(String candidate, String requirement) {
+        if (candidate == null || requirement == null) return false;
+        if (candidate.equalsIgnoreCase(requirement)) return true;
+        if (requirement.startsWith("list:")) {
+            return materialListContains(requirement.substring("list:".length()), candidate);
+        }
+        return false;
+    }
+
+    /** TF素材互換リストにトークンが含まれるか。 */
+    private boolean materialListContains(String listId, String token) {
+        if (token.startsWith("custom:")) {
+            Set<String> ids = com.arspaper.integration.TrinityForgeBridge
+                .resolveMaterialListCustomIds(listId);
+            return ids.contains(token.substring("custom:".length()));
+        }
+        Material mat = Material.matchMaterial(token);
+        return mat != null && com.arspaper.integration.TrinityForgeBridge
+            .resolveMaterialList(listId).contains(mat);
+    }
+
+    /**
+     * このレシピが閲覧者にとって解放済みか。
+     * TF未ロード/例外時は fail-open（解放済み扱い）— {@link com.arspaper.recipe.UnlockGate} と同じ方針。
+     */
+    private boolean isUnlocked(RecipeEntry entry) {
+        try {
+            com.arspaper.recipe.UnlockGate gate = ArsPaper.getInstance().getUnlockGate();
+            if (gate == null) return true;
+            return entry.isRitual
+                ? gate.hasRitualPermission(viewer, entry.id)
+                : gate.hasRecipePermission(viewer, entry.id);
+        } catch (Throwable t) {
+            return true;
+        }
+    }
+
+    /**
+     * チャットでの名前検索入力を受け付ける。
+     * {@code SpellSettingsGui} のリネーム入力と同じ形（一時リスナー + タイムアウト自動解除）。
+     */
+    private void promptSearch(Player player) {
+        player.closeInventory();
+        player.sendMessage(Component.text("チャットに検索する名前を入力してください", NamedTextColor.YELLOW));
+        player.sendMessage(Component.text(
+            "ワイルドカード * ? が使えます / 「" + SEARCH_CLEAR_TOKEN + "」で解除 / 「cancel」で中止",
+            NamedTextColor.GRAY));
+
+        ArsPaper plugin = ArsPaper.getInstance();
+        final java.util.UUID playerUuid = player.getUniqueId();
+        final RecipeBrowserGui self = this;
+
+        org.bukkit.event.Listener chatListener = new org.bukkit.event.Listener() {
+            private void cleanup() {
+                org.bukkit.event.HandlerList.unregisterAll(this);
+            }
+
+            @org.bukkit.event.EventHandler(priority = org.bukkit.event.EventPriority.LOWEST)
+            public void onChat(io.papermc.paper.event.player.AsyncChatEvent event) {
+                if (!event.getPlayer().getUniqueId().equals(playerUuid)) return;
+                event.setCancelled(true);
+                // Discord連携プラグイン等への漏洩を防止（受信者を空にする）
+                event.viewers().clear();
+
+                String message = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
+                    .plainText().serialize(event.message()).trim();
+
+                cleanup();
+
+                if (message.equalsIgnoreCase("cancel")) {
+                    plugin.getServer().getScheduler().runTask(plugin, () -> reopen(playerUuid, self));
+                    return;
+                }
+                plugin.getServer().getScheduler().runTask(plugin, () -> {
+                    self.searchTerm = SEARCH_CLEAR_TOKEN.equals(message) ? "" : message;
+                    self.currentPage = 0;
+                    self.refresh();
+                    reopen(playerUuid, self);
+                });
+            }
+
+            @org.bukkit.event.EventHandler
+            public void onPlayerQuit(org.bukkit.event.player.PlayerQuitEvent event) {
+                if (event.getPlayer().getUniqueId().equals(playerUuid)) {
+                    cleanup();
+                }
+            }
+        };
+
+        plugin.getServer().getPluginManager().registerEvents(chatListener, plugin);
+        plugin.getServer().getScheduler().runTaskLater(plugin,
+            () -> org.bukkit.event.HandlerList.unregisterAll(chatListener), SEARCH_TIMEOUT_TICKS);
+    }
+
+    /** 検索入力後にGUIを開き直す(オフラインなら何もしない)。 */
+    private static void reopen(java.util.UUID playerUuid, RecipeBrowserGui gui) {
+        Player p = ArsPaper.getInstance().getServer().getPlayer(playerUuid);
+        if (p == null || !p.isOnline()) return;
+        gui.render();
+        p.openInventory(gui.getInventory());
     }
 
     /**
@@ -128,11 +489,10 @@ public class RecipeBrowserGui extends BaseGui {
         if (slot < ITEM_START || slot >= 44) return null;
         int startIndex = currentPage * ITEMS_PER_PAGE;
         // スロットからインデックスを逆算（枠を考慮）
-        int itemIdx = 0;
         int s = ITEM_START;
-        for (int i = startIndex; i < allRecipes.size() && s < 44; i++) {
+        for (int i = startIndex; i < visible.size() && s < 44; i++) {
             if (s % 9 == 0 || s % 9 == 8) { s++; i--; continue; }
-            if (s == slot) return allRecipes.get(i);
+            if (s == slot) return visible.get(i);
             s++;
         }
         return null;
@@ -161,7 +521,7 @@ public class RecipeBrowserGui extends BaseGui {
             List.of(Component.text("§a【作業台レシピ】").decoration(TextDecoration.ITALIC, false))));
 
         // 3×3 グリッド (slots: 10,11,12 / 19,20,21 / 28,29,30)
-        int[][] gridSlots = {{10, 11, 12}, {19, 20, 21}, {28, 29, 30}};
+        int[][] gridSlots = GRID_SLOTS;
 
         if (!entry.shape.isEmpty()) {
             // Shaped recipe
@@ -176,7 +536,7 @@ public class RecipeBrowserGui extends BaseGui {
                         String ingKey = String.valueOf(c);
                         String ingValue = entry.ingredientMap.get(ingKey);
                         if (ingValue != null) {
-                            inventory.setItem(guiSlot, createIngredientDisplay(ingValue));
+                            inventory.setItem(guiSlot, withJumpHint(createIngredientDisplay(ingValue), ingValue));
                         }
                     }
                 }
@@ -187,7 +547,7 @@ public class RecipeBrowserGui extends BaseGui {
             for (String ing : entry.ingredientMap.values()) {
                 if (idx >= 9) break;
                 int row = idx / 3, col = idx % 3;
-                inventory.setItem(gridSlots[row][col], createIngredientDisplay(ing));
+                inventory.setItem(gridSlots[row][col], withJumpHint(createIngredientDisplay(ing), ing));
                 idx++;
             }
         }
@@ -213,21 +573,48 @@ public class RecipeBrowserGui extends BaseGui {
                 }
                 // 詳細情報を結果アイテムに表示
                 appendDetailLore(entry, resultLore);
+                if (entry.resultToken != null) {
+                    resultLore.add(Component.empty());
+                    resultLore.add(detailText("クリック: これを使うレシピ一覧", NamedTextColor.DARK_GRAY));
+                }
                 if (!resultLore.isEmpty()) meta.lore(resultLore);
             });
-            inventory.setItem(15, resultDisplay);
+            inventory.setItem(DETAIL_RESULT_SLOT, resultDisplay);
         } else {
             ItemStack resultDisplay = new ItemStack(entry.icon);
             if (entry.amount > 1) resultDisplay.setAmount(entry.amount);
-            inventory.setItem(15, resultDisplay);
+            if (entry.resultToken != null) {
+                resultDisplay.editMeta(meta -> meta.lore(List.of(
+                    detailText("クリック: これを使うレシピ一覧", NamedTextColor.DARK_GRAY))));
+            }
+            inventory.setItem(DETAIL_RESULT_SLOT, resultDisplay);
         }
 
         // 素材個数サマリー (slot 24-25)
         inventory.setItem(24, createMaterialSummary(entry));
 
         // 戻るボタン (slot 49)
-        inventory.setItem(49, createButton(Material.DARK_OAK_DOOR,
-            Component.text("← 一覧に戻る", NamedTextColor.YELLOW)));
+        inventory.setItem(DETAIL_BACK_SLOT, createButton(Material.DARK_OAK_DOOR,
+            Component.text(detailHistory.isEmpty() ? "← 一覧に戻る" : "← 前のレシピに戻る",
+                NamedTextColor.YELLOW),
+            List.of(detailText("素材をクリックすると、その素材を作るレシピへ移動します",
+                NamedTextColor.DARK_GRAY))));
+    }
+
+    /**
+     * 素材表示に「クリックでこの素材を作るレシピへ」のヒント行を足す。
+     * 生産レシピが1件も無い素材（原材料）には足さない — 押しても何も起きないことを明示するため。
+     */
+    private ItemStack withJumpHint(ItemStack display, String token) {
+        if (display == null || token == null || producersOf(token).isEmpty()) {
+            return display;
+        }
+        display.editMeta(meta -> {
+            List<Component> lore = meta.lore() == null ? new ArrayList<>() : new ArrayList<>(meta.lore());
+            lore.add(detailText("クリック: この素材を作るレシピへ", NamedTextColor.DARK_GRAY));
+            meta.lore(lore);
+        });
+        return display;
     }
 
     /**
@@ -387,6 +774,17 @@ public class RecipeBrowserGui extends BaseGui {
         // 詳細情報を追加
         appendDetailLore(entry, lore);
 
+        // 解放状態(2026-07-27): 絞り込みが「すべて」でも一目で分かるようにする
+        if (!isUnlocked(entry)) {
+            lore.add(Component.empty());
+            lore.add(detailText("✖ 未解放（スキルツリーで解放が必要）", NamedTextColor.RED));
+        }
+        if (entry.sortLevel > 0) {
+            lore.add(detailText("使用可能レベル: " + entry.sortLevel
+                + (entry.sortSkill.isBlank() ? "" : " (" + entry.sortSkill + ")"),
+                NamedTextColor.DARK_AQUA));
+        }
+
         // iconItemがある場合はそのItemStackベースでボタン生成（革防具の色等を保持）
         if (entry.iconItem != null) {
             ItemStack button = entry.iconItem.clone();
@@ -428,6 +826,9 @@ public class RecipeBrowserGui extends BaseGui {
                 .toList();
             entry.source = recipe.sourceRequired();
             entry.resultCustomId = recipe.resultId();
+            entry.resultToken = recipe.isCustomResult() && recipe.resultId() != null
+                ? "custom:" + recipe.resultId()
+                : (recipe.resultMaterial() != null ? recipe.resultMaterial().name() : null);
             entry.effectType = recipe.effectType();
             entry.effectParams = recipe.effectParams();
             if ("thread".equals(recipe.effectType()) && recipe.effectParams().containsKey("thread")) {
@@ -518,10 +919,33 @@ public class RecipeBrowserGui extends BaseGui {
                 entry.iconItem = catalogDisplay;
                 entry.icon = catalogDisplay.getType();
             }
+            // TFカタログレシピのキーは "catalog_<catalogId>"。素材トークンと同じ語彙へ揃える
+            // (Bukkitの結果ItemStackにはカタログidのPDCが載らない経路があるため、キーから起こす)。
+            String catalogId = entry.id.startsWith(CATALOG_KEY_PREFIX)
+                ? entry.id.substring(CATALOG_KEY_PREFIX.length()) : null;
+            if (catalogId != null && !catalogId.isBlank()) {
+                entry.resultToken = "custom:" + catalogId;
+            }
             entries.add(entry);
         }
 
+        // 並べ替えキー(使用スキル種別 / 使用可能レベル)は、表示アイテムが最終確定した後にまとめて取る。
+        for (RecipeEntry entry : entries) {
+            applySortKeys(entry);
+        }
         return entries;
+    }
+
+    /** item-stats の use-skill / use-level を並べ替えキーとして取り込む（未設定なら空/0のまま）。 */
+    private void applySortKeys(RecipeEntry entry) {
+        ItemStack probe = entry.iconItem;
+        if (probe == null && entry.icon != null && entry.icon.isItem()) {
+            probe = new ItemStack(entry.icon);
+        }
+        var gate = com.arspaper.integration.TrinityForgeBridge.itemUseGate(probe);
+        if (gate == null) return;
+        entry.sortSkill = gate.skill() == null ? "" : gate.skill();
+        entry.sortLevel = Math.max(0, gate.level());
     }
 
     /** 作業台レシピ(Shaped/Shapeless)をRecipeEntryへ変換する。未知タイプはnull。 */
@@ -536,6 +960,7 @@ public class RecipeBrowserGui extends BaseGui {
             entry.icon = shaped.getResult().getType();
             entry.amount = shaped.getResult().getAmount();
             entry.shape = List.of(shaped.getShape());
+            entry.resultToken = resultTokenOf(shaped.getResult());
 
             Map<String, String> ingMap = new HashMap<>();
             for (Map.Entry<Character, org.bukkit.inventory.RecipeChoice> choiceEntry : shaped.getChoiceMap().entrySet()) {
@@ -549,6 +974,7 @@ public class RecipeBrowserGui extends BaseGui {
             entry.iconItem = shapeless.getResult().clone();
             entry.icon = shapeless.getResult().getType();
             entry.amount = shapeless.getResult().getAmount();
+            entry.resultToken = resultTokenOf(shapeless.getResult());
 
             Map<String, String> ingMap = new HashMap<>();
             List<org.bukkit.inventory.RecipeChoice> choices = shapeless.getChoiceList();
@@ -559,6 +985,22 @@ public class RecipeBrowserGui extends BaseGui {
             return entry;
         }
         return null; // 未知のレシピタイプはスキップ
+    }
+
+    /**
+     * 完成品を素材トークンと同じ語彙({@code custom:<id>} / Material名)へ変換する。
+     * {@link #describeChoice} と対称 — 双方が同じ語彙を返すことで素材⇔完成品の突き合わせが成立する。
+     */
+    private String resultTokenOf(ItemStack result) {
+        if (result == null || result.getType().isAir()) return null;
+        if (result.hasItemMeta()) {
+            String customId = result.getItemMeta().getPersistentDataContainer()
+                .get(com.arspaper.item.ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING);
+            if (customId != null && !customId.isBlank()) {
+                return "custom:" + customId;
+            }
+        }
+        return result.getType().name();
     }
 
     /**
@@ -773,23 +1215,4 @@ public class RecipeBrowserGui extends BaseGui {
         return "UNKNOWN";
     }
 
-    private static class RecipeEntry {
-        String id;
-        String displayName;
-        boolean isRitual;
-        Material icon = Material.PAPER;
-        ItemStack iconItem = null;
-        String resultCustomId = null; // カスタムアイテム結果ID
-        String effectType = null;     // 儀式エフェクトタイプ
-        Map<String, String> effectParams = null; // エフェクトパラメータ
-        String threadId = null;       // スレッドID
-        // 儀式用
-        String coreItem;
-        List<String> ingredients = List.of();
-        int source;
-        // 作業台用
-        List<String> shape = List.of();
-        java.util.Map<String, String> ingredientMap = java.util.Map.of();
-        int amount = 1;
-    }
 }
