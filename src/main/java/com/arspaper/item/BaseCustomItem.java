@@ -79,10 +79,9 @@ public abstract class BaseCustomItem {
             meta.displayName(resolvedDisplayName);
             // Geyser互換: itemName も設定（Bedrockでベース素材名が表示される問題の対策）
             meta.itemName(resolvedDisplayName);
-            // Geyser互換: CustomModelDataを無効化してアイテム透明化を防止
-            if (!isCustomModelDataDisabled()) {
-                meta.setCustomModelData(getCustomModelData());
-            }
+            // CustomModelDataは常時付与する(2026-07-27: config経由での無効化を撤去。
+            // 無効化するとリソースパックのモデルが一切出なくなるため、逃げ道自体を無くした)。
+            meta.setCustomModelData(getCustomModelData());
             meta.getPersistentDataContainer().set(
                 ItemKeys.CUSTOM_ITEM_ID,
                 PersistentDataType.STRING,
@@ -164,13 +163,6 @@ public abstract class BaseCustomItem {
         FunctionalItemConfig config = instance != null ? instance.getFunctionalItemConfig() : null;
         Material override = config != null ? config.materialOverride(itemId) : null;
         return override != null ? override : getBaseMaterial();
-    }
-
-    /** config.ymlのgeyser.disable-custom-model-data設定を参照 */
-    private static boolean isCustomModelDataDisabled() {
-        ArsPaper instance = ArsPaper.getInstance();
-        if (instance == null) return false;
-        return instance.getConfig().getBoolean("geyser.disable-custom-model-data", false);
     }
 
     /** 右クリック時の処理 */
