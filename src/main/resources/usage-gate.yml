@@ -8,8 +8,9 @@
 # PlayerData.heldPerks() のエントリと一致するかで行う。
 #
 # ■ Source of truth (SoT)
-# glyph → perk 対応の正本は TrinityForge の
-#   skilltree/dedicated-effects.yml（channel: glyph-gate）である。
+# glyph → perk 対応の正本は TrinityForge の各スキルツリー yml
+#   (skilltree/*.yml) のノード内 dedicated-effects: フィールド（id: "glyph:<key>" = channel glyph-gate）
+#   である。読み込みは SkillTreeConfig#parseDedicatedEffects が行う。
 # 本ファイルの glyph-perks は空を維持し、ランタイムでは
 # TrinityForgeBridge.tfGlyphGatePerks()（skilltree 由来）と union(OR) 判定する。
 # サーバー運用で fork 側だけ一時的に上書きしたい場合のみ、ここへ追記する。

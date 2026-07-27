@@ -10,14 +10,15 @@
 # TrinityForge 未ロード時は安全側（ゲート無効=使用可）に倒す。
 #
 # ■ Source of truth (SoT)
-# レシピ/儀式 → perk 対応の正本は TrinityForge の
-#   skilltree/dedicated-effects.yml（channel: recipe-gate / ritual-gate）である。
+# レシピ/儀式 → perk 対応の正本は TrinityForge の各スキルツリー yml
+#   (skilltree/*.yml) のノード内 dedicated-effects: フィールド（id: "recipe:<id>" / "ritual:<id>" =
+#   channel recipe-gate / ritual-gate）である。読み込みは SkillTreeConfig#parseDedicatedEffects が行う。
 # 本ファイルの recipe-perks / ritual-perks は空を維持し、ランタイムでは
 # TrinityForgeBridge.tfRecipeGatePerks() / tfRitualGatePerks()（skilltree 由来）と
 # union(OR) 判定する。サーバー運用で fork 側だけ一時的に上書きしたい場合のみ追記する。
 #
 # ▼ 未 gate（対象未実装のため）: skilltree の以下の「解放」は ArsPaper 側に実体が無い。
-#   実装後に dedicated-effects.yml または（一時的に）ここへ追記する。
+#   実装後に該当スキルツリー yml (skilltree/*.yml) のノード dedicated-effects: または（一時的に）ここへ追記する。
 #   - ソースジェム武器コーティング / 上位ソースジャー / 各種コア（ウッド/ベジタブル/ミート/ジュエリー）
 #     ※ tf_core_* カタログアイテム自体は TrinityForge に残す（削除しない）。
 #   - バニラ防具・道具クラフト（石/鉄/ダイヤ/ネザライト, SMITHING A〜D）= TF 側機構で ArsPaper 外
