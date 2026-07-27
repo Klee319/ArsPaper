@@ -4,8 +4,11 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 /**
  * レシピ一覧の並べ替え・絞り込み・名前検索 (2026-07-27 レシピGUI改修)。
@@ -23,6 +26,13 @@ final class RecipeBrowserFilter {
 
     /** 正規表現の暴発を防ぐための入力長上限(これを超える検索語は先頭だけ使う)。 */
     private static final int MAX_PATTERN_LENGTH = 128;
+
+    /**
+     * コンパイル済みパターンの上限付きキャッシュ。検索語はプレイヤーの自由入力なので、
+     * 無制限に貯めると悪意ある入力でヒープを膨らませられる。
+     */
+    private static final int MAX_CACHE = 256;
+    private static final Map<String, Pattern> CACHE = new ConcurrentHashMap<>();
 
     private RecipeBrowserFilter() {
     }
@@ -118,7 +128,13 @@ final class RecipeBrowserFilter {
      * {@code *} / {@code ?} を含まない入力は「部分一致」として扱う(利用者が毎回 {@code *foo*} と
      * 書かなくて済むように — ユーザー確定仕様「名前検索はワイルドカードで」の実用形)。
      *
-     * @return 検索なしのときは null
+     * <p><b>TrinityForge 側の {@code com.trinityforge.progression.GlobMatcher} と意図的に同じ実装を
+     * 持っている。</b>このGUIは TrinityForge が入っていなくても動く必要があるため TF のクラスを
+     * 直接は呼べない。片方だけ直すと同じ検索語で図鑑とレシピ一覧の結果が食い違うので、
+     * 仕様(部分一致への昇格・大文字小文字無視・長さ上限・壊れたパターンの扱い)を変えるときは
+     * <b>必ず両方そろえること</b>。
+     *
+     * @return 検索なし、または解釈できないパターンのときは null(＝絞り込みなし)
      */
     static Pattern compileGlob(String raw) {
         if (raw == null) return null;
@@ -127,13 +143,22 @@ final class RecipeBrowserFilter {
         if (trimmed.length() > MAX_PATTERN_LENGTH) {
             trimmed = trimmed.substring(0, MAX_PATTERN_LENGTH);
         }
-        if (trimmed.indexOf('*') < 0 && trimmed.indexOf('?') < 0) {
-            trimmed = "*" + trimmed + "*";
+        String key = trimmed.toLowerCase(Locale.ROOT);
+        Pattern cached = CACHE.get(key);
+        if (cached != null) return cached;
+        Pattern built = buildGlob(key);
+        if (built != null && CACHE.size() < MAX_CACHE) {
+            CACHE.put(key, built);
         }
-        StringBuilder regex = new StringBuilder(trimmed.length() * 2);
+        return built;
+    }
+
+    private static Pattern buildGlob(String glob) {
+        String effective = (glob.indexOf('*') < 0 && glob.indexOf('?') < 0) ? "*" + glob + "*" : glob;
+        StringBuilder regex = new StringBuilder(effective.length() * 2);
         StringBuilder literal = new StringBuilder();
-        for (int i = 0; i < trimmed.length(); i++) {
-            char c = trimmed.charAt(i);
+        for (int i = 0; i < effective.length(); i++) {
+            char c = effective.charAt(i);
             if (c == '*' || c == '?') {
                 if (literal.length() > 0) {
                     regex.append(Pattern.quote(literal.toString()));
@@ -147,7 +172,12 @@ final class RecipeBrowserFilter {
         if (literal.length() > 0) {
             regex.append(Pattern.quote(literal.toString()));
         }
-        return Pattern.compile(regex.toString(),
-                Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.DOTALL);
+        try {
+            return Pattern.compile(regex.toString(),
+                    Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.DOTALL);
+        } catch (PatternSyntaxException ex) {
+            // 壊れたパターンで全件消すより絞り込み無しに倒す(TF GlobMatcher と同じ判断)。
+            return null;
+        }
     }
 }
