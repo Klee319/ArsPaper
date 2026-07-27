@@ -2,6 +2,7 @@ package com.arspaper.item.impl;
 
 import com.arspaper.ArsPaper;
 import com.arspaper.gui.SpellCraftingGui;
+import com.arspaper.integration.TrinityForgeBridge;
 import com.arspaper.item.BaseCustomItem;
 import com.arspaper.item.ItemKeys;
 import com.arspaper.item.WandTier;
@@ -49,10 +50,6 @@ public class SpellWand extends BaseCustomItem {
         return wandTier.getCustomModelData();
     }
 
-    /** 触媒(完成品): 厳選(quality/rollSeed)の対象とする。 */
-    @Override
-    protected boolean usesQualityRoll() { return true; }
-
     @Override
     public ItemStack createItemStack() {
         ItemStack item = super.createItemStack();
@@ -89,9 +86,11 @@ public class SpellWand extends BaseCustomItem {
         if (player.isSneaking()) {
             int tier = item.getItemMeta().getPersistentDataContainer()
                 .getOrDefault(ItemKeys.WAND_TIER, PersistentDataType.INTEGER, 1);
+            // 要件⑥ ars-tier: skilltree由来のperkで使用可能グリフtier上限を加算する(fail-open)。
             SpellCraftingGui gui = new SpellCraftingGui(
                 ArsPaper.getInstance(), player, item, 0,
                 WandTier.fromTier(tier).getMaxGlyphTier()
+                    + TrinityForgeBridge.tfArsTierUnlockBonus(player)
             );
             gui.open();
         } else {

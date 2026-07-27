@@ -54,6 +54,7 @@ public class MaterialConfigManager {
                 }
                 int customModelData = matSection.getInt("custom_model_data", 0);
                 List<String> lore = matSection.getStringList("lore");
+                boolean enchantGlow = matSection.getBoolean("enchant_glow", true);
 
                 // レシピ
                 String coreItem = null;
@@ -69,7 +70,7 @@ public class MaterialConfigManager {
 
                 materials.put(id, new MaterialConfig(
                     id, displayName, nameColor, baseMaterial, customModelData,
-                    lore, coreItem, pedestalItems, source));
+                    lore, enchantGlow, coreItem, pedestalItems, source));
             } catch (Exception e) {
                 plugin.getLogger().warning("Failed to load material: " + id + " - " + e.getMessage());
             }

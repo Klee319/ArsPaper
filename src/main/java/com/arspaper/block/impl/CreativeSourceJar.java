@@ -1,7 +1,9 @@
 package com.arspaper.block.impl;
 
+import com.arspaper.ArsPaper;
 import com.arspaper.block.BlockKeys;
 import com.arspaper.block.CustomBlock;
+import com.arspaper.block.SourceJarConfig;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -13,7 +15,9 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Creative Source Jar - 無限にSourceを供給するクリエイティブ専用ブロック。
@@ -26,40 +30,56 @@ public class CreativeSourceJar extends CustomBlock {
         super(plugin, "creative_source_jar");
     }
 
+    private Optional<SourceJarConfig.JarDef> jarDef() {
+        ArsPaper ars = ArsPaper.getInstance();
+        if (ars == null || ars.getSourceJarConfig() == null) {
+            return Optional.empty();
+        }
+        return ars.getSourceJarConfig().get(getItemId());
+    }
+
     @Override
     public Material getBlockMaterial() {
-        return Material.DECORATED_POT;
+        return jarDef().map(SourceJarConfig.JarDef::material).orElse(Material.DECORATED_POT);
     }
 
     @Override
     public Component getDisplayName() {
-        return Component.text("クリエイティブソースジャー", NamedTextColor.LIGHT_PURPLE)
-            .decoration(TextDecoration.ITALIC, false);
+        return jarDef()
+                .map(d -> Component.text(d.displayName()).decoration(TextDecoration.ITALIC, false))
+                .orElse(Component.text("クリエイティブソースジャー", NamedTextColor.LIGHT_PURPLE)
+                        .decoration(TextDecoration.ITALIC, false));
     }
 
     @Override
     public int getCustomModelData() {
-        return 200003;
+        return jarDef().map(SourceJarConfig.JarDef::customModelData).orElse(200003);
     }
 
     @Override
     public ItemStack createItemStack() {
         ItemStack item = super.createItemStack();
-        item.editMeta(meta ->
-            meta.lore(List.of(
-                Component.text("無限のソースエネルギーを供給", NamedTextColor.LIGHT_PURPLE)
-                    .decoration(TextDecoration.ITALIC, false),
-                Component.text("ソース: \u221E (無限)", NamedTextColor.LIGHT_PURPLE)
-                    .decoration(TextDecoration.ITALIC, false)
-            ))
-        );
+        List<Component> lore = new ArrayList<>();
+        Optional<SourceJarConfig.JarDef> def = jarDef();
+        if (def.isPresent() && !def.get().lore().isEmpty()) {
+            for (String line : def.get().lore()) {
+                lore.add(Component.text(line, NamedTextColor.LIGHT_PURPLE)
+                        .decoration(TextDecoration.ITALIC, false));
+            }
+        } else {
+            lore.add(Component.text("無限のソースエネルギーを供給", NamedTextColor.LIGHT_PURPLE)
+                    .decoration(TextDecoration.ITALIC, false));
+        }
+        lore.add(Component.text("ソース: \u221E (無限)", NamedTextColor.LIGHT_PURPLE)
+                .decoration(TextDecoration.ITALIC, false));
+        item.editMeta(meta -> meta.lore(lore));
         return item;
     }
 
     @Override
     public ItemStack getDisplayHeadItem() {
         ItemStack head = new ItemStack(Material.PURPLE_STAINED_GLASS);
-        head.editMeta(meta -> meta.setCustomModelData(200003));
+        head.editMeta(meta -> meta.setCustomModelData(getCustomModelData()));
         return head;
     }
 

@@ -42,6 +42,12 @@ public class ConfigurableMaterial extends BaseCustomItem {
         return config.customModelData();
     }
 
+    /** エンチャント光沢(キラキラ)の付与可否。materials.yml の enchant_glow で制御(既定 true)。 */
+    @Override
+    public boolean hasEnchantGlow() {
+        return config.enchantGlow();
+    }
+
     @Override
     public ItemStack createItemStack() {
         ItemStack item = super.createItemStack();

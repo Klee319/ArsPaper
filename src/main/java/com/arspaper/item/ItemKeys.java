@@ -41,6 +41,9 @@ public final class ItemKeys {
     /** 防具スレッドスロット（JSON配列: ["mana_regen", null, "mana_boost"]） */
     public static final NamespacedKey THREAD_SLOTS = new NamespacedKey(NAMESPACE, "thread_slots");
 
+    /** ArsPaperが所有するスレッド表示Lore（Adventure Component JSON文字列の配列） */
+    public static final NamespacedKey THREAD_LORE = new NamespacedKey(NAMESPACE, "thread_lore");
+
     /** スレッドアイテムのタイプID */
     public static final NamespacedKey THREAD_ITEM_TYPE = new NamespacedKey(NAMESPACE, "thread_item_type");
 

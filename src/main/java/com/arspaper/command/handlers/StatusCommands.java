@@ -2,6 +2,7 @@ package com.arspaper.command.handlers;
 
 import com.arspaper.ArsPaper;
 import com.arspaper.gui.BackpackGui;
+import com.arspaper.mana.ManaBaseStats;
 import com.arspaper.mana.ManaKeys;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonParser;
@@ -23,7 +24,7 @@ public final class StatusCommands {
         var config = plugin.getManaManager().getConfig();
 
         // === マナ上限 ===
-        int baseMana = config.defaultMaxMana();
+        int baseMana = ManaBaseStats.defaultMax();
         int glyphBonus = pdc.getOrDefault(ManaKeys.GLYPH_MANA_BONUS, PersistentDataType.INTEGER, 0);
         int armorManaBonus = pdc.getOrDefault(ManaKeys.ARMOR_MANA_BONUS, PersistentDataType.INTEGER, 0);
         int threadManaBonus = pdc.getOrDefault(ManaKeys.THREAD_MANA_BONUS, PersistentDataType.INTEGER, 0);
@@ -42,7 +43,7 @@ public final class StatusCommands {
         int currentMana = plugin.getManaManager().getCurrentMana(player);
 
         // === マナ回復 ===
-        int baseRegen = pdc.getOrDefault(ManaKeys.REGEN_RATE, PersistentDataType.INTEGER, config.defaultRegenRate());
+        int baseRegen = pdc.getOrDefault(ManaKeys.REGEN_RATE, PersistentDataType.INTEGER, ManaBaseStats.defaultRegenRate());
         int threadRegenBonus = pdc.getOrDefault(ManaKeys.THREAD_REGEN_BONUS, PersistentDataType.INTEGER, 0);
         int enchantRegenBonus = pdc.getOrDefault(ManaKeys.ENCHANT_REGEN_BONUS, PersistentDataType.INTEGER, 0);
         int armorRegenBonus = pdc.getOrDefault(ManaKeys.ARMOR_REGEN_BONUS, PersistentDataType.INTEGER, 0);
@@ -74,7 +75,7 @@ public final class StatusCommands {
             player.sendMessage(Component.text("  ワールド: " + (worldManaBonus >= 0 ? "+" : "") + worldManaBonus, NamedTextColor.GRAY));
 
         // 回復
-        double regenInterval = config.regenIntervalTicks() / 20.0;
+        double regenInterval = ManaBaseStats.regenIntervalTicks() / 20.0;
         double regenPerSec = totalRegen / regenInterval;
         player.sendMessage(Component.text("回復: ", NamedTextColor.GREEN)
             .append(Component.text(totalRegen + "/tick (" + String.format("%.1f", regenPerSec) + "/秒)", NamedTextColor.WHITE)));
@@ -120,9 +121,23 @@ public final class StatusCommands {
     }
 
     public static int executeDebug(ArsPaper plugin, Player player) {
-        boolean enabled = plugin.getManaManager().toggleInfiniteMana(player);
+        return executeDebug(plugin, player, null);
+    }
+
+    /**
+     * @param mode {@code null}=トグル, {@code true}=ON, {@code false}=OFF
+     */
+    public static int executeDebug(ArsPaper plugin, Player player, Boolean mode) {
+        boolean enabled;
+        if (mode == null) {
+            enabled = plugin.getManaManager().toggleInfiniteMana(player);
+        } else {
+            plugin.getManaManager().setInfiniteMana(player, mode);
+            enabled = mode;
+        }
         if (enabled) {
-            player.sendMessage(Component.text("デバッグモード: ON（マナ無限）", NamedTextColor.GREEN));
+            player.sendMessage(Component.text(
+                    "デバッグモード: ON（マナ無限・パーク解放ゲート全通過）", NamedTextColor.GREEN));
         } else {
             player.sendMessage(Component.text("デバッグモード: OFF", NamedTextColor.YELLOW));
         }

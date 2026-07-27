@@ -1,0 +1,35 @@
+# =============================================================================
+# sourcejars.yml - ソースジャー定義
+# =============================================================================
+# jars.<id>:
+#   material / display-name / custom-model-data / lore : item-catalog 相当の見た目
+#   capacity : 蓄積可能なソース量。-1 で無限（クリエイティブ用）
+#   recipe   : 作業台 / 儀式レシピ（UnifiedRecipeLoader が読む。Ars Nouveau 既定を踏襲）
+# =============================================================================
+
+# 設定リファレンス(本文コメント移設先): docs/config-reference/arspaper/sourcejars.md
+jars:
+  source_jar:
+    material: DECORATED_POT
+    display-name: "ソースジャー"
+    custom-model-data: 200002
+    capacity: 10000
+    lore:
+      - "魔法のソースエネルギーを貯蔵"
+    recipe:
+      method: workbench
+      type: shaped
+      shape:
+        - GGG
+        - GSG
+        - GGG
+      ingredients:
+        G: BRICK
+        S: custom:source_berry
+  creative_source_jar:
+    material: DECORATED_POT
+    display-name: "クリエイティブソースジャー"
+    custom-model-data: 200003
+    capacity: -1
+    lore:
+      - "無限のソースエネルギーを供給"

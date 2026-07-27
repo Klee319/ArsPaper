@@ -152,16 +152,29 @@ public class BlockParticleTask extends BukkitRunnable implements Listener {
                 world.spawnParticle(Particle.ENCHANT, center, 3, 0.3, 0.2, 0.3, 0.5);
             case "source_jar" ->
                 world.spawnParticle(Particle.END_ROD, center, 1, 0.2, 0.2, 0.2, 0.02);
-            case "volcanic_sourcelink" ->
-                world.spawnParticle(Particle.FLAME, center, 2, 0.2, 0.1, 0.2, 0.01);
-            case "mycelial_sourcelink" ->
-                world.spawnParticle(Particle.SPORE_BLOSSOM_AIR, center, 2, 0.3, 0.2, 0.3, 0);
             case "ritual_core" ->
                 world.spawnParticle(Particle.DUST, center, 1, 0.3, 0.2, 0.3, 0,
                     new Particle.DustOptions(Color.fromRGB(140, 0, 50), 0.7f));
             case "pedestal" ->
                 world.spawnParticle(Particle.DUST, center, 2, 0.2, 0.2, 0.2, 0,
                     new Particle.DustOptions(Color.fromRGB(128, 0, 255), 0.8f));
+            default -> spawnSourcelinkParticle(world, center, blockId);
         }
+    }
+
+    /**
+     * ソースリンクのパーティクル。カスタムid (sourcelinks.yml items:) でも実体クラスで判定する
+     * ため、固定idと同じ見た目になる。
+     */
+    private void spawnSourcelinkParticle(World world, Location center, String blockId) {
+        com.arspaper.ArsPaper ars = com.arspaper.ArsPaper.getInstance();
+        if (ars == null) return;
+        ars.getBlockRegistry().get(blockId).ifPresent(cb -> {
+            if (cb instanceof com.arspaper.source.sourcelink.VolcanicSourcelink) {
+                world.spawnParticle(Particle.FLAME, center, 2, 0.2, 0.1, 0.2, 0.01);
+            } else if (cb instanceof com.arspaper.source.sourcelink.MycelialSourcelink) {
+                world.spawnParticle(Particle.SPORE_BLOSSOM_AIR, center, 2, 0.3, 0.2, 0.3, 0);
+            }
+        });
     }
 }

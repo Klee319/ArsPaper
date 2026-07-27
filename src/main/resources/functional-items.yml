@@ -1,0 +1,142 @@
+# ============================================================
+# functional-items.yml - 機能アイテム設定 (2026-07-25 統合)
+# ============================================================
+# 対象7アイテム: dominion_wand / teleport_compass / pedestal / ritual_core /
+#                scribing_table / waystone / source_berry
+# (ワンド/コンパス/儀式ブロック等、プログラム制御の機能アイテム)
+#
+# 編集可能なキー:
+#   display-name : 表示名 (MiniMessage記法)
+#   lore          : 説明文リスト (MiniMessage記法)
+#   enchant-glow  : エンチャント光の表示有無 (true/false)
+#   material      : 素材 (※ dominion_wand / teleport_compass / source_berry の
+#                   「保持アイテム」3種のみ有効。pedestal/ritual_core/scribing_table/waystone
+#                   の「ブロック」4種はTileState対応判定・儀式の近傍探索等、Materialに
+#                   密結合したコードが複数あるため未対応。書いても無視され警告ログが出る)
+#   recipe        : クラフトレシピ。method: workbench(作業台/2×2インベントリ) または
+#                   method: ritual(儀式) に対応。記法は下記参照。
+#
+# 編集不可 (プログラム側固定。書いても無視され、警告ログが1回出る):
+#   内部ID (このセクションのキー名そのもの) / custom-model-data
+#
+# 全キーは省略可能。省略時はfork Java実装のハードコード値にフォールバックする
+# (=display-nameだけ書かれた旧来のエントリはそのまま動く)。
+#
+# レシピ記法 (catalog.yml / items.yml と同じ):
+#   method: workbench  - 作業台クラフト (type: shaped/shapeless, shape, ingredients, amount)
+#     - type: inventory とすると2×2インベントリクラフトにも対応 (shape最大2×2)
+#   method: ritual      - 儀式クラフト (core-item, pedestal-items, source)
+#     - 結果アイテムは常にこのエントリ自身 (custom:<エントリのキー名>)。result明示指定は不要。
+#
+# custom: プレフィックスは本プラグインのカスタムアイテムを参照する。
+# "x2" 等の記法はアイテム数量を示す。
+#
+# 移行元 (2026-07-25): dominion_wand/teleport_compass/source_berryは
+# TrinityForge items/catalog.yml から、pedestal/ritual_core/scribing_table/waystoneは
+# 本プラグインの items.yml から、それぞれレシピ含め本ファイルへ統合した。
+# catalog.yml / items.yml 側は当該エントリを削除済み(カタログにレシピを二重登録する必要はない)。
+# ============================================================
+
+# 設定リファレンス(本文コメント移設先): docs/config-reference/arspaper/functional-items.md
+items:
+  dominion_wand:
+    display-name: "ドミニオンワンド"
+    material: BLAZE_ROD
+    enchant-glow: true
+    lore:
+      - ""
+      - "<color:dark_purple>ソース管理入門</color>"
+    recipe:
+      method: workbench
+      type: shaped
+      shape:
+        - "  G"
+        - " B "
+        - "B  "
+      ingredients:
+        G: GOLD_INGOT
+        B: BLAZE_ROD
+      amount: 1
+
+  teleport_compass:
+    display-name: "テレポートコンパス"
+    material: COMPASS
+    enchant-glow: true
+    lore:
+      - "<gray>ウェイストーンに右クリックで紐づけ</gray>"
+      - "<dark_gray>右クリックでテレポート</dark_gray>"
+      - ""
+      - "<color:dark_purple>ルーラ！</color>"
+    recipe:
+      method: ritual
+      core-item: COMPASS
+      pedestal-items:
+        - ENDER_PEARL x2
+        - custom:source_gem x2
+        - CHORUS_FRUIT x2
+        - LAPIS_BLOCK x2
+      source: 600
+
+  pedestal:
+    display-name: "台座"
+    recipe:
+      method: workbench
+      type: shaped
+      shape:
+        - " G "
+        - " S "
+        - SSS
+      ingredients:
+        G: GOLD_INGOT
+        S: custom:sourcestone
+      amount: 2
+
+  ritual_core:
+    display-name: "儀式の核"
+    recipe:
+      method: workbench
+      type: shaped
+      shape:
+        - ODO
+        - DLD
+        - ODO
+      ingredients:
+        O: OBSIDIAN
+        D: DIAMOND
+        L: LODESTONE
+
+  scribing_table:
+    display-name: "筆記台"
+    recipe:
+      method: workbench
+      type: shaped
+      shape:
+        - LGL
+        - " B "
+        - " B "
+      ingredients:
+        L: LAPIS_LAZULI
+        G: custom:source_gem
+        B: BOOKSHELF
+
+  waystone:
+    display-name: "ウェイストーン"
+    recipe:
+      method: ritual
+      core-item: LODESTONE
+      pedestal-items:
+        - ENDER_EYE x2
+        - custom:source_gem x2
+        - CHORUS_FLOWER x2
+        - DIAMOND_BLOCK x2
+      source: 1000
+
+  source_berry:
+    display-name: "ソースベリー"
+    material: GLOW_BERRIES
+    recipe:
+      method: inventory
+      type: shapeless
+      ingredients:
+        - GLOW_BERRIES
+        - AMETHYST_SHARD

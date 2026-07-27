@@ -7,17 +7,22 @@
 # perk の所持判定は TrinityForge 統合アドオンの
 # PlayerData.heldPerks() のエントリと一致するかで行う。
 #
+# ■ Source of truth (SoT)
+# glyph → perk 対応の正本は TrinityForge の
+#   skilltree/dedicated-effects.yml（channel: glyph-gate）である。
+# 本ファイルの glyph-perks は空を維持し、ランタイムでは
+# TrinityForgeBridge.tfGlyphGatePerks()（skilltree 由来）と union(OR) 判定する。
+# サーバー運用で fork 側だけ一時的に上書きしたい場合のみ、ここへ追記する。
+#
 # 書式:
 #   glyph-perks:
 #     <glyph-key>: "<必要な perk ID>"
 #
-# - <glyph-key> は glyph の NamespacedKey のキー部分（例: fireball, heal）。
+# - <glyph-key> は glyph の NamespacedKey のキー部分（glyphs.yml のキー。例: scorch, heal）。
+# - perk ID は TF の PerkNaming 形式 <compact>_perk_<node>（例 arsmagic_perk_b_1_1）。
 # - 未定義の glyph はゲート無し（自由に使用可）。
-# - このマップが空 = 全 glyph 自由使用。
+# - このマップが空 = yml 側ゲート無し（TF skilltree 側の定義は引き続き有効）。
 # - TrinityForge 未ロード時は安全側（ゲート無効=使用可）に倒す。
 # ============================================================
 
-glyph-perks:
-  # 例（コメントアウト中。必要に応じて有効化する）:
-  # fireball: "perk.fire_mage"
-  # heal: "perk.cleric"
+glyph-perks: {}

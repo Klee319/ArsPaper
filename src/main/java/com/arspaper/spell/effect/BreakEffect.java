@@ -24,6 +24,7 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -182,10 +183,12 @@ public class BreakEffect implements SpellEffect {
     /** シャベル適正判定用の仮想ツール（掘削モード） */
     private static final ItemStack SHOVEL_CHECK = new ItemStack(Material.WOODEN_SHOVEL);
 
+    private final JavaPlugin plugin;
     private final NamespacedKey id;
     private final GlyphConfig config;
 
     public BreakEffect(JavaPlugin plugin, GlyphConfig config) {
+        this.plugin = plugin;
         this.id = new NamespacedKey(plugin, "break");
         this.config = config;
     }
@@ -239,8 +242,17 @@ public class BreakEffect implements SpellEffect {
      * 通常破壊モードと掘削モードの両方から呼ばれる。
      */
     private void breakBlock(Block block, Player caster, SpellContext context, Location blockLocation) {
-        BlockBreakEvent breakEvent = new BlockBreakEvent(block, caster);
-        Bukkit.getPluginManager().callEvent(breakEvent);
+        // 保護プラグイン互換 + TF連携: 合成イベントであることをmetadataでマークし、TF側の採取ギミック
+        // (VeinMining/TreeFelling/FarmingHarvest等)が誤発動しないようにする(callEvent直前にセットし、
+        // finallyで必ず除去する — SpellBreakMarker参照)。
+        BlockBreakEvent breakEvent;
+        block.setMetadata(SpellBreakMarker.METADATA_KEY, new FixedMetadataValue(plugin, true));
+        try {
+            breakEvent = new BlockBreakEvent(block, caster);
+            Bukkit.getPluginManager().callEvent(breakEvent);
+        } finally {
+            block.removeMetadata(SpellBreakMarker.METADATA_KEY, plugin);
+        }
         if (breakEvent.isCancelled()) return;
 
         // 掘削モードはシャベル、通常モードはピッケル
@@ -258,35 +270,44 @@ public class BreakEffect implements SpellEffect {
 
         Location dropLoc = blockLocation.clone().add(0.5, 0.5, 0.5);
         BlockState state = block.getState();
+        // TFが setDropItems(false) した(=ドロップ処理をTF自身が引き受ける意図)場合、この自前ドロップ処理
+        // を丸ごと抑止する。ブロックの除去(setType(AIR))自体は従来どおり行う(2026-07-26 二重ドロップ修正)。
+        boolean dropItems = breakEvent.isDropItems();
 
         // コンテナブロック（チェスト、樽等）: 中身をドロップしてからブロック自体も破壊
         // シュルカーボックスはドロップアイテム自体に中身を保持するためスキップ
         if (!isShulkerBox(blockType) && state instanceof Container container) {
-            // ルートテーブル（トレジャーチェスト等）が未生成の場合、先に中身を生成
-            if (container instanceof org.bukkit.loot.Lootable lootable
-                    && lootable.getLootTable() != null) {
-                org.bukkit.loot.LootTable lootTable = lootable.getLootTable();
-                long seed = lootable.getSeed();
-                org.bukkit.loot.LootContext ctx = new org.bukkit.loot.LootContext.Builder(blockLocation)
-                    .killer(caster)
-                    .build();
-                lootTable.fillInventory(container.getInventory(),
-                    new java.util.Random(seed != 0 ? seed : System.nanoTime()), ctx);
-                lootable.setLootTable(null);
-                container.update();
-            }
+            if (dropItems) {
+                // ルートテーブル（トレジャーチェスト等）が未生成の場合、先に中身を生成
+                if (container instanceof org.bukkit.loot.Lootable lootable
+                        && lootable.getLootTable() != null) {
+                    org.bukkit.loot.LootTable lootTable = lootable.getLootTable();
+                    long seed = lootable.getSeed();
+                    org.bukkit.loot.LootContext ctx = new org.bukkit.loot.LootContext.Builder(blockLocation)
+                        .killer(caster)
+                        .build();
+                    lootTable.fillInventory(container.getInventory(),
+                        new java.util.Random(seed != 0 ? seed : System.nanoTime()), ctx);
+                    lootable.setLootTable(null);
+                    container.update();
+                }
 
-            for (ItemStack item : container.getInventory().getContents()) {
-                if (item != null && !item.getType().isAir()) {
-                    block.getWorld().dropItemNaturally(dropLoc, item);
+                for (ItemStack item : container.getInventory().getContents()) {
+                    if (item != null && !item.getType().isAir()) {
+                        block.getWorld().dropItemNaturally(dropLoc, item);
+                    }
                 }
             }
             container.getInventory().clear();
-            // ブロック自体も破壊してドロップ（バニラと同じ挙動）
-            Collection<ItemStack> drops = block.getDrops(tool);
-            block.setType(Material.AIR);
-            for (ItemStack drop : drops) {
-                block.getWorld().dropItemNaturally(dropLoc, drop);
+            if (dropItems) {
+                // ブロック自体も破壊してドロップ（バニラと同じ挙動）
+                Collection<ItemStack> drops = block.getDrops(tool);
+                block.setType(Material.AIR);
+                for (ItemStack drop : drops) {
+                    block.getWorld().dropItemNaturally(dropLoc, drop);
+                }
+            } else {
+                block.setType(Material.AIR);
             }
         }
 
@@ -294,20 +315,26 @@ public class BreakEffect implements SpellEffect {
         // BlockStateMetaでデータを保持したままドロップ
         else if (state instanceof TileState tileState
                 && !tileState.getPersistentDataContainer().getKeys().isEmpty()) {
-            ItemStack drop = new ItemStack(blockType);
-            if (drop.getItemMeta() instanceof org.bukkit.inventory.meta.BlockStateMeta bsm) {
-                bsm.setBlockState(block.getState());
-                drop.setItemMeta(bsm);
+            if (dropItems) {
+                ItemStack drop = new ItemStack(blockType);
+                if (drop.getItemMeta() instanceof org.bukkit.inventory.meta.BlockStateMeta bsm) {
+                    bsm.setBlockState(block.getState());
+                    drop.setItemMeta(bsm);
+                }
+                block.setType(Material.AIR);
+                block.getWorld().dropItemNaturally(dropLoc, drop);
+            } else {
+                block.setType(Material.AIR);
             }
-            block.setType(Material.AIR);
-            block.getWorld().dropItemNaturally(dropLoc, drop);
-        } else {
+        } else if (dropItems) {
             // 通常ブロック: バニラドロップ
             Collection<ItemStack> drops = block.getDrops(tool);
             block.setType(Material.AIR);
             for (ItemStack drop : drops) {
                 block.getWorld().dropItemNaturally(dropLoc, drop);
             }
+        } else {
+            block.setType(Material.AIR);
         }
     }
 

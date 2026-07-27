@@ -428,12 +428,15 @@ public class CustomBlockListener implements Listener {
             // ホッパーは1個ずつ移動するためそのまま消費してバッファに追加
             sourcelink.addToBuffer(destState.getBlock(), sourceValue);
             event.setCancelled(true);
-            // ホッパー側のアイテムを1個減らす（次tickで反映）
-            Material itemType = item.getType();
+            // ホッパー側のアイテムを1個減らす（次tickで反映）— Material だけでなく custom id も一致させる
+            final ItemStack consumed = item.clone();
+            consumed.setAmount(1);
             org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+                var want = com.arspaper.item.ItemCostRef.fromStack(consumed);
+                if (want.isEmpty()) return;
                 for (int i = 0; i < event.getSource().getSize(); i++) {
                     ItemStack slot = event.getSource().getItem(i);
-                    if (slot != null && slot.getType() == itemType) {
+                    if (slot != null && want.get().matches(slot)) {
                         slot.setAmount(slot.getAmount() - 1);
                         break;
                     }

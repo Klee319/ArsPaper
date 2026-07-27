@@ -35,14 +35,12 @@ public final class ArsCommand {
                     .requires(src -> src.getSender().hasPermission("arspaper.admin"))
                     .then(Commands.argument("itemId", StringArgumentType.word())
                         .suggests((ctx, builder) -> {
-                            plugin.getItemRegistry().getAll().forEach(item ->
-                                builder.suggest(item.getItemId())
-                            );
-                            for (String eid : new String[]{"mana_regen", "mana_boost", "share", "soulbound"}) {
-                                for (int lv = 1; lv <= 3; lv++) {
-                                    builder.suggest("enchant_book." + eid + "." + lv);
+                            plugin.getItemRegistry().getAll().forEach(item -> {
+                                String id = item.getItemId();
+                                if (ArsGiveAllowlist.isAllowed(id)) {
+                                    builder.suggest(id);
                                 }
-                            }
+                            });
                             return builder.buildFuture();
                         })
                         // /ars give <itemId> (自分に1個)
@@ -53,7 +51,13 @@ public final class ArsCommand {
                                 return 0;
                             }
                             String itemId = StringArgumentType.getString(ctx, "itemId");
-                            if (itemId.startsWith("enchant_book.")) return GiveCommands.executeGiveEnchantBook(player, itemId);
+                            if (!ArsGiveAllowlist.isAllowed(itemId)) {
+                                ctx.getSource().getSender().sendMessage(Component.text(
+                                    "このアイテムは /ars give では取得できません。"
+                                        + "魔導書・素材等は /tf give <id> を使ってください。",
+                                    NamedTextColor.RED));
+                                return 0;
+                            }
                             return GiveCommands.executeGive(plugin, player, itemId, 1);
                         })
                         // /ars give <itemId> <count>
@@ -66,7 +70,13 @@ public final class ArsCommand {
                                 }
                                 String itemId = StringArgumentType.getString(ctx, "itemId");
                                 int count = IntegerArgumentType.getInteger(ctx, "count");
-                                if (itemId.startsWith("enchant_book.")) return GiveCommands.executeGiveEnchantBook(player, itemId);
+                                if (!ArsGiveAllowlist.isAllowed(itemId)) {
+                                    ctx.getSource().getSender().sendMessage(Component.text(
+                                        "このアイテムは /ars give では取得できません。"
+                                            + "魔導書・素材等は /tf give <id> を使ってください。",
+                                        NamedTextColor.RED));
+                                    return 0;
+                                }
                                 return GiveCommands.executeGive(plugin, player, itemId, count);
                             })
                             // /ars give <itemId> <count> <player>
@@ -87,7 +97,13 @@ public final class ArsCommand {
                                             Component.text("プレイヤーが見つかりません: " + targetName, NamedTextColor.RED));
                                         return 0;
                                     }
-                                    if (itemId.startsWith("enchant_book.")) return GiveCommands.executeGiveEnchantBook(target, itemId);
+                                    if (!ArsGiveAllowlist.isAllowed(itemId)) {
+                                        ctx.getSource().getSender().sendMessage(Component.text(
+                                            "このアイテムは /ars give では取得できません。"
+                                                + "魔導書・素材等は /tf give <id> を使ってください。",
+                                            NamedTextColor.RED));
+                                        return 0;
+                                    }
                                     return GiveCommands.executeGive(plugin, target, itemId, count);
                                 })
                             )
@@ -119,6 +135,16 @@ public final class ArsCommand {
                         if (!(ctx.getSource().getSender() instanceof Player player)) return 0;
                         return StatusCommands.executeDebug(plugin, player);
                     })
+                    .then(Commands.literal("on")
+                        .executes(ctx -> {
+                            if (!(ctx.getSource().getSender() instanceof Player player)) return 0;
+                            return StatusCommands.executeDebug(plugin, player, true);
+                        }))
+                    .then(Commands.literal("off")
+                        .executes(ctx -> {
+                            if (!(ctx.getSource().getSender() instanceof Player player)) return 0;
+                            return StatusCommands.executeDebug(plugin, player, false);
+                        }))
                 )
                 .then(Commands.literal("fixmana")
                     .requires(src -> src.getSender().hasPermission("arspaper.admin"))

@@ -18,10 +18,15 @@ import java.util.logging.Level;
  * 全YMLファイルからレシピを統合読み込みするローダー。
  *
  * 読み込み元:
- *   - items.yml     → items: (workbench/ritual) + ritual_effects: (world effects)
- *   - materials.yml → materials: (ritual recipes)
- *   - threads.yml   → threads: (ritual recipes, effect-type: thread)
- *   - armors.yml    → armor_sets: (workbench recipes は ArmorConfigManager 経由)
+ *   - functional-items.yml → items: の各エントリ内 recipe: (workbench/ritual)。機能アイテム
+ *     (ワンド/コンパス/儀式ブロック等)のレシピはここに統一済み(2026-07-25 catalog.yml/items.yml統合)。
+ *   - items.yml       → items: (workbench/ritual) + ritual_effects: (world effects)
+ *   - materials.yml   → materials: (workbench or ritual recipes)
+ *   - threads.yml     → threads: (ritual recipes, effect-type: thread)
+ *   - sourcejars.yml  → jars.*.recipe
+ *   - sourcelinks.yml → items.*.recipe
+ *   - spellbooks.yml  → spell-books[].recipe
+ *   - 防具は TrinityForge の item-catalog レシピ機構が担うため、ここでは扱わない。
  *
  * RecipeManager（作業台）と RitualRecipeRegistry（儀式）にレシピを配布する。
  */
@@ -46,12 +51,45 @@ public class UnifiedRecipeLoader {
         workbenchRecipes.clear();
         ritualRecipes.clear();
 
+        loadFunctionalItemsYml();
         loadItemsYml();
         loadMaterialsYml();
         loadThreadsYml();
+        loadSourceJarsYml();
+        loadSourceLinksYml();
+        loadSpellbooksYml();
 
         plugin.getLogger().info("UnifiedRecipeLoader: " + workbenchRecipes.size()
             + " workbench + " + ritualRecipes.size() + " ritual recipes loaded");
+    }
+
+    // ============================
+    // functional-items.yml
+    // ============================
+    /**
+     * functional-items.yml の items.&lt;id&gt;.recipe を読み込む。表示名/lore/enchant-glow/material の
+     * 上書きは {@link com.arspaper.item.FunctionalItemConfig} が別途扱うため、ここではrecipeのみ見る
+     * (同じファイルを2つのローダーがそれぞれの関心事だけ読む — items.ymlの構造をそのまま踏襲)。
+     */
+    private void loadFunctionalItemsYml() {
+        YamlConfiguration config = loadYml("functional-items.yml");
+        if (config == null) return;
+
+        ConfigurationSection items = config.getConfigurationSection("items");
+        if (items == null) return;
+
+        for (String id : items.getKeys(false)) {
+            ConfigurationSection itemSection = items.getConfigurationSection(id);
+            if (itemSection == null) continue;
+            ConfigurationSection recipeSection = itemSection.getConfigurationSection("recipe");
+            if (recipeSection == null) continue;
+
+            try {
+                loadItemRecipe(id, recipeSection, itemSection);
+            } catch (Exception e) {
+                plugin.getLogger().log(Level.WARNING, "Failed to load functional item recipe: " + id, e);
+            }
+        }
     }
 
     // ============================
@@ -72,8 +110,8 @@ public class UnifiedRecipeLoader {
 
                 try {
                     String method = recipeSection.getString("method", "workbench");
-                    if ("workbench".equalsIgnoreCase(method)) {
-                        loadWorkbenchFromSection(id, recipeSection, itemSection);
+                    if ("workbench".equalsIgnoreCase(method) || "inventory".equalsIgnoreCase(method)) {
+                        loadWorkbenchFromSection(id, recipeSection, itemSection, method.toLowerCase());
                     } else if ("ritual".equalsIgnoreCase(method)) {
                         loadRitualFromSection(id, recipeSection, itemSection);
                     }
@@ -116,14 +154,15 @@ public class UnifiedRecipeLoader {
             if (recipeSection == null) continue;
 
             try {
-                String name = matSection.getString("display_name", id) + "精製";
-                RitualIngredient coreItem = parseSingleIngredient(recipeSection.getString("core-item", null));
-                List<RitualIngredient> pedestalItems = parsePedestalItems(recipeSection.getStringList("pedestal-items"));
-                int source = recipeSection.getInt("source", 0);
-
-                ritualRecipes.add(new RitualRecipe(
-                    id, name, coreItem, pedestalItems, source,
-                    id, null, "craft", Map.of()));
+                String method = resolveMaterialRecipeMethod(recipeSection);
+                if (method == null) continue;
+                if ("workbench".equals(method) || "inventory".equals(method)) {
+                    loadWorkbenchFromSection(id, recipeSection, matSection, method);
+                } else if ("ritual".equals(method)) {
+                    loadMaterialRitualFromSection(id, recipeSection, matSection);
+                } else {
+                    plugin.getLogger().warning("Unknown material recipe method for " + id + ": " + method);
+                }
             } catch (Exception e) {
                 plugin.getLogger().log(Level.WARNING, "Failed to load material recipe: " + id, e);
             }
@@ -171,10 +210,136 @@ public class UnifiedRecipeLoader {
     }
 
     // ============================
+    // sourcejars.yml
+    // ============================
+    private void loadSourceJarsYml() {
+        YamlConfiguration config = loadYml("sourcejars.yml");
+        if (config == null) return;
+        ConfigurationSection jars = config.getConfigurationSection("jars");
+        if (jars == null) return;
+        for (String id : jars.getKeys(false)) {
+            ConfigurationSection jarSection = jars.getConfigurationSection(id);
+            if (jarSection == null) continue;
+            ConfigurationSection recipeSection = jarSection.getConfigurationSection("recipe");
+            if (recipeSection == null) continue;
+            try {
+                loadItemRecipe(id, recipeSection, jarSection);
+            } catch (Exception e) {
+                plugin.getLogger().log(Level.WARNING, "Failed to load sourcejar recipe: " + id, e);
+            }
+        }
+    }
+
+    // ============================
+    // sourcelinks.yml
+    // ============================
+    private void loadSourceLinksYml() {
+        YamlConfiguration config = loadYml("sourcelinks.yml");
+        if (config == null) return;
+        ConfigurationSection items = config.getConfigurationSection("items");
+        if (items == null) return;
+        for (String id : items.getKeys(false)) {
+            ConfigurationSection itemSection = items.getConfigurationSection(id);
+            if (itemSection == null) continue;
+            ConfigurationSection recipeSection = itemSection.getConfigurationSection("recipe");
+            if (recipeSection == null) continue;
+            try {
+                loadItemRecipe(id, recipeSection, itemSection);
+            } catch (Exception e) {
+                plugin.getLogger().log(Level.WARNING, "Failed to load sourcelink recipe: " + id, e);
+            }
+        }
+    }
+
+    // ============================
+    // spellbooks.yml
+    // ============================
+    private void loadSpellbooksYml() {
+        YamlConfiguration config = loadYml("spellbooks.yml");
+        if (config == null) return;
+        List<?> books = config.getList("spell-books");
+        if (books == null) return;
+        for (Object raw : books) {
+            if (!(raw instanceof Map<?, ?> map)) continue;
+            Object idObj = map.get("id");
+            if (!(idObj instanceof String id) || id.isBlank()) continue;
+            Object recipeObj = map.get("recipe");
+            if (!(recipeObj instanceof Map<?, ?>)) continue;
+            // Map → 一時 YamlConfiguration 経由で ConfigurationSection 化
+            YamlConfiguration wrap = new YamlConfiguration();
+            wrap.createSection("root", castStringKeyMap(map));
+            ConfigurationSection bookSection = wrap.getConfigurationSection("root");
+            if (bookSection == null) continue;
+            ConfigurationSection recipeSection = bookSection.getConfigurationSection("recipe");
+            if (recipeSection == null) continue;
+            try {
+                loadItemRecipe(id, recipeSection, bookSection);
+            } catch (Exception e) {
+                plugin.getLogger().log(Level.WARNING, "Failed to load spellbook recipe: " + id, e);
+            }
+        }
+    }
+
+    /** items.yml / jars / sourcelinks / spellbooks 共通の recipe 振り分け。 */
+    private void loadItemRecipe(String id, ConfigurationSection recipeSection,
+                                ConfigurationSection itemSection) {
+        String method = recipeSection.getString("method", "workbench");
+        if ("workbench".equalsIgnoreCase(method) || "inventory".equalsIgnoreCase(method)) {
+            loadWorkbenchFromSection(id, recipeSection, itemSection, method.toLowerCase());
+        } else if ("ritual".equalsIgnoreCase(method)) {
+            loadRitualFromSection(id, recipeSection, itemSection);
+        } else {
+            plugin.getLogger().warning("Unsupported recipe method for " + id + ": " + method);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> castStringKeyMap(Map<?, ?> map) {
+        Map<String, Object> out = new HashMap<>();
+        for (Map.Entry<?, ?> e : map.entrySet()) {
+            if (e.getKey() == null) continue;
+            out.put(String.valueOf(e.getKey()), e.getValue());
+        }
+        return out;
+    }
+
+    /**
+     * materials.yml の recipe.method を解決する。
+     * method 未指定時: core-item/pedestal-items があれば ritual、
+     * shape/ingredients/type があれば workbench、どちらもなければ null (スキップ)。
+     */
+    private String resolveMaterialRecipeMethod(ConfigurationSection recipeSection) {
+        String method = recipeSection.getString("method", null);
+        if (method != null && !method.isEmpty()) {
+            return method.toLowerCase();
+        }
+        if (recipeSection.contains("core-item") || recipeSection.contains("pedestal-items")) {
+            return "ritual";
+        }
+        if (recipeSection.contains("shape") || recipeSection.contains("ingredients")
+            || recipeSection.contains("type")) {
+            return "workbench";
+        }
+        return null;
+    }
+
+    private void loadMaterialRitualFromSection(String id, ConfigurationSection recipeSection,
+                                                ConfigurationSection matSection) {
+        String name = matSection.getString("display_name", id) + "精製";
+        RitualIngredient coreItem = parseSingleIngredient(recipeSection.getString("core-item", null));
+        List<RitualIngredient> pedestalItems = parsePedestalItems(recipeSection.getStringList("pedestal-items"));
+        int source = recipeSection.getInt("source", 0);
+
+        ritualRecipes.add(new RitualRecipe(
+            id, name, coreItem, pedestalItems, source,
+            id, null, "craft", Map.of()));
+    }
+
+    // ============================
     // Workbench recipe parser
     // ============================
     private void loadWorkbenchFromSection(String id, ConfigurationSection recipeSection,
-                                           ConfigurationSection itemSection) {
+                                           ConfigurationSection itemSection, String method) {
         String type = recipeSection.getString("type", "shaped");
         String result = "custom:" + id;
         // items.yml側でresult指定があればそれを使う
@@ -189,9 +354,18 @@ public class UnifiedRecipeLoader {
             for (String key : ingSection.getKeys(false)) {
                 ingredients.put(key, ingSection.getString(key));
             }
+        } else if (recipeSection.isList("ingredients")) {
+            // カタログUIの shapeless 配列形式 (Material名のリスト)
+            List<String> list = recipeSection.getStringList("ingredients");
+            for (int i = 0; i < list.size() && i < 9; i++) {
+                String mat = list.get(i);
+                if (mat == null || mat.isBlank()) continue;
+                ingredients.put(String.valueOf((char) ('A' + i)), mat.trim());
+            }
         }
+        boolean reversible = recipeSection.getBoolean("reversible", false);
 
-        workbenchRecipes.add(new WorkbenchRecipeData(id, type, result, amount, shape, ingredients));
+        workbenchRecipes.add(new WorkbenchRecipeData(id, type, result, amount, shape, ingredients, method, reversible));
     }
 
     // ============================
@@ -305,7 +479,18 @@ public class UnifiedRecipeLoader {
         ConfigurationSection paramsSection = section.getConfigurationSection("effect-params");
         if (paramsSection != null) {
             for (String key : paramsSection.getKeys(false)) {
-                params.put(key, paramsSection.getString(key, ""));
+                // list 値（entities 等）はカンマ結合して String Map に載せる
+                List<String> asList = paramsSection.getStringList(key);
+                if (asList != null && !asList.isEmpty()) {
+                    params.put(key, String.join(",", asList));
+                    continue;
+                }
+                Object raw = paramsSection.get(key);
+                if (raw == null) {
+                    params.put(key, "");
+                } else {
+                    params.put(key, String.valueOf(raw));
+                }
             }
         }
         return params;
@@ -321,7 +506,7 @@ public class UnifiedRecipeLoader {
             var itemOpt = com.arspaper.ArsPaper.getInstance().getItemRegistry().get(customId);
             if (itemOpt.isPresent()) {
                 String displayName = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
-                    .plainText().serialize(itemOpt.get().getDisplayName());
+                    .plainText().serialize(itemOpt.get().resolveDisplayName());
                 return displayName;
             }
         }
@@ -349,6 +534,10 @@ public class UnifiedRecipeLoader {
 
     /**
      * 作業台レシピのデータ。RecipeManagerが消費する。
+     *
+     * @param method     "workbench"(作業台専用, 3×3上限) または "inventory"(2×2クラフト対応, 2×2上限)。
+     * @param reversible true の場合、RecipeManagerが逆レシピ(このエントリ1個→元の素材N個)を自動登録する。
+     *                   素材が全同一でない場合はRecipeManager側で黙ってスキップされる(fail-soft)。
      */
     public record WorkbenchRecipeData(
         String id,
@@ -356,6 +545,8 @@ public class UnifiedRecipeLoader {
         String result,
         int amount,
         List<String> shape,
-        Map<String, String> ingredients
+        Map<String, String> ingredients,
+        String method,
+        boolean reversible
     ) {}
 }

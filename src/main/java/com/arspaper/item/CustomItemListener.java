@@ -1,22 +1,35 @@
 package com.arspaper.item;
 
+import com.arspaper.ArsPaper;
+import com.arspaper.integration.TrinityForgeBridge;
+import com.arspaper.item.impl.ConfigurableMaterial;
 import com.arspaper.item.impl.SpellBook;
 import com.arspaper.util.PdcHelper;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.inventory.BrewingStandFuelEvent;
 import org.bukkit.event.inventory.CraftItemEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.inventory.PrepareAnvilEvent;
+import org.bukkit.event.inventory.PrepareGrindstoneEvent;
 import org.bukkit.event.inventory.PrepareItemCraftEvent;
 import org.bukkit.event.inventory.PrepareSmithingEvent;
+import io.papermc.paper.event.entity.EntityCompostItemEvent;
+import io.papermc.paper.event.block.CompostItemEvent;
+import org.bukkit.event.inventory.FurnaceBurnEvent;
+import org.bukkit.event.inventory.InventoryMoveItemEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.inventory.MerchantInventory;
+import org.bukkit.inventory.Recipe;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ArmorMeta;
@@ -102,7 +115,9 @@ public class CustomItemListener implements Listener {
 
         int tier = droppedItem.getItemMeta().getPersistentDataContainer()
             .getOrDefault(ItemKeys.BOOK_TIER, PersistentDataType.INTEGER, 1);
-        int maxSlots = SpellBookTier.fromTier(tier).getMaxSlots();
+        // 要件⑥ glyph-slot-plus: SpellBook#switchSlotと対称にperk加算分を反映する(fail-open)。
+        int maxSlots = ArsPaper.getInstance().getSpellBookConfig().byTier(tier).getMaxSlots()
+            + TrinityForgeBridge.tfGlyphSlotBonus(player);
         int current = droppedItem.getItemMeta().getPersistentDataContainer()
             .getOrDefault(ItemKeys.SPELL_SLOT, PersistentDataType.INTEGER, 0);
 
@@ -130,10 +145,8 @@ public class CustomItemListener implements Listener {
     @EventHandler
     public void onCraftItem(CraftItemEvent event) {
         // プラグイン登録レシピはカスタム素材を意図的に使用するので許可
-        if (event.getRecipe() instanceof org.bukkit.Keyed keyed) {
-            if ("arspaper".equals(keyed.getKey().getNamespace())) {
-                return;
-            }
+        if (isPluginRecipe(event.getRecipe())) {
+            return;
         }
         // カスタム革防具の染色は許可
         if (isDyeingCustomArmor(event.getInventory().getMatrix())) {
@@ -154,6 +167,17 @@ public class CustomItemListener implements Listener {
     @EventHandler
     public void onPrepareCraft(PrepareItemCraftEvent event) {
         ItemStack[] matrix = event.getInventory().getMatrix();
+
+        // バニラ/外部レシピが materials.yml 素材を消費しないようプレビューを空にする
+        if (event.getRecipe() != null && !isPluginRecipe(event.getRecipe())) {
+            for (ItemStack item : matrix) {
+                if (isConfigurableMaterial(item)) {
+                    event.getInventory().setResult(null);
+                    return;
+                }
+            }
+        }
+
         if (!isDyeingCustomArmor(matrix)) return;
 
         ItemStack vanillaResult = event.getInventory().getResult();
@@ -177,6 +201,98 @@ public class CustomItemListener implements Listener {
             result.editMeta(LeatherArmorMeta.class, meta -> meta.setColor(newColor));
         }
         event.getInventory().setResult(result);
+    }
+
+    /**
+     * 砥石: materials.yml 素材はバニラ消費（エンチャ除去等）を禁止する。
+     * TrinityForge 装備の PDC 保全は {@code GrindstonePreserveListener} 側で行う。
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onPrepareGrindstone(PrepareGrindstoneEvent event) {
+        ItemStack upper = event.getInventory().getItem(0);
+        ItemStack lower = event.getInventory().getItem(1);
+        if (isConfigurableMaterial(upper) || isConfigurableMaterial(lower)) {
+            event.setResult(null);
+        }
+    }
+
+    /**
+     * かまど系の燃料スロットに materials.yml 素材を入れさせない。
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onFurnaceBurn(FurnaceBurnEvent event) {
+        if (isConfigurableMaterial(event.getFuel())) {
+            event.setCancelled(true);
+        }
+    }
+
+    /**
+     * コンポスターに materials.yml 素材を投入させない（プレイヤー/村人等）。
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onEntityCompost(EntityCompostItemEvent event) {
+        if (isConfigurableMaterial(event.getItem())) {
+            event.setCancelled(true);
+        }
+    }
+
+    /**
+     * ホッパー経由のコンポスター投入も禁止（CompostItemEvent 自体は非キャンセル可能）。
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onHopperCompost(CompostItemEvent event) {
+        if (isConfigurableMaterial(event.getItem())) {
+            event.setWillRaiseLevel(false);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onHopperToComposter(InventoryMoveItemEvent event) {
+        if (event.getDestination().getType() != InventoryType.COMPOSTER) {
+            return;
+        }
+        if (isConfigurableMaterial(event.getItem())) {
+            event.setCancelled(true);
+        }
+    }
+
+    /**
+     * 食べ物ベースの materials.yml 素材の直接消費を禁止する。
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onConsumeMaterial(PlayerItemConsumeEvent event) {
+        ItemStack item = event.getItem();
+        if (isConfigurableMaterial(item) && isMaterialEdibleBase(item)) {
+            event.setCancelled(true);
+        }
+    }
+
+    /**
+     * 醸造台の燃料に materials.yml 素材を使わせない。
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onBrewingFuel(BrewingStandFuelEvent event) {
+        if (isConfigurableMaterial(event.getFuel())) {
+            event.setCancelled(true);
+        }
+    }
+
+    /**
+     * かまど/醸造台インベントリへ materials.yml 素材を置かせない。
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onVanillaMachineClick(InventoryClickEvent event) {
+        InventoryType type = event.getInventory().getType();
+        if (type != InventoryType.FURNACE
+                && type != InventoryType.BLAST_FURNACE
+                && type != InventoryType.SMOKER
+                && type != InventoryType.BREWING) {
+            return;
+        }
+        if (isConfigurableMaterial(event.getCursor())
+                || isConfigurableMaterial(event.getCurrentItem())) {
+            event.setCancelled(true);
+        }
     }
 
     /**
@@ -336,6 +452,50 @@ public class CustomItemListener implements Listener {
     private static boolean isLeatherArmor(Material mat) {
         return mat == Material.LEATHER_HELMET || mat == Material.LEATHER_CHESTPLATE
             || mat == Material.LEATHER_LEGGINGS || mat == Material.LEATHER_BOOTS;
+    }
+
+    /** arspaper / trinityforge 名前空間のプラグインレシピか。 */
+    private static boolean isPluginRecipe(Recipe recipe) {
+        if (!(recipe instanceof org.bukkit.Keyed keyed)) {
+            return false;
+        }
+        String ns = keyed.getKey().getNamespace();
+        return "arspaper".equals(ns) || "trinityforge".equals(ns);
+    }
+
+    /**
+     * materials.yml 由来の ConfigurableMaterial か。
+     * registry の型判定を優先し、未登録 id は MaterialConfigManager でフォールバックする。
+     */
+    private boolean isConfigurableMaterial(ItemStack item) {
+        if (item == null || item.getType().isAir()) {
+            return false;
+        }
+        Optional<String> customId = PdcHelper.getCustomItemId(item);
+        if (customId.isEmpty()) {
+            return false;
+        }
+        Optional<BaseCustomItem> customItem = registry.get(customId.get());
+        if (customItem.isPresent()) {
+            return customItem.get() instanceof ConfigurableMaterial;
+        }
+        return ArsPaper.getInstance().getMaterialConfigManager().get(customId.get()).isPresent();
+    }
+
+    /** materials.yml 素材の base_material が食べ物か。 */
+    private boolean isMaterialEdibleBase(ItemStack item) {
+        Optional<String> customId = PdcHelper.getCustomItemId(item);
+        if (customId.isEmpty()) {
+            return false;
+        }
+        return ArsPaper.getInstance().getMaterialConfigManager().get(customId.get())
+            .map(cfg -> cfg.baseMaterial().isEdible())
+            .orElseGet(() -> {
+                Optional<BaseCustomItem> customItem = registry.get(customId.get());
+                return customItem.filter(ConfigurableMaterial.class::isInstance)
+                    .map(ci -> ((ConfigurableMaterial) ci).getBaseMaterial().isEdible())
+                    .orElse(false);
+            });
     }
 
 }

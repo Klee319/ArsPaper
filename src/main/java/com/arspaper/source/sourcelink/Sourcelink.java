@@ -1,16 +1,26 @@
 package com.arspaper.source.sourcelink;
 
+import com.arspaper.ArsPaper;
 import com.arspaper.block.BlockKeys;
 import com.arspaper.block.CustomBlock;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.SoundCategory;
 import org.bukkit.block.Block;
 import org.bukkit.block.TileState;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 
 /**
  * Sourcelink（Source生成装置）の抽象基底クラス。
@@ -33,7 +43,8 @@ public abstract class Sourcelink extends CustomBlock {
 
     /**
      * アイテムがカスタムアイテム（PDC付き）かどうかを判定する。
-     * カスタムアイテムはソースリンクの燃料として使用不可。
+     * 溶岩バケツ返却などバニラ専用副作用のガードに使う。
+     * 燃料判定自体は {@link com.arspaper.item.ItemCostTable} 側で custom id も許可する。
      */
     protected static boolean isCustomItem(org.bukkit.inventory.ItemStack item) {
         if (item == null || !item.hasItemMeta()) return false;
@@ -144,5 +155,49 @@ public abstract class Sourcelink extends CustomBlock {
             Particle.WITCH, center, 4, 0.15, 0.2, 0.15, 0.02);
         jarLoc.getWorld().playSound(center,
             Sound.BLOCK_AMETHYST_BLOCK_CHIME, SoundCategory.BLOCKS, 0.4f, 1.4f);
+    }
+
+    /** sourcelinks.yml {@code items.<id>} — 未定義なら empty。 */
+    protected Optional<SourcelinkConfig.ItemDef> itemDef() {
+        ArsPaper ars = ArsPaper.getInstance();
+        if (ars == null || ars.getSourcelinkConfig() == null) {
+            return Optional.empty();
+        }
+        return ars.getSourcelinkConfig().item(getItemId());
+    }
+
+    protected Material materialOr(Material fallback) {
+        return itemDef().map(SourcelinkConfig.ItemDef::material).orElse(fallback);
+    }
+
+    protected Component displayNameOr(Component fallback) {
+        Optional<SourcelinkConfig.ItemDef> def = itemDef();
+        if (def.isPresent()) {
+            return Component.text(def.get().displayName()).decoration(TextDecoration.ITALIC, false);
+        }
+        return fallback;
+    }
+
+    protected int cmdOr(int fallback) {
+        return itemDef().map(SourcelinkConfig.ItemDef::customModelData).orElse(fallback);
+    }
+
+    /**
+     * 設定 lore があればそれを、なければ {@code defaultLore} を付与する。
+     */
+    protected ItemStack withConfiguredOrDefaultLore(ItemStack item, List<Component> defaultLore) {
+        List<Component> lore;
+        Optional<SourcelinkConfig.ItemDef> def = itemDef();
+        if (def.isPresent() && !def.get().lore().isEmpty()) {
+            lore = new ArrayList<>(def.get().lore().size());
+            for (String line : def.get().lore()) {
+                lore.add(Component.text(line, NamedTextColor.GRAY)
+                        .decoration(TextDecoration.ITALIC, false));
+            }
+        } else {
+            lore = defaultLore;
+        }
+        item.editMeta(meta -> meta.lore(lore));
+        return item;
     }
 }

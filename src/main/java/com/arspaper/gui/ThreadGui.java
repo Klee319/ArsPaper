@@ -1,28 +1,33 @@
 package com.arspaper.gui;
 
 import com.arspaper.ArsPaper;
+import com.arspaper.integration.TrinityForgeBridge;
 import com.arspaper.item.*;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 防具スレッドスロット管理GUI。
- * メイジアーマー（レガシー）および設定ベース防具のスレッドスロットを管理する。
+ * 防具システム(armors.yml)は撤去済みのため、スレッド枠容量はTrinityForgeのitem-stats
+ * (canonicalキー thread_slots)から取得する。
  */
 public class ThreadGui extends BaseGui {
 
@@ -34,53 +39,49 @@ public class ThreadGui extends BaseGui {
     private final ItemStack armorItem;
     private final int threadSlotCount;
     private final String armorDisplayName;
-    private final int manaBonus;
-    private final List<String> loreTemplate;
     private final List<String> threadSlots;
 
     /**
-     * レガシーコンストラクタ（MageArmor用、後方互換）。
+     * レガシーコンストラクタ（後方互換）。
      */
     public ThreadGui(Player viewer, ItemStack armorItem) {
         this(viewer, armorItem, null);
     }
 
     /**
-     * 統合コンストラクタ。pluginがnullの場合はレガシーモードで動作。
+     * 統合コンストラクタ。pluginパラメータは既存呼び出し箇所との互換のために残しているが未使用。
      */
     public ThreadGui(Player viewer, ItemStack armorItem, JavaPlugin plugin) {
-        super(viewer, calculateGuiRows(armorItem), Component.text("スレッドスロット", NamedTextColor.DARK_PURPLE)
+        super(viewer, calculateGuiRows(armorItem, viewer), Component.text("スレッドスロット", NamedTextColor.DARK_PURPLE)
             .decoration(TextDecoration.ITALIC, false));
         this.armorItem = armorItem;
 
-        PersistentDataContainer pdc = armorItem.getItemMeta().getPersistentDataContainer();
-
-        // 設定ベース防具を優先チェック
-        String armorSetId = pdc.get(ItemKeys.ARMOR_SET_ID, PersistentDataType.STRING);
-        if (armorSetId != null) {
-            ArmorSetConfig config = ArsPaper.getInstance().getArmorConfigManager().getSetById(armorSetId);
-            if (config != null) {
-                this.threadSlotCount = config.getThreadSlots();
-                this.armorDisplayName = config.getDisplayNamePrefix();
-                this.manaBonus = config.getManaBonus();
-                this.loreTemplate = config.getLoreLines();
-            } else {
-                this.threadSlotCount = 1;
-                this.armorDisplayName = "不明";
-                this.manaBonus = 0;
-                this.loreTemplate = List.of();
-            }
-        } else {
-            // レガシーフォールバック: ArmorTier enum
-            int tierValue = pdc.getOrDefault(ItemKeys.ARMOR_TIER, PersistentDataType.INTEGER, 1);
-            ArmorTier tier = ArmorTier.fromTier(tierValue);
-            this.threadSlotCount = tier.getThreadSlots();
-            this.armorDisplayName = tier.getDisplayName();
-            this.manaBonus = tier.getManaBonus();
-            this.loreTemplate = List.of();
-        }
+        Map<String, Double> tfStats = resolveArmorItemStats(armorItem);
+        // 枠数は装備自身のitem-stats(thread_slots)だけで決まる。拡張は「スレッド枠拡張の儀式」
+        // ({@link com.arspaper.ritual.effect.ThreadSlotExpandRitualEffect})が装備のPDCを直接書き換えて
+        // 行うため、ここで装着者のperk/ステータスを見る必要はない(2026-07-26: TFステータス経由で
+        // 枠を増やす thread_slot_cap_bonus は儀式と機能が重複するため廃止)。
+        this.threadSlotCount = TrinityForgeBridge.tfEffectiveThreadSlotCap(tfStats, viewer);
+        this.armorDisplayName = resolveArmorDisplayName(armorItem);
 
         this.threadSlots = loadThreadSlots(armorItem);
+    }
+
+    /**
+     * 防具アイテムの「実際の」CustomModelDataでTF item-statsを解決する。
+     */
+    private static Map<String, Double> resolveArmorItemStats(ItemStack armorItem) {
+        return TrinityForgeBridge.resolveFullItemStats(armorItem);
+    }
+
+    /**
+     * 防具の表示名をGUI情報表示用に取得する。表示名未設定時はMaterial名にフォールバックする。
+     */
+    private static String resolveArmorDisplayName(ItemStack armorItem) {
+        if (armorItem != null && armorItem.hasItemMeta() && armorItem.getItemMeta().hasDisplayName()) {
+            return PlainTextComponentSerializer.plainText().serialize(armorItem.getItemMeta().displayName());
+        }
+        return armorItem != null ? armorItem.getType().name() : "不明";
     }
 
     @Override
@@ -262,7 +263,9 @@ public class ThreadGui extends BaseGui {
             Component.text("セット/取り外しできます", NamedTextColor.DARK_GRAY)
                 .decoration(TextDecoration.ITALIC, false)
         );
-        return createButton(armorItem.getType(), armorItem.getItemMeta().displayName(), lore);
+        // displayName() はカスタム名未設定アイテムでは null。コンストラクタで解決済みの
+        // Material名フォールバックを使い、バニラ防具でも情報ボタンを安全に生成する。
+        return createButton(armorItem.getType(), Component.text(armorDisplayName), lore);
     }
 
     private ItemStack createThreadSlotButton(int index, String threadId) {
@@ -296,16 +299,12 @@ public class ThreadGui extends BaseGui {
     /**
      * 防具のスレッドスロット数に応じてGUIの行数を決定する。
      * 5スロット以上は4行、それ以外は3行。
+     * thread-slot-expansion加算後の実効枠数で判定する（コンストラクタのthreadSlotCountと整合）。
      */
-    private static int calculateGuiRows(ItemStack armorItem) {
-        if (armorItem == null || !armorItem.hasItemMeta()) return 3;
-        PersistentDataContainer pdc = armorItem.getItemMeta().getPersistentDataContainer();
-        String armorSetId = pdc.get(ItemKeys.ARMOR_SET_ID, PersistentDataType.STRING);
-        if (armorSetId != null) {
-            ArmorSetConfig config = ArsPaper.getInstance().getArmorConfigManager().getSetById(armorSetId);
-            if (config != null && config.getThreadSlots() > 4) return 4;
-        }
-        return 3;
+    private static int calculateGuiRows(ItemStack armorItem, Player viewer) {
+        Map<String, Double> tfStats = resolveArmorItemStats(armorItem);
+        int threadSlots = TrinityForgeBridge.tfEffectiveThreadSlotCap(tfStats, viewer);
+        return threadSlots > 4 ? 4 : 3;
     }
 
     // === PDCデータ管理 ===
@@ -333,9 +332,12 @@ public class ThreadGui extends BaseGui {
     private void saveThreadSlots() {
         armorItem.editMeta(meta -> {
             PersistentDataContainer pdc = meta.getPersistentDataContainer();
+            List<Component> previousOwned = loadOwnedThreadLore(pdc);
+            List<Component> nextOwned = buildThreadLore();
+            meta.lore(ThreadLoreMerge.merge(meta.lore(), previousOwned, nextOwned));
             pdc.set(ItemKeys.THREAD_SLOTS, PersistentDataType.STRING, GSON.toJson(threadSlots));
+            pdc.set(ItemKeys.THREAD_LORE, PersistentDataType.STRING, serializeThreadLore(nextOwned));
             pdc.remove(ItemKeys.THREAD_TYPE);
-            meta.lore(buildArmorLore());
             // エンチャントオーラを明示的に保持（editMetaでオーラが消失する問題の対策）
             if (meta.hasEnchants()) {
                 meta.setEnchantmentGlintOverride(true);
@@ -343,24 +345,10 @@ public class ThreadGui extends BaseGui {
         });
     }
 
-    private List<Component> buildArmorLore() {
+    private List<Component> buildThreadLore() {
         List<Component> lore = new ArrayList<>();
-
-        // 設定ベース防具: YAMLのloreを使用
-        if (!loreTemplate.isEmpty()) {
-            for (String line : loreTemplate) {
-                lore.add(LegacyComponentSerializer.legacyAmpersand().deserialize(line)
-                    .decoration(TextDecoration.ITALIC, false));
-            }
-        } else {
-            // レガシー: ハードコードlore
-            lore.add(Component.text("セット: " + armorDisplayName, NamedTextColor.GRAY)
-                .decoration(TextDecoration.ITALIC, false));
-            lore.add(Component.text("マナボーナス: +" + manaBonus, NamedTextColor.AQUA)
-                .decoration(TextDecoration.ITALIC, false));
-            lore.add(Component.text("スレッドスロット: " + threadSlotCount, NamedTextColor.DARK_AQUA)
-                .decoration(TextDecoration.ITALIC, false));
-        }
+        lore.add(Component.text("スレッドスロット: " + threadSlotCount, NamedTextColor.DARK_AQUA)
+            .decoration(TextDecoration.ITALIC, false));
 
         // スレッド情報
         for (int i = 0; i < threadSlots.size(); i++) {
@@ -374,5 +362,29 @@ public class ThreadGui extends BaseGui {
             }
         }
         return lore;
+    }
+
+    private static List<Component> loadOwnedThreadLore(PersistentDataContainer pdc) {
+        String json = pdc.get(ItemKeys.THREAD_LORE, PersistentDataType.STRING);
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+        try {
+            List<String> serialized = GSON.fromJson(json, new TypeToken<List<String>>(){}.getType());
+            if (serialized == null) {
+                return List.of();
+            }
+            return serialized.stream()
+                .map(GsonComponentSerializer.gson()::deserialize)
+                .toList();
+        } catch (RuntimeException ignored) {
+            return List.of();
+        }
+    }
+
+    private static String serializeThreadLore(List<Component> lore) {
+        return GSON.toJson(lore.stream()
+            .map(GsonComponentSerializer.gson()::serialize)
+            .toList());
     }
 }

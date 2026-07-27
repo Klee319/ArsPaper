@@ -5,6 +5,8 @@ import com.arspaper.block.BlockKeys;
 import com.arspaper.block.impl.Pedestal;
 import com.arspaper.block.impl.RitualCore;
 import com.arspaper.block.impl.SourceJar;
+import com.arspaper.integration.TrinityForgeBridge;
+import com.arspaper.item.BaseCustomItem;
 import com.arspaper.item.ItemKeys;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -17,6 +19,7 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * 儀式の実行を管理する。
@@ -28,6 +31,11 @@ public class RitualManager {
 
     /** 台座の検索距離: コアから1ブロック空けた正方形リング (max(|x|,|z|)==2, 計16マス) */
     private static final int PEDESTAL_DISTANCE = 2;
+    /**
+     * コアアイテムを消費せず、効果側がコアの中身を変換して同じコアへ書き戻す effect-type 群。
+     * "thread"（空スレッド→型付きスレッド）に加え、"thread_slot_expand"（装備のスレッド枠+1儀式）が該当。
+     */
+    private static final Set<String> CORE_PRESERVING_EFFECT_TYPES = Set.of("thread", "thread_slot_expand");
     private final RitualRecipeRegistry recipeRegistry;
     private final RitualEffectRegistry effectRegistry;
     /** 儀式の perk 解放ゲート + 修繕儀式コスト設定の参照。 */
@@ -105,7 +113,17 @@ public class RitualManager {
             return;
         }
         int extraSource = isRepair ? unlockGate.repairExtraSourceCost() : 0;
-        int totalSourceRequired = recipe.sourceRequired() + extraSource;
+        int baseSourceRequired = recipe.sourceRequired() + extraSource;
+        // 要件⑥ source-cost-reduction: skilltree由来のstat(source_cost_reduction、装備+perk合算)で
+        // ソース消費を割合減する(2026-07-23 stat-gate-overhaul §2でdedicated-effectからstat化)。
+        // プレイヤーが特定できる儀式実行経路(このメソッドの呼び出し元)にのみ適用する。
+        // TF未ロード/未所持時はtfStatTotalが0.0を返し、reductionFrac=0で従来消費のまま(fail-open)。
+        // 2026-07-23 正準スケール分数統一によりstat値は分数[0,1](例 0.10=10%減)、
+        // clampReductionFractionで[0,0.95]へ安全クランプ(全額無料化を防止)する。
+        double reductionFrac = TrinityForgeBridge.clampReductionFraction(
+            TrinityForgeBridge.tfStatTotal(player, TrinityForgeBridge.STAT_SOURCE_COST_REDUCTION));
+        int totalSourceRequired = Math.max(0,
+            (int) Math.round(baseSourceRequired * (1.0 - reductionFrac)));
 
         // Source予約消費（TOCTOU防止: チェックと消費を一体化）
         // アニメーション中に他の儀式がSourceを使い切るのを防ぐため、先に消費する
@@ -214,10 +232,24 @@ public class RitualManager {
                     return;
                 }
 
-                // エフェクトの事前検証（素材消費前にチェック）
+                // エフェクトの事前検証 + craft結果の事前解決（素材消費前 — 失敗時の消滅防止）
+                ItemStack craftResult = null;
                 if (!recipe.isCraftType()) {
                     Optional<RitualEffect> preValidateEffect = effectRegistry.get(recipe.effectType());
-                    if (preValidateEffect.isPresent() && !preValidateEffect.get().validate(coreLocation, player, recipe)) {
+                    if (preValidateEffect.isEmpty()) {
+                        player.sendMessage(Component.text(
+                            "不明な儀式タイプ: " + recipe.effectType(), NamedTextColor.RED));
+                        refundSource(coreLocation, reservedSource);
+                        return;
+                    }
+                    if (!preValidateEffect.get().validate(coreLocation, player, recipe)) {
+                        refundSource(coreLocation, reservedSource);
+                        return;
+                    }
+                } else {
+                    craftResult = resolveResult(recipe);
+                    if (craftResult == null) {
+                        player.sendMessage(Component.text("儀式の結果が無効です！", NamedTextColor.RED));
                         refundSource(coreLocation, reservedSource);
                         return;
                     }
@@ -226,40 +258,38 @@ public class RitualManager {
                 // Source消費は予約済み（アニメーション前に消費済み）
 
                 // Pedestalの素材を消費（再検証後のPedestalを使用）
-                consumePedestalItems(revalidatePedestals, recipe.pedestalItems());
+                consumePedestalItems(player, revalidatePedestals, recipe.pedestalItems());
 
                 // effectType分岐
                 if (!recipe.isCraftType()) {
-                    // world_effect / thread タイプ
+                    // world_effect / thread タイプ（存在は消費前に確認済み）
                     Optional<RitualEffect> effectOpt = effectRegistry.get(recipe.effectType());
                     if (effectOpt.isPresent()) {
-                        // thread以外ではコアアイテムを消費
+                        // thread / thread_slot_expand 以外ではコアアイテムを消費
+                        // (thread_slot_expand はコアの装備を変換して同じコアへ書き戻すため、
+                        // thread と同じ「コア非消費」側 = CORE_PRESERVING_EFFECT_TYPES に加える)
                         if (recipe.coreItem() != null
-                                && !"thread".equals(recipe.effectType())) {
+                                && !CORE_PRESERVING_EFFECT_TYPES.contains(recipe.effectType())) {
                             RitualCore.clearCoreItem(revalidateCore);
                         }
                         effectOpt.get().execute(coreLocation, player, recipe);
-                    } else {
-                        player.sendMessage(Component.text(
-                            "不明な儀式タイプ: " + recipe.effectType(), NamedTextColor.RED));
-                        return;
                     }
                     playRitualCompleteEffects(coreLocation);
                     player.sendMessage(Component.text(
                         "儀式完了: " + recipe.name() + "！", NamedTextColor.GREEN));
                 } else {
-                    // craft タイプ（従来のアイテム生成）
-                    ItemStack result = resolveResult(recipe);
-                    if (result == null) {
-                        player.sendMessage(Component.text("儀式の結果が無効です！", NamedTextColor.RED));
-                        return;
-                    }
+                    // craft タイプ（結果は消費前に解決済み）
+                    ItemStack result = craftResult;
 
                     // コアアイテムを消費（レシピがコアアイテムを要求する場合）
                     if (recipe.coreItem() != null) {
                         // アップグレード儀式: 旧アイテムのデータを結果に転送
                         if (recipe.isCustomResult()) {
+                            // tfcatalog: 経由(カタログ儀式)でも同じ転送処理が効くようプレフィックスを剥がす
                             String rid = recipe.resultId();
+                            if (rid.startsWith(CatalogRitualRegistrar.RESULT_PREFIX)) {
+                                rid = rid.substring(CatalogRitualRegistrar.RESULT_PREFIX.length());
+                            }
                             if (rid.startsWith("spell_book_") || rid.startsWith("wand_")) {
                                 // スペルブック/ワンド: スペルデータ転送
                                 String oldSpellSlots = RitualCore.getStoredSpellSlots(revalidateCore);
@@ -285,6 +315,7 @@ public class RitualManager {
                                     // 転送対象のPDCキー
                                     org.bukkit.NamespacedKey[] transferKeys = {
                                         ItemKeys.THREAD_SLOTS,
+                                        ItemKeys.THREAD_LORE,
                                         com.arspaper.mana.ManaKeys.THREAD_MANA_BONUS,
                                         com.arspaper.mana.ManaKeys.THREAD_REGEN_BONUS,
                                         com.arspaper.mana.ManaKeys.THREAD_COST_REDUCTION,
@@ -313,7 +344,7 @@ public class RitualManager {
                                         for (var entry : enchants.entrySet()) {
                                             meta.addEnchant(entry.getKey(), entry.getValue(), true);
                                         }
-                                        // loreは次回ThreadGui表示時に再生成される
+                                        // Ars所有のthread loreもPDCで転送され、TF再構築後に末尾へ復元される。
                                     });
                                 }
                             }
@@ -324,6 +355,20 @@ public class RitualManager {
                     // 結果数量を適用
                     if (recipe.resultAmount() > 1) {
                         result.setAmount(recipe.resultAmount());
+                    }
+
+                    // craft-quality一本化: TFカタログは装備のみ品質+SOULBOUND作成者刻印。
+                    // Arsカスタムは isQualityStamped のもののみ品質刻印。
+                    if (recipe.isCustomResult()) {
+                        String rid = recipe.resultId();
+                        if (rid != null && rid.startsWith(CatalogRitualRegistrar.RESULT_PREFIX)) {
+                            TrinityForgeBridge.finalizeCatalogRitualResult(result, player);
+                        } else {
+                            ArsPaper.getInstance().getItemRegistry()
+                                .get(recipe.resultId())
+                                .filter(BaseCustomItem::isQualityStamped)
+                                .ifPresent(bci -> TrinityForgeBridge.stampCraftedQuality(result, player));
+                        }
                     }
 
                     // 結果をドロップ
@@ -467,18 +512,74 @@ public class RitualManager {
         }
     }
 
-    private void consumePedestalItems(List<PedestalInfo> pedestals, List<RitualIngredient> requiredItems) {
+    private void consumePedestalItems(Player player, List<PedestalInfo> pedestals,
+            List<RitualIngredient> requiredItems) {
         List<RitualIngredient> toConsume = new ArrayList<>(requiredItems);
+
+        // 要件 material-refund-chance: skilltree由来のperkでペデスタル素材の消費をまれに1個返却する。
+        // TF未ロード/perk未所持時はfrac<=0のため必ず従来通り消費のまま(fail-open)。
+        // 2026-07-23 正準スケール分数統一によりstat値は分数[0,1](例 0.10=10%)。
+        double refundFrac = TrinityForgeBridge.tfMaterialRefundChanceFraction(player);
 
         for (PedestalInfo pedestal : pedestals) {
             if (pedestal.ingredient != null && toConsume.remove(pedestal.ingredient)) {
+                // clearPedestalItemで消し去る前に、可能ならTileStateから正確なItemStackを復元しておく。
+                ItemStack storedItem = Pedestal.getStoredItemStack(pedestal.tileState);
                 Pedestal.clearPedestalItem(pedestal.tileState);
+
+                boolean doRefund = refundFrac > 0.0
+                    && ThreadLocalRandom.current().nextDouble() < refundFrac;
+                if (doRefund) {
+                    // 返却量の定義は最小(1個/1種)であり要調整。
+                    ItemStack refundStack = storedItem != null
+                        ? storedItem.asOne()
+                        : resolveIngredientAsItemStack(pedestal.ingredient);
+                    if (refundStack != null) {
+                        var overflow = player.getInventory().addItem(refundStack);
+                        if (!overflow.isEmpty()) {
+                            overflow.values().forEach(item ->
+                                player.getWorld().dropItemNaturally(player.getLocation(), item));
+                        }
+                    }
+                }
             }
         }
     }
 
+    /**
+     * {@link RitualIngredient}からItemStackを復元する(TileState由来のItemStackが取得できなかった場合の
+     * フォールバック)。カスタムアイテムはitemRegistryから、バニラ素材はMaterial名から解決する。
+     * 解決不能時は{@code null}(fail-open、返却なし)。
+     */
+    private ItemStack resolveIngredientAsItemStack(RitualIngredient ingredient) {
+        if (ingredient.isCustom()) {
+            return ArsPaper.getInstance().getItemRegistry()
+                .get(ingredient.materialOrCustomId())
+                .map(item -> item.createItemStack())
+                .orElse(null);
+        }
+        Material mat = Material.matchMaterial(ingredient.materialOrCustomId());
+        return mat != null ? new ItemStack(mat, 1) : null;
+    }
+
     private ItemStack resolveResult(RitualRecipe recipe) {
         if (recipe.isCustomResult()) {
+            String rid = recipe.resultId();
+            if (rid != null && rid.startsWith(CatalogRitualRegistrar.RESULT_PREFIX)) {
+                String catalogId = rid.substring(CatalogRitualRegistrar.RESULT_PREFIX.length());
+                // Ars登録済みアイテム(魔導書/素材等)はArs実体を優先: 機能PDC(book tier等)を持たせる。
+                ItemStack ars = ArsPaper.getInstance().getItemRegistry()
+                    .get(catalogId)
+                    .map(item -> item.createItemStack())
+                    .orElse(null);
+                if (ars != null) {
+                    return ars;
+                }
+                ItemStack tf = TrinityForgeBridge.createCatalogIdentity(catalogId);
+                if (tf != null) {
+                    return tf;
+                }
+            }
             return ArsPaper.getInstance().getItemRegistry()
                 .get(recipe.resultId())
                 .map(item -> item.createItemStack())

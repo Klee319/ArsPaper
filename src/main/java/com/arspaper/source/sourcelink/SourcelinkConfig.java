@@ -1,5 +1,6 @@
 package com.arspaper.source.sourcelink;
 
+import com.arspaper.item.ItemCostTable;
 import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -7,36 +8,74 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
 import java.util.Collections;
-import java.util.EnumMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.logging.Logger;
 
 /**
- * sourcelinks.yml から各ソースリンクのマテリアル値マップを読み込む。
- * 設定ファイルが存在しない/セクションが空の場合はハードコードのデフォルト値を使用。
+ * sourcelinks.yml から各ソースリンクのマテリアル／カスタムアイテム値マップと、本体アイテム定義(items:)を読み込む。
  */
 public class SourcelinkConfig {
 
+    /** 実装が挙動を持つソースリンク種別 (items.<id>.type に指定できる値)。 */
+    public static final List<String> TYPES =
+            List.of("volcanic", "mycelial", "alchemical", "vitalic", "botanical");
+
+    public record ItemDef(
+            String id,
+            Material material,
+            String displayName,
+            int customModelData,
+            List<String> lore,
+            String type) {
+
+        /** 旧来の5固定id用 (type は id から推定)。 */
+        public ItemDef(String id, Material material, String displayName,
+                       int customModelData, List<String> lore) {
+            this(id, material, displayName, customModelData, lore, inferType(id, ""));
+        }
+    }
+
+    /**
+     * type の解決: 明示指定を最優先し、無ければ id に含まれる種別名から推定する
+     * (固定5種 "volcanic_sourcelink" 等はこれで解決)。どちらでも解決できなければ "" を返す。
+     */
+    public static String inferType(String id, String explicit) {
+        String ex = explicit == null ? "" : explicit.trim().toLowerCase(Locale.ROOT);
+        if (TYPES.contains(ex)) {
+            return ex;
+        }
+        String lower = id == null ? "" : id.toLowerCase(Locale.ROOT);
+        for (String type : TYPES) {
+            if (lower.contains(type)) {
+                return type;
+            }
+        }
+        return "";
+    }
+
     private final JavaPlugin plugin;
-    private Map<Material, Integer> volcanicMaterials;
-    private Map<Material, Integer> mycelialMaterials;
-    private Map<Material, Integer> alchemicalMaterials;
+    private ItemCostTable volcanicMaterials = ItemCostTable.empty();
+    private ItemCostTable mycelialMaterials = ItemCostTable.empty();
+    private ItemCostTable alchemicalMaterials = ItemCostTable.empty();
+    private Map<String, ItemDef> items = Map.of();
 
     public SourcelinkConfig(JavaPlugin plugin) {
         this.plugin = plugin;
         reload();
     }
 
-    /**
-     * 設定ファイルを読み込み（または再読み込み）する。
-     */
     public void reload() {
         File file = new File(plugin.getDataFolder(), "sourcelinks.yml");
         if (!file.exists()) {
             plugin.getLogger().info("sourcelinks.yml not found, using default values");
-            volcanicMaterials = VolcanicSourcelink.getDefaultFuelValues();
-            mycelialMaterials = MycelialSourcelink.getDefaultFoodValues();
-            alchemicalMaterials = AlchemicalSourcelink.getDefaultAlchemyValues();
+            volcanicMaterials = ItemCostTable.fromMaterials(VolcanicSourcelink.getDefaultFuelValues());
+            mycelialMaterials = ItemCostTable.fromMaterials(MycelialSourcelink.getDefaultFoodValues());
+            alchemicalMaterials = ItemCostTable.fromMaterials(AlchemicalSourcelink.getDefaultAlchemyValues());
+            items = Map.of();
             return;
         }
 
@@ -44,49 +83,80 @@ public class SourcelinkConfig {
         Logger logger = plugin.getLogger();
 
         volcanicMaterials = loadSection(config, "volcanic.materials",
-                VolcanicSourcelink.getDefaultFuelValues(), logger);
+                ItemCostTable.fromMaterials(VolcanicSourcelink.getDefaultFuelValues()), logger);
         mycelialMaterials = loadSection(config, "mycelial.materials",
-                MycelialSourcelink.getDefaultFoodValues(), logger);
+                ItemCostTable.fromMaterials(MycelialSourcelink.getDefaultFoodValues()), logger);
         alchemicalMaterials = loadSection(config, "alchemical.materials",
-                AlchemicalSourcelink.getDefaultAlchemyValues(), logger);
+                ItemCostTable.fromMaterials(AlchemicalSourcelink.getDefaultAlchemyValues()), logger);
+        items = loadItems(config, logger);
 
         logger.info("Sourcelink config loaded: volcanic=" + volcanicMaterials.size()
                 + ", mycelial=" + mycelialMaterials.size()
-                + ", alchemical=" + alchemicalMaterials.size());
+                + ", alchemical=" + alchemicalMaterials.size()
+                + ", items=" + items.size());
     }
 
-    private Map<Material, Integer> loadSection(YamlConfiguration config, String path,
-                                                Map<Material, Integer> defaults, Logger logger) {
+    private Map<String, ItemDef> loadItems(YamlConfiguration config, Logger logger) {
+        ConfigurationSection section = config.getConfigurationSection("items");
+        if (section == null) {
+            return Map.of();
+        }
+        Map<String, ItemDef> result = new LinkedHashMap<>();
+        for (String id : section.getKeys(false)) {
+            ConfigurationSection entry = section.getConfigurationSection(id);
+            if (entry == null) {
+                continue;
+            }
+            try {
+                Material mat = Material.valueOf(entry.getString("material", "STONE")
+                        .trim().toUpperCase(Locale.ROOT));
+                String type = inferType(id, entry.getString("type", ""));
+                if (type.isEmpty()) {
+                    logger.warning("sourcelinks.yml: items." + id
+                            + " has no resolvable type (set 'type:' to one of " + TYPES + ") — entry skipped");
+                    continue;
+                }
+                result.put(id, new ItemDef(
+                        id,
+                        mat,
+                        entry.getString("display-name", id),
+                        entry.getInt("custom-model-data", 0),
+                        List.copyOf(entry.getStringList("lore")),
+                        type));
+            } catch (IllegalArgumentException ex) {
+                logger.warning("sourcelinks.yml: items." + id + " invalid: " + ex.getMessage());
+            }
+        }
+        return Collections.unmodifiableMap(result);
+    }
+
+    private ItemCostTable loadSection(YamlConfiguration config, String path,
+                                      ItemCostTable defaults, Logger logger) {
         ConfigurationSection section = config.getConfigurationSection(path);
         if (section == null) {
             return defaults;
         }
-
-        Map<Material, Integer> result = new EnumMap<>(Material.class);
-        for (String key : section.getKeys(false)) {
-            try {
-                Material mat = Material.valueOf(key.toUpperCase());
-                int value = section.getInt(key);
-                if (value > 0) {
-                    result.put(mat, value);
-                }
-            } catch (IllegalArgumentException e) {
-                logger.warning("sourcelinks.yml: Unknown material '" + key + "' in " + path);
-            }
-        }
-
-        return result.isEmpty() ? defaults : Collections.unmodifiableMap(result);
+        ItemCostTable parsed = ItemCostTable.parseSection(section, logger, "sourcelinks.yml " + path);
+        return parsed.isEmpty() ? defaults : parsed;
     }
 
-    public Map<Material, Integer> getVolcanicMaterials() {
+    public ItemCostTable getVolcanicMaterials() {
         return volcanicMaterials;
     }
 
-    public Map<Material, Integer> getMycelialMaterials() {
+    public ItemCostTable getMycelialMaterials() {
         return mycelialMaterials;
     }
 
-    public Map<Material, Integer> getAlchemicalMaterials() {
+    public ItemCostTable getAlchemicalMaterials() {
         return alchemicalMaterials;
+    }
+
+    public Optional<ItemDef> item(String id) {
+        return Optional.ofNullable(items.get(id));
+    }
+
+    public Map<String, ItemDef> items() {
+        return items;
     }
 }

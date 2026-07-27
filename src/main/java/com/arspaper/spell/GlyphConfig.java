@@ -1,5 +1,6 @@
 package com.arspaper.spell;
 
+import com.arspaper.item.ItemCostRef;
 import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -54,8 +55,15 @@ public class GlyphConfig {
             int tier = section.getInt("tier", 1);
             int manaCost = section.getInt("mana-cost", 10);
 
+            // 表示名の上書き（editorでの分類用。未設定ならnull＝ハードコード名にフォールバック）
+            // category はエディタ分類用の任意メタデータ。forkの動作には一切影響しないため、ここでは読み捨てる。
+            String displayNameOverride = section.getString("display-name", "");
+            if (displayNameOverride != null && displayNameOverride.isBlank()) {
+                displayNameOverride = null;
+            }
+
             int unlockLevel = 5;
-            Map<Material, Integer> unlockMaterials = new LinkedHashMap<>();
+            Map<ItemCostRef, Integer> unlockMaterials = new LinkedHashMap<>();
 
             ConfigurationSection unlockSection = section.getConfigurationSection("unlock-cost");
             if (unlockSection != null) {
@@ -63,9 +71,12 @@ public class GlyphConfig {
                 ConfigurationSection matsSection = unlockSection.getConfigurationSection("materials");
                 if (matsSection != null) {
                     for (String matKey : matsSection.getKeys(false)) {
-                        Material mat = Material.matchMaterial(matKey);
-                        if (mat != null) {
-                            unlockMaterials.put(mat, matsSection.getInt(matKey, 1));
+                        try {
+                            ItemCostRef ref = ItemCostRef.parse(matKey);
+                            unlockMaterials.put(ref, matsSection.getInt(matKey, 1));
+                        } catch (IllegalArgumentException ex) {
+                            logger.warning("glyphs.yml: glyphs." + key + ".unlock-cost.materials invalid key '"
+                                    + matKey + "': " + ex.getMessage());
                         }
                     }
                 }
@@ -91,7 +102,7 @@ public class GlyphConfig {
                 }
             }
 
-            newData.put(key, new GlyphData(tier, manaCost, unlockLevel, unlockMaterials, compatibleEffects, params, maxAugments));
+            newData.put(key, new GlyphData(tier, manaCost, unlockLevel, unlockMaterials, compatibleEffects, params, maxAugments, displayNameOverride));
         }
 
         // アトミックに差し替え（volatile書き込み）
@@ -118,18 +129,19 @@ public class GlyphConfig {
         return data != null ? data.unlockLevel : 5;
     }
 
-    public Map<Material, Integer> getUnlockMaterials(String glyphKey) {
+    public Map<ItemCostRef, Integer> getUnlockMaterials(String glyphKey) {
         GlyphData data = glyphData.get(glyphKey);
-        return data != null ? Collections.unmodifiableMap(data.unlockMaterials) : Map.of(Material.LAPIS_LAZULI, 1);
+        return data != null ? Collections.unmodifiableMap(data.unlockMaterials)
+                : Map.of(ItemCostRef.ofMaterial(Material.LAPIS_LAZULI), 1);
     }
 
     public String getUnlockCostDescription(String glyphKey) {
         int level = getUnlockLevel(glyphKey);
-        Map<Material, Integer> mats = getUnlockMaterials(glyphKey);
+        Map<ItemCostRef, Integer> mats = getUnlockMaterials(glyphKey);
         StringBuilder sb = new StringBuilder();
         sb.append(level).append("レベル");
-        for (Map.Entry<Material, Integer> entry : mats.entrySet()) {
-            sb.append(" + ").append(localizeMatName(entry.getKey())).append(entry.getValue()).append("個");
+        for (Map.Entry<ItemCostRef, Integer> entry : mats.entrySet()) {
+            sb.append(" + ").append(entry.getKey().displayName()).append(entry.getValue()).append("個");
         }
         return sb.toString();
     }
@@ -137,6 +149,12 @@ public class GlyphConfig {
     /** 素材名の日本語化（公開メソッド） */
     public String localizeMatNamePublic(Material mat) {
         return com.arspaper.util.JaTranslations.translate(mat);
+    }
+
+    /** @deprecated use {@link ItemCostRef#displayName()} */
+    @Deprecated
+    public String localizeCostName(ItemCostRef ref) {
+        return ref.displayName();
     }
 
     private String localizeMatName(Material mat) {
@@ -408,9 +426,19 @@ public class GlyphConfig {
         return data.maxAugments.getOrDefault(baseKey, Integer.MAX_VALUE);
     }
 
-    private record GlyphData(int tier, int manaCost, int unlockLevel, Map<Material, Integer> unlockMaterials,
+    private record GlyphData(int tier, int manaCost, int unlockLevel, Map<ItemCostRef, Integer> unlockMaterials,
                               List<String> compatibleEffects,
-                              Map<String, Double> params, Map<String, Integer> maxAugments) {}
+                              Map<String, Double> params, Map<String, Integer> maxAugments,
+                              String displayNameOverride) {}
+
+    /**
+     * glyphs.yml の display-name 上書き値を返す。未設定の場合は null。
+     * category フィールドはエディタ分類専用のメタデータであり、forkの動作には使われない（読み捨て）。
+     */
+    public String displayNameOverride(String glyphKey) {
+        GlyphData data = glyphData.get(glyphKey);
+        return data != null ? data.displayNameOverride : null;
+    }
 
     // ============================================================
     // 交換グリフ ブロックティアマッピング

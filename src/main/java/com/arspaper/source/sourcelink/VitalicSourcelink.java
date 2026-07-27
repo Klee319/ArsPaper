@@ -33,40 +33,41 @@ public class VitalicSourcelink extends Sourcelink {
         super(plugin, "vitalic_sourcelink");
     }
 
+    /** カスタムソースリンク (sourcelinks.yml items.<id> type: vitalic) 用: 任意idで同じ挙動の別ブロックを作る。 */
+    public VitalicSourcelink(JavaPlugin plugin, String blockId) {
+        super(plugin, blockId);
+    }
+
     @Override
     public Material getBlockMaterial() {
-        return Material.BARREL;
+        return materialOr(Material.BARREL);
     }
 
     @Override
     public Component getDisplayName() {
-        return Component.text("バイタリックソースリンク", NamedTextColor.GREEN)
-            .decoration(TextDecoration.ITALIC, false);
+        return displayNameOr(Component.text("バイタリックソースリンク", NamedTextColor.GREEN)
+            .decoration(TextDecoration.ITALIC, false));
     }
 
     @Override
     public int getCustomModelData() {
-        return 200006;
+        return cmdOr(200006);
     }
 
     @Override
     public ItemStack createItemStack() {
-        ItemStack item = super.createItemStack();
-        item.editMeta(meta ->
-            meta.lore(List.of(
+        return withConfiguredOrDefaultLore(super.createItemStack(), List.of(
                 Component.text("生命の力でソースを生成", NamedTextColor.GRAY)
                     .decoration(TextDecoration.ITALIC, false),
                 Component.text("近くでmobが倒されるとボーナス生成", NamedTextColor.DARK_GRAY)
                     .decoration(TextDecoration.ITALIC, false)
-            ))
-        );
-        return item;
+        ));
     }
 
     @Override
     public ItemStack getDisplayHeadItem() {
         ItemStack head = new ItemStack(Material.BONE);
-        head.editMeta(meta -> meta.setCustomModelData(200006));
+        head.editMeta(meta -> meta.setCustomModelData(getCustomModelData()));
         return head;
     }
 

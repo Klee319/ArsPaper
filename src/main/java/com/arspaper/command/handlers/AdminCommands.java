@@ -33,7 +33,8 @@ public final class AdminCommands {
 
         // reset: 設定ファイルをデフォルトに上書き復元
         if (resetDefaults) {
-            String[] ymlFiles = {"config.yml", "glyphs.yml", "items.yml", "materials.yml", "armors.yml", "threads.yml", "ban.yml"};
+            String[] ymlFiles = {"config.yml", "glyphs.yml", "items.yml", "materials.yml", "threads.yml",
+                    "ban.yml", "spellbooks.yml", "sourcelinks.yml", "sourcejars.yml", "functional-items.yml"};
             for (String yml : ymlFiles) {
                 plugin.saveResource(yml, true); // true = 上書き
             }
@@ -50,18 +51,23 @@ public final class AdminCommands {
         // 解放ゲート（レシピ/儀式 perk + 修繕儀式コスト）リロード
         plugin.getUnlockGate().reload();
 
-        // 厳選（selection）設定リロード
-        com.arspaper.item.SelectionConfig.reload();
-
         // エンチャント定数リロード
         com.arspaper.enchant.ArsEnchantments.loadConfig(plugin.getConfig());
 
         // glyphs.yml リロード（グリフのティア・コスト・係数）
         plugin.reloadGlyphConfig();
 
-        // materials.yml / armors.yml を先にリロード（レシピ解決に必要）
+        // functional-items.yml リロード（機能アイテムの表示名上書き）
+        plugin.reloadFunctionalItemConfig();
+
+        // materials.yml を先にリロード（レシピ解決に必要）
         plugin.reloadMaterialConfig();
-        plugin.reloadArmorConfig();
+
+        // spellbooks.yml リロード（魔導書ティアのスロット数・グリフ上限・PDC対応表）
+        plugin.reloadSpellBookConfig();
+
+        // spellbooks.yml catalysts: リロード（触媒のステ/マナ減/CT定義 + TrinityForge動的登録の再反映）
+        plugin.reloadCatalystConfig();
 
         // 統合レシピリロード（items.yml, materials.yml, threads.yml）
         com.arspaper.recipe.UnifiedRecipeLoader loader = new com.arspaper.recipe.UnifiedRecipeLoader(plugin);
@@ -69,12 +75,22 @@ public final class AdminCommands {
         plugin.getRecipeManager().unloadRecipes();
         plugin.getRecipeManager().registerWorkbenchRecipes(loader.getWorkbenchRecipes());
         plugin.getRitualRecipeRegistry().registerRecipes(loader.getRitualRecipes());
-
-        // 防具レシピ再登録（armorConfigリロード済み）
-        plugin.getRecipeManager().registerArmorRecipes(plugin.getArmorConfigManager());
+        // 上のmaterialConfig/spellBookConfig/catalystConfigリロードでitemRegistryの内容が変わりうるため、
+        // TrinityForgeのExternalItemRegistry(customレシピのper-slot識別台帳)を再反映する。
+        // 必ずrepushCatalogRituals/refreshCatalogRecipesより前 — でないと古い識別情報のままレシピ結果が再構築される。
+        com.arspaper.integration.TrinityForgeBridge.registerExternalItems(plugin.getItemRegistry().getAll());
+        // TF catalog.yml ritual recipes are registered via CatalogRitualBridge; re-push after Ars clears the registry.
+        com.arspaper.integration.TrinityForgeBridge.repushCatalogRituals();
+        // TF catalog workbench recipes: rebuild so Ars-owned results stay Ars-built after item re-registration.
+        com.arspaper.integration.TrinityForgeBridge.refreshCatalogRecipes();
 
         // スレッド設定リロード
         plugin.getThreadConfig().reload(plugin.getConfig());
+
+        // スレッド・セット効果設定リロード(thread-sets.yml)
+        if (plugin.getThreadSetConfig() != null) {
+            plugin.getThreadSetConfig().reload();
+        }
 
         // マナ設定リロード（regenIntervalの変更はサーバ再起動が必要）
         com.arspaper.mana.ManaConfig newManaConfig = com.arspaper.mana.ManaConfig.fromConfig(plugin.getConfig());
@@ -82,12 +98,19 @@ public final class AdminCommands {
 
         // ソースリンク設定リロード
         plugin.reloadSourcelinkConfig();
+        plugin.reloadSourceJarConfig();
 
         // ルートチェスト設定リロード
         plugin.reloadLootConfig();
 
         // ワールド別設定リロード
         plugin.getWorldSettingsManager().load();
+
+        // 設定変更を装備中の全オンラインプレイヤーへ即時反映
+        // (マナ集計 + スレッド戦闘ステ/セット効果PDC を再計算。未反映だと再装備/再ログインまで旧値のまま)
+        for (Player online : org.bukkit.Bukkit.getOnlinePlayers()) {
+            com.arspaper.item.ArmorManaListener.recalculateArmorBonus(online);
+        }
 
         long elapsed = System.currentTimeMillis() - start;
         sender.sendMessage(Component.text(

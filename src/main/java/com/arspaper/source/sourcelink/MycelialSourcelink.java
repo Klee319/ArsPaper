@@ -69,60 +69,58 @@ public class MycelialSourcelink extends Sourcelink {
     );
 
     /** 実行時に使用する食料値マップ（設定ファイルから読み込み可能） */
-    private Map<Material, Integer> foodValues = DEFAULT_FOOD_VALUES;
+    private com.arspaper.item.ItemCostTable foodValues =
+            com.arspaper.item.ItemCostTable.fromMaterials(DEFAULT_FOOD_VALUES);
 
     public MycelialSourcelink(JavaPlugin plugin) {
         super(plugin, "mycelial_sourcelink");
     }
 
-    /**
-     * デフォルトの食料値マップを返す（設定ファイルが無い場合のフォールバック用）。
-     */
+    /** カスタムソースリンク (sourcelinks.yml items.<id> type: mycelial) 用: 任意idで同じ挙動の別ブロックを作る。 */
+    public MycelialSourcelink(JavaPlugin plugin, String blockId) {
+        super(plugin, blockId);
+    }
+
     static Map<Material, Integer> getDefaultFoodValues() {
         return DEFAULT_FOOD_VALUES;
     }
 
-    /**
-     * 設定ファイルから読み込んだ食料値マップを設定する。
-     */
-    public void setFoodValues(Map<Material, Integer> values) {
-        this.foodValues = values != null ? values : DEFAULT_FOOD_VALUES;
+    public void setFoodValues(com.arspaper.item.ItemCostTable values) {
+        this.foodValues = values != null && !values.isEmpty()
+                ? values
+                : com.arspaper.item.ItemCostTable.fromMaterials(DEFAULT_FOOD_VALUES);
     }
 
     @Override
     public Material getBlockMaterial() {
-        return Material.SMOKER;
+        return materialOr(Material.SMOKER);
     }
 
     @Override
     public Component getDisplayName() {
-        return Component.text("マイセリアルソースリンク", NamedTextColor.DARK_GREEN)
-            .decoration(TextDecoration.ITALIC, false);
+        return displayNameOr(Component.text("マイセリアルソースリンク", NamedTextColor.DARK_GREEN)
+            .decoration(TextDecoration.ITALIC, false));
     }
 
     @Override
     public int getCustomModelData() {
-        return 200004;
+        return cmdOr(200004);
     }
 
     @Override
     public ItemStack createItemStack() {
-        ItemStack item = super.createItemStack();
-        item.editMeta(meta ->
-            meta.lore(List.of(
+        return withConfiguredOrDefaultLore(super.createItemStack(), List.of(
                 Component.text("食料を消費してソースを生成", NamedTextColor.GRAY)
                     .decoration(TextDecoration.ITALIC, false),
                 Component.text("食料を手に持って右クリックで投入", NamedTextColor.DARK_GRAY)
                     .decoration(TextDecoration.ITALIC, false)
-            ))
-        );
-        return item;
+        ));
     }
 
     @Override
     public ItemStack getDisplayHeadItem() {
         ItemStack head = new ItemStack(Material.BROWN_MUSHROOM_BLOCK);
-        head.editMeta(meta -> meta.setCustomModelData(200004));
+        head.editMeta(meta -> meta.setCustomModelData(getCustomModelData()));
         return head;
     }
 
@@ -133,24 +131,15 @@ public class MycelialSourcelink extends Sourcelink {
 
     @Override
     public int getSourceValueForItem(org.bukkit.inventory.ItemStack item) {
-        if (item == null) return 0;
-        Integer value = foodValues.get(item.getType());
-        return value != null ? value : 0;
+        return foodValues.valueOf(item);
     }
 
     @Override
     public void onBlockInteract(Player player, Block block, TileState tileState) {
         ItemStack hand = player.getInventory().getItemInMainHand();
-        if (isCustomItem(hand)) {
-            int buffer = getBuffer(tileState);
-            player.sendMessage(Component.text(
-                "マイセリアルソースリンク - 蓄積ソース: " + buffer, NamedTextColor.DARK_GREEN
-            ));
-            return;
-        }
-        Integer sourceValue = foodValues.get(hand.getType());
+        int sourceValue = foodValues.valueOf(hand);
 
-        if (sourceValue != null) {
+        if (sourceValue > 0) {
             int addCount = player.isSneaking() ? hand.getAmount() : 1;
             addCount = Math.min(addCount, hand.getAmount());
             int totalAdded = sourceValue * addCount;

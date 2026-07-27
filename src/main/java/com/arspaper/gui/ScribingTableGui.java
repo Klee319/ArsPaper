@@ -3,6 +3,7 @@ package com.arspaper.gui;
 import com.arspaper.ArsPaper;
 import com.arspaper.mana.ManaKeys;
 import com.arspaper.spell.GlyphConfig;
+import com.arspaper.spell.GlyphNames;
 import com.arspaper.spell.SpellComponent;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -134,7 +135,7 @@ public class ScribingTableGui extends BaseGui {
         GlyphConfig glyphConfig = plugin.getGlyphConfig();
         String glyphKey = component.getId().getKey();
         int levelCost = glyphConfig.getUnlockLevel(glyphKey);
-        java.util.Map<Material, Integer> materials = glyphConfig.getUnlockMaterials(glyphKey);
+        java.util.Map<com.arspaper.item.ItemCostRef, Integer> materials = glyphConfig.getUnlockMaterials(glyphKey);
 
         // アンロックアニメーション開始（GUI閉じ→素材消費→軌道演出→XP消費→アンロック完了）
         GlyphUnlockAnimation.play(
@@ -147,10 +148,7 @@ public class ScribingTableGui extends BaseGui {
                         "経験値レベルが不足しています！アンロックに失敗しました。", NamedTextColor.RED));
                     // 素材は既に消費済みのため返還（インベントリ満杯時は足元にドロップ）
                     for (var entry : materials.entrySet()) {
-                        java.util.Map<Integer, ItemStack> overflow =
-                            clicker.getInventory().addItem(new ItemStack(entry.getKey(), entry.getValue()));
-                        overflow.values().forEach(item ->
-                            clicker.getWorld().dropItemNaturally(clicker.getLocation(), item));
+                        entry.getKey().giveOrDrop(clicker, entry.getValue());
                     }
                     return;
                 }
@@ -200,15 +198,14 @@ public class ScribingTableGui extends BaseGui {
             lore.add(Component.text("必要レベル: " + gc.getUnlockLevel(glyphKey), NamedTextColor.DARK_GRAY)
                 .decoration(TextDecoration.ITALIC, false));
             for (var entry : gc.getUnlockMaterials(glyphKey).entrySet()) {
-                String name = gc.localizeMatNamePublic(entry.getKey());
-                lore.add(Component.text("  " + name + " ×" + entry.getValue(), NamedTextColor.DARK_GRAY)
+                lore.add(Component.text("  " + entry.getKey().displayName() + " ×" + entry.getValue(), NamedTextColor.DARK_GRAY)
                     .decoration(TextDecoration.ITALIC, false));
             }
         }
 
         return createButton(material,
             Component.text(
-                (unlocked ? "[解放済] " : "") + component.getDisplayName(),
+                (unlocked ? "[解放済] " : "") + GlyphNames.display(component),
                 unlocked ? NamedTextColor.GREEN : NamedTextColor.RED
             ),
             lore);
@@ -235,7 +232,7 @@ public class ScribingTableGui extends BaseGui {
         GlyphConfig glyphConfig = plugin.getGlyphConfig();
         String glyphKey = component.getId().getKey();
         int levelCost = glyphConfig.getUnlockLevel(glyphKey);
-        java.util.Map<Material, Integer> materials = glyphConfig.getUnlockMaterials(glyphKey);
+        java.util.Map<com.arspaper.item.ItemCostRef, Integer> materials = glyphConfig.getUnlockMaterials(glyphKey);
 
         if (player.getLevel() < levelCost) {
             player.sendMessage(Component.text(
@@ -244,10 +241,8 @@ public class ScribingTableGui extends BaseGui {
             return false;
         }
 
-        // 全素材の在庫チェック（カスタムアイテムを除外してカウント）
         for (var entry : materials.entrySet()) {
-            int count = countVanillaItems(player, entry.getKey());
-            if (count < entry.getValue()) {
+            if (entry.getKey().countIn(player) < entry.getValue()) {
                 player.sendMessage(Component.text(
                     "素材が不足しています！必要: " + glyphConfig.getUnlockCostDescription(glyphKey),
                     NamedTextColor.RED
@@ -273,17 +268,6 @@ public class ScribingTableGui extends BaseGui {
     /**
      * カスタムアイテムを除外して、指定Materialのバニラアイテム数をカウントする。
      */
-    private static int countVanillaItems(Player player, Material material) {
-        int count = 0;
-        for (ItemStack item : player.getInventory().getContents()) {
-            if (item == null || item.getType() != material) continue;
-            if (item.hasItemMeta() && item.getItemMeta().getPersistentDataContainer()
-                    .has(com.arspaper.item.ItemKeys.CUSTOM_ITEM_ID)) continue;
-            count += item.getAmount();
-        }
-        return count;
-    }
-
     private void saveUnlockedGlyphs(Set<String> glyphs) {
         JsonArray arr = new JsonArray();
         glyphs.forEach(arr::add);

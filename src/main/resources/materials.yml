@@ -6,64 +6,1581 @@
 #
 # custom: プレフィックスは本プラグインのカスタムアイテムを参照する。
 # "x2" 等の記法はアイテム数量を示す。
+#
+# 表示名の色は display_name 内の &カラーコードで指定する
+# (旧 name_color パラメータは廃止し display_name へ統合済み)。
+#
+# enchant_glow: エンチャント光沢(キラキラ)を付与するか。省略時 true(従来どおり光る)。
+#               false にするとその素材だけ光沢を消せる(例: 見た目を素朴にしたい鉱石系)。
+#
+# 圧縮ブロック系のレシピは「1段前の圧縮アイテム9個(不定形)」で統一。
+# 1段目(_1x)のみバニラアイテム9個。
 # ============================================================
 
 materials:
-
-  # ----------------------------------------------------------
-  # ソースジェム - 魔力を帯びた結晶
-  # ----------------------------------------------------------
   source_gem:
     base_material: PRISMARINE_SHARD
     custom_model_data: 100011
-    display_name: "ソースジェム"
-    name_color: "&b"
+    display_name: "&bソースジェム"
     lore:
       - "&7魔力を帯びた結晶"
+      - ""
+      - "&5全ての源"
     recipe:
       method: ritual
-      core-item: AMETHYST_SHARD
+      core-item: LAPIS_LAZULI
       pedestal-items:
-        - "AMETHYST_SHARD x3"
-        - "LAPIS_LAZULI x2"
-      source: 200
-
-  # ----------------------------------------------------------
-  # ソースジェムブロック - ソースジェム9個の圧縮ストレージ
-  # ----------------------------------------------------------
+        - AMETHYST_SHARD
+      source: 500
+      type: shapeless
+      ingredients: []
+    enchant_glow: false
   source_gem_block:
     base_material: PRISMARINE
     custom_model_data: 100012
-    display_name: "ソースジェムブロック"
-    name_color: "&b"
+    display_name: "&bソースジェムブロック"
     lore:
       - "&7ソースジェム9個分の結晶塊"
-
-  # ----------------------------------------------------------
-  # マジックファイバー - 魔力を帯びた繊維
-  # ----------------------------------------------------------
+      - ""
+      - "&5すべての核となれ"
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:source_gem
+      shape:
+        - iii
+        - iii
+        - iii
   magebloom_fiber:
     base_material: STRING
     custom_model_data: 100021
-    display_name: "マジックファイバー"
-    name_color: "&d"
+    display_name: "&dマジックファイバー"
     lore:
       - "&7魔力を帯びた繊維"
+      - ""
+      - "&5魔法の繊維！"
     recipe:
-      method: ritual
-      core-item: STRING
-      pedestal-items:
-        - "WHEAT_SEEDS"
-        - "custom:source_gem"
-      source: 100
-
-  # ----------------------------------------------------------
-  # ソースストーン - 魔力を帯びた石
-  # ----------------------------------------------------------
+      method: inventory
+      type: shapeless
+      ingredients:
+        - WHEAT_SEEDS
+        - custom:source_gem
+      amount: 4
   sourcestone:
     base_material: STONE
     custom_model_data: 100031
-    display_name: "ソースストーン"
-    name_color: "&3"
+    display_name: "&3ソースストーン"
     lore:
       - "&7魔力を帯びた石"
+      - ""
+      - "&5自然由来の魔法"
+    recipe:
+      method: workbench
+      type: shaped
+      shape:
+        - iii
+        - igi
+        - iii
+      ingredients:
+        i: STONE
+        g: custom:source_gem
+      amount: 8
+  oak_wood_1x:
+    base_material: OAK_LOG
+    custom_model_data: 5201
+    display_name: 9倍圧縮オークの原木
+    enchant_glow: false
+    lore:
+      - "&7&o9個分の原木を凝縮した修繕用木材。"
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: OAK_LOG
+      shape:
+        - iii
+        - iii
+        - iii
+  stone_1x:
+    base_material: STONE
+    custom_model_data: 100041
+    display_name: "&f9倍圧縮石"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: STONE
+      shape:
+        - iii
+        - iii
+        - iii
+  stone_2x:
+    base_material: STONE
+    custom_model_data: 100042
+    display_name: "&781倍圧縮石"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:stone_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  stone_3x:
+    base_material: STONE
+    custom_model_data: 100043
+    display_name: "&7729倍圧縮石"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:stone_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  stone_4x:
+    base_material: STONE
+    custom_model_data: 100044
+    display_name: "&86561倍圧縮石"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:stone_3x
+      shape:
+        - iii
+        - iii
+        - iii
+  stone_5x:
+    base_material: STONE
+    custom_model_data: 100045
+    display_name: "&859049倍圧縮石"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:stone_4x
+      shape:
+        - iii
+        - iii
+        - iii
+  copper_block_1x:
+    base_material: COPPER_BLOCK
+    custom_model_data: 100051
+    display_name: "&f9倍圧縮銅ブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: COPPER_BLOCK
+      shape:
+        - iii
+        - iii
+        - iii
+  copper_block_2x:
+    base_material: COPPER_BLOCK
+    custom_model_data: 100052
+    display_name: "&781倍圧縮銅ブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:copper_block_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  copper_block_3x:
+    base_material: COPPER_BLOCK
+    custom_model_data: 100053
+    display_name: "&7729倍圧縮銅ブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:copper_block_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  iron_block_1x:
+    base_material: IRON_BLOCK
+    custom_model_data: 100061
+    display_name: "&f9倍圧縮鉄ブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: IRON_BLOCK
+      shape:
+        - iii
+        - iii
+        - iii
+  iron_block_2x:
+    base_material: IRON_BLOCK
+    custom_model_data: 100062
+    display_name: "&781倍圧縮鉄ブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:iron_block_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  iron_block_3x:
+    base_material: IRON_BLOCK
+    custom_model_data: 100063
+    display_name: "&7729倍圧縮鉄ブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:iron_block_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  gold_block_1x:
+    base_material: GOLD_BLOCK
+    custom_model_data: 100071
+    display_name: "&f9倍圧縮金ブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: GOLD_BLOCK
+      shape:
+        - iii
+        - iii
+        - iii
+  gold_block_2x:
+    base_material: GOLD_BLOCK
+    custom_model_data: 100072
+    display_name: "&781倍圧縮金ブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:gold_block_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  gold_block_3x:
+    base_material: GOLD_BLOCK
+    custom_model_data: 100073
+    display_name: "&7729倍圧縮金ブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:gold_block_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  netherrack_1x:
+    base_material: NETHERRACK
+    custom_model_data: 1002
+    display_name: "&f9倍圧縮ネザーラック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: NETHERRACK
+      shape:
+        - iii
+        - iii
+        - iii
+  netherrack_2x:
+    base_material: NETHERRACK
+    custom_model_data: 1001
+    display_name: "&f81倍圧縮ネザーラック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:netherrack_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  end_stone_1x:
+    base_material: END_STONE
+    custom_model_data: 999
+    display_name: "&79倍圧縮エンドストーン"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: END_STONE
+      shape:
+        - iii
+        - iii
+        - iii
+  end_stone_2x:
+    base_material: END_STONE
+    custom_model_data: 1000
+    display_name: "&781倍圧縮エンドストーン"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:end_stone_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  lapis_block_1x:
+    base_material: LAPIS_BLOCK
+    custom_model_data: 100101
+    display_name: "&f9倍圧縮ラピスラズリブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: LAPIS_BLOCK
+      shape:
+        - iii
+        - iii
+        - iii
+  lapis_block_2x:
+    base_material: LAPIS_BLOCK
+    custom_model_data: 100102
+    display_name: "&781倍圧縮ラピスラズリブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:lapis_block_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  lapis_block_3x:
+    base_material: LAPIS_BLOCK
+    custom_model_data: 100103
+    display_name: "&7729倍圧縮ラピスラズリブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:lapis_block_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  emerald_block_1x:
+    base_material: EMERALD_BLOCK
+    custom_model_data: 100111
+    display_name: "&f9倍圧縮エメラルドブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: EMERALD_BLOCK
+      shape:
+        - iii
+        - iii
+        - iii
+  emerald_block_2x:
+    base_material: EMERALD_BLOCK
+    custom_model_data: 100112
+    display_name: "&781倍圧縮エメラルドブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:emerald_block_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  emerald_block_3x:
+    base_material: EMERALD_BLOCK
+    custom_model_data: 100113
+    display_name: "&7729倍圧縮エメラルドブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:emerald_block_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  emerald_block_4x:
+    base_material: EMERALD_BLOCK
+    custom_model_data: 100114
+    display_name: "&86561倍圧縮エメラルドブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:emerald_block_3x
+      shape:
+        - iii
+        - iii
+        - iii
+  netherite_block_1x:
+    base_material: NETHERITE_BLOCK
+    custom_model_data: 100121
+    display_name: "&f9倍圧縮ネザライトブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: NETHERITE_BLOCK
+      shape:
+        - iii
+        - iii
+        - iii
+  diamond_block_1x:
+    base_material: DIAMOND_BLOCK
+    custom_model_data: 100091
+    display_name: "&f9倍圧縮ダイヤモンドブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: DIAMOND_BLOCK
+      shape:
+        - iii
+        - iii
+        - iii
+  diamond_block_2x:
+    base_material: DIAMOND_BLOCK
+    custom_model_data: 100092
+    display_name: "&781倍圧縮ダイヤモンドブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:diamond_block_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  diamond_block_3x:
+    base_material: DIAMOND_BLOCK
+    custom_model_data: 100093
+    display_name: "&7729倍圧縮ダイヤモンドブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:diamond_block_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  coal_block_1x:
+    base_material: COAL_BLOCK
+    custom_model_data: 88
+    display_name: "&f9倍圧縮石炭ブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: COAL_BLOCK
+      shape:
+        - iii
+        - iii
+        - iii
+  coal_block_2x:
+    base_material: COAL_BLOCK
+    custom_model_data: 89
+    display_name: "&781倍圧縮石炭ブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:coal_block_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  coal_block_3x:
+    base_material: COAL_BLOCK
+    custom_model_data: 90
+    display_name: "&7729倍圧縮石炭ブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:coal_block_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  redstone_block_1x:
+    base_material: REDSTONE_BLOCK
+    custom_model_data: 91
+    display_name: "&f9倍圧縮レッドストーンブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: REDSTONE_BLOCK
+      shape:
+        - iii
+        - iii
+        - iii
+  redstone_block_2x:
+    base_material: REDSTONE_BLOCK
+    custom_model_data: 92
+    display_name: "&781倍圧縮レッドストーンブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:redstone_block_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  redstone_block_3x:
+    base_material: REDSTONE_BLOCK
+    custom_model_data: 93
+    display_name: "&7729倍圧縮レッドストーンブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:redstone_block_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  quartz_block_1x:
+    base_material: QUARTZ_BLOCK
+    custom_model_data: 94
+    display_name: "&f9倍圧縮クォーツブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: QUARTZ_BLOCK
+      shape:
+        - iii
+        - iii
+        - iii
+  quartz_block_2x:
+    base_material: QUARTZ_BLOCK
+    custom_model_data: 95
+    display_name: "&781倍圧縮クォーツブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:quartz_block_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  quartz_block_3x:
+    base_material: QUARTZ_BLOCK
+    custom_model_data: 96
+    display_name: "&7729倍圧縮クォーツブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:quartz_block_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  amethyst_block_1x:
+    base_material: AMETHYST_BLOCK
+    custom_model_data: 97
+    display_name: "&f9倍圧縮アメジストブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: AMETHYST_BLOCK
+      shape:
+        - iii
+        - iii
+        - iii
+  amethyst_block_2x:
+    base_material: AMETHYST_BLOCK
+    custom_model_data: 98
+    display_name: "&781倍圧縮アメジストブロック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:amethyst_block_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  echo_shard_1x:
+    base_material: ECHO_SHARD
+    custom_model_data: 100081
+    display_name: "&34倍圧縮残響の欠片"
+    lore: []
+    recipe:
+      method: inventory
+      reversible: true
+      type: shaped
+      ingredients:
+        i: ECHO_SHARD
+      shape:
+        - ii
+        - ii
+  compressed_bread_1x:
+    base_material: BREAD
+    custom_model_data: 5202
+    display_name: 圧縮パン
+    enchant_glow: false
+    lore:
+      - "&7&o9個分のパンを1個に凝縮した保存食。"
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: BREAD
+      shape:
+        - iii
+        - iii
+        - iii
+  compressed_cooked_beef_1x:
+    base_material: COOKED_BEEF
+    custom_model_data: 5203
+    display_name: 圧縮ステーキ
+    enchant_glow: false
+    lore:
+      - "&7&o9個分のステーキを1個に凝縮した保存食。"
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: COOKED_BEEF
+      shape:
+        - iii
+        - iii
+        - iii
+  breeze_rod_1x:
+    base_material: BREEZE_ROD
+    custom_model_data: 99
+    display_name: "&f4倍圧縮ブリーズロッド"
+    lore: []
+    recipe:
+      method: inventory
+      reversible: true
+      type: shaped
+      ingredients:
+        i: BREEZE_ROD
+      shape:
+        - ii
+        - ii
+  breeze_rod_2x:
+    base_material: BREEZE_ROD
+    custom_model_data: 100
+    display_name: "&716倍圧縮ブリーズロッド"
+    lore: []
+    recipe:
+      method: inventory
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:breeze_rod_1x
+      shape:
+        - ii
+        - ii
+  breeze_rod_3x:
+    base_material: BREEZE_ROD
+    custom_model_data: 100
+    display_name: "&764倍圧縮ブリーズロッド"
+    lore: []
+    recipe:
+      method: inventory
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:breeze_rod_2x
+      shape:
+        - ii
+        - ii
+  blaze_rod_1x:
+    base_material: BLAZE_ROD
+    custom_model_data: 400009
+    display_name: "&f4倍圧縮ブレイズロッド"
+    lore: []
+    recipe:
+      method: inventory
+      reversible: true
+      type: shaped
+      ingredients:
+        i: BLAZE_ROD
+      shape:
+        - ii
+        - ii
+  blaze_rod_2x:
+    base_material: BLAZE_ROD
+    custom_model_data: 400010
+    display_name: "&716倍圧縮ブレイズロッド"
+    lore: []
+    recipe:
+      method: inventory
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:blaze_rod_1x
+      shape:
+        - ii
+        - ii
+  blaze_rod_3x:
+    base_material: BLAZE_ROD
+    custom_model_data: 400011
+    display_name: "&764倍圧縮ブレイズロッド"
+    lore: []
+    recipe:
+      method: inventory
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:blaze_rod_2x
+      shape:
+        - ii
+        - ii
+  shulker_shell_1x:
+    base_material: SHULKER_SHELL
+    custom_model_data: 101
+    display_name: "&f4倍圧縮シュルカーの殻"
+    lore: []
+    recipe:
+      method: inventory
+      reversible: true
+      type: shaped
+      ingredients:
+        i: SHULKER_SHELL
+      shape:
+        - ii
+        - ii
+  shulker_shell_2x:
+    base_material: SHULKER_SHELL
+    custom_model_data: 102
+    display_name: "&716倍圧縮シュルカーの殻"
+    lore: []
+    recipe:
+      method: inventory
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:shulker_shell_1x
+      shape:
+        - ii
+        - ii
+  dragon_breath_1x:
+    base_material: DRAGON_BREATH
+    custom_model_data: 103
+    display_name: "&f4倍圧縮ドラゴンブレス"
+    lore: []
+    recipe:
+      method: inventory
+      reversible: true
+      type: shaped
+      ingredients:
+        i: DRAGON_BREATH
+      shape:
+        - ii
+        - ii
+  dragon_breath_2x:
+    base_material: DRAGON_BREATH
+    custom_model_data: 104
+    display_name: "&716倍圧縮ドラゴンブレス"
+    lore: []
+    recipe:
+      method: inventory
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:dragon_breath_1x
+      shape:
+        - ii
+        - ii
+  dragon_breath_3x:
+    base_material: DRAGON_BREATH
+    custom_model_data: 105
+    display_name: "&764倍圧縮ドラゴンブレス"
+    lore: []
+    recipe:
+      method: inventory
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:dragon_breath_2x
+      shape:
+        - ii
+        - ii
+  wither_rose_1x:
+    base_material: WITHER_ROSE
+    custom_model_data: 106
+    display_name: "&f4倍圧縮ウィザーローズ"
+    lore: []
+    recipe:
+      method: inventory
+      reversible: true
+      type: shaped
+      ingredients:
+        i: WITHER_ROSE
+      shape:
+        - ii
+        - ii
+  tf_core_meat:
+    base_material: LEATHER
+    custom_model_data: 5103
+    display_name: ミートコア
+    enchant_glow: false
+    lore:
+      - "&7&o右クリックで治癒・生命のグリフを解放する。"
+      - ""
+      - "&5脈打つ命を宿す核"
+    recipe:
+      method: workbench
+      type: shaped
+      shape:
+        - abc
+        - def
+        - ghi
+      ingredients:
+        a: COOKED_PORKCHOP
+        b: COOKED_CHICKEN
+        c: COOKED_MUTTON
+        d: COOKED_RABBIT
+        e: custom:compressed_cooked_beef_1x
+        f: COOKED_COD
+        g: COOKED_SALMON
+        h: LEATHER
+        i: ROTTEN_FLESH
+  tf_core_jewelry:
+    base_material: EMERALD
+    custom_model_data: 5104
+    display_name: ジュエリーコア
+    enchant_glow: false
+    lore:
+      - "&7&o右クリックで魔力・実用のグリフを解放する。"
+      - ""
+      - "&5価値ある輝きを宿す核"
+    recipe:
+      method: workbench
+      type: shaped
+      shape:
+        - abc
+        - def
+        - ghi
+      ingredients:
+        a: custom:coal_block_3x
+        b: custom:copper_block_3x
+        c: custom:iron_block_3x
+        d: custom:redstone_block_3x
+        e: custom:gold_block_3x
+        f: custom:diamond_block_3x
+        g: custom:lapis_block_3x
+        h: custom:emerald_block_3x
+        i: custom:quartz_block_3x
+  tf_core_vegetable:
+    base_material: WHEAT
+    custom_model_data: 5102
+    display_name: ベジタブルコア
+    enchant_glow: false
+    lore:
+      - "&7&o右クリックで成長のグリフを解放する。"
+      - ""
+      - "&5生命の芽吹きを宿す核"
+    recipe:
+      method: workbench
+      type: shaped
+      shape:
+        - abc
+        - def
+        - ghi
+      ingredients:
+        a: PUMPKIN
+        b: MELON
+        c: CARROT
+        d: POTATO
+        e: HAY_BLOCK
+        f: BEETROOT
+        g: SUGAR_CANE
+        h: WHEAT
+        i: DRIED_KELP_BLOCK
+  tf_core_wood:
+    base_material: STICK
+    custom_model_data: 5101
+    display_name: ウッドコア
+    enchant_glow: false
+    lore:
+      - "&7&o右クリックで自然のグリフを解放する。"
+      - ""
+      - "&5森の記憶が宿る核"
+    recipe:
+      method: workbench
+      type: shaped
+      shape:
+        - abc
+        - def
+        - ghi
+      ingredients:
+        a: OAK_LOG
+        b: SPRUCE_LOG
+        c: BIRCH_LOG
+        d: JUNGLE_LOG
+        e: custom:oak_wood_1x
+        f: ACACIA_LOG
+        g: DARK_OAK_LOG
+        h: MANGROVE_LOG
+        i: CHERRY_LOG
+  tf_crystal_apple:
+    base_material: ENCHANTED_GOLDEN_APPLE
+    custom_model_data: 5201
+    display_name: クリスタルリンゴ
+    enchant_glow: false
+    lore:
+      - "&7&o透き通るように輝く、結晶化した特別なリンゴ。"
+  tf_gacha_ticket:
+    base_material: PAPER
+    custom_model_data: 5001
+    display_name: ガチャ券
+    enchant_glow: false
+    lore:
+      - "&7&o手に持って右クリックすると、景品が1つ抽選される。"
+      - "&8景品プールは gacha.yml で設定"
+  tf_gacha_ticket_1:
+    base_material: PAPER
+    custom_model_data: 5011
+    display_name: "&7ガチャ券【I】"
+    enchant_glow: false
+    lore:
+      - "&7&o手に持って右クリックすると、景品が1つ抽選される。"
+      - "&8もっとも入手しやすい、初級の景品プール。"
+  tf_gacha_ticket_2:
+    base_material: PAPER
+    custom_model_data: 5012
+    display_name: "&aガチャ券【II】"
+    enchant_glow: false
+    lore:
+      - "&7&o手に持って右クリックすると、景品が1つ抽選される。"
+      - "&8初級より少し豪華な景品プール。"
+  tf_gacha_ticket_3:
+    base_material: PAPER
+    custom_model_data: 5013
+    display_name: "&bガチャ券【III】"
+    enchant_glow: false
+    lore:
+      - "&7&o手に持って右クリックすると、景品が1つ抽選される。"
+      - "&8中級の景品プール。"
+  tf_gacha_ticket_4:
+    base_material: PAPER
+    custom_model_data: 5014
+    display_name: "&dガチャ券【IV】"
+    enchant_glow: false
+    lore:
+      - "&7&o手に持って右クリックすると、景品が1つ抽選される。"
+      - "&8上級の景品プール。"
+  tf_gacha_ticket_5:
+    base_material: PAPER
+    custom_model_data: 5015
+    display_name: ガチャ券【V】
+    enchant_glow: false
+    lore:
+      - "&7&o手に持って右クリックすると、景品が1つ抽選される。"
+      - "&8釣りなどでまれに入手できる、最上級の景品プール。"
+  tf_scrap:
+    base_material: IRON_NUGGET
+    custom_model_data: 5301
+    display_name: "&7スクラップ"
+    enchant_glow: false
+    lore:
+      - "&7&oジャンク品を分解して得られる金属片"
+      - ""
+      - "&5何かの素材に使えそうだ"
+  plank_scrap:
+    base_material: OAK_PLANKS
+    custom_model_data: 5311
+    display_name: "&6木材スクラップ"
+    enchant_glow: false
+    lore:
+      - "&7&o木製装備を解体して得られる木片。4個でオークの板材に戻せる。"
+      - ""
+      - "&5役割を終えた"
+    recipe:
+      # 2026-07-26: result を明示。未指定だと UnifiedRecipeLoader が "custom:<自分自身>" を既定にするため、
+      # 「4個 → 自分自身1個」という純粋な破壊レシピになり、解体で得たスクラップに用途が無くなっていた。
+      result: OAK_PLANKS
+      method: inventory
+      type: shaped
+      ingredients:
+        i: custom:plank_scrap
+      shape:
+        - ii
+        - ii
+      amount: 1
+  copper_ingot_scrap:
+    base_material: COPPER_INGOT
+    custom_model_data: 5312
+    display_name: "&6銅スクラップ"
+    enchant_glow: false
+    lore:
+      - "&7&o銅製装備を解体して得られる金属片。4個で銅インゴットに戻せる。"
+      - ""
+      - "&5決して自然の姿ではない"
+    recipe:
+      result: COPPER_INGOT  # 2026-07-26: 未指定だと自分自身に戻る破壊レシピになる(plank_scrap参照)
+      method: inventory
+      type: shaped
+      ingredients:
+        i: custom:copper_ingot_scrap
+      shape:
+        - ii
+        - ii
+      amount: 1
+  iron_ingot_scrap:
+    base_material: IRON_INGOT
+    custom_model_data: 5313
+    display_name: "&f鉄スクラップ"
+    enchant_glow: false
+    lore:
+      - "&7&o鉄製装備を解体して得られる金属片。4個で鉄インゴットに戻せる。"
+      - ""
+      - "&5意思をもって行っている"
+    recipe:
+      result: IRON_INGOT  # 2026-07-26: 未指定だと自分自身に戻る破壊レシピになる(plank_scrap参照)
+      method: inventory
+      type: shaped
+      ingredients:
+        i: custom:iron_ingot_scrap
+      shape:
+        - ii
+        - ii
+      amount: 1
+  gold_ingot_scrap:
+    base_material: GOLD_INGOT
+    custom_model_data: 5314
+    display_name: "&e金スクラップ"
+    enchant_glow: false
+    lore:
+      - "&7&o金製装備を解体して得られる金属片。4個で金インゴットに戻せる。"
+      - ""
+      - "&5いわば人工物である証明"
+    recipe:
+      result: GOLD_INGOT  # 2026-07-26: 未指定だと自分自身に戻る破壊レシピになる(plank_scrap参照)
+      method: inventory
+      type: shaped
+      ingredients:
+        i: custom:gold_ingot_scrap
+      shape:
+        - ii
+        - ii
+      amount: 1
+  diamond_scrap:
+    base_material: DIAMOND
+    custom_model_data: 5315
+    display_name: "&bダイヤモンドスクラップ"
+    enchant_glow: false
+    lore:
+      - "&7&oダイヤ装備を解体して得られる結晶片。4個でダイヤモンドに戻せる。"
+      - ""
+      - "&5役立つものだと"
+    recipe:
+      result: DIAMOND  # 2026-07-26: 未指定だと自分自身に戻る破壊レシピになる(plank_scrap参照)
+      method: inventory
+      type: shaped
+      ingredients:
+        i: custom:diamond_scrap
+      shape:
+        - ii
+        - ii
+      amount: 1
+  netherite_ingot_scrap:
+    base_material: NETHERITE_INGOT
+    custom_model_data: 5316
+    display_name: "&8ネザライトスクラップ"
+    enchant_glow: false
+    lore:
+      - "&7&oネザライト装備を解体して得られる金属片。4個でネザライトインゴットに戻せる。"
+      - ""
+      - "&5そう主に示すだろう"
+    recipe:
+      result: NETHERITE_INGOT  # 2026-07-26: 未指定だと自分自身に戻る破壊レシピになる(plank_scrap参照)
+      method: inventory
+      type: shaped
+      ingredients:
+        i: custom:netherite_ingot_scrap
+      shape:
+        - ii
+        - ii
+      amount: 1
+  leather_scrap:
+    base_material: LEATHER
+    custom_model_data: 5317
+    display_name: "&6革スクラップ"
+    enchant_glow: false
+    lore:
+      - "&7&o革装備を解体して得られる革片。4個で革に戻せる。"
+      - ""
+      - "&5使い古されたもの"
+    recipe:
+      result: LEATHER  # 2026-07-26: 未指定だと自分自身に戻る破壊レシピになる(plank_scrap参照)
+      method: inventory
+      type: shaped
+      ingredients:
+        i: custom:leather_scrap
+      shape:
+        - ii
+        - ii
+      amount: 1
+  turtle_scute_scrap:
+    base_material: TURTLE_SCUTE
+    custom_model_data: 5318
+    display_name: "&a亀甲スクラップ"
+    enchant_glow: false
+    lore:
+      - "&7&o亀甲装備を解体して得られる甲羅片。4個で亀甲に戻せる。"
+      - ""
+      - "&5生物も例外ではない"
+    recipe:
+      result: TURTLE_SCUTE  # 2026-07-26: 未指定だと自分自身に戻る破壊レシピになる(plank_scrap参照)
+      method: inventory
+      type: shaped
+      ingredients:
+        i: custom:turtle_scute_scrap
+      shape:
+        - ii
+        - ii
+      amount: 1
+  dragon_scale:
+    base_material: TURTLE_SCUTE
+    custom_model_data: 86
+    display_name: "&fエンダードラゴンの鱗"
+    lore:
+      - "&7エンダードラゴンの体表を覆う硬質の鱗。"
+      - ""
+      - "&5天空の覇者が纏いし鎧。"
+  elder_guardian_spike:
+    base_material: PRISMARINE_SHARD
+    custom_model_data: 100013
+    display_name: "&bエルダーガーディアンの棘"
+    lore:
+      - "&7エルダーガーディアンの体から突き出た鋭い棘。"
+      - ""
+      - "&5深海の守護者の意志。"
+  wither_skull_fragment:
+    base_material: WITHER_SKELETON_SKULL
+    custom_model_data: 87
+    display_name: "&8ウィザーの頭蓋骨"
+    lore:
+      - "&7ウィザーが討伐時に落とす禍々しい頭蓋骨の欠片。"
+      - "&8※設置可能アイテムのため地面に置くと通常のウィザースケルトンの頭に見えます(回収すれば元の見た目に戻ります)。"
+      - ""
+      - "&5終焉を告げる呪い。"
+  warden_tendril:
+    base_material: ECHO_SHARD
+    custom_model_data: 100082
+    display_name: "&3ウォーデンの触覚"
+    lore:
+      - "&7ウォーデンの触覚状の器官。深き闇の記憶を宿す。"
+      - ""
+      - "&5深層の番人の警告。"
+  reinforced_fiber:
+    base_material: STRING
+    custom_model_data: 100022
+    display_name: 強化繊維
+    lore:
+      - "&7&o糸を石炭で強化し、ダイヤモンドで結晶化させた繊維。"
+      - ""
+      - "&5技術革新"
+    recipe:
+      method: workbench
+      type: shaped
+      shape:
+        - rcr
+        - cdc
+        - rcr
+      ingredients:
+        r: COAL
+        c: STRING
+        d: DIAMOND
+  heavy_metal:
+    base_material: IRON_INGOT
+    custom_model_data: 107
+    display_name: 重量鋼材
+    lore:
+      - "&7&o鉄と銅を重ね、ダイヤモンドで鍛え上げた刃。"
+      - ""
+      - "&5繊維の時代は終わるだろう"
+    recipe:
+      method: workbench
+      type: shaped
+      shape:
+        - rcr
+        - cdc
+        - rcr
+      ingredients:
+        r: COPPER_INGOT
+        c: IRON_INGOT
+        d: DIAMOND
+  hard_metal:
+    base_material: NETHERITE_SCRAP
+    custom_model_data: 108
+    display_name: 硬質鋼材
+    lore:
+      - "&7&o黒曜石とクォーツブロックをダイヤモンドで研ぎ澄ました刃。"
+    recipe:
+      method: workbench
+      type: shaped
+      shape:
+        - rcr
+        - cdc
+        - rcr
+      ingredients:
+        r: QUARTZ_BLOCK
+        c: OBSIDIAN
+        d: DIAMOND
+  reinforced_leather:
+    base_material: LEATHER
+    custom_model_data: 5105
+    display_name: 強化合皮
+    lore:
+      - "&7&o革をファントムの被膜で補強し、ダイヤモンドで仕上げた合皮。"
+      - ""
+      - "&5合皮しかし最硬"
+    recipe:
+      method: workbench
+      type: shaped
+      shape:
+        - rcr
+        - cdc
+        - rcr
+      ingredients:
+        r: PHANTOM_MEMBRANE
+        c: LEATHER
+        d: DIAMOND
+  echo_shard_2x:
+    base_material: ECHO_SHARD
+    custom_model_data: 100081
+    display_name: "&316倍圧縮残響の欠片"
+    lore: []
+    recipe:
+      method: inventory
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:echo_shard_1x
+      shape:
+        - ii
+        - ii
+  wither_rose_2x:
+    base_material: WITHER_ROSE
+    custom_model_data: 106
+    display_name: "&f16倍圧縮ウィザーローズ"
+    lore: []
+    recipe:
+      method: inventory
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:wither_rose_1x
+      shape:
+        - ii
+        - ii
+_editor:
+  categories:
+    material:
+      - id: cat_1784733348418
+        label: 中間素材
+        itemIds:
+          - tf_scrap
+          - plank_scrap
+          - copper_ingot_scrap
+          - iron_ingot_scrap
+          - gold_ingot_scrap
+          - diamond_scrap
+          - netherite_ingot_scrap
+          - leather_scrap
+          - turtle_scute_scrap
+          - reinforced_fiber
+          - heavy_metal
+          - hard_metal
+          - reinforced_leather
+      - id: cat_1784625931991
+        label: 圧縮ブロック
+        itemIds:
+          - stone_1x
+          - stone_2x
+          - stone_3x
+          - stone_4x
+          - stone_5x
+          - copper_block_1x
+          - copper_block_2x
+          - copper_block_3x
+          - iron_block_1x
+          - iron_block_2x
+          - iron_block_3x
+          - gold_block_1x
+          - gold_block_2x
+          - gold_block_3x
+          - lapis_block_1x
+          - lapis_block_2x
+          - lapis_block_3x
+          - emerald_block_1x
+          - emerald_block_2x
+          - emerald_block_3x
+          - emerald_block_4x
+          - netherite_block_1x
+          - end_stone_2x
+          - end_stone_1x
+          - netherrack_1x
+          - netherrack_2x
+          - oak_wood_1x
+          - diamond_block_1x
+          - diamond_block_2x
+          - diamond_block_3x
+          - coal_block_1x
+          - coal_block_2x
+          - coal_block_3x
+          - redstone_block_1x
+          - redstone_block_2x
+          - redstone_block_3x
+          - quartz_block_1x
+          - quartz_block_2x
+          - amethyst_block_1x
+          - quartz_block_3x
+          - amethyst_block_2x
+      - id: cat_1784626872880
+        label: 圧縮素材
+        itemIds:
+          - echo_shard_1x
+          - breeze_rod_1x
+          - breeze_rod_2x
+          - blaze_rod_1x
+          - blaze_rod_2x
+          - blaze_rod_3x
+          - shulker_shell_1x
+          - shulker_shell_2x
+          - dragon_breath_1x
+          - dragon_breath_2x
+          - dragon_breath_3x
+          - wither_rose_1x
+          - breeze_rod_3x
+          - wither_rose_2x
+          - echo_shard_2x
+      - id: cat_1784733247787
+        label: コア
+        itemIds:
+          - tf_core_meat
+          - tf_core_jewelry
+          - tf_core_vegetable
+          - tf_core_wood
+      - id: cat_1784733270033
+        label: ガチャ券
+        itemIds:
+          - tf_gacha_ticket
+          - tf_gacha_ticket_1
+          - tf_gacha_ticket_2
+          - tf_gacha_ticket_3
+          - tf_gacha_ticket_4
+          - tf_gacha_ticket_5
+      - id: cat_1784733285048
+        label: Ars(魔法)
+        itemIds:
+          - source_gem
+          - source_gem_block
+          - magebloom_fiber
+          - sourcestone
+      - id: cat_1784733374294
+        label: 食料
+        itemIds:
+          - tf_crystal_apple
+          - compressed_bread_1x
+          - compressed_cooked_beef_1x
+      - id: cat_20260723_drop
+        label: ドロップ素材
+        itemIds:
+          - dragon_scale
+          - elder_guardian_spike
+          - wither_skull_fragment
+          - warden_tendril
+  orders:
+    material:
+      - source_gem
+      - source_gem_block
+      - magebloom_fiber
+      - sourcestone
+      - oak_wood_1x
+      - stone_1x
+      - stone_2x
+      - stone_3x
+      - stone_4x
+      - stone_5x
+      - copper_block_1x
+      - copper_block_2x
+      - copper_block_3x
+      - iron_block_1x
+      - iron_block_2x
+      - iron_block_3x
+      - gold_block_1x
+      - gold_block_2x
+      - gold_block_3x
+      - netherrack_1x
+      - netherrack_2x
+      - end_stone_1x
+      - end_stone_2x
+      - lapis_block_1x
+      - lapis_block_2x
+      - lapis_block_3x
+      - emerald_block_1x
+      - emerald_block_2x
+      - emerald_block_3x
+      - emerald_block_4x
+      - netherite_block_1x
+      - diamond_block_1x
+      - diamond_block_2x
+      - diamond_block_3x
+      - coal_block_1x
+      - coal_block_2x
+      - coal_block_3x
+      - redstone_block_1x
+      - redstone_block_2x
+      - redstone_block_3x
+      - quartz_block_1x
+      - quartz_block_2x
+      - quartz_block_3x
+      - amethyst_block_1x
+      - amethyst_block_2x
+      - echo_shard_1x
+      - compressed_bread_1x
+      - compressed_cooked_beef_1x
+      - breeze_rod_1x
+      - breeze_rod_2x
+      - breeze_rod_3x
+      - blaze_rod_1x
+      - blaze_rod_2x
+      - blaze_rod_3x
+      - shulker_shell_1x
+      - shulker_shell_2x
+      - dragon_breath_1x
+      - dragon_breath_2x
+      - dragon_breath_3x
+      - wither_rose_1x
+      - tf_core_meat
+      - tf_core_jewelry
+      - tf_core_vegetable
+      - tf_core_wood
+      - tf_crystal_apple
+      - tf_gacha_ticket
+      - tf_gacha_ticket_1
+      - tf_gacha_ticket_2
+      - tf_gacha_ticket_3
+      - tf_gacha_ticket_4
+      - tf_gacha_ticket_5
+      - tf_scrap
+      - plank_scrap
+      - copper_ingot_scrap
+      - iron_ingot_scrap
+      - gold_ingot_scrap
+      - diamond_scrap
+      - netherite_ingot_scrap
+      - leather_scrap
+      - turtle_scute_scrap
+      - dragon_scale
+      - elder_guardian_spike
+      - wither_skull_fragment
+      - warden_tendril
+      - reinforced_fiber
+      - heavy_metal
+      - hard_metal
+      - reinforced_leather

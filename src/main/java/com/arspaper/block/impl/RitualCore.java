@@ -69,19 +69,15 @@ public class RitualCore extends CustomBlock {
     }
 
     @Override
-    public ItemStack createItemStack() {
-        ItemStack item = super.createItemStack();
-        item.editMeta(meta ->
-            meta.lore(List.of(
-                Component.text("台座と共に設置して儀式を行う", NamedTextColor.GRAY)
-                    .decoration(TextDecoration.ITALIC, false),
-                Component.text("スニーク+右クリックで儀式を発動", NamedTextColor.DARK_GRAY)
-                    .decoration(TextDecoration.ITALIC, false),
-                Component.text("右クリックでアイテムを設置/回収", NamedTextColor.DARK_GRAY)
-                    .decoration(TextDecoration.ITALIC, false)
-            ))
+    protected List<Component> getDefaultLore() {
+        return List.of(
+            Component.text("台座と共に設置して儀式を行う", NamedTextColor.GRAY)
+                .decoration(TextDecoration.ITALIC, false),
+            Component.text("スニーク+右クリックで儀式を発動", NamedTextColor.DARK_GRAY)
+                .decoration(TextDecoration.ITALIC, false),
+            Component.text("右クリックでアイテムを設置/回収", NamedTextColor.DARK_GRAY)
+                .decoration(TextDecoration.ITALIC, false)
         );
-        return item;
     }
 
     @Override
@@ -302,5 +298,16 @@ public class RitualCore extends CustomBlock {
      */
     public static ItemStack getStoredItem(TileState tileState) {
         return restoreStoredItem(tileState.getPersistentDataContainer());
+    }
+
+    /**
+     * コアの保存アイテムを差し替える（儀式効果からの書き戻し用、例: スレッド枠拡張儀式で変換後の装備を
+     * コアへ戻すケース）。{@code onBlockInteract} の設置処理（141-147行目）と同じ手順
+     * (完全シリアライズ保存 + ヘッド表示更新)を、既存アイテムをコアから取り除かずに行う点だけが異なる。
+     */
+    public static void setStoredItem(TileState tileState, ItemStack item) {
+        saveStoredItem(tileState.getPersistentDataContainer(), item);
+        tileState.update();
+        ItemFrameHelper.updateHeadDisplay(tileState.getLocation(), item);
     }
 }

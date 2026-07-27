@@ -1,6 +1,7 @@
 package com.arspaper.source.sourcelink;
 
 import com.arspaper.block.BlockKeys;
+import com.arspaper.integration.TrinityForgeBridge;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -17,6 +18,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Alchemical Sourcelink - 醸造素材を消費してSourceを生成。
@@ -56,60 +58,58 @@ public class AlchemicalSourcelink extends Sourcelink {
     );
 
     /** 実行時に使用する錬金素材値マップ（設定ファイルから読み込み可能） */
-    private Map<Material, Integer> alchemyValues = DEFAULT_ALCHEMY_VALUES;
+    private com.arspaper.item.ItemCostTable alchemyValues =
+            com.arspaper.item.ItemCostTable.fromMaterials(DEFAULT_ALCHEMY_VALUES);
 
     public AlchemicalSourcelink(JavaPlugin plugin) {
         super(plugin, "alchemical_sourcelink");
     }
 
-    /**
-     * デフォルトの錬金素材値マップを返す（設定ファイルが無い場合のフォールバック用）。
-     */
+    /** カスタムソースリンク (sourcelinks.yml items.<id> type: alchemical) 用: 任意idで同じ挙動の別ブロックを作る。 */
+    public AlchemicalSourcelink(JavaPlugin plugin, String blockId) {
+        super(plugin, blockId);
+    }
+
     static Map<Material, Integer> getDefaultAlchemyValues() {
         return DEFAULT_ALCHEMY_VALUES;
     }
 
-    /**
-     * 設定ファイルから読み込んだ錬金素材値マップを設定する。
-     */
-    public void setAlchemyValues(Map<Material, Integer> values) {
-        this.alchemyValues = values != null ? values : DEFAULT_ALCHEMY_VALUES;
+    public void setAlchemyValues(com.arspaper.item.ItemCostTable values) {
+        this.alchemyValues = values != null && !values.isEmpty()
+                ? values
+                : com.arspaper.item.ItemCostTable.fromMaterials(DEFAULT_ALCHEMY_VALUES);
     }
 
     @Override
     public Material getBlockMaterial() {
-        return Material.BLAST_FURNACE;
+        return materialOr(Material.BLAST_FURNACE);
     }
 
     @Override
     public Component getDisplayName() {
-        return Component.text("アルケミカルソースリンク", NamedTextColor.DARK_PURPLE)
-            .decoration(TextDecoration.ITALIC, false);
+        return displayNameOr(Component.text("アルケミカルソースリンク", NamedTextColor.DARK_PURPLE)
+            .decoration(TextDecoration.ITALIC, false));
     }
 
     @Override
     public int getCustomModelData() {
-        return 200005;
+        return cmdOr(200005);
     }
 
     @Override
     public ItemStack createItemStack() {
-        ItemStack item = super.createItemStack();
-        item.editMeta(meta ->
-            meta.lore(List.of(
+        return withConfiguredOrDefaultLore(super.createItemStack(), List.of(
                 Component.text("醸造素材を消費してソースを生成", NamedTextColor.GRAY)
                     .decoration(TextDecoration.ITALIC, false),
                 Component.text("醸造素材を手に持って右クリックで投入", NamedTextColor.DARK_GRAY)
                     .decoration(TextDecoration.ITALIC, false)
-            ))
-        );
-        return item;
+        ));
     }
 
     @Override
     public ItemStack getDisplayHeadItem() {
         ItemStack head = new ItemStack(Material.DRAGON_BREATH);
-        head.editMeta(meta -> meta.setCustomModelData(200005));
+        head.editMeta(meta -> meta.setCustomModelData(getCustomModelData()));
         return head;
     }
 
@@ -120,30 +120,31 @@ public class AlchemicalSourcelink extends Sourcelink {
 
     @Override
     public int getSourceValueForItem(org.bukkit.inventory.ItemStack item) {
-        if (item == null) return 0;
-        Integer value = alchemyValues.get(item.getType());
-        return value != null ? value : 0;
+        return alchemyValues.valueOf(item);
     }
 
     @Override
     public void onBlockInteract(Player player, Block block, TileState tileState) {
         ItemStack hand = player.getInventory().getItemInMainHand();
-        if (isCustomItem(hand)) {
-            int buffer = getBuffer(tileState);
-            player.sendMessage(Component.text(
-                "アルケミカルソースリンク - 蓄積ソース: " + buffer, NamedTextColor.DARK_PURPLE
-            ));
-            return;
-        }
-        Integer sourceValue = alchemyValues.get(hand.getType());
+        int sourceValue = alchemyValues.valueOf(hand);
 
-        if (sourceValue != null) {
+        if (sourceValue > 0) {
             int addCount = player.isSneaking() ? hand.getAmount() : 1;
             addCount = Math.min(addCount, hand.getAmount());
             int totalAdded = sourceValue * addCount;
 
             addToBuffer(block, totalAdded);
-            hand.setAmount(hand.getAmount() - addCount);
+
+            // 要件 ingredient-no-consume-chance: skilltree由来のperkで素材消費をまれにスキップする。
+            // バッファへの加算(addToBuffer)は通常通り行い、スキップするのは「素材の消費」のみ。
+            // TF未ロード/perk未所持時はfrac<=0のため必ず従来通り消費する(fail-open)。
+            // 2026-07-23 正準スケール分数統一によりstat値は分数[0,1](例 0.10=10%)。
+            double noConsumeFrac = TrinityForgeBridge.tfIngredientNoConsumeChanceFraction(player);
+            boolean skipConsume = noConsumeFrac > 0.0
+                && ThreadLocalRandom.current().nextDouble() < noConsumeFrac;
+            if (!skipConsume) {
+                hand.setAmount(hand.getAmount() - addCount);
+            }
 
             int buffer = getBuffer((TileState) block.getState());
             player.sendMessage(Component.text(

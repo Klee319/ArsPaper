@@ -20,8 +20,6 @@ import java.util.Set;
  */
 public class ManaRecoveryListener implements Listener {
 
-    private static final int PERCENT_DIVISOR = 100;
-
     /**
      * 攻撃時マナ回復の対象とする近接攻撃のDamageCause。
      *
@@ -44,13 +42,17 @@ public class ManaRecoveryListener implements Listener {
 
     /**
      * 被弾時マナ回復: プレイヤーがエンティティからダメージを受けた時に設定分を回復。
+     *
+     * <p>攻撃側({@link #onPlayerDealDamage})と対称に MONITOR で最終確定後に判定し、
+     * {@code getFinalDamage()>0} のみ回復対象とする（後続ハンドラでのキャンセル/吸収/無効化を反映し、
+     * 0ダメージ被弾でのマナ回復誘発を防ぐ）。
      */
-    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onPlayerDamaged(EntityDamageByEntityEvent event) {
         if (event.isCancelled()) return;
         if (!(event.getEntity() instanceof Player player)) return;
-        ManaConfig config = manaManager.getConfig();
-        recover(player, config.onHitPercent(), config.onHitFlat());
+        if (event.getFinalDamage() <= 0) return;
+        recover(player, ManaBaseStats.onHitPercent(), ManaBaseStats.onHitFlat());
     }
 
     /**
@@ -66,18 +68,19 @@ public class ManaRecoveryListener implements Listener {
         if (!(event.getDamager() instanceof Player player)) return;
         if (!MELEE_ATTACK_CAUSES.contains(event.getCause())) return;
         if (event.getFinalDamage() <= 0) return;
-        ManaConfig config = manaManager.getConfig();
-        recover(player, config.onAttackPercent(), config.onAttackFlat());
+        recover(player, ManaBaseStats.onAttackPercent(), ManaBaseStats.onAttackFlat());
     }
 
     /**
      * 最大マナに対する%＋固定値を回復する。回復量が0以下なら何もしない。
+     *
+     * @param percent 分数[0,1](例 0.03 = 3%)。{@link ManaBaseStats} が既に正規化済みの値を返す。
      */
-    private void recover(Player player, int percent, int flat) {
+    private void recover(Player player, double percent, int flat) {
         int amount = flat;
         if (percent > 0) {
             int max = manaManager.getMaxMana(player);
-            amount += (int) Math.round(max * percent / (double) PERCENT_DIVISOR);
+            amount += (int) Math.round(max * percent);
         }
         if (amount > 0) {
             manaManager.addMana(player, amount);

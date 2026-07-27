@@ -2,6 +2,7 @@ package com.arspaper.command.handlers;
 
 import com.arspaper.ArsPaper;
 import com.arspaper.item.ItemKeys;
+import com.arspaper.spell.GlyphNames;
 import com.arspaper.spell.SpellAugment;
 import com.arspaper.spell.SpellComponent;
 import com.arspaper.spell.SpellEffect;
@@ -99,7 +100,7 @@ public final class SpellCommands {
         player.sendMessage(Component.text("形態(Form): ", NamedTextColor.GREEN)
             .append(Component.text(
                 plugin.getSpellRegistry().getForms().stream()
-                    .map(SpellForm::getDisplayName)
+                    .map(c -> GlyphNames.display(c))
                     .collect(Collectors.joining(", ")),
                 NamedTextColor.WHITE
             )));
@@ -107,7 +108,7 @@ public final class SpellCommands {
         player.sendMessage(Component.text("効果(Effect): ", NamedTextColor.YELLOW)
             .append(Component.text(
                 plugin.getSpellRegistry().getEffects().stream()
-                    .map(SpellEffect::getDisplayName)
+                    .map(c -> GlyphNames.display(c))
                     .collect(Collectors.joining(", ")),
                 NamedTextColor.WHITE
             )));
@@ -115,7 +116,7 @@ public final class SpellCommands {
         player.sendMessage(Component.text("増強(Augment): ", NamedTextColor.LIGHT_PURPLE)
             .append(Component.text(
                 plugin.getSpellRegistry().getAugments().stream()
-                    .map(SpellAugment::getDisplayName)
+                    .map(c -> GlyphNames.display(c))
                     .collect(Collectors.joining(", ")),
                 NamedTextColor.WHITE
             )));

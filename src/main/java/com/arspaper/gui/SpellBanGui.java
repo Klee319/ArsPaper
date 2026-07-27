@@ -2,6 +2,7 @@ package com.arspaper.gui;
 
 import com.arspaper.ArsPaper;
 import com.arspaper.spell.SpellComponent;
+import com.arspaper.spell.GlyphNames;
 import com.arspaper.spell.SpellEffect;
 import com.arspaper.world.WorldSettingsManager;
 import net.kyori.adventure.text.Component;
@@ -113,7 +114,7 @@ public class SpellBanGui extends BaseGui {
         }
 
         return createButton(material,
-            Component.text(effect.getDisplayName(), nameColor),
+            Component.text(GlyphNames.display(effect), nameColor),
             lore);
     }
 
@@ -156,17 +157,17 @@ public class SpellBanGui extends BaseGui {
             // グローバルBANはGUIから変更不可
             if (plugin.getWorldSettingsManager().getGlobalBannedSpells().contains(key)) {
                 clicker.sendMessage(Component.text(
-                    effect.getDisplayName() + " はサーバ全体でBANされています (ban.ymlで管理)", NamedTextColor.RED));
+                    GlyphNames.display(effect) + " はサーバ全体でBANされています (ban.ymlで管理)", NamedTextColor.RED));
                 return true;
             }
 
             boolean nowBanned = plugin.getWorldSettingsManager().toggleWorldBan(worldName, key);
             if (nowBanned) {
                 clicker.sendMessage(Component.text(
-                    effect.getDisplayName() + " を " + worldName + " でBANしました", NamedTextColor.RED));
+                    GlyphNames.display(effect) + " を " + worldName + " でBANしました", NamedTextColor.RED));
             } else {
                 clicker.sendMessage(Component.text(
-                    effect.getDisplayName() + " の " + worldName + " でのBANを解除しました", NamedTextColor.GREEN));
+                    GlyphNames.display(effect) + " の " + worldName + " でのBANを解除しました", NamedTextColor.GREEN));
             }
             render();
             return true;

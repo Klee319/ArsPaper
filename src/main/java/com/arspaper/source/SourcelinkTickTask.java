@@ -132,6 +132,7 @@ public class SourcelinkTickTask implements Listener {
 
     /**
      * Vitalic Sourcelink: 近くでmobが死亡した際にボーナスSourceをバッファに蓄積。
+     * 固定idだけでなく、type=vitalic のカスタムソースリンクも対象。
      */
     @EventHandler
     public void onEntityDeath(EntityDeathEvent event) {
@@ -141,26 +142,9 @@ public class SourcelinkTickTask implements Listener {
         World deathWorld = deathLoc.getWorld();
         if (deathWorld == null) return;
 
-        Set<Location> vitalicLocs = sourcelinkLocations.get("vitalic_sourcelink");
-        if (vitalicLocs == null || vitalicLocs.isEmpty()) return;
-
         int radiusSq = VitalicSourcelink.DETECTION_RADIUS * VitalicSourcelink.DETECTION_RADIUS;
-
-        for (Location loc : List.copyOf(vitalicLocs)) {
-            World locWorld = loc.getWorld();
-            if (locWorld == null || !deathWorld.equals(locWorld)) continue;
-            if (deathLoc.distanceSquared(loc) > radiusSq) continue;
-
-            Block block = loc.getBlock();
-            if (!(block.getState() instanceof TileState)) continue;
-
-            blockRegistry.get("vitalic_sourcelink").ifPresent(cb -> {
-                if (cb instanceof Sourcelink sourcelink) {
-                    // バッファに蓄積（次のtickで排出される）
-                    sourcelink.addToBuffer(block, VitalicSourcelink.SOURCE_PER_KILL);
-                }
-            });
-        }
+        accumulateNear(VitalicSourcelink.class, deathWorld, deathLoc, radiusSq,
+            VitalicSourcelink.SOURCE_PER_KILL);
     }
 
     /**
@@ -183,24 +167,33 @@ public class SourcelinkTickTask implements Listener {
         World growthWorld = growthLoc.getWorld();
         if (growthWorld == null) return;
 
-        Set<Location> botanicalLocs = sourcelinkLocations.get("botanical_sourcelink");
-        if (botanicalLocs == null || botanicalLocs.isEmpty()) return;
-
         int radiusSq = BotanicalSourcelink.DETECTION_RADIUS * BotanicalSourcelink.DETECTION_RADIUS;
+        accumulateNear(BotanicalSourcelink.class, growthWorld, growthLoc, radiusSq,
+            BotanicalSourcelink.SOURCE_PER_GROWTH);
+    }
 
-        for (Location loc : List.copyOf(botanicalLocs)) {
-            World locWorld = loc.getWorld();
-            if (locWorld == null || !growthWorld.equals(locWorld)) continue;
-            if (growthLoc.distanceSquared(loc) > radiusSq) continue;
+    /**
+     * 指定typeのソースリンク (カスタムid含む) のうち、イベント地点の近傍にある設置ブロックの
+     * バッファへ {@code amount} を加算する。次のtickで排出される。
+     */
+    private void accumulateNear(Class<? extends Sourcelink> type, World world,
+                                Location center, int radiusSq, int amount) {
+        for (var entry : sourcelinkLocations.entrySet()) {
+            Sourcelink sourcelink = blockRegistry.get(entry.getKey())
+                .filter(type::isInstance)
+                .map(cb -> (Sourcelink) cb)
+                .orElse(null);
+            if (sourcelink == null || entry.getValue().isEmpty()) continue;
 
-            Block block = loc.getBlock();
-            if (!(block.getState() instanceof TileState)) continue;
+            for (Location loc : List.copyOf(entry.getValue())) {
+                World locWorld = loc.getWorld();
+                if (locWorld == null || !world.equals(locWorld)) continue;
+                if (center.distanceSquared(loc) > radiusSq) continue;
 
-            blockRegistry.get("botanical_sourcelink").ifPresent(cb -> {
-                if (cb instanceof Sourcelink sourcelink) {
-                    sourcelink.addToBuffer(block, BotanicalSourcelink.SOURCE_PER_GROWTH);
-                }
-            });
+                Block block = loc.getBlock();
+                if (!(block.getState() instanceof TileState)) continue;
+                sourcelink.addToBuffer(block, amount);
+            }
         }
     }
 

@@ -13,4 +13,8 @@
 # ワールド別のBAN設定は /ars world ban コマンドで設定できます。
 # ============================================================
 
-banned-spells: []
+banned-spells:
+  - arspaper:solar
+  - arspaper:lunar
+  - arspaper:sonic_boom
+  - arspaper:journey

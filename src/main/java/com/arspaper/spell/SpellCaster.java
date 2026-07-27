@@ -1,6 +1,9 @@
 package com.arspaper.spell;
 
 import com.arspaper.ArsPaper;
+import com.arspaper.item.CatalystData;
+import com.arspaper.item.ItemKeys;
+import com.arspaper.item.SpellBookTierData;
 import com.arspaper.mana.ManaKeys;
 import com.arspaper.mana.ManaManager;
 import com.arspaper.spell.form.BeamForm;
@@ -42,9 +45,9 @@ public class SpellCaster {
     /** 使用ゲート（perk所持→glyph使用許可）。 */
     private final UsageGate usageGate;
 
-    public SpellCaster(ManaManager manaManager) {
+    public SpellCaster(ManaManager manaManager, UnlockedGlyphs unlockedGlyphs) {
         this.manaManager = manaManager;
-        this.usageGate = new UsageGate(ArsPaper.getInstance());
+        this.usageGate = new UsageGate(ArsPaper.getInstance(), unlockedGlyphs);
         reloadFormCooldowns();
     }
 
@@ -90,7 +93,7 @@ public class SpellCaster {
     public String firstMissingPerkGlyph(Player player, SpellRecipe recipe) {
         for (SpellComponent comp : recipe.getComponents()) {
             if (!usageGate.hasPermission(player, comp.getId().getKey())) {
-                return comp.getDisplayName();
+                return GlyphNames.display(comp);
             }
         }
         return null;
@@ -145,6 +148,31 @@ public class SpellCaster {
         if (recipe == null || !recipe.isValid()) {
             caster.sendMessage(Component.text("無効なスペルです！", NamedTextColor.RED));
             return false;
+        }
+
+        // SOULBOUND / OWNER_BOUND: 非所有者は触媒・魔導書での詠唱不可。
+        // 共有エンチャント付き魔導書(sharedSpell + share on catalyst)は例外。
+        if (catalyst != null) {
+            boolean shareExempt = sharedSpell
+                && com.arspaper.enchant.ArsEnchantments.hasShareEnchant(catalyst);
+            if (!shareExempt
+                    && !com.arspaper.integration.TrinityForgeBridge.mayActorUseItem(caster, catalyst)) {
+                caster.sendMessage(Component.text(
+                    "このアイテムは所有者以外は使用できません。", NamedTextColor.RED));
+                return false;
+            }
+        }
+
+        // 触媒/魔導書の詠唱ゲート (use-requirements): use-skill / use-level 要件未達なら不発
+        // (マナ消費前)。近接/弓/ツール/防具ゲートと同じ規則・文言をTF側で一元評価する。
+        // TF未ロード/enforceオフ/要件なしは null(fail-open)。
+        if (catalyst != null) {
+            net.kyori.adventure.text.Component denial =
+                com.arspaper.integration.TrinityForgeBridge.useRequirementDenial(caster, catalyst);
+            if (denial != null) {
+                caster.sendActionBar(denial);
+                return false;
+            }
         }
 
         // グリフ解放チェック: 共有エンチャント付きでない場合のみ
@@ -206,10 +234,80 @@ public class SpellCaster {
             return false;
         }
 
+        // 触媒(catalysts.yml)/魔導書(spellbooks.yml)のCTオプション解決。
+        // 触媒として登録済みのアイテムを優先し、そうでなければ魔導書アイテムのcooldownを見る
+        // （両者は同一詠唱で二重適用しない: 触媒が解決できた場合は魔導書側を見ない）。
+        CatalystData catalystData = resolveCatalystData(catalyst);
+        SpellBookTierData bookTierData = (catalystData == null) ? resolveSpellBookTierData(catalyst) : null;
+
+        // 触媒のみ: アイテムCTゲージ(武器CT/詠唱CT)が残っている間は詠唱不可。
+        // CT設定(item-cooldownステ or cooldownオプション)を持つ触媒だけをゲートし、
+        // 同マテリアルのバニラ由来クールダウン(エンダーパール等)では誤ブロックしない
+        // (CombatListener.meleeWeaponOnCooldown と同じ規則)。これにより近接命中で入ったCT中は
+        // 詠唱も塞がれ、詠唱で入ったCT中の連続詠唱も塞がれる(攻撃側は既存のTFゲートが塞ぐ)。
+        if (catalystData != null && catalyst != null && caster.getCooldown(catalyst) > 0) {
+            boolean ownsCt = catalystData.cooldownMs() > 0
+                || com.arspaper.integration.TrinityForgeBridge.itemCooldownSeconds(catalyst) > 0.0;
+            if (ownsCt) {
+                return false;
+            }
+        }
+
+        // 触媒別CT: form別CTとは別キー空間（"catalyst:" + id + ":" + uuid）でゲートする。
+        String catalystCooldownKey = null;
+        if (catalystData != null && catalystData.cooldownMs() > 0) {
+            catalystCooldownKey = "catalyst:" + catalystData.id() + ":" + caster.getUniqueId();
+            Long lastCatalystCast = cooldowns.get(catalystCooldownKey);
+            if (lastCatalystCast != null && now - lastCatalystCast < catalystData.cooldownMs()) {
+                return false;
+            }
+        }
+        // 魔導書別CT: 同様に別キー空間（"book:" + id + ":" + uuid）でゲートする。
+        String bookCooldownKey = null;
+        if (bookTierData != null && bookTierData.getCooldownMs() > 0) {
+            bookCooldownKey = "book:" + bookTierData.getItemId() + ":" + caster.getUniqueId();
+            Long lastBookCast = cooldowns.get(bookCooldownKey);
+            if (lastBookCast != null && now - lastBookCast < bookTierData.getCooldownMs()) {
+                return false;
+            }
+        }
+
         int baseCost = recipe.getTotalManaCost();
         // マナ消費量低下%の合算はManaManagerに集約（THREAD_COST_REDUCTION＋将来の装備由来削減）。
-        int costReduction = manaManager.getCostReductionPercent(caster);
-        int cost = Math.max(1, baseCost - (int) Math.round(baseCost * costReduction / 100.0));
+        // 触媒(catalysts.yml)のmana-cost-reductionは、実数減算(flat)を先に適用してから
+        // 割合減算(percent、ManaManagerの装備由来%に加算合成)を掛ける。触媒でない経路は従来どおり不変。
+        int costReductionPercent = manaManager.getCostReductionPercent(caster);
+        int manaFlatReduction = 0;
+        if (catalystData != null) {
+            costReductionPercent = Math.min(100, costReductionPercent + catalystData.manaPercentReduction());
+            manaFlatReduction = catalystData.manaFlatReduction();
+            // P2-Java: 触媒のマナ削減はcatalysts.ymlのstats節(mana-cost-reduction-flat/-percent、
+            // INTEGER item-stats)としてTrinityForgeへ動的登録され、品質/ランダムロール込みで解決される。
+            // 旧来のmana-cost-reduction:{flat,percent}(CatalystData由来、上の2行)は後方互換のため
+            // 合算を継続する — エディタの移行はstats書込み時に旧キーを削除するため、移行済み設定では
+            // 二重計上にならない(未移行の設定はCatalystData側のみが値を持つ)。
+            com.arspaper.integration.TrinityForgeBridge.CatalystManaReduction resolved =
+                com.arspaper.integration.TrinityForgeBridge.resolveCatalystManaReduction(catalyst);
+            costReductionPercent = Math.min(100, costReductionPercent + resolved.percent());
+            manaFlatReduction += resolved.flat();
+        }
+        // 2026-07-26 マナ系ステ穴埋め(タスク5、オーケストレータ決定): パーク/役職/永続バフ/base-stats由来の
+        // mana_cost_reduction_flat/-percent を、触媒(アイテム)由来の削減と加算合成する。
+        // TF正準スケール(PercentStatNormalize.RATE_KEYS)では mana-cost-reduction-percent は割合[0,1]、
+        // mana-cost-reduction-flat は整数のFLAT軽減量なので、percent側だけ%整数へ変換してから合算する。
+        // 触媒(アイテム)側は上のcatalystData/resolveCatalystManaReductionが引き続き担当し、
+        // tfNonItemStatTotalは装備を一切含まない非アイテム分だけを返すため二重計上しない。
+        // clampReductionFraction で軽減率が[0,0.95]にクランプ済み(消費マナが負=回復化する事故を防止)、
+        // 加えて下の Math.min(100, ...) が最終合成後にも同じ安全上限を再度効かせる。
+        double nonItemPercentFraction = com.arspaper.integration.TrinityForgeBridge.clampReductionFraction(
+                com.arspaper.integration.TrinityForgeBridge.tfNonItemStatTotal(
+                        caster, "mana_cost_reduction_percent"));
+        costReductionPercent = Math.min(100,
+                costReductionPercent + (int) Math.round(nonItemPercentFraction * 100.0));
+        manaFlatReduction += (int) Math.round(com.arspaper.integration.TrinityForgeBridge.tfNonItemStatTotal(
+                caster, "mana_cost_reduction_flat"));
+        int afterFlatReduction = Math.max(0, baseCost - manaFlatReduction);
+        int cost = Math.max(1, afterFlatReduction - (int) Math.round(afterFlatReduction * costReductionPercent / 100.0));
         if (!manaManager.consumeMana(caster, cost)) {
             // マナ不足通知が無効化されていなければメッセージ表示
             int notifyOff = caster.getPersistentDataContainer()
@@ -219,8 +317,13 @@ public class SpellCaster {
             }
             return false;
         }
+        // 要件⑥ source-auto-consume: 上のconsumeManaがSource補填で不足分を賄った場合、
+        // その補填量を記録しておく（キャンセル時のマナ返還からSource補填分を除外するため）。
+        int sourceConvertedAmount = manaManager.getLastSourceConvertedAmount();
 
         cooldowns.put(cooldownKey, now);
+        if (catalystCooldownKey != null) cooldowns.put(catalystCooldownKey, now);
+        if (bookCooldownKey != null) cooldowns.put(bookCooldownKey, now);
         // 非発動（idle）回復ボーナス判定用に最終詠唱時刻を記録
         manaManager.touchCast(caster);
 
@@ -231,8 +334,17 @@ public class SpellCaster {
 
         // エフェクトがキャンセルした場合、マナを返還
         if (context.isCancelled()) {
-            manaManager.addMana(caster, cost);
+            // source-auto-consumeでSource補填された分(sourceConvertedAmount)はSourceへ戻す経路が
+            // 用意されていないため、マナ返還からは除外する(=返還しない)。これにより
+            // 「不足分だけSource補填→自己キャンセル→全額マナ返還」でSourceがマナへ実質変換され続ける
+            // エクスプロイトを遮断する。正当な実消費マナ分(cost - sourceConvertedAmount)は従来どおり返還する。
+            int manaRefund = cost - sourceConvertedAmount;
+            if (manaRefund > 0) {
+                manaManager.addMana(caster, manaRefund);
+            }
             cooldowns.remove(cooldownKey);
+            if (catalystCooldownKey != null) cooldowns.remove(catalystCooldownKey);
+            if (bookCooldownKey != null) cooldowns.remove(bookCooldownKey);
             return false;
         }
 
@@ -246,6 +358,14 @@ public class SpellCaster {
         //  - 二重付与なし: 1回のcast成功につき1回のみ呼ばれる（cost = 実消費マナ）。
         grantArsMagicExp(caster, cost);
 
+        // P9: 触媒詠唱成功時にアイテムクールダウンゲージ(武器CT相当)を表示する。触媒の実クールダウン
+        // (catalystData.cooldownMs())をフォールバック秒として渡し、触媒の解決済みitem-cooldownステが
+        // あればそちらを優先する。触媒未使用(catalystData==null)の詠唱には何も表示しない(従来挙動)。
+        if (catalystData != null) {
+            com.arspaper.integration.TrinityForgeBridge.startItemCooldown(
+                caster, catalyst, catalystData.cooldownMs() / 1000.0);
+        }
+
         // アクションバーにスペル名を表示
         caster.sendActionBar(Component.text("§d" + recipe.getName()));
 
@@ -255,10 +375,15 @@ public class SpellCaster {
     /**
      * ARS_MAGIC カスタムスキルへEXPを付与する（プレイヤー詠唱成功時のみ）。
      * amount = ars-magic.exp-per-cast + ars-magic.exp-per-mana * cost（config駆動）。
+     * TF {@code stats/skill-exp.yml} が権威。TrinityForge 未ロード時のみ ArsPaper config.yml にフォールバック。
      *
      * <p>TrinityForge未ロード（{@code TrinityForge.getInstance()==null}）時は呼ばない（fail-open）。
-     * ValhallaMMO不在/ARS_MAGIC未登録/amount<=0 は {@code ArsBridge.grantMagicExp} が内部でno-op化し、
+     * TF進行サービス未初期化/amount<=0 は進行ブリッジが内部でno-op化し、
      * 例外も内部で握るため、ここでの追加ハンドリングは不要。
+     *
+     * <p>{@code dungeon-only-exp=true}（既定）の場合、詠唱者が現在いるワールドが
+     * {@link com.trinityforge.dungeon.DungeonWorldRegistry} 登録済みのダンジョンワールドでなければ
+     * EXPは付与しない（マナ消費・詠唱自体は本メソッド到達前に完了しており影響しない）。
      *
      * @param player 詠唱に成功したプレイヤー
      * @param cost   その詠唱で実際に消費したマナ量
@@ -268,10 +393,15 @@ public class SpellCaster {
         if (tf == null) {
             return; // TF未ロード: 付与しない（例外を出さない）
         }
-        var manaConfig = manaManager.getConfig();
-        double amount = manaConfig.arsMagicExpPerCast()
-            + manaConfig.arsMagicExpPerMana() * cost;
-        com.trinityforge.bridge.valhalla.ArsBridge.grantMagicExp(tf, player, amount);
+        // ダンジョンワールド限定EXP(stats/skill-exp.yml dungeon-only-exp)。
+        // マナ消費/詠唱自体は呼び出し元で既に完了済みのため、ここではEXP付与のみを抑止する。
+        if (tf.config().skillExp().dungeonOnlyExp()
+                && !tf.dungeonWorldRegistry().isDungeonWorld(player.getWorld().getUID())) {
+            return;
+        }
+        double amount = com.arspaper.integration.TrinityForgeBridge.arsMagicExpPerCast()
+            + com.arspaper.integration.TrinityForgeBridge.arsMagicExpPerMana() * cost;
+        com.trinityforge.integration.ars.ArsProgressionBridge.grantMagicExp(tf, player, amount);
     }
 
     /**
@@ -282,6 +412,29 @@ public class SpellCaster {
         String prefix = playerId + ":";
         cooldowns.keySet().removeIf(key -> key.startsWith(prefix));
         invalidateGlyphCache(playerId);
+    }
+
+    /**
+     * 詠唱に使われたcatalyst ItemStackが、登録済み触媒(catalysts.yml)かどうかを解決する。
+     * material + CustomModelDataで照合するCatalystConfigへ委譲する。
+     */
+    private static CatalystData resolveCatalystData(org.bukkit.inventory.ItemStack catalyst) {
+        if (catalyst == null) return null;
+        return ArsPaper.getInstance().getCatalystConfig().resolve(catalyst);
+    }
+
+    /**
+     * 詠唱に使われたcatalyst ItemStackが魔導書(spell_book_*)であれば、そのティア定義を返す。
+     * 魔導書でない、またはBOOK_TIER未設定/未知ティアの場合は{@code null}。
+     */
+    private static SpellBookTierData resolveSpellBookTierData(org.bukkit.inventory.ItemStack catalyst) {
+        if (catalyst == null || !catalyst.hasItemMeta()) return null;
+        String customId = catalyst.getItemMeta().getPersistentDataContainer()
+            .get(ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING);
+        if (customId == null || !customId.startsWith("spell_book_")) return null;
+        int tier = catalyst.getItemMeta().getPersistentDataContainer()
+            .getOrDefault(ItemKeys.BOOK_TIER, PersistentDataType.INTEGER, 1);
+        return ArsPaper.getInstance().getSpellBookConfig().byTier(tier);
     }
 
     /**
@@ -311,7 +464,7 @@ public class SpellCaster {
         String worldName = caster.getWorld().getName();
         for (SpellComponent comp : recipe.getComponents()) {
             if (wsm.isSpellBanned(worldName, comp.getId().toString())) {
-                return comp.getDisplayName();
+                return GlyphNames.display(comp);
             }
         }
         return null;

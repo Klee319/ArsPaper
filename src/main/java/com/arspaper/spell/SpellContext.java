@@ -210,6 +210,12 @@ public class SpellContext {
         // catalyst==null（儀式/タレット等の非プレイヤー詠唱）では plain(0) フォールバック。
         double finalDamage = com.arspaper.integration.TrinityForgeBridge
             .magicalFinalDamage(casterUuid, target, spellBase, catalyst);
+        // #6: 負の最終魔法ダメージは対象を回復させる(TF物理側 CombatListener と対称。負クランプ設定時のみ発生)。
+        // 0 は何もしない。正のときのみ MAGIC ダメージソースで適用する。
+        if (finalDamage < 0) {
+            com.arspaper.integration.TrinityForgeBridge.healEntity(target, -finalDamage);
+            return;
+        }
         if (finalDamage <= 0) {
             return;
         }

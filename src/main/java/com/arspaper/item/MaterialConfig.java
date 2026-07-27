@@ -15,6 +15,8 @@ public record MaterialConfig(
     Material baseMaterial,
     int customModelData,
     List<String> lore,
+    // エンチャント光沢(キラキラ)を付与するか。既定 true（従来どおり）
+    boolean enchantGlow,
     // 儀式レシピ（null=レシピなし）
     String coreItem,
     List<String> pedestalItems,

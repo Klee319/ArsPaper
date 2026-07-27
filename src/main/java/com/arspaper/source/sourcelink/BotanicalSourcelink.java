@@ -33,40 +33,41 @@ public class BotanicalSourcelink extends Sourcelink {
         super(plugin, "botanical_sourcelink");
     }
 
+    /** カスタムソースリンク (sourcelinks.yml items.<id> type: botanical) 用: 任意idで同じ挙動の別ブロックを作る。 */
+    public BotanicalSourcelink(JavaPlugin plugin, String blockId) {
+        super(plugin, blockId);
+    }
+
     @Override
     public Material getBlockMaterial() {
-        return Material.BEEHIVE;
+        return materialOr(Material.BEEHIVE);
     }
 
     @Override
     public Component getDisplayName() {
-        return Component.text("ボタニカルソースリンク", NamedTextColor.GREEN)
-            .decoration(TextDecoration.ITALIC, false);
+        return displayNameOr(Component.text("ボタニカルソースリンク", NamedTextColor.GREEN)
+            .decoration(TextDecoration.ITALIC, false));
     }
 
     @Override
     public int getCustomModelData() {
-        return 200007;
+        return cmdOr(200007);
     }
 
     @Override
     public ItemStack createItemStack() {
-        ItemStack item = super.createItemStack();
-        item.editMeta(meta ->
-            meta.lore(List.of(
+        return withConfiguredOrDefaultLore(super.createItemStack(), List.of(
                 Component.text("植物の成長からソースを生成", NamedTextColor.GRAY)
                     .decoration(TextDecoration.ITALIC, false),
                 Component.text("半径10ブロック以内の作物成長で蓄積", NamedTextColor.DARK_GRAY)
                     .decoration(TextDecoration.ITALIC, false)
-            ))
-        );
-        return item;
+        ));
     }
 
     @Override
     public ItemStack getDisplayHeadItem() {
         ItemStack head = new ItemStack(Material.OAK_LEAVES);
-        head.editMeta(meta -> meta.setCustomModelData(200007));
+        head.editMeta(meta -> meta.setCustomModelData(getCustomModelData()));
         return head;
     }
 

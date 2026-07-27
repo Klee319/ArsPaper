@@ -45,15 +45,11 @@ public class ScribingTable extends CustomBlock {
     }
 
     @Override
-    public ItemStack createItemStack() {
-        ItemStack item = super.createItemStack();
-        item.editMeta(meta ->
-            meta.lore(List.of(
-                Component.text("設置して右クリックでグリフを解放", NamedTextColor.GRAY)
-                    .decoration(TextDecoration.ITALIC, false)
-            ))
+    protected List<Component> getDefaultLore() {
+        return List.of(
+            Component.text("設置して右クリックでグリフを解放", NamedTextColor.GRAY)
+                .decoration(TextDecoration.ITALIC, false)
         );
-        return item;
     }
 
     @Override

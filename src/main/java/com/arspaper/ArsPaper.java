@@ -3,6 +3,7 @@ package com.arspaper;
 import com.arspaper.block.BlockParticleTask;
 import com.arspaper.block.CustomBlockListener;
 import com.arspaper.block.CustomBlockRegistry;
+import com.arspaper.block.SourceJarConfig;
 import com.arspaper.block.impl.CreativeSourceJar;
 import com.arspaper.block.impl.Pedestal;
 import com.arspaper.block.impl.RitualCore;
@@ -12,8 +13,7 @@ import com.arspaper.block.impl.Waystone;
 import com.arspaper.command.ArsCommand;
 import com.arspaper.gui.GuiListener;
 import com.arspaper.item.*;
-import com.arspaper.item.impl.ConfigurableArmor;
-import com.arspaper.item.impl.MageArmor;
+import com.arspaper.item.impl.CatalystItem;
 import com.arspaper.item.impl.SourceBerry;
 import com.arspaper.item.impl.SpellBook;
 // SpellWand は廃止（アイテムバインドで代替）
@@ -73,13 +73,18 @@ public class ArsPaper extends JavaPlugin {
     private RitualManager ritualManager;
     private BlockParticleTask blockParticleTask;
     private GlyphConfig glyphConfig;
+    private com.arspaper.item.FunctionalItemConfig functionalItemConfig;
     private SpellCaster spellCaster;
-    private ArmorConfigManager armorConfigManager;
+    private com.arspaper.spell.UnlockedGlyphs unlockedGlyphs;
     private MaterialConfigManager materialConfigManager;
     private ArmorManaListener armorManaListener;
     private ThreadConfig threadConfig;
+    private ThreadSetConfig threadSetConfig;
+    private SpellBookConfig spellBookConfig;
+    private CatalystConfig catalystConfig;
     private com.arspaper.loot.LootTableListener lootTableListener;
     private SourcelinkConfig sourcelinkConfig;
+    private SourceJarConfig sourceJarConfig;
     private com.arspaper.world.WorldSettingsManager worldSettingsManager;
 
     @Override
@@ -101,12 +106,17 @@ public class ArsPaper extends JavaPlugin {
 
         recipeManager = new RecipeManager(this);
         recipeManager.registerWorkbenchRecipes(recipeLoader.getWorkbenchRecipes());
-        recipeManager.registerArmorRecipes(armorConfigManager);
+        // 作業台専用(3×3, method: workbench)レシピが2×2インベントリグリッドで成立するのを防ぐ。
+        getServer().getPluginManager().registerEvents(
+            new com.arspaper.recipe.WorkbenchGridGateListener(recipeManager), this);
+        // 圧縮ブロック等、base material 共通・CMD違いのカスタムアイテムがプレーン素材レシピに
+        // material のみで誤一致する over-match(最上位圧縮→下位に戻るバグ)を per-slot 厳密照合で防ぐ。
+        getServer().getPluginManager().registerEvents(
+            new com.arspaper.recipe.CustomIngredientCraftGuardListener(recipeManager), this);
 
         // 儀式エフェクトレジストリ
         ritualEffectRegistry = new RitualEffectRegistry();
         ritualEffectRegistry.register("weather", new WeatherRitualEffect());
-        ritualEffectRegistry.register("thread", new ThreadRitualEffect());
         FlightRitualEffect flightEffect = new FlightRitualEffect();
         getServer().getPluginManager().registerEvents(flightEffect, this);
         ritualEffectRegistry.register("flight", flightEffect);
@@ -116,11 +126,17 @@ public class ArsPaper extends JavaPlugin {
         ritualEffectRegistry.register("animal_summon", new AnimalSummonRitualEffect());
         ritualEffectRegistry.register("mob_summon", new MobSummonRitualEffect());
         ritualEffectRegistry.register("enchant_book", new EnchantBookRitualEffect());
+        ritualEffectRegistry.register("thread_slot_expand", new ThreadSlotExpandRitualEffect());
 
         // 儀式レシピ読み込み（UnifiedRecipeLoaderから）
         ritualRecipeRegistry = new RitualRecipeRegistry(this);
         ritualRecipeRegistry.registerRecipes(recipeLoader.getRitualRecipes());
         ritualManager = new RitualManager(ritualRecipeRegistry, ritualEffectRegistry, unlockGate);
+
+        // TF は Ars より先に enable するため、catalog.yml 儀式はここで Ars 側へ取り込む。
+        com.arspaper.integration.TrinityForgeBridge.repushCatalogRituals();
+        // 同様に TF のカタログ作業台レシピも再登録させ、結果を Ars 実体(機能PDC付き)へ差し替える。
+        com.arspaper.integration.TrinityForgeBridge.refreshCatalogRecipes();
 
         if (!com.arspaper.integration.TrinityForgeBridge.isAvailable()) {
             getLogger().severe("TrinityForge が見つかりません。魔法ダメージの対称パイプライン供給と全perkゲートが無効化されます（fail-open）。");
@@ -131,6 +147,10 @@ public class ArsPaper extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        // TFのExternalItemRegistryに残った "arspaper" レイヤーを消す(空Mapで置換=レイヤーごと除去)。
+        // 無いとArsPaperがこのセッションだけ無効化された場合に、もう存在しないカスタムアイテムの
+        // material+CMD識別がTF側の custom: レシピ判定に残留してしまう。
+        com.arspaper.integration.TrinityForgeBridge.registerExternalItems(java.util.List.of());
         if (manaManager != null) {
             manaManager.shutdown();
         }
@@ -181,7 +201,7 @@ public class ArsPaper extends JavaPlugin {
         }
 
         if (!currentVersion.equals(savedVersion)) {
-            String[] resourceFiles = {"glyphs.yml", "items.yml", "materials.yml", "threads.yml", "armors.yml", "sourcelinks.yml"};
+            String[] resourceFiles = {"glyphs.yml", "items.yml", "materials.yml", "threads.yml", "sourcelinks.yml", "spellbooks.yml", "sourcejars.yml", "functional-items.yml"};
             for (String name : resourceFiles) {
                 java.io.File existing = new java.io.File(getDataFolder(), name);
                 if (existing.exists()) {
@@ -216,9 +236,16 @@ public class ArsPaper extends JavaPlugin {
         // グリフ設定
         glyphConfig = new GlyphConfig(this);
 
+        // 機能アイテム表示名設定（ワンド/コンパス/儀式ブロック等の表示名上書き）
+        functionalItemConfig = new com.arspaper.item.FunctionalItemConfig(this);
+
         // スペルレジストリ
         spellRegistry = new SpellRegistry();
         registerDefaultGlyphs();
+
+        // Glyph unlock is handled by glyphs.yml tier gates + TrinityForge skilltree glyph-gate perks.
+        // Keep UnlockedGlyphs for existing PDC data and UsageGate / admin command paths.
+        unlockedGlyphs = new com.arspaper.spell.UnlockedGlyphs(this);
 
         // エンチャント定数読み込み
         com.arspaper.enchant.ArsEnchantments.loadConfig(getConfig());
@@ -231,10 +258,7 @@ public class ArsPaper extends JavaPlugin {
         worldSettingsManager = new com.arspaper.world.WorldSettingsManager(this);
 
         // スペルキャスター（シングルトン）
-        spellCaster = new SpellCaster(manaManager);
-
-        // 防具設定マネージャー
-        armorConfigManager = new ArmorConfigManager(this);
+        spellCaster = new SpellCaster(manaManager, unlockedGlyphs);
 
         // 素材設定マネージャー
         materialConfigManager = new MaterialConfigManager(this);
@@ -242,8 +266,20 @@ public class ArsPaper extends JavaPlugin {
         // スレッド設定
         threadConfig = new ThreadConfig(this);
 
+        // スレッド・セット効果設定(thread-sets.yml, TrinityForge戦闘連携)
+        threadSetConfig = new ThreadSetConfig(this);
+
+        // 魔導書ティア設定（spellbooks.ymlから動的登録）
+        spellBookConfig = new SpellBookConfig(this);
+
+        // 触媒設定（spellbooks.ymlのcatalysts:節から動的登録）
+        catalystConfig = new CatalystConfig(this);
+
         // ソースリンク設定
         sourcelinkConfig = new SourcelinkConfig(this);
+        // ソースジャー容量・見た目
+        sourceJarConfig = new SourceJarConfig(this);
+        SourceJar.applyConfiguredCapacity(sourceJarConfig.capacityOf("source_jar"));
 
         // 解放ゲート（レシピ/儀式 perk ゲート + 修繕儀式コスト設定）
         unlockGate = new com.arspaper.recipe.UnlockGate(this);
@@ -255,6 +291,18 @@ public class ArsPaper extends JavaPlugin {
         blockRegistry = new CustomBlockRegistry();
         registerDefaultBlocks();
         registerDefaultItems();
+        // sourcelinks.yml items: のカスタムid定義を登録する。既定ブロック/アイテムの後に行うことで、
+        // 既存idとの衝突を検知してスキップできる (上書き事故防止)。
+        registerCustomSourcelinks();
+
+        // 全カスタムアイテム(素材/魔導書/触媒/スレッド等)の識別(material+CMD)をTrinityForgeの
+        // ExternalItemRegistryへ反映する。custom:<id> レシピのper-slot識別(CatalogWorkbenchListener)
+        // がArsPaperアイテムを認識できるようにするための登録で、必ず後続のrepushCatalogRituals/
+        // refreshCatalogRecipes(TFはArsより先にenableするため、この後にTF側から呼ばれる)より前に置く。
+        com.arspaper.integration.TrinityForgeBridge.registerExternalItems(itemRegistry.getAll());
+
+        // 触媒ステをTrinityForgeへ動的登録（品質/ランダムロール解決・lore自動生成・戦闘連携を統一パイプラインへ委譲）
+        registerCatalystStatsWithTrinityForge();
 
         // Sourceネットワーク
         sourceNetwork = new SourceNetwork(this);
@@ -443,8 +491,8 @@ public class ArsPaper extends JavaPlugin {
     }
 
     private void registerDefaultItems() {
-        // Spell Books (3 tiers)
-        for (SpellBookTier tier : SpellBookTier.values()) {
+        // 設定ベース魔導書ティア（spellbooks.ymlから動的登録）
+        for (SpellBookTierData tier : spellBookConfig.all()) {
             itemRegistry.register(new SpellBook(this, spellRegistry, tier));
         }
 
@@ -458,16 +506,28 @@ public class ArsPaper extends JavaPlugin {
             itemRegistry.register(new com.arspaper.item.impl.ConfigurableMaterial(this, mat));
         }
 
-        // 設定ベース防具（armors.ymlから動的登録）
-        for (ArmorSetConfig armorSet : armorConfigManager.getAll()) {
-            for (String slot : ArmorSetConfig.getSlotNames()) {
-                itemRegistry.register(new ConfigurableArmor(this, armorSet, slot));
-            }
-        }
-
         // Thread Items (空 + 効果付き)
         for (ThreadType threadType : ThreadType.values()) {
             itemRegistry.register(new ThreadItem(this, threadType));
+        }
+
+        // 設定ベース触媒（spellbooks.ymlのcatalysts:節から動的登録）
+        for (CatalystData catalyst : catalystConfig.all()) {
+            itemRegistry.register(new CatalystItem(this, catalyst));
+        }
+    }
+
+    /**
+     * 触媒(catalysts.yml)のステをTrinityForgeの動的item-stats登録APIへ反映する。
+     * 既存の{@link com.arspaper.integration.TrinityForgeBridge#CATALYST_NAMESPACE}配下の登録を
+     * 一旦クリアしてから全触媒を再登録するため、削除された触媒の残留登録も除去される。
+     */
+    private void registerCatalystStatsWithTrinityForge() {
+        com.arspaper.integration.TrinityForgeBridge.clearCatalystStats();
+        for (CatalystData catalyst : catalystConfig.all()) {
+            com.arspaper.integration.TrinityForgeBridge.registerCatalystStats(
+                catalyst.material(), catalyst.customModelData(),
+                catalyst.fixedStats(), catalyst.perQualityStats(), catalyst.randomStats());
         }
     }
 
@@ -518,9 +578,67 @@ public class ArsPaper extends JavaPlugin {
         itemRegistry.register(new TeleportCompass(this));
     }
 
+    /** 固定5種のソースリンクid (これ以外の items.<id> はカスタム定義として type から実体を作る)。 */
+    private static final java.util.Set<String> FIXED_SOURCELINK_IDS = java.util.Set.of(
+        "volcanic_sourcelink", "mycelial_sourcelink", "alchemical_sourcelink",
+        "vitalic_sourcelink", "botanical_sourcelink");
+
+    /**
+     * sourcelinks.yml {@code items:} のカスタムid定義から、typeに対応する挙動のソースリンクを
+     * 生成してブロック/アイテムレジストリへ登録する。見た目 (material / display-name / CMD / lore)
+     * は各インスタンスが自身のidで {@code items.<id>} を参照するため自動的に反映される。
+     * 燃料テーブルはtypeごとの共有設定 (volcanic.materials 等) を使う。
+     *
+     * <p>再登録 (reload時) はレジストリのMapを同idで上書きするだけなので冪等。設定から消えたidの
+     * 登録解除は再起動が必要 (残っていても実害はない: 設置済みブロックが動き続けるだけ)。
+     */
+    private void registerCustomSourcelinks() {
+        for (SourcelinkConfig.ItemDef def : sourcelinkConfig.items().values()) {
+            String id = def.id();
+            if (FIXED_SOURCELINK_IDS.contains(id) || blockRegistry.has(id)) {
+                continue;
+            }
+            // 既存の非ブロックアイテム (wand / source_berry 等) と同じ id は上書きしない。
+            if (itemRegistry.has(id)) {
+                getLogger().warning("sourcelinks.yml: items." + id
+                    + " conflicts with an existing item id — skipped (choose another id)");
+                continue;
+            }
+            com.arspaper.source.sourcelink.Sourcelink link = switch (def.type()) {
+                case "volcanic" -> {
+                    VolcanicSourcelink v = new VolcanicSourcelink(this, id);
+                    v.setFuelValues(sourcelinkConfig.getVolcanicMaterials());
+                    yield v;
+                }
+                case "mycelial" -> {
+                    MycelialSourcelink m = new MycelialSourcelink(this, id);
+                    m.setFoodValues(sourcelinkConfig.getMycelialMaterials());
+                    yield m;
+                }
+                case "alchemical" -> {
+                    AlchemicalSourcelink a = new AlchemicalSourcelink(this, id);
+                    a.setAlchemyValues(sourcelinkConfig.getAlchemicalMaterials());
+                    yield a;
+                }
+                case "vitalic" -> new VitalicSourcelink(this, id);
+                case "botanical" -> new BotanicalSourcelink(this, id);
+                default -> null;
+            };
+            if (link == null) {
+                getLogger().warning("sourcelinks.yml: items." + id + " type '" + def.type()
+                    + "' is unknown — skipped");
+                continue;
+            }
+            blockRegistry.register(link);
+            itemRegistry.register(link);
+            getLogger().info("Registered custom sourcelink '" + id + "' (type=" + def.type() + ")");
+        }
+    }
+
     private void registerListeners() {
         var pluginManager = getServer().getPluginManager();
         pluginManager.registerEvents(new CustomItemListener(itemRegistry), this);
+        // グリフ解放はScribingTable(glyphs.yml unlock-cost) + skilltree glyph-gateに一本化 (2026-07-23: 旧glyph-unlock-items.yml右クリック解放ルートを削除)。
         pluginManager.registerEvents(new CustomBlockListener(this, blockRegistry, blockParticleTask, sourcelinkTickTask), this);
         pluginManager.registerEvents(new ProjectileHitListener(), this);
         pluginManager.registerEvents(new GuiListener(), this);
@@ -528,16 +646,23 @@ public class ArsPaper extends JavaPlugin {
         pluginManager.registerEvents(new com.arspaper.mana.ManaRecoveryListener(manaManager), this);
         armorManaListener = new ArmorManaListener(this);
         pluginManager.registerEvents(armorManaListener, this);
+        pluginManager.registerEvents(new ThreadGuiOpenListener(this), this);
         pluginManager.registerEvents(new SourceBerryListener(this), this);
         pluginManager.registerEvents(new PhantomBlockListener(), this);
         pluginManager.registerEvents(new SummonedMobListener(this), this);
         pluginManager.registerEvents(new com.arspaper.enchant.EnchantBookListener(), this);
         pluginManager.registerEvents(new com.arspaper.enchant.SoulboundListener(), this);
+        // 要件⑥ lapis-cost-reduction: skilltree由来のperkでエンチャント台のラピス消費を割合減する。
+        pluginManager.registerEvents(new com.arspaper.enchant.LapisCostReductionListener(), this);
         pluginManager.registerEvents(new com.arspaper.spell.SpellBindListener(), this);
         lootTableListener = new com.arspaper.loot.LootTableListener(this);
         pluginManager.registerEvents(lootTableListener, this);
+        // 要件⑥ ocean-thread-catch / ruins-thread-drop: TF側ドロップテーブル(2026-07-23
+        // stat-gate-overhaul §4)へ移設されたため、fork側の重複ドロップリスナーは廃止(W2d-2)。
         // クラフトレシピの perk 解放ゲート
         pluginManager.registerEvents(new com.arspaper.recipe.RecipeUnlockGate(unlockGate), this);
+        // 鍛冶台（ネザライト強化等）の perk 解放ゲート。PrepareItemCraftEvent を通らない経路を埋める。
+        pluginManager.registerEvents(new com.arspaper.recipe.SmithingTableUnlockGate(unlockGate), this);
 
         // SpellEffectリスナー登録（Listener実装のEffectのみ）
         for (var component : spellRegistry.getAll()) {
@@ -603,16 +728,32 @@ public class ArsPaper extends JavaPlugin {
         return glyphConfig;
     }
 
+    public com.arspaper.item.FunctionalItemConfig getFunctionalItemConfig() {
+        return functionalItemConfig;
+    }
+
     public SpellCaster getSpellCaster() {
         return spellCaster;
     }
 
-    public ArmorConfigManager getArmorConfigManager() {
-        return armorConfigManager;
-    }
-
     public ThreadConfig getThreadConfig() {
         return threadConfig;
+    }
+
+    public ThreadSetConfig getThreadSetConfig() {
+        return threadSetConfig;
+    }
+
+    public SpellBookConfig getSpellBookConfig() {
+        return spellBookConfig;
+    }
+
+    public CatalystConfig getCatalystConfig() {
+        return catalystConfig;
+    }
+
+    public MaterialConfigManager getMaterialConfigManager() {
+        return materialConfigManager;
     }
 
     public SourcelinkTickTask getSourcelinkTickTask() {
@@ -630,6 +771,10 @@ public class ArsPaper extends JavaPlugin {
         glyphConfig.reload();
     }
 
+    public void reloadFunctionalItemConfig() {
+        functionalItemConfig.reload();
+    }
+
     public void reloadMaterialConfig() {
         materialConfigManager.reload();
         // 素材アイテムを登録/更新（既存IDも最新設定で再登録）
@@ -638,14 +783,24 @@ public class ArsPaper extends JavaPlugin {
         }
     }
 
-    public void reloadArmorConfig() {
-        armorConfigManager.reload();
-        // 防具アイテムを登録/更新（既存IDも最新設定で再登録）
-        for (ArmorSetConfig armorSet : armorConfigManager.getAll()) {
-            for (String slot : ArmorSetConfig.getSlotNames()) {
-                itemRegistry.register(new ConfigurableArmor(this, armorSet, slot));
-            }
+    public void reloadSpellBookConfig() {
+        spellBookConfig.reload();
+        // 魔導書アイテムを登録/更新（既存IDも最新設定で再登録）
+        for (SpellBookTierData tier : spellBookConfig.all()) {
+            itemRegistry.register(new SpellBook(this, spellRegistry, tier));
         }
+    }
+
+    /**
+     * spellbooks.ymlのcatalysts:節を再読み込みし、触媒アイテムの再登録＋
+     * TrinityForge動的item-stats登録の再反映まで行う。
+     */
+    public void reloadCatalystConfig() {
+        catalystConfig.reload();
+        for (CatalystData catalyst : catalystConfig.all()) {
+            itemRegistry.register(new CatalystItem(this, catalyst));
+        }
+        registerCatalystStatsWithTrinityForge();
     }
 
     public void reloadLootConfig() {
@@ -662,9 +817,13 @@ public class ArsPaper extends JavaPlugin {
         return sourcelinkConfig;
     }
 
+    public SourceJarConfig getSourceJarConfig() {
+        return sourceJarConfig;
+    }
+
     public void reloadSourcelinkConfig() {
         sourcelinkConfig.reload();
-        // 登録済みソースリンクに新しい値を適用
+        // 登録済みソースリンクに新しい値を適用 (カスタムidのインスタンスも instanceof で拾われる)
         for (var block : blockRegistry.getAll()) {
             if (block instanceof VolcanicSourcelink v) {
                 v.setFuelValues(sourcelinkConfig.getVolcanicMaterials());
@@ -674,5 +833,16 @@ public class ArsPaper extends JavaPlugin {
                 a.setAlchemyValues(sourcelinkConfig.getAlchemicalMaterials());
             }
         }
+        // reloadで新しく追加されたカスタムソースリンクを登録 (既存idはスキップされる)
+        registerCustomSourcelinks();
+    }
+
+    public void reloadSourceJarConfig() {
+        if (sourceJarConfig == null) {
+            sourceJarConfig = new SourceJarConfig(this);
+        } else {
+            sourceJarConfig.reload();
+        }
+        SourceJar.applyConfiguredCapacity(sourceJarConfig.capacityOf("source_jar"));
     }
 }

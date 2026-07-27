@@ -9,7 +9,11 @@
 # ※ 増強の互換性はソースコード定義（GlyphConfig.AUGMENT_COMPAT）
 # unlock-cost:
 #   level: 必要経験値レベル
-#   materials: 必要素材（素材名: 個数）
+#   materials: 必要素材（個数）
+#     キーは Material名 / custom:<itemId> / 登録済みなら裸の itemId
+#     例: ARROW: 16
+#         "custom:source_gem": 2
+#         magebloom_fiber: 4
 #
 # ===== 増強カテゴリ一覧 =====
 # amplify    (増幅)     : 効果の強度・威力を上昇させる
@@ -35,18 +39,14 @@
 #                          ルーン+残留で発動後も効果が残る
 # propagate  (伝播)     : 投射/接触互換。ブロック着弾時に周辺エンティティにも効果を伝播
 
+# 設定リファレンス(本文コメント移設先): docs/config-reference/arspaper/glyphs.md
 glyphs:
 
-  # ============================================================
-  # Forms（形態）- スペルの発動方法を決定する
-  # ============================================================
 
-  # 説明: 弾を発射し着弾地点に効果を適用する
   projectile:
+    display-name: "投射"
     tier: 1
     mana-cost: 10
-    # 加速:弾速↑ | 減速:弾速↓ | 貫通:対象を貫通 | 分裂:弾が複数化
-    # 軌跡:飛行経路上にも効果 | 延伸:射程延長
     params:
       max-trail-ticks: 200          # 弾の最大飛行時間(tick)
       spread-angle-step: 0.15       # 分裂時の弾の拡散角度(rad)
@@ -63,11 +63,10 @@ glyphs:
         ARROW: 16
         LAPIS_BLOCK: 1
 
-  # 説明: 近接距離の対象に直接効果を適用する
   touch:
+    display-name: "接触"
     tier: 1
     mana-cost: 10
-    # effects空=全効果互換（投擲のみコード側で除外）
     max-augments:
       rapid_fire: 4
     params:
@@ -78,8 +77,8 @@ glyphs:
         OAK_BUTTON: 4
         LAPIS_BLOCK: 1
 
-  # 説明: 自分自身に効果を適用する
   self:
+    display-name: "自己"
     tier: 1
     mana-cost: 10
     max-augments:
@@ -90,8 +89,8 @@ glyphs:
         IRON_CHESTPLATE: 1
         LAPIS_BLOCK: 1
 
-  # 説明: 足元のブロックに効果を適用する
   underfoot:
+    display-name: "足元"
     tier: 1
     mana-cost: 10
     max-augments:
@@ -102,8 +101,8 @@ glyphs:
         IRON_BOOTS: 1
         LAPIS_BLOCK: 1
 
-  # 説明: 頭上のブロックに効果を適用する（足元の上方向版）
   overhead:
+    display-name: "頭上"
     tier: 1
     mana-cost: 5
     max-augments:
@@ -114,12 +113,10 @@ glyphs:
         IRON_HELMET: 1
         LAPIS_BLOCK: 1
 
-  # 説明: 自身の周囲を回転する球体が接触した対象に効果を適用する
   orbit:
+    display-name: "旋回"
     tier: 2
     mana-cost: 80
-    # 加速:回転速度↑ | 減速:回転速度↓ | 分裂:軌道数増加
-    # 延長:旋回持続+3秒/段 | 短縮:旋回持続-3秒/段 | 半径増加:軌道半径↑
     params:
       orbit-radius: 2.0             # 旋回半径(ブロック)
       radius-per-aoe: 1.0           # 半径増加1段あたりの旋回半径増加(ブロック)
@@ -142,13 +139,10 @@ glyphs:
         ENDER_EYE: 16
         COMPASS: 1
 
-  # 説明: 時限式の火球を発射し、炸裂地点に効果を適用する
   burst:
+    display-name: "炸裂"
     tier: 2
     mana-cost: 70
-    # 延伸:弾速UP=遠くで炸裂(距離ベース) | 延長:信管延長=遅く炸裂(時間ベース)
-    # 半径増加:炸裂範囲↑ | 貫通:エンティティ貫通 | 分裂:複数弾
-    # 空中炸裂でもブロック対象を取れる
     params:
       base-speed: 1.0               # 基本弾速
       reach-speed-bonus: 0.25        # 延伸1段あたりの弾速増加
@@ -171,13 +165,10 @@ glyphs:
         TNT: 16
         ENDER_EYE: 8
 
-  # 説明: 直線レーザーを照射し経路上の全対象に効果を適用する（デフォルト全貫通）
   beam:
+    display-name: "照射"
     tier: 3
     mana-cost: 110
-    # エンティティ全貫通 | 加速:射程↑ | 減速:射程↓ | 分裂:複数ビーム
-    # 半径増加:ビームが太くなる（範囲内全エンティティ対象）
-    # 貫通:ソリッドブロックを貫通（1*pierce個） | 軌跡:軌道上のブロックにも効果 | 延伸:射程延長
     params:
       base-range: 25.0              # 基本射程(ブロック)
       range-per-reach: 5.0         # 延伸1段あたりの射程増加(ブロック)
@@ -200,18 +191,11 @@ glyphs:
   
 
 
-  # ============================================================
-  # Effects（効果）- Tier 1 (Novice)
-  # ============================================================
 
-  # 説明: ブロックを破壊する。増幅でツールティア上昇
   break:
+    display-name: "破壊"
     tier: 1
     mana-cost: 20
-    # 増幅:ツールティア上昇(0=石, 1=鉄, 2=ダイヤ, 3=ネザライト) + 破壊可能硬度上昇
-    # 減衰1:掘削モード(シャベル適正ブロックのみ破壊)
-    # 減衰2:ユーティリティモード(道/樹皮剥ぎ/さび落とし/さび止め落とし/苔落とし)
-    # 範囲:範囲破壊 | 抽出:シルクタッチ | 幸運:ドロップ増
     max-augments:
       amplify: 3  # 0=石(硬度25), 1=鉄(硬度50), 2=ダイヤ(硬度75,黒曜石可), 3=ネザライト(硬度100)
       dampen: 2   # 1=掘削モード, 2=ユーティリティモード
@@ -228,12 +212,10 @@ glyphs:
         IRON_PICKAXE: 1
         STONE_PICKAXE: 1
 
-  # 説明: 対象にダメージを与え毒を付与する
   harm:
+    display-name: "害悪"
     tier: 1
     mana-cost: 20
-    # 増幅:ダメージ↑(+2.0HP/段)
-    # 延長:毒の持続延長(+3秒/段) | 短縮:毒の持続短縮
     max-augments:
       amplify: 6
       dampen: 2   # 2個でamp-1(=2.0HP), 4個でamp-2(=0に近い)。これ以上積んでも変化なし
@@ -253,13 +235,10 @@ glyphs:
         IRON_SWORD: 1
         GOLDEN_SWORD: 1
 
-  # 説明: 対象を炎上させカスタム火炎ダメージを与える（火炎耐性有効）
   ignite:
+    display-name: "着火"
     tier: 2
     mana-cost: 25
-    # 増幅:火炎ダメージ↑(+0.5HP/段)| 半径増加:範囲着火
-    # 延長:炎上持続延長(+20tick/段) | 短縮:持続短縮
-    # 火炎耐性が有効（DamageType.ON_FIRE使用）
     max-augments:
       amplify: 6
       dampen: 1   
@@ -281,12 +260,10 @@ glyphs:
         FLINT: 16
         FIRE_CHARGE: 4
 
-  # 説明: 対象を凍結させ移動を阻害する
   freeze:
+    display-name: "氷結"
     tier: 2
     mana-cost: 25
-    # 増幅:凍結強度↑
-    # 延長:凍結持続延長 | 短縮:凍結持続短縮
     max-augments:
       amplify: 6
       dampen: 2
@@ -298,18 +275,16 @@ glyphs:
       base-duration: 120             # 基本凍結持続(tick=6秒)
       duration-per-level: 40        # 延長1段あたりの持続増加(tick=2秒)
       base-slowness-level: 0
-      # amplify: 鈍足レベル上昇(per-stackはamplifyグリフのparams参照)
     unlock-cost:
       level: 20
       materials:
         ICE: 16
         POWDER_SNOW_BUCKET: 1
 
-  # 説明: 対象を吹き飛ばす（自己:視線の反対方向）
   knockback:
+    display-name: "吹飛"
     tier: 2
     mana-cost: 25
-    # 増幅:吹き飛ばし力↑(+1.0/段)
     max-augments:
       amplify: 6
       dampen: 1   
@@ -326,13 +301,10 @@ glyphs:
         PISTON: 16
         WIND_CHARGE: 4
 
-  # 説明: 対象を術者方向に引き寄せる
-  # 説明: 対象の位置に吸引エリアを生成し周囲を引き寄せる（突風の逆）
-  # 対象がエンティティの場合、対象自身は影響を受けない
   pull:
+    display-name: "引寄"
     tier: 2
     mana-cost: 25
-    # 増幅:吸引力↑| 半径増加:吸引範囲拡大 | 延長/短縮:効果時間
     max-augments:
       amplify: 6
       dampen: 1
@@ -352,12 +324,10 @@ glyphs:
         FISHING_ROD: 1
         SLIME_BLOCK: 4
 
-  # 説明: 対象に重力効果を付与し押し下げる
   gravity:
+    display-name: "重力"
     tier: 2
     mana-cost: 25
-    # 増幅:重力効果↑
-    # 延長:持続延長 | 短縮:持続短縮
     max-augments:
       amplify: 6
       dampen: 2
@@ -376,13 +346,10 @@ glyphs:
         ANVIL: 1
         SAND: 32
 
-  # 説明: ブロック→松明設置（壁対応）、エンティティ→暗視+発光付与
   light:
+    display-name: "光明"
     tier: 1
     mana-cost: 15
-    # 範囲:範囲設置
-    # 延長:暗視持続延長 | 短縮:暗視持続短縮
-    # ブロック→松明設置 | エンティティ→暗視+発光付与
     max-augments:
       aoe: 7
       extend_time: 6
@@ -396,13 +363,10 @@ glyphs:
         LANTERN: 4
         TORCH: 16
 
-  # 説明: 成熟した作物を収穫する。増幅で植え直し確率上昇（正方形範囲）
   harvest:
+    display-name: "収穫"
     tier: 1
     mana-cost: 15
-    # 増幅:植え直し確率(1=33%,2=66%,3=100%)
-    # 半径増加:範囲収穫 | 幸運:ドロップ増 | 抽出:シルクタッチ
-    # 耕地化・花/雑草の破壊にも対応
     max-augments:
       amplify: 3
       aoe_radius: 7
@@ -417,11 +381,10 @@ glyphs:
         GOLDEN_HOE: 1
         STONE_HOE: 1
 
-  # 説明: 草・つる・羊毛等を刈り取る
   cut:
+    display-name: "剪断"
     tier: 1
     mana-cost: 15
-    # 範囲:範囲カット
     max-augments:
       aoe: 7
     unlock-cost:
@@ -430,12 +393,10 @@ glyphs:
         SHEARS: 1
         OAK_LEAVES: 16
 
-  # 説明: 対象ブロックに遠隔で右クリック操作を行う（全ブロック対応）
   interact:
+    display-name: "操作"
     tier: 1
     mana-cost: 10
-    # 範囲:範囲操作
-    # 遠隔で右クリック操作（ドア開閉・ボタン押下・レバー操作）
     max-augments:
       aoe: 7
     unlock-cost:
@@ -444,11 +405,10 @@ glyphs:
         LEVER: 4
         STONE_BUTTON: 4
 
-  # 説明: 周囲のドロップアイテムを拾い術者に渡す
   pickup:
+    display-name: "回収"
     tier: 1
     mana-cost: 20
-    # 半径増加:拾得範囲拡大
     max-augments:
       aoe_radius: 7
     params:
@@ -459,12 +419,10 @@ glyphs:
         HOPPER: 4
         CHEST: 4
 
-  # 説明: ブロックの向きを回転させる
   rotate:
+    display-name: "回転"
     tier: 2
     mana-cost: 25
-    # 増幅:回転角度↑| 半径増加:範囲回転
-    # 延長:継続回転 | 短縮:回転短縮
     max-augments:
       amplify: 3
       dampen: 2   # 2個でamp-1(=逆回転90°)。方向反転のみなのでこれ以上不要
@@ -480,11 +438,10 @@ glyphs:
         COMPASS: 4
         REDSTONE_BLOCK: 4
 
-  # 説明: 木を一括伐採する
   fell:
+    display-name: "伐採"
     tier: 1
     mana-cost: 20
-    # 半径増加:伐採範囲拡大
     max-augments:
       aoe_radius: 6
     params:
@@ -497,13 +454,10 @@ glyphs:
         GOLDEN_AXE: 1
         STONE_AXE: 1
 
-  # 説明: 一時的なガラスブロックを設置する。増幅で永続化
   phantom_block:
+    display-name: "仮想ブロック"
     tier: 1
     mana-cost: 15
-    # 増幅:永続ブロック化(一時でなくなる、ON/OFF)| 範囲:範囲設置
-    # 延長:一時ブロック持続延長 | 短縮:持続短縮
-    # 破壊時ドロップなし
     max-augments:
       amplify: 1
       aoe: 7
@@ -519,12 +473,10 @@ glyphs:
         WHITE_WOOL: 8
         
 
-  # 説明: 手持ちのブロックを遠隔設置する
   place_block:
+    display-name: "設置"
     tier: 1
     mana-cost: 15
-    # 範囲:範囲設置
-    # オフハンドまたはホットバー右側のブロックを設置
     max-augments:
       aoe: 7
     unlock-cost:
@@ -534,11 +486,10 @@ glyphs:
         COBBLESTONE: 64
 
 
-  # 説明: エンティティを上方に打ち上げる。ブロック対象はFallingBlock化
   launch:
+    display-name: "打上"
     tier: 2
     mana-cost: 25
-    # 増幅:打ち上げ力↑(+0.8/段)| 半径増加:AOE打ち上げ範囲
     max-augments:
       amplify: 6
       dampen: 2   
@@ -554,12 +505,10 @@ glyphs:
         FIREWORK_ROCKET: 8
         FEATHER: 4
 
-  # 説明: 対象に跳躍を付与する
   leap:
+    display-name: "跳躍"
     tier: 2
     mana-cost: 25
-    # 増幅:ジャンプブーストレベル↑
-    # 延長:持続時間延長(+100tick/段) | 短縮:持続時間短縮
     max-augments:
       amplify: 6
       dampen: 1   # ※ON/OFFのみ（跳躍不能モード切替）
@@ -574,13 +523,10 @@ glyphs:
         RABBIT_FOOT: 1
         FEATHER: 4
 
-  # 説明: 着地時に自動で跳ね返る効果を付与する
   bounce:
+    display-name: "跳弾"
     tier: 2
     mana-cost: 25
-    # 増幅:バウンド高度↑
-    # 延長:バウンド持続延長(+160tick/段) | 短縮:バウンド持続短縮
-    # 着地時に自動ジャンプする効果を付与
     max-augments:
       amplify: 6
       dampen: 4
@@ -603,12 +549,10 @@ glyphs:
         SLIME_BLOCK: 4
         RABBIT_FOOT: 1
 
-  # 説明: 対象の移動・ジャンプを完全に封じる
   snare:
+    display-name: "拘束"
     tier: 3
     mana-cost: 50
-    # 延長:拘束持続延長(+20tick/段) | 短縮:拘束持続短縮
-    # ※コードではSlowness 255固定のためamplifyは効果なし
     max-augments:
       amplify: 5
       extend_time: 6
@@ -624,11 +568,10 @@ glyphs:
         COBWEB: 16
         OBSIDIAN: 16
 
-  # 説明: 水源・水流を除去する
   evaporate:
+    display-name: "蒸発"
     tier: 1
     mana-cost: 30
-    # 半径増加:蒸発範囲拡大
     max-augments:
       aoe_radius: 6
     unlock-cost:
@@ -637,8 +580,8 @@ glyphs:
         SPONGE: 1
         BUCKET: 4
 
-  # 説明: ポーション効果を解除する
   dispel:
+    display-name: "解呪"
     tier: 2
     mana-cost: 40
     max-augments:
@@ -651,12 +594,10 @@ glyphs:
         MILK_BUCKET: 1
         LAPIS_BLOCK: 4
 
-  # 説明: 踏むと後続効果が発動するトラップを地面に設置する
-  # 説明: 地面にスペルトラップを設置する（罠術）
   rune:
+    display-name: "罠術"
     tier: 3
     mana-cost: 30
-    # 延長:罠持続延長 | 短縮:罠持続短縮 | 半径増加:トリガー範囲拡大 | 残留:トリガー後も残る
     max-augments:
       extend_time: 6
       duration_down: 1
@@ -674,12 +615,10 @@ glyphs:
         HEAVY_WEIGHTED_PRESSURE_PLATE: 8
         STONE_PRESSURE_PLATE: 16
 
-  # 説明: 一時的な馬を召喚する
   summon_steed:
+    display-name: "騎馬召喚"
     tier: 1
     mana-cost: 50
-    # 増幅:馬の移動速度↑(最大3段)
-    # 延長:馬の持続延長 | 短縮:持続短縮
     max-augments:
       amplify: 6
       dampen: 2
@@ -698,12 +637,10 @@ glyphs:
         SADDLE: 1
         GOLDEN_CARROT: 4
 
-  # 説明: 一時的なオオカミを召喚する
   summon_wolves:
+    display-name: "狼召喚"
     tier: 2
     mana-cost: 50
-    # 増幅:オオカミHP↑(+8HP/段)| 半径増加:召喚数増加(最大4体)
-    # 延長:持続延長(+160tick/段) | 短縮:持続短縮
     max-augments:
       amplify: 6
       dampen: 2
@@ -724,11 +661,10 @@ glyphs:
         BONE: 8
         LEATHER: 8
 
-  # 説明: 対象の色を変更する（羊・ベッド等）
   wololo:
+    display-name: "色彩"
     tier: 1
     mana-cost: 25
-    # 増幅:色スキップ数↑(16色サイクル) | 半径増加:範囲染色 | 無作為:ランダム色
     max-augments:
       amplify: 5
       aoe_radius: 6
@@ -743,11 +679,10 @@ glyphs:
         YELLOW_DYE: 4
         GREEN_DYE: 4
 
-  # 説明: 水中呼吸・コンジット効果を付与する
   bubble:
+    display-name: "泡"
     tier: 3
     mana-cost: 80
-    # 半径増加:範囲適用 | 延長:持続延長 | 短縮:持続短縮
     max-augments:
       aoe_radius: 6
       extend_time: 6
@@ -762,12 +697,10 @@ glyphs:
         CONDUIT: 1
         WATER_BUCKET: 1
 
-  # 説明: パーティクル演出のみ（見た目だけの装飾効果）
   prestidigitation:
+    display-name: "手品"
     tier: 1
     mana-cost: 0
-    # 無作為:パーティクルの種類をランダム変更
-    # 装飾用。パーティクルと発光を付与する見た目のみの効果
     max-augments:
       randomize: 1
     unlock-cost:
@@ -776,16 +709,11 @@ glyphs:
         GOLD_INGOT: 1
         WHITE_DYE: 1
 
-  # ============================================================
-  # Effects（効果）- Tier 2 (Apprentice)
-  # ============================================================
 
-  # 説明: HPを回復する（アンデッドにはダメージ）
   heal:
+    display-name: "回復"
     tier: 2
     mana-cost: 40
-    # 増幅:回復量↑(+3.0HP/段)
-    # アンデッドにはダメージを与える
     max-augments:
       amplify: 6
       dampen: 1   
@@ -801,11 +729,10 @@ glyphs:
         GLISTERING_MELON_SLICE: 4
         GOLDEN_APPLE: 4
 
-  # 説明: 作物の成長を促進する（正方形範囲）
   grow:
+    display-name: "成長"
     tier: 2
     mana-cost: 30
-    # 増幅:成長促進量↑| 半径増加:正方形範囲成長
     max-augments:
       amplify: 6
       aoe_radius: 6
@@ -818,12 +745,10 @@ glyphs:
         BONE_BLOCK: 4
         WHEAT_SEEDS: 32
 
-  # 説明: 対象位置で爆発を起こす（ブロック破壊なし）
   explosion:
+    display-name: "爆発"
     tier: 3
     mana-cost: 100
-    # 半径増加:爆発power↑(+0.8/段) |抽出でブロック破壊ON
-    # ※増幅は非互換。威力調整はparamsのbase-power/max-powerで行う
     max-augments:
       aoe_radius: 6
       extract: 1  # ※ON/OFFのみ
@@ -838,12 +763,10 @@ glyphs:
         GUNPOWDER: 64
         END_CRYSTAL: 4
 
-  # 説明: ブロック→リスト内で次に変換、エンティティ→位置入れ替え
   exchange:
+    display-name: "交換"
     tier: 2
     mana-cost: 80
-    # 増幅:ブロックティア↑(上位リストに変換)| 範囲:範囲変換
-    # ブロック→リスト内で次のブロックにサイクル変換 | エンティティ→位置入れ替え
     max-augments:
       amplify: 0
       aoe: 7
@@ -853,11 +776,10 @@ glyphs:
         STICKY_PISTON: 4
         ENDER_EYE: 16
 
-  # 説明: ドロップアイテムを精錬する
   smelt:
+    display-name: "精錬"
     tier: 2
     mana-cost: 60
-    # 半径増加:範囲精錬
     max-augments:
       aoe_radius: 6
     unlock-cost:
@@ -867,11 +789,10 @@ glyphs:
         COAL_BLOCK: 16
         BLAST_FURNACE: 16
 
-  # 説明: ブロックを粉砕してドロップ品を変化させる
   crush:
+    display-name: "粉砕"
     tier: 1
     mana-cost: 30
-    # 範囲:範囲粉砕 | 幸運:ドロップ増 | アイテム粉砕対応
     max-augments:
       aoe: 7
       fortune: 3
@@ -881,12 +802,10 @@ glyphs:
         ANVIL: 1
         GRAVEL: 32
 
-  # 説明: 水に触れている敵に2倍ダメージの衝撃波
   crush_wave:
+    display-name: "砕波"
     tier: 2
     mana-cost: 25
-    # 増幅:威力↑(+2.0HP/段)
-    # 水に触れている敵に2倍ダメージ
     max-augments:
       amplify: 6
       dampen: 1   
@@ -902,12 +821,10 @@ glyphs:
         TRIDENT: 1
         SEA_LANTERN: 4
 
-  # 説明: 炎上中の敵に1.5倍ダメージの灼熱攻撃
   scorch:
+    display-name: "焦熱"
     tier: 2
     mana-cost: 25
-    # 増幅:威力↑(+2.0HP/段)
-    # 炎上中の敵に1.5倍ダメージ
     max-augments:
       amplify: 6
       dampen: 1  
@@ -923,11 +840,10 @@ glyphs:
         BLAZE_ROD: 8
         FIRE_CHARGE: 8
 
-  # 説明: 凍結ダメージを与える
   cold_snap:
+    display-name: "凍裂"
     tier: 2
     mana-cost: 25
-    # 増幅:凍結ダメージ↑ | 減衰:ダメージ↓ | 凍結・鈍化・水濡れ条件で発動
     max-augments:
       amplify: 6
       dampen: 2
@@ -942,11 +858,10 @@ glyphs:
         BLUE_ICE: 16
         SNOW_BLOCK: 4
 
-  # 説明: 高度に比例した風ダメージを与える（高所ほど強力）
   windshear:
+    display-name: "烈風"
     tier: 2
     mana-cost: 25
-    # 増幅:風ダメージ↑
     max-augments:
       amplify: 6
       dampen: 1   
@@ -962,11 +877,10 @@ glyphs:
         FEATHER: 8
         BREEZE_ROD: 1
 
-  # 説明: 水源を一時的に生成し炎を消す
   conjure_water:
+    display-name: "水生成"
     tier: 1
     mana-cost: 25
-    # 範囲:水源範囲拡大 | 延長:水の持続延長 | 短縮:水の持続短縮
     max-augments:
       aoe: 7
       extend_time: 6
@@ -982,11 +896,10 @@ glyphs:
         WATER_BUCKET: 1
         ICE: 16
 
-  # 説明: 低速落下効果を付与する
   slowfall:
+    display-name: "緩落"
     tier: 2
     mana-cost: 30
-    # 延長:持続延長 | 短縮:持続短縮
     max-augments:
       extend_time: 6
       duration_down: 2
@@ -1001,11 +914,10 @@ glyphs:
         PHANTOM_MEMBRANE: 1
         FEATHER: 8
 
-  # 説明: 透明化する
   invisibility:
+    display-name: "透明化"
     tier: 2
     mana-cost: 50
-    # 延長:透明化持続延長 | 短縮:透明化持続短縮
     max-augments:
       extend_time: 6
       duration_down: 2
@@ -1018,20 +930,18 @@ glyphs:
         FERMENTED_SPIDER_EYE: 4
         GOLDEN_CARROT: 8
 
-  # 説明: 手持ちポーションの効果を対象に適用して消費する
   infuse:
+    display-name: "注入"
     tier: 2
     mana-cost: 25
-    # 増強不可（AUGMENT_COMPATが空集合）
-    # オフハンドまたはホットバー右側のポーション(通常/スプラッシュ/残留)を対象に適用・消費
     unlock-cost:
       level: 20
       materials:
         BREWING_STAND: 4
         BLAZE_POWDER: 16
 
-  # 説明: 対象プレイヤーにクラフトテーブルGUIを強制的に開く
   craft:
+    display-name: "製作"
     tier: 1
     mana-cost: 10
     unlock-cost:
@@ -1039,13 +949,10 @@ glyphs:
       materials:
         CRAFTING_TABLE: 4
 
-  # 説明: 一時的なアイアンゴーレムを召喚する
   animate:
+    display-name: "生命化"
     tier: 2
     mana-cost: 150
-    # 増幅:ゴーレムHP↑(+20HP/段)| 半径増加:範囲召喚
-    # 延長:ゴーレム持続延長 | 短縮:持続短縮
-    # 一時的なアイアンゴーレムを召喚
     max-augments:
       amplify: 6
       dampen: 2
@@ -1065,12 +972,10 @@ glyphs:
         CARVED_PUMPKIN: 4
         IRON_BLOCK: 16
 
-  # 説明: 花火を打ち上げる
   firework:
+    display-name: "花火"
     tier: 2
     mana-cost: 15
-    # 増幅:スター数↑ | 減衰:スター数↓ | 半径増加:花火エンティティ数↑
-    # 延長:飛翔力↑ | 短縮:飛翔力↓
     max-augments:
       amplify: 6
       dampen: 0
@@ -1090,22 +995,20 @@ glyphs:
         FIREWORK_ROCKET: 16
         GUNPOWDER: 8
 
-  # 説明: キャスターの名前を対象に付与する
   name:
+    display-name: "命名"
     tier: 1
     mana-cost: 20
-    # 増強不可。対象にキャスターの名前を付与する
     unlock-cost:
       level: 10
       materials:
         NAME_TAG: 4
         PAPER: 8
 
-  # 説明: 衝撃点から周囲のエンティティを吹き飛ばす（自己:視線の反対方向）
   wind_burst:
+    display-name: "突風"
     tier: 3
     mana-cost: 35
-    # 増幅:吹き飛ばし力↑(+0.5/段)| 半径増加:範囲吹き飛ばし
     max-augments:
       amplify: 6
       dampen: 1   
@@ -1125,13 +1028,10 @@ glyphs:
         BREEZE_ROD: 4
         WIND_CHARGE: 8
 
-  # 説明: 対象を視線先に高速移動させる
   speed_boost:
+    display-name: "指向"
     tier: 2
     mana-cost: 25
-    # 増幅:ブースト力↑ | 減衰:ブースト力↓
-    # 延伸:視線判定距離↑(+5ブロック/段) | 収縮:判定距離↓
-    # 無作為:ランダム方向にブースト
     max-augments:
       amplify: 6
       dampen: 2
@@ -1152,12 +1052,10 @@ glyphs:
         SUGAR: 64
         FEATHER: 4
 
-  # 説明: 浮遊効果を付与する
   levitate:
+    display-name: "浮遊"
     tier: 2
     mana-cost: 35
-    # 増幅:浮遊速度↑(レベル上昇)
-    # 延長:持続延長(+40tick/段) | 短縮:持続短縮
     max-augments:
       amplify: 6
       dampen: 2
@@ -1175,17 +1073,11 @@ glyphs:
         SHULKER_SHELL: 4
         PHANTOM_MEMBRANE: 8
 
-  # ============================================================
-  # Effects（効果）- Tier 3 (Archmage)
-  # ============================================================
 
-  # 説明: 視線方向にテレポートする。延伸で距離延長+透過ブロック貫通
   blink:
+    display-name: "瞬間移動"
     tier: 3
     mana-cost: 50
-    # 延伸:テレポート距離↑(+8ブロック/段)
-    # 貫通:ブロック貫通TP（1段につき1ブロック貫通）
-    # 対象エンティティとは位置交換（互いの向きを維持）
     max-augments:
       extend_reach: 6
       shrink_reach: 1
@@ -1200,12 +1092,10 @@ glyphs:
         ENDER_PEARL: 16
         CHORUS_FRUIT: 16
 
-  # 説明: 対象位置に落雷を発生させる
   lightning:
+    display-name: "雷撃"
     tier: 3
     mana-cost: 100
-    # 増幅:落雷ダメージ↑(最大2段)
-    # 延長:連続落雷回数↑ | 短縮:連続落雷回数↓
     max-augments:
       amplify: 6
       dampen: 1 
@@ -1226,12 +1116,10 @@ glyphs:
         LIGHTNING_ROD: 16
         TRIDENT: 1
 
-  # 説明: ウィザー効果を付与する
   wither:
+    display-name: "衰弱"
     tier: 3
     mana-cost: 80
-    # 増幅:ウィザー効果レベル↑
-    # 延長:ウィザー持続延長 | 短縮:持続短縮
     max-augments:
       amplify: 3
       dampen: 4
@@ -1249,14 +1137,10 @@ glyphs:
         WITHER_SKELETON_SKULL: 4
         WITHER_ROSE: 8
 
-  # 説明: 複数デバフを同時付与する呪い
   hex:
+    display-name: "呪詛"
     tier: 3
     mana-cost: 100
-    # 増幅:追撃倍率↑(+5%/段) + 弱体化レベル↑
-    # 延長:呪い持続延長 | 短縮:持続短縮
-    # 被ダメージの (10 + 5*増幅)% を追撃ダメージとして付与
-    # 有益なポーション効果を全て除去
     max-augments:
       amplify: 6
       dampen: 1
@@ -1277,11 +1161,10 @@ glyphs:
         WITHER_ROSE: 16
         PUFFERFISH: 16
 
-  # 説明: エリトラなしで一時的に滑空できる
   glide:
+    display-name: "滑空"
     tier: 2
     mana-cost: 50
-    # 延長:滑空持続延長(+100tick/段) | 短縮:持続短縮
     max-augments:
       extend_time: 6
       duration_down: 1
@@ -1294,8 +1177,8 @@ glyphs:
         PHANTOM_MEMBRANE: 8
         FEATHER: 16
 
-  # 説明: 耐性のシールドを展開する
   shield:
+    display-name: "盾"
     tier: 3
     mana-cost: 150
     max-augments:
@@ -1314,11 +1197,10 @@ glyphs:
         ENCHANTED_GOLDEN_APPLE: 1
         TOTEM_OF_UNDYING: 1
 
-  # 説明: 一時的なゾンビを召喚する。増幅でスケルトンに切替
   summon_undead:
+    display-name: "不死召喚"
     tier: 3
     mana-cost: 80
-    # 増幅:Skeleton切替(ON/OFF) | 半径増加:召喚数↑ | 延長/短縮:持続時間
     max-augments:
       amplify: 1
       dampen: 2
@@ -1337,11 +1219,10 @@ glyphs:
         ROTTEN_FLESH: 64
         BONE_BLOCK: 16
 
-  # 説明: 一時的なヴェックスを召喚する
   summon_vex:
+    display-name: "妖精召喚"
     tier: 3
     mana-cost: 150
-    # 増幅:HP↑ | 減衰:HP↓ | 半径増加:召喚数↑ | 延長/短縮:持続時間
     max-augments:
       amplify: 6
       dampen: 2
@@ -1362,13 +1243,10 @@ glyphs:
         TOTEM_OF_UNDYING: 4
         EMERALD_BLOCK: 16
 
-  # 説明: キャスターの装備をコピーした囮ゾンビを召喚する
   summon_decoy:
+    display-name: "囮召喚"
     tier: 3
     mana-cost: 200
-    # 増幅:囮HP↑(+10HP/段)
-    # 延長:持続延長(+100tick/段) | 短縮:持続短縮
-    # キャスターの装備をコピーした囮Zombieを召喚
     max-augments:
       amplify: 6
       dampen: 2
@@ -1387,13 +1265,10 @@ glyphs:
         NETHERITE_SWORD: 1
         NETHERITE_CHESTPLATE: 1
 
-  # 説明: ブロックを一時的に透過可能にする
   intangible:
+    display-name: "無形化"
     tier: 3
     mana-cost: 30
-    # 幅:左右に範囲拡大 | 上下:縦方向に拡大 | 垂直:視線奥方向に拡大
-    # 延長:透過持続延長 | 短縮:持続短縮
-    # ※奥行き方向は設置と逆（壁の中に向かって透過）
     max-augments:
       aoe: 7
       extend_time: 6
@@ -1408,12 +1283,10 @@ glyphs:
         ENDER_PEARL: 16
         ENDER_EYE: 16
 
-  # 説明: 発動時の位置を記録し、一定時間後にその位置へ自動テレポートする
   rewind:
+    display-name: "巻き戻し"
     tier: 3
     mana-cost: 120
-    # 延長:帰還までの遅延時間↑ | 短縮:遅延時間↓
-    # 発動時の位置をマークし、遅延後にマーク地点へテレポート
     max-augments:
       extend_time: 6
       duration_down: 2
@@ -1426,12 +1299,10 @@ glyphs:
         CLOCK: 16
         RECOVERY_COMPASS: 1
 
-  # 説明: エヴォーカーの牙を召喚してダメージを与える
   fangs:
+    display-name: "牙"
     tier: 3
     mana-cost: 35
-    # 増幅:牙の本数↑(+2本/段)| 半径増加:円形配置に変更
-    # エヴォーカーの牙を召喚してダメージを与える
     max-augments:
       amplify: 6
       dampen: 2
@@ -1450,12 +1321,10 @@ glyphs:
         TOTEM_OF_UNDYING: 4
         EMERALD_BLOCK: 16
 
-  # 説明: 幸運3+ダイヤツール相当の強化版破壊
   advanced_break:
+    display-name: "採掘"
     tier: 3
     mana-cost: 100
-    # 範囲:範囲破壊 | 抽出:シルクタッチ(内蔵幸運3を上書き) | 幸運:内蔵幸運3に加算
-    # 幸運3+ダイヤツール相当の破壊力を内蔵
     max-augments:
       aoe: 7
       fortune: 0  # ※内蔵幸運3に加算（1にすると幸運4、2で幸運5）
@@ -1466,18 +1335,11 @@ glyphs:
         NETHERITE_PICKAXE: 1
         DIAMOND_BLOCK: 2
 
-  # ============================================================
-  # Effects（効果）- 追加分（旧・孤立エフェクトの登録）
-  # ※ 以下のtier/mana-cost/unlock-cost/params/max-augmentsは全て暫定値。
-  #    バランス調整フェーズで見直す想定。
-  # ============================================================
 
-  # 説明: 炎上中の対象にバーストダメージを与える（焦熱の閃光版）
   flare:
+    display-name: "閃炎"
     tier: 2
     mana-cost: 25
-    # 増幅:バーストダメージ↑(+2.5HP/段) | 減衰:ダメージ↓
-    # 対象が炎上中の場合のみ発動する（焦熱scorchと類似の互換設定）
     max-augments:
       amplify: 6
       dampen: 1
@@ -1492,11 +1354,10 @@ glyphs:
         BLAZE_POWDER: 8
         FIRE_CHARGE: 4
 
-  # 説明: 対象に発光と暗視を付与し魔法的存在を感知する
   sense_magic:
+    display-name: "魔力感知"
     tier: 2
     mana-cost: 30
-    # 延長:発光/暗視の持続延長(+160tick/段) | 短縮:持続短縮
     max-augments:
       extend_time: 6
       duration_down: 2
@@ -1510,11 +1371,10 @@ glyphs:
         SPIDER_EYE: 8
         GLOWSTONE_DUST: 16
 
-  # 説明: インベントリのアイテムを投出する（コンテナには挿入）
   toss:
+    display-name: "投擲"
     tier: 1
     mana-cost: 15
-    # 増幅:投出数量↑(1 + 増幅段、スタック上限内) | 接触形態とは非互換（コード側で除外）
     max-augments:
       amplify: 6
     unlock-cost:
@@ -1523,28 +1383,22 @@ glyphs:
         DISPENSER: 1
         DROPPER: 1
 
-  # 説明: スペルチェーンをリセットする（演出のみのプレースホルダー）
   reset:
+    display-name: "初期化"
     tier: 1
     mana-cost: 5
-    # 増強不可。視覚的フィードバックのみ提供する
     unlock-cost:
       level: 5
       materials:
         REDSTONE: 8
         QUARTZ: 4
 
-  # ============================================================
-  # Augments（増強）- 汎用性の高い順にソート
-  # ============================================================
 
-  # --- 汎用（全形態互換） ---
 
-  # 説明: 後続効果の発動を遅延させる（複数積みで遅延時間加算）
   delay:
+    display-name: "遅延"
     tier: 1
     mana-cost: 5
-    # 延長:遅延時間↑ | 短縮:遅延時間↓ | 無作為:遅延を±25%変動
     params:
       base-ticks: 20                 # オーグメント: 基本遅延時間(tick=1秒)
       ticks-per-duration-level: 20   # オーグメント: 延長1段あたりの追加遅延(tick=1秒)
@@ -1556,11 +1410,10 @@ glyphs:
         CLOCK: 4
         REPEATER: 4
 
-  # 説明: スペルのCTを短縮する（1段=-100ms、最低100ms）
   rapid_fire:
+    display-name: "連射"
     tier: 2
     mana-cost: 0
-    # 全形態互換。1つにつきCTを半減（最低100ms）
     params:
       per-stack: 1                   # 1個あたりの連射レベル増加量
     unlock-cost:
@@ -1569,10 +1422,9 @@ glyphs:
         SUGAR: 64
         COMPARATOR: 16
 
-  # --- 広汎（多くのエフェクトに互換） ---
 
-  # 説明: 効果の強度・威力を上昇させる
   amplify:
+    display-name: "増幅"
     tier: 1
     mana-cost: 20
     params:
@@ -1583,8 +1435,8 @@ glyphs:
         DIAMOND_PICKAXE: 2
         GLOWSTONE_DUST: 8
 
-  # 説明: 効果の強度・威力を低下させる
   dampen:
+    display-name: "減衰"
     tier: 1
     mana-cost: 0
     unlock-cost:
@@ -1593,8 +1445,8 @@ glyphs:
         NETHER_BRICKS: 4
         CRACKED_STONE_BRICKS: 4
 
-  # 説明: 持続時間を延長する
   extend_time:
+    display-name: "延長"
     tier: 1
     mana-cost: 10
     params:
@@ -1605,8 +1457,8 @@ glyphs:
         REDSTONE_BLOCK: 4
         CLOCK: 4
 
-  # 説明: 持続時間を短縮する
   duration_down:
+    display-name: "短縮"
     tier: 1
     mana-cost: 0
     unlock-cost:
@@ -1615,8 +1467,8 @@ glyphs:
         QUARTZ_BLOCK: 4
         CLOCK: 4
 
-  # 説明: XZ方向に範囲を広げる（3軸AOE）
   aoe:
+    display-name: "範囲[幅]"
     tier: 1
     mana-cost: 10
     params:
@@ -1627,8 +1479,8 @@ glyphs:
         DIORITE_WALL: 16
         STONE: 32
 
-  # 説明: Y方向（上下）に範囲を広げる（3軸AOE）
   aoe_height:
+    display-name: "範囲[高さ]"
     tier: 1
     mana-cost: 10
     params:
@@ -1639,8 +1491,8 @@ glyphs:
         GRANITE_WALL: 16
         STONE: 32
 
-  # 説明: 面に垂直な方向に範囲を延長する（3軸AOE）
   aoe_vertical:
+    display-name: "範囲[法線]"
     tier: 1
     mana-cost: 10
     params:
@@ -1651,8 +1503,8 @@ glyphs:
         ANDESITE_WALL: 16
         STONE: 32
 
-  # 説明: 半径を拡大する（爆発/召喚数/拾い範囲等）
   aoe_radius:
+    display-name: "半径増加"
     tier: 2
     mana-cost: 25
     params:
@@ -1663,8 +1515,8 @@ glyphs:
         JUKEBOX: 4
         NOTE_BLOCK: 16
 
-  # 説明: 効果にランダム性を付与する
   randomize:
+    display-name: "無作為"
     tier: 1
     mana-cost: 5
     unlock-cost:
@@ -1673,10 +1525,9 @@ glyphs:
         TARGET: 4
         DROPPER: 4
 
-  # --- 形態限定（投射/照射/接触等） ---
 
-  # 説明: 弾速・射程を上昇させる（投射/照射用）
   accelerate:
+    display-name: "加速"
     tier: 2
     mana-cost: 10
     params:
@@ -1687,8 +1538,8 @@ glyphs:
         SUGAR: 64
         BLAZE_ROD: 1
 
-  # 説明: 弾速・射程を低下させる（投射/照射用）
   decelerate:
+    display-name: "減速"
     tier: 2
     mana-cost: 0
     params:
@@ -1699,8 +1550,8 @@ glyphs:
         SOUL_SAND: 4
         HONEY_BLOCK: 1
 
-  # 説明: 投擲が対象を貫通する
   pierce:
+    display-name: "貫通"
     tier: 2
     mana-cost: 15
     params:
@@ -1711,8 +1562,8 @@ glyphs:
         CROSSBOW: 1
         DIAMOND_SWORD: 1
 
-  # 説明: 射程・距離を延長する（投射/照射/瞬間移動用）
   extend_reach:
+    display-name: "延伸"
     tier: 2
     mana-cost: 15
     params:
@@ -1723,8 +1574,8 @@ glyphs:
         FISHING_ROD: 1
         DIAMOND_SWORD: 1
 
-  # 説明: 投擲・ビームを複数に分裂させる
   split:
+    display-name: "分裂"
     tier: 2
     mana-cost: 20
     params:
@@ -1735,12 +1586,10 @@ glyphs:
         SLIME_BLOCK: 16
         CROSSBOW: 1
 
-  # 説明: 飛行経路上のブロックにも効果を適用する（投射/照射用）
   trace:
+    display-name: "軌跡"
     tier: 3
     mana-cost: 50
-    # 投射/照射互換
-    # 飛行経路上にも効果を適用
     unlock-cost:
       level: 40
       materials:
@@ -1748,8 +1597,8 @@ glyphs:
         ENDER_EYE: 16
         SNOWBALL: 16
 
-  # 説明: エンティティヒット時に周囲の敵にエフェクトをチェーンする
   propagate:
+    display-name: "伝播"
     tier: 2
     mana-cost: 25
     params:
@@ -1761,10 +1610,9 @@ glyphs:
         MOSS_BLOCK: 16
         PODZOL: 16
 
-  # --- 特殊限定 ---
 
-  # 説明: シルクタッチ効果を付与する（幸運と排他）
   extract:
+    display-name: "抽出"
     tier: 2
     mana-cost: 30
     params:
@@ -1775,8 +1623,8 @@ glyphs:
         COBWEB: 16
         FEATHER: 16
 
-  # 説明: ドロップ量を増加させる（抽出と排他）
   fortune:
+    display-name: "幸運"
     tier: 2
     mana-cost: 25
     params:
@@ -1787,13 +1635,10 @@ glyphs:
         EMERALD_BLOCK: 4
         LAPIS_BLOCK: 4
 
-  # 説明: 命中範囲に効果を持続的に再発動するエリアを生成する
   linger:
+    display-name: "残留"
     tier: 3
     mana-cost: 30
-    # 命中範囲に効果を持続的に再発動するエリアを生成
-    # ルーン：残留を組み合わせると発動後も効果が残る
-    # エンティティ効果系（凍結、害悪、治癒等）にも互換
     params:
       per-stack: 1                  # 1個あたりの残留レベル加算
       ticks-per-level: 100          # 残留1レベルあたりの持続時間(tick=5秒)
@@ -1805,12 +1650,9 @@ glyphs:
         OMINOUS_BOTTLE: 1
         DRAGON_BREATH: 4
 
-  # ============================================================
-  # 新規増強
-  # ============================================================
 
-  # 説明: 射程・距離を短縮する（延伸の逆）
   shrink_reach:
+    display-name: "収縮"
     tier: 1
     mana-cost: 0
     params:
@@ -1821,12 +1663,9 @@ glyphs:
         ARROW: 16
         SNOWBALL: 16
 
-  # ============================================================
-  # 新規エフェクト
-  # ============================================================
 
-  # 説明: ランダムな音を対象の位置から発声する
   cry:
+    display-name: "鳴き声"
     tier: 1
     mana-cost: 0
     max-augments:
@@ -1845,9 +1684,9 @@ glyphs:
         GOLD_INGOT: 1
 
   saturation:
+    display-name: "満腹"
     tier: 2
     mana-cost: 25
-    # 増幅:満腹レベル↑ | 減衰:空腹デバフ
     max-augments:
       amplify: 2
       dampen: 2
@@ -1865,8 +1704,8 @@ glyphs:
         COOKED_BEEF: 32
         GOLDEN_CARROT: 16
 
-  # 説明: 対象にスピードを付与する（減衰で鈍足）
   gale:
+    display-name: "疾風"
     tier: 2
     mana-cost: 25
     max-augments:
@@ -1886,8 +1725,8 @@ glyphs:
         SUGAR: 64
         BLAZE_ROD: 4
 
-  # 説明: 対象のサイズを変更する（当たり判定含む）
   scale:
+    display-name: "スケール"
     tier: 2
     mana-cost: 25
     params:
@@ -1909,11 +1748,10 @@ glyphs:
         SLIME_BLOCK: 8
         MAGMA_BLOCK: 8
 
-  # 説明: 対象に体力増強を付与する
   journey:
+    display-name: "旅路の魔法"
     tier: 3
     mana-cost: 500
-    # 増幅:体力増強レベル↑ | 減衰:最大体力減少
     max-augments:
       amplify: 6
       dampen: 6
@@ -1936,8 +1774,8 @@ glyphs:
         DRAGON_HEAD: 1
         ENCHANTED_GOLDEN_APPLE: 1
 
-  # 説明: 視点方向へソニックブームを発射する（自己形態専用）
   sonic_boom:
+    display-name: "ソニックブーム"
     tier: 3
     mana-cost: 200
     params:
@@ -1957,11 +1795,10 @@ glyphs:
         ECHO_SHARD: 4
         SCULK_SHRIEKER: 16
 
-  # 説明: 太陽を召喚し周囲の敵に防御無視の炎ダメージを与え炎上させる
   solar:
+    display-name: "日輪"
     tier: 3
     mana-cost: 500
-    # 増幅:ダメージ↑ | 半径増加:索敵範囲↑ | 延長:持続時間↑ | 分裂:発射頻度↑
     params:
       base-damage: 4.0              # 1発あたりの基本ダメージ(HP、防御無視)
       amplify-damage-bonus: 1.0     # 増幅1段あたりのダメージ増加(HP)
@@ -1992,11 +1829,10 @@ glyphs:
         LANTERN: 16
         TORCH: 16
 
-  # 説明: 月を召喚し周囲の敵に防御無視の凍結ダメージを与え拘束する
   lunar:
+    display-name: "月輪"
     tier: 3
     mana-cost: 500
-    # 増幅:ダメージ↑ | 半径増加:索敵範囲↑ | 延長:持続時間↑ | 分裂:発射頻度↑
     params:
       base-damage: 4.0              # 1発あたりの基本ダメージ(HP、防御無視)
       amplify-damage-bonus: 1.0     # 増幅1段あたりのダメージ増加(HP)
@@ -2028,8 +1864,8 @@ glyphs:
         VERDANT_FROGLIGHT: 1
         PEARLESCENT_FROGLIGHT: 1
 
-  # 説明: 地面に衝撃波を走らせ5段階の連続ダメージを与える
   heavy_impact:
+    display-name: "ヘビーインパクト"
     tier: 3
     mana-cost: 150
     params:
@@ -2051,15 +1887,9 @@ glyphs:
         MACE: 1
         ANVIL: 8
 
-  # ============================================================
-  # 超増強 (Super Augments) — ベース増強2個分の効果を1スロットで発揮
-  # コストはベースの4倍（上限64マナ）
-  # スタック上限は通常増強と共有（超増強1個 = 通常2個分）
-  # 上限を超える場合はスペルに搭載できない
-  # ============================================================
 
-  # 説明: 増幅2個分の強化効果
   super_amplify:
+    display-name: "超増幅"
     tier: 3
     mana-cost: 50
     unlock-cost:
@@ -2068,8 +1898,8 @@ glyphs:
         NETHER_STAR: 1
         DIAMOND_BLOCK: 2
 
-  # 説明: 減衰2個分の抑制効果
   super_dampen:
+    display-name: "超減衰"
     tier: 3
     mana-cost: 10
     unlock-cost:
@@ -2078,8 +1908,8 @@ glyphs:
         NETHER_STAR: 1
         SOUL_SAND: 32
 
-  # 説明: 加速2個分の速度上昇
   super_accelerate:
+    display-name: "超加速"
     tier: 3
     mana-cost: 30
     unlock-cost:
@@ -2088,8 +1918,8 @@ glyphs:
         NETHER_STAR: 1
         SUGAR: 64
 
-  # 説明: 減速2個分の速度低下
   super_decelerate:
+    display-name: "超減速"
     tier: 3
     mana-cost: 10
     unlock-cost:
@@ -2098,8 +1928,8 @@ glyphs:
         NETHER_STAR: 1
         COBWEB: 32
 
-  # 説明: 分裂2個分の弾数増加
   super_split:
+    display-name: "超分裂"
     tier: 3
     mana-cost: 50
     unlock-cost:
@@ -2108,8 +1938,8 @@ glyphs:
         NETHER_STAR: 1
         PRISMARINE_SHARD: 64
 
-  # 説明: 貫通2個分の貫通効果
   super_pierce:
+    display-name: "超貫通"
     tier: 3
     mana-cost: 40
     unlock-cost:
@@ -2118,8 +1948,8 @@ glyphs:
         NETHER_STAR: 1
         ARROW: 64
 
-  # 説明: 半径増加2個分の範囲拡大
   super_aoe_radius:
+    display-name: "超半径増加"
     tier: 3
     mana-cost: 60
     unlock-cost:
@@ -2128,8 +1958,8 @@ glyphs:
         NETHER_STAR: 1
         TNT: 16
 
-  # 説明: 延伸2個分の射程延長
   super_extend_reach:
+    display-name: "超延伸"
     tier: 3
     mana-cost: 40
     unlock-cost:
@@ -2138,8 +1968,8 @@ glyphs:
         NETHER_STAR: 1
         ENDER_PEARL: 16
 
-  # 説明: 伝播2個分のチェーン対象
   super_propagate:
+    display-name: "超伝播"
     tier: 3
     mana-cost: 60
     unlock-cost:
@@ -2148,8 +1978,8 @@ glyphs:
         NETHER_STAR: 1
         SCULK_CATALYST: 4
 
-  # 説明: 延長2個分の持続時間延長
   super_extend_time:
+    display-name: "超延長"
     tier: 3
     mana-cost: 30
     unlock-cost:
@@ -2158,8 +1988,8 @@ glyphs:
         NETHER_STAR: 1
         CLOCK: 8
 
-  # 説明: 短縮2個分の持続時間短縮
   super_duration_down:
+    display-name: "超短縮"
     tier: 3
     mana-cost: 10
     unlock-cost:
@@ -2168,8 +1998,8 @@ glyphs:
         NETHER_STAR: 1
         REDSTONE: 64
 
-  # 説明: 幸運2個分のドロップ増加
   super_fortune:
+    display-name: "超幸運"
     tier: 3
     mana-cost: 60
     unlock-cost:
@@ -2178,8 +2008,8 @@ glyphs:
         NETHER_STAR: 1
         EMERALD_BLOCK: 8
 
-  # 説明: 収縮2個分の射程短縮
   super_shrink_reach:
+    display-name: "超収縮"
     tier: 3
     mana-cost: 10
     unlock-cost:
@@ -2188,8 +2018,8 @@ glyphs:
         NETHER_STAR: 1
         SNOW_BLOCK: 16
 
-  # 説明: 残留2個分の持続時間
   super_linger:
+    display-name: "超残留"
     tier: 3
     mana-cost: 70
     unlock-cost:
@@ -2198,8 +2028,8 @@ glyphs:
         NETHER_STAR: 1
         DRAGON_BREATH: 8
 
-  # 説明: 遅延2個分の遅延時間
   super_delay:
+    display-name: "超遅延"
     tier: 3
     mana-cost: 20
     unlock-cost:
@@ -2208,12 +2038,6 @@ glyphs:
         NETHER_STAR: 1
         CLOCK: 16
 
-# ============================================================
-# 交換グリフ ブロック変換マッピング
-# ============================================================
-# 各ティアはブロックのグループ。同一ティア内でサイクル変換する。
-# Amplify増強でティアを上げると上位グループの先頭に変換される。
-# サーバー管理者が自由にグループやブロックを追加・変更可能。
 exchange_tiers:
   - [DIRT, COARSE_DIRT, ROOTED_DIRT, MUD]
   - [STONE, COBBLESTONE, MOSSY_COBBLESTONE]
@@ -2227,40 +2051,21 @@ exchange_tiers:
   - [WHITE_CONCRETE, ORANGE_CONCRETE, MAGENTA_CONCRETE, LIGHT_BLUE_CONCRETE, YELLOW_CONCRETE, LIME_CONCRETE, PINK_CONCRETE, GRAY_CONCRETE, LIGHT_GRAY_CONCRETE, CYAN_CONCRETE, PURPLE_CONCRETE, BLUE_CONCRETE, BROWN_CONCRETE, GREEN_CONCRETE, RED_CONCRETE, BLACK_CONCRETE]
   - [GLASS, WHITE_STAINED_GLASS, ORANGE_STAINED_GLASS, MAGENTA_STAINED_GLASS, LIGHT_BLUE_STAINED_GLASS, YELLOW_STAINED_GLASS, LIME_STAINED_GLASS, PINK_STAINED_GLASS, GRAY_STAINED_GLASS, LIGHT_GRAY_STAINED_GLASS, CYAN_STAINED_GLASS, PURPLE_STAINED_GLASS, BLUE_STAINED_GLASS, BROWN_STAINED_GLASS, GREEN_STAINED_GLASS, RED_STAINED_GLASS, BLACK_STAINED_GLASS]
   - [AMETHYST_BLOCK, BUDDING_AMETHYST]
-  # 銅の経年変化
   - [COPPER_BLOCK, EXPOSED_COPPER, WEATHERED_COPPER, OXIDIZED_COPPER]
   - [CUT_COPPER, EXPOSED_CUT_COPPER, WEATHERED_CUT_COPPER, OXIDIZED_CUT_COPPER]
-  # カーペット
   - [WHITE_CARPET, ORANGE_CARPET, MAGENTA_CARPET, LIGHT_BLUE_CARPET, YELLOW_CARPET, LIME_CARPET, PINK_CARPET, GRAY_CARPET, LIGHT_GRAY_CARPET, CYAN_CARPET, PURPLE_CARPET, BLUE_CARPET, BROWN_CARPET, GREEN_CARPET, RED_CARPET, BLACK_CARPET]
-  # コンクリートパウダー
   - [WHITE_CONCRETE_POWDER, ORANGE_CONCRETE_POWDER, MAGENTA_CONCRETE_POWDER, LIGHT_BLUE_CONCRETE_POWDER, YELLOW_CONCRETE_POWDER, LIME_CONCRETE_POWDER, PINK_CONCRETE_POWDER, GRAY_CONCRETE_POWDER, LIGHT_GRAY_CONCRETE_POWDER, CYAN_CONCRETE_POWDER, PURPLE_CONCRETE_POWDER, BLUE_CONCRETE_POWDER, BROWN_CONCRETE_POWDER, GREEN_CONCRETE_POWDER, RED_CONCRETE_POWDER, BLACK_CONCRETE_POWDER]
-  # 釉薬テラコッタ
   - [WHITE_GLAZED_TERRACOTTA, ORANGE_GLAZED_TERRACOTTA, MAGENTA_GLAZED_TERRACOTTA, LIGHT_BLUE_GLAZED_TERRACOTTA, YELLOW_GLAZED_TERRACOTTA, LIME_GLAZED_TERRACOTTA, PINK_GLAZED_TERRACOTTA, GRAY_GLAZED_TERRACOTTA, LIGHT_GRAY_GLAZED_TERRACOTTA, CYAN_GLAZED_TERRACOTTA, PURPLE_GLAZED_TERRACOTTA, BLUE_GLAZED_TERRACOTTA, BROWN_GLAZED_TERRACOTTA, GREEN_GLAZED_TERRACOTTA, RED_GLAZED_TERRACOTTA, BLACK_GLAZED_TERRACOTTA]
-  # 花
   - [DANDELION, POPPY, BLUE_ORCHID, ALLIUM, AZURE_BLUET, RED_TULIP, ORANGE_TULIP, WHITE_TULIP, PINK_TULIP, OXEYE_DAISY, CORNFLOWER, LILY_OF_THE_VALLEY]
-  # サンゴブロック
   - [TUBE_CORAL_BLOCK, BRAIN_CORAL_BLOCK, BUBBLE_CORAL_BLOCK, FIRE_CORAL_BLOCK, HORN_CORAL_BLOCK]
-  # 苗木
   - [OAK_SAPLING, SPRUCE_SAPLING, BIRCH_SAPLING, JUNGLE_SAPLING, ACACIA_SAPLING, DARK_OAK_SAPLING, CHERRY_SAPLING]
-  # 葉
   - [OAK_LEAVES, SPRUCE_LEAVES, BIRCH_LEAVES, JUNGLE_LEAVES, ACACIA_LEAVES, DARK_OAK_LEAVES, MANGROVE_LEAVES, CHERRY_LEAVES, AZALEA_LEAVES, FLOWERING_AZALEA_LEAVES]
-  # キノコブロック
   - [BROWN_MUSHROOM_BLOCK, RED_MUSHROOM_BLOCK, MUSHROOM_STEM]
-  # プリズマリン系
   - [PRISMARINE, PRISMARINE_BRICKS, DARK_PRISMARINE]
-  # ネザーレンガ系
   - [NETHER_BRICKS, RED_NETHER_BRICKS, CRACKED_NETHER_BRICKS, CHISELED_NETHER_BRICKS]
-  # 深層岩系
   - [DEEPSLATE_BRICKS, DEEPSLATE_TILES, CRACKED_DEEPSLATE_BRICKS, CRACKED_DEEPSLATE_TILES, CHISELED_DEEPSLATE, POLISHED_DEEPSLATE]
-  # タフ系
   - [TUFF, POLISHED_TUFF, TUFF_BRICKS, CHISELED_TUFF_BRICKS]
-# ============================================================
-# 粉砕グリフ 変換マッピング
-# ============================================================
-# 変換前 → 変換後 のペア。サーバー管理者が自由に追加・変更可能。
-# 変換後が非ブロック素材（染料等）の場合、ブロックを破壊してアイテムをドロップする。
 crush_map:
-  # 石系
   STONE: COBBLESTONE
   COBBLESTONE: GRAVEL
   GRAVEL: SAND
@@ -2270,12 +2075,9 @@ crush_map:
   DEEPSLATE: COBBLED_DEEPSLATE
   TUFF: GRAVEL
   CALCITE: GRAVEL
-  # 骨系
   BONE_BLOCK: BONE_MEAL
-  # 氷系
   BLUE_ICE: PACKED_ICE
   PACKED_ICE: ICE
-  # 花 → 染料
   DANDELION: YELLOW_DYE
   POPPY: RED_DYE
   BLUE_ORCHID: LIGHT_BLUE_DYE
@@ -2288,30 +2090,19 @@ crush_map:
   OXEYE_DAISY: LIGHT_GRAY_DYE
   CORNFLOWER: BLUE_DYE
   LILY_OF_THE_VALLEY: WHITE_DYE
-  # 羊毛 → 糸
   WHITE_WOOL: STRING
   SNOW_BLOCK: SNOWBALL
-  # その他
   GLOWSTONE: GLOWSTONE_DUST
   SEA_LANTERN: PRISMARINE_CRYSTALS
-  # ブロック分解
   NETHER_WART_BLOCK: NETHER_WART
   BRICKS: BRICK
   QUARTZ_BLOCK: QUARTZ
   HONEYCOMB_BLOCK: HONEYCOMB
   MAGMA_BLOCK: MAGMA_CREAM
-  # 風化・逆精錬
   SMOOTH_BASALT: BASALT
-  # 食品分解
   MELON: MELON_SLICE
   SUGAR_CANE: SUGAR
 
-# ============================================================
-# 交換グリフ エンティティペアマッピング
-# ============================================================
-# 交換グリフでエンティティに使用した際、サイクル巡回で種類を入れ替える。
-# 各配列はサイクル巡回（A→B→C→...→A）。2要素=双方向ペア、3要素以上=循環。
-# サーバー管理者が自由にサイクルを追加・変更可能。
 entity_exchange_pairs:
   - [HOGLIN, ZOGLIN]
   - [PIGLIN, ZOMBIFIED_PIGLIN]

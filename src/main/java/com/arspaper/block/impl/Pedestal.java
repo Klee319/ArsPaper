@@ -61,17 +61,13 @@ public class Pedestal extends CustomBlock {
     }
 
     @Override
-    public ItemStack createItemStack() {
-        ItemStack item = super.createItemStack();
-        item.editMeta(meta ->
-            meta.lore(List.of(
-                Component.text("儀式用アイテムを設置する台座", NamedTextColor.GRAY)
-                    .decoration(TextDecoration.ITALIC, false),
-                Component.text("アイテムを持って右クリックで設置", NamedTextColor.DARK_GRAY)
-                    .decoration(TextDecoration.ITALIC, false)
-            ))
+    protected List<Component> getDefaultLore() {
+        return List.of(
+            Component.text("儀式用アイテムを設置する台座", NamedTextColor.GRAY)
+                .decoration(TextDecoration.ITALIC, false),
+            Component.text("アイテムを持って右クリックで設置", NamedTextColor.DARK_GRAY)
+                .decoration(TextDecoration.ITALIC, false)
         );
-        return item;
     }
 
     @Override
@@ -230,6 +226,16 @@ public class Pedestal extends CustomBlock {
             .get(PEDESTAL_ITEM_KEY, PersistentDataType.STRING);
         if (matName == null || matName.isEmpty()) return null;
         return Material.matchMaterial(matName);
+    }
+
+    /**
+     * このPedestalに載っている完全なItemStackを取得する(儀式の素材返却用)。
+     * {@link #clearPedestalItem}でクリアする前に呼び出すことで、後方互換の再生成
+     * (Material+customIdからの復元)より正確なアイテムを得られる。
+     * 何も載っていない場合は{@code null}。
+     */
+    public static ItemStack getStoredItemStack(TileState tileState) {
+        return restoreStoredItem(tileState.getPersistentDataContainer());
     }
 
     /**

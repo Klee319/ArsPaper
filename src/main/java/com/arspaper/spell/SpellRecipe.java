@@ -31,6 +31,14 @@ public final class SpellRecipe {
             .sum();
     }
 
+    /** 構成グリフの最大tier（バインド時の触媒max-bind-tier判定に使用）。構成が空なら1。 */
+    public int getMaxTier() {
+        return components.stream()
+            .mapToInt(SpellComponent::getTier)
+            .max()
+            .orElse(1);
+    }
+
     /** 先頭のFormを取得 */
     public SpellForm getForm() {
         if (components.isEmpty()) return null;

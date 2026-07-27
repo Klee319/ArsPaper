@@ -8,6 +8,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 解放ゲート（UNLOCK Model）。
@@ -17,7 +18,11 @@ import java.util.Map;
  * 有効/無効と追加 Source コストもここで一元管理する。
  *
  * <p>対応表は unlock-gate.yml から設定駆動で読み込み、perk 対応や
- * コストはハードコードしない。未定義のレシピ/儀式はゲート無し（解放=従来通り使用可）。
+ * コストはハードコードしない。加えて、TrinityForgeがskilltreeのdedicated-effectから
+ * 算出した レシピID/儀式ID→perkId集合（{@link com.arspaper.integration.TrinityForgeBridge#tfRecipeGatePerks()}
+ * / {@link com.arspaper.integration.TrinityForgeBridge#tfRitualGatePerks()}）も union(OR)で参照する
+ * （要件⑥: skilltree由来の解放を既存ゲートに合流）。yml/TF双方に対応perkが無いレシピ/儀式は
+ * ゲート無し（解放=従来通り使用可）。
  *
  * <p>perk 所持判定は {@code com.trinityforge.pdc.PlayerData.heldPerks()} で行う。
  * TrinityForge 未ロード時は安全側に倒し、常に解放（使用可）とする。
@@ -84,21 +89,26 @@ public final class UnlockGate {
      * @param recipeId レシピID（NamespacedKey のキー部分）
      */
     public boolean hasRecipePermission(Player player, String recipeId) {
-        return hasPermission(player, recipePerks.get(recipeId));
+        return hasPermission(player, recipePerks.get(recipeId),
+            com.arspaper.integration.TrinityForgeBridge.tfRecipeGatePerks().get(recipeId));
     }
 
     /**
      * レシピが perk ゲートの対象かどうかをプレイヤー非依存で判定する。
      *
      * <p>Crafterブロック等、クラフト主体のプレイヤーを特定できない自動化経路で使用する。
-     * ゲート対象（recipe-perksに定義あり）なら true を返し、呼び出し側は
-     * fail-closed（キャンセル）で扱う。
+     * ゲート対象（yml の recipe-perks または TF の skilltree由来マップのいずれかに定義あり）なら
+     * true を返し、呼び出し側は fail-closed（キャンセル）で扱う。
      *
      * @param recipeId レシピID（NamespacedKey のキー部分）
      */
     public boolean isRecipeGated(String recipeId) {
         String requiredPerk = recipePerks.get(recipeId);
-        return requiredPerk != null && !requiredPerk.isBlank();
+        if (requiredPerk != null && !requiredPerk.isBlank()) {
+            return true;
+        }
+        Set<String> tfPerks = com.arspaper.integration.TrinityForgeBridge.tfRecipeGatePerks().get(recipeId);
+        return tfPerks != null && !tfPerks.isEmpty();
     }
 
     /**
@@ -108,7 +118,8 @@ public final class UnlockGate {
      * @param ritualId 儀式レシピID（RitualRecipe.id()）
      */
     public boolean hasRitualPermission(Player player, String ritualId) {
-        return hasPermission(player, ritualPerks.get(ritualId));
+        return hasPermission(player, ritualPerks.get(ritualId),
+            com.arspaper.integration.TrinityForgeBridge.tfRitualGatePerks().get(ritualId));
     }
 
     /** 修繕儀式が許可されているか。 */
@@ -122,23 +133,47 @@ public final class UnlockGate {
     }
 
     /**
-     * perk 所持判定の共通ロジック。
+     * perk 所持判定の共通ロジック（yml由来perk ∪ TF(skilltree)由来perk集合のunion判定）。
      *
-     * - 必要 perk が未定義（null/空）: ゲート無し → true
-     * - perk 所持: true / 未所持: false
+     * - yml由来 requiredPerk・TF由来 tfPerks が両方とも未定義（null/空）: ゲート無し → true
+     * - 上記union集合とプレイヤーのheldPerksが交わる: true / 交わらない: false
      * - TrinityForge 未ロード等で確認できない場合: 安全側に倒し true
      */
-    private boolean hasPermission(Player player, String requiredPerk) {
-        if (requiredPerk == null || requiredPerk.isBlank()) {
-            return true; // ゲート無し（解放）
+    private boolean hasPermission(Player player, String requiredPerk, Set<String> tfPerks) {
+        if (isDebugMode(player)) {
+            return true;
+        }
+        boolean ymlGated = requiredPerk != null && !requiredPerk.isBlank();
+        boolean tfGated = tfPerks != null && !tfPerks.isEmpty();
+        if (!ymlGated && !tfGated) {
+            return true; // ゲート無し（yml/TF双方に対応perk無し。従来通り解放）
         }
         try {
-            return com.trinityforge.pdc.PlayerData.of(player)
-                .heldPerks()
-                .contains(requiredPerk);
+            java.util.List<String> held = com.trinityforge.pdc.PlayerData.of(player).heldPerks();
+            if (ymlGated && held.contains(requiredPerk)) {
+                return true;
+            }
+            if (tfGated) {
+                for (String perk : tfPerks) {
+                    if (held.contains(perk)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
         } catch (Throwable t) {
             // TrinityForge 未ロード/参照不可時はゲートを無効化（解放=従来通り使用可。LinkageError 等も安全側に倒す）
             return true;
+        }
+    }
+
+    /** {@code /ars debug} ON 時はパーク解放ゲートを全通過。 */
+    private static boolean isDebugMode(Player player) {
+        try {
+            com.arspaper.ArsPaper ars = com.arspaper.ArsPaper.getInstance();
+            return ars != null && ars.getManaManager() != null && ars.getManaManager().isDebugMode(player);
+        } catch (Throwable ignored) {
+            return false;
         }
     }
 }

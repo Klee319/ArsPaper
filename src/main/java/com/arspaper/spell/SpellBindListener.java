@@ -40,10 +40,12 @@ public class SpellBindListener implements Listener {
         ItemStack item = event.getItem();
         if (item == null || !item.hasItemMeta()) return;
 
-        // カスタムアイテム（スペルブック等）は既存のリスナーで処理
+        // カスタムアイテム（スペルブック等）は既存のリスナーで処理。
+        // ただし触媒(catalysts.yml登録品)はバインド対象になり得るため例外的に処理を続行する。
         String customId = item.getItemMeta().getPersistentDataContainer()
             .get(ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING);
-        if (customId != null) return;
+        com.arspaper.item.CatalystData heldCatalyst = ArsPaper.getInstance().getCatalystConfig().resolve(item);
+        if (customId != null && heldCatalyst == null) return;
 
         PersistentDataContainer pdc = item.getItemMeta().getPersistentDataContainer();
         String bookUuid = pdc.get(ItemKeys.BOUND_BOOK_UUID, PersistentDataType.STRING);
@@ -93,8 +95,18 @@ public class SpellBindListener implements Listener {
 
         // 共有エンチャントチェック: 魔導書にshareエンチャントがあればグリフチェックをスキップ
         boolean sharedSpell = ArsEnchantments.hasShareEnchant(bookItem);
-        // 触媒＝スペルの本体であるスペルブック ItemStack（会心/貫通を魔法ダメージへ連携）。
-        ArsPaper.getInstance().getSpellCaster().cast(player, recipe, sharedSpell, bookItem);
+        // 非共有魔導書は所有者のみ（触媒経由でも bookItem 自体の所有権を確認）
+        if (!sharedSpell
+                && !com.arspaper.integration.TrinityForgeBridge.mayActorUseItem(player, bookItem)) {
+            player.sendMessage(Component.text(
+                "このアイテムは所有者以外は使用できません。", NamedTextColor.RED));
+            return;
+        }
+        // 触媒判定: バインド先(手持ちアイテム)自体が触媒(catalysts.yml登録品)なら、
+        // その触媒のステ/マナ減/CTを反映するため触媒引数にはheld itemを渡す。
+        // 触媒でなければ従来どおりスペルの本体であるスペルブック ItemStack を渡す。
+        ItemStack catalystArg = (heldCatalyst != null) ? item : bookItem;
+        ArsPaper.getInstance().getSpellCaster().cast(player, recipe, sharedSpell, catalystArg);
     }
 
     /**
@@ -121,7 +133,7 @@ public class SpellBindListener implements Listener {
                 case EFFECT -> NamedTextColor.YELLOW;
                 case AUGMENT -> NamedTextColor.AQUA;
             };
-            glyphLine = glyphLine.append(Component.text(comp.getDisplayName(), color));
+            glyphLine = glyphLine.append(Component.text(GlyphNames.display(comp), color));
             first = false;
         }
         player.sendMessage(glyphLine);
@@ -173,6 +185,20 @@ public class SpellBindListener implements Listener {
                 "このアイテムにはバインドできません", NamedTextColor.RED));
             player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
             return false;
+        }
+
+        // 触媒(catalysts.yml登録品)へのバインドは、触媒のmax-bind-tierを超えるスペルを拒否する。
+        // SpellCraftingGui経由(SpellSettingsGui.handleBind)もこの単一実装点を通るため同様にゲートされる。
+        com.arspaper.item.CatalystData catalyst = ArsPaper.getInstance().getCatalystConfig().resolve(item);
+        if (catalyst != null) {
+            int recipeMaxTier = recipe.getMaxTier();
+            if (recipeMaxTier > catalyst.maxBindTier()) {
+                player.sendMessage(Component.text(
+                    "この触媒は最大ティア" + catalyst.maxBindTier() + "までのスペルしかバインドできません（このスペルはティア"
+                        + recipeMaxTier + "）", NamedTextColor.RED));
+                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
+                return false;
+            }
         }
 
         String bookUuid = bookItem.getItemMeta().getPersistentDataContainer()
@@ -269,17 +295,20 @@ public class SpellBindListener implements Listener {
 
     /**
      * アイテムがバインド可能か判定。
-     * ArsPaperのカスタムアイテム（スペルブック等）のみバインド不可。
+     * ArsPaperのカスタムアイテム（スペルブック等）はバインド不可だが、
+     * 触媒(catalysts.yml登録品)は例外的にバインド可能（触媒＝バインド先そのもの）。
      * エンチャント・属性修飾子・耐久値を持つアイテムにもバインド可能。
      */
     public static boolean canBind(ItemStack item) {
         if (item == null || item.getType().isAir()) return false;
 
-        // ArsPaperのカスタムアイテムはバインド不可（スペルブック/ワンド等）
+        // ArsPaperのカスタムアイテムはバインド不可（スペルブック/ワンド等）。触媒のみ例外。
         if (item.hasItemMeta()) {
             String customId = item.getItemMeta().getPersistentDataContainer()
                 .get(ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING);
-            if (customId != null) return false;
+            if (customId != null) {
+                return ArsPaper.getInstance().getCatalystConfig().resolve(item) != null;
+            }
         }
 
         return true;

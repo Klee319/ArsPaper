@@ -3,6 +3,7 @@ package com.arspaper.gui;
 import com.arspaper.ArsPaper;
 import com.arspaper.block.BlockKeys;
 import com.arspaper.mana.ManaKeys;
+import com.arspaper.spell.GlyphNames;
 import com.arspaper.spell.SpellComponent;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -58,7 +59,7 @@ public class GlyphUnlockAnimation {
             Player player,
             SpellComponent component,
             Location tableLoc,
-            Map<Material, Integer> materials,
+            Map<com.arspaper.item.ItemCostRef, Integer> materials,
             int levelCost,
             Set<String> unlocked,
             Runnable saveCallback
@@ -74,9 +75,9 @@ public class GlyphUnlockAnimation {
         // GUI を閉じる
         player.closeInventory();
 
-        // 素材をインベントリから消費（耐久値が減ったアイテムも対象）
+        // 素材をインベントリから消費
         for (var entry : materials.entrySet()) {
-            removeMaterialFromInventory(player, entry.getKey(), entry.getValue());
+            entry.getKey().removeFrom(player, entry.getValue());
         }
 
         // アニメーション中心点（ブロック中央、少し上）
@@ -85,7 +86,7 @@ public class GlyphUnlockAnimation {
 
         // 素材ごとにArmorStandを生成
         List<ArmorStand> stands = new ArrayList<>();
-        List<Material> matTypes = new ArrayList<>(materials.keySet());
+        List<com.arspaper.item.ItemCostRef> matTypes = new ArrayList<>(materials.keySet());
         int count = matTypes.size();
         double angleStep = (2 * Math.PI) / Math.max(count, 1);
 
@@ -107,16 +108,13 @@ public class GlyphUnlockAnimation {
                 as.setBasePlate(false);
                 as.setCanPickupItems(false);
                 as.addScoreboardTag(CLEANUP_TAG);
-                // /ars cleanup（DISPLAY_MARKER PDC基準で除去）でクラッシュ時の孤立残骸も回収できるよう、
-                // ブロック表示用と同じマーカーを付与する。
                 as.getPersistentDataContainer().set(
                         BlockKeys.DISPLAY_MARKER, PersistentDataType.STRING, CLEANUP_TAG);
-                // 腕を表示して右手にアイテムを持たせる
                 as.setArms(true);
                 as.setRightArmPose(new EulerAngle(Math.toRadians(-90), 0, 0));
             });
 
-            stand.getEquipment().setItemInMainHand(new ItemStack(matTypes.get(i)));
+            stand.getEquipment().setItemInMainHand(matTypes.get(i).createStack(1));
             stands.add(stand);
         }
 
@@ -134,10 +132,7 @@ public class GlyphUnlockAnimation {
                     // オンラインなら素材をインベントリ/足元に返還
                     if (player.isOnline()) {
                         for (var entry : materials.entrySet()) {
-                            java.util.Map<Integer, ItemStack> overflow =
-                                player.getInventory().addItem(new ItemStack(entry.getKey(), entry.getValue()));
-                            overflow.values().forEach(item ->
-                                player.getWorld().dropItemNaturally(player.getLocation(), item));
+                            entry.getKey().giveOrDrop(player, entry.getValue());
                         }
                         player.sendMessage(net.kyori.adventure.text.Component.text(
                             "アンロックが中断されました。素材を返還しました。",
@@ -146,7 +141,7 @@ public class GlyphUnlockAnimation {
                     // オフラインの場合は筆記台の場所に素材をドロップ
                     else {
                         for (var entry : materials.entrySet()) {
-                            world.dropItemNaturally(center, new ItemStack(entry.getKey(), entry.getValue()));
+                            world.dropItemNaturally(center, entry.getKey().createStack(entry.getValue()));
                         }
                     }
                     animatingPlayers.remove(player.getUniqueId());
@@ -159,7 +154,7 @@ public class GlyphUnlockAnimation {
                 if (tableLoc.getBlock().getType().isAir()) {
                     // ブロックが壊された：素材をドロップして中断
                     for (int i = 0; i < matTypes.size(); i++) {
-                        world.dropItemNaturally(center, new ItemStack(matTypes.get(i),
+                        world.dropItemNaturally(center, matTypes.get(i).createStack(
                                 materials.get(matTypes.get(i))));
                     }
                     player.sendMessage(Component.text(
@@ -256,29 +251,6 @@ public class GlyphUnlockAnimation {
     }
 
     /**
-     * Material型一致でインベントリからアイテムを消費する。
-     * 耐久値が減ったツール類（火打石と打ち金等）や非スタックアイテム（トライデント等）も正しく消費される。
-     */
-    private static void removeMaterialFromInventory(Player player, Material material, int amount) {
-        int remaining = amount;
-        for (int i = 0; i < player.getInventory().getSize() && remaining > 0; i++) {
-            ItemStack slot = player.getInventory().getItem(i);
-            if (slot == null || slot.getType() != material) continue;
-            // カスタムアイテムは素材として消費しない
-            if (slot.hasItemMeta() && slot.getItemMeta().getPersistentDataContainer()
-                    .has(com.arspaper.item.ItemKeys.CUSTOM_ITEM_ID)) continue;
-            int take = Math.min(remaining, slot.getAmount());
-            if (slot.getAmount() - take <= 0) {
-                // 非スタックアイテム（トライデント等）でも確実にスロットをクリア
-                player.getInventory().setItem(i, null);
-            } else {
-                slot.setAmount(slot.getAmount() - take);
-            }
-            remaining -= take;
-        }
-    }
-
-    /**
      * アンロック完了処理。アニメーション終了後に呼ばれる。
      */
     private static void completeUnlock(
@@ -310,7 +282,7 @@ public class GlyphUnlockAnimation {
         );
 
         player.sendMessage(Component.text(
-                "解放: " + component.getDisplayName() + "！ (最大マナ+" + perGlyphBonus + ")",
+                "解放: " + GlyphNames.display(component) + "！ (最大マナ+" + perGlyphBonus + ")",
                 NamedTextColor.GREEN
         ));
     }

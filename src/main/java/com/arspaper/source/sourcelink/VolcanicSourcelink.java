@@ -69,10 +69,16 @@ public class VolcanicSourcelink extends Sourcelink {
     );
 
     /** 実行時に使用する燃料値マップ（設定ファイルから読み込み可能） */
-    private Map<Material, Integer> fuelValues = DEFAULT_FUEL_VALUES;
+    private com.arspaper.item.ItemCostTable fuelValues =
+            com.arspaper.item.ItemCostTable.fromMaterials(DEFAULT_FUEL_VALUES);
 
     public VolcanicSourcelink(JavaPlugin plugin) {
         super(plugin, "volcanic_sourcelink");
+    }
+
+    /** カスタムソースリンク (sourcelinks.yml items.<id> type: volcanic) 用: 任意idで同じ挙動の別ブロックを作る。 */
+    public VolcanicSourcelink(JavaPlugin plugin, String blockId) {
+        super(plugin, blockId);
     }
 
     /**
@@ -85,44 +91,42 @@ public class VolcanicSourcelink extends Sourcelink {
     /**
      * 設定ファイルから読み込んだ燃料値マップを設定する。
      */
-    public void setFuelValues(Map<Material, Integer> values) {
-        this.fuelValues = values != null ? values : DEFAULT_FUEL_VALUES;
+    public void setFuelValues(com.arspaper.item.ItemCostTable values) {
+        this.fuelValues = values != null && !values.isEmpty()
+                ? values
+                : com.arspaper.item.ItemCostTable.fromMaterials(DEFAULT_FUEL_VALUES);
     }
 
     @Override
     public Material getBlockMaterial() {
-        return Material.FURNACE;
+        return materialOr(Material.FURNACE);
     }
 
     @Override
     public Component getDisplayName() {
-        return Component.text("ヴォルカニックソースリンク", NamedTextColor.RED)
-            .decoration(TextDecoration.ITALIC, false);
+        return displayNameOr(Component.text("ヴォルカニックソースリンク", NamedTextColor.RED)
+            .decoration(TextDecoration.ITALIC, false));
     }
 
     @Override
     public int getCustomModelData() {
-        return 200003;
+        return cmdOr(200003);
     }
 
     @Override
     public ItemStack createItemStack() {
-        ItemStack item = super.createItemStack();
-        item.editMeta(meta ->
-            meta.lore(List.of(
+        return withConfiguredOrDefaultLore(super.createItemStack(), List.of(
                 Component.text("燃料を燃やしてソースを生成", NamedTextColor.GRAY)
                     .decoration(TextDecoration.ITALIC, false),
                 Component.text("燃料を手に持って右クリックで投入", NamedTextColor.DARK_GRAY)
                     .decoration(TextDecoration.ITALIC, false)
-            ))
-        );
-        return item;
+        ));
     }
 
     @Override
     public ItemStack getDisplayHeadItem() {
         ItemStack head = new ItemStack(Material.MAGMA_BLOCK);
-        head.editMeta(meta -> meta.setCustomModelData(200003));
+        head.editMeta(meta -> meta.setCustomModelData(getCustomModelData()));
         return head;
     }
 
@@ -133,34 +137,25 @@ public class VolcanicSourcelink extends Sourcelink {
 
     @Override
     public int getSourceValueForItem(org.bukkit.inventory.ItemStack item) {
-        if (item == null || isCustomItem(item)) return 0;
-        Integer value = fuelValues.get(item.getType());
-        return value != null ? value : 0;
+        return fuelValues.valueOf(item);
     }
 
     @Override
     public void onBlockInteract(Player player, Block block, TileState tileState) {
         ItemStack hand = player.getInventory().getItemInMainHand();
-        if (isCustomItem(hand)) {
-            // カスタムアイテムは燃料として使用不可
-            int buffer = getBuffer(tileState);
-            player.sendMessage(Component.text(
-                "ボルケニックソースリンク - 蓄積ソース: " + buffer, NamedTextColor.RED
-            ));
-            return;
-        }
-        Integer sourceValue = fuelValues.get(hand.getType());
+        int sourceValue = fuelValues.valueOf(hand);
 
-        if (sourceValue != null) {
+        if (sourceValue > 0) {
             int addCount = player.isSneaking() ? hand.getAmount() : 1;
             addCount = Math.min(addCount, hand.getAmount());
             int totalAdded = sourceValue * addCount;
 
             addToBuffer(block, totalAdded);
+            boolean wasLavaBucket = hand.getType() == Material.LAVA_BUCKET && addCount == 1 && !isCustomItem(hand);
             hand.setAmount(hand.getAmount() - addCount);
 
-            // 溶岩バケツは空バケツを返す
-            if (hand.getType() == Material.LAVA_BUCKET && addCount == 1) {
+            // 溶岩バケツは空バケツを返す（バニラのみ）
+            if (wasLavaBucket) {
                 player.getInventory().setItemInMainHand(new ItemStack(Material.BUCKET));
             }
 

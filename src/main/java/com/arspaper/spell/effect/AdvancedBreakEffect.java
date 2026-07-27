@@ -17,6 +17,7 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.Collection;
@@ -29,10 +30,12 @@ import java.util.Collection;
  */
 public class AdvancedBreakEffect implements SpellEffect {
 
+    private final JavaPlugin plugin;
     private final NamespacedKey id;
     private final GlyphConfig config;
 
     public AdvancedBreakEffect(JavaPlugin plugin, GlyphConfig config) {
+        this.plugin = plugin;
         this.id = new NamespacedKey(plugin, "advanced_break");
         this.config = config;
     }
@@ -51,9 +54,17 @@ public class AdvancedBreakEffect implements SpellEffect {
         Player caster = context.getCaster();
         if (caster == null) return;
 
-        // 保護プラグイン互換
-        BlockBreakEvent breakEvent = new BlockBreakEvent(block, caster);
-        Bukkit.getPluginManager().callEvent(breakEvent);
+        // 保護プラグイン互換 + TF連携: 合成イベントであることをmetadataでマークし、TF側の採取ギミック
+        // (VeinMining/TreeFelling/FarmingHarvest等)が誤発動しないようにする(callEvent直前にセットし、
+        // finallyで必ず除去する — SpellBreakMarker参照)。
+        BlockBreakEvent breakEvent;
+        block.setMetadata(SpellBreakMarker.METADATA_KEY, new FixedMetadataValue(plugin, true));
+        try {
+            breakEvent = new BlockBreakEvent(block, caster);
+            Bukkit.getPluginManager().callEvent(breakEvent);
+        } finally {
+            block.removeMetadata(SpellBreakMarker.METADATA_KEY, plugin);
+        }
         if (breakEvent.isCancelled()) return;
 
         Material blockType = block.getType();
@@ -81,13 +92,18 @@ public class AdvancedBreakEffect implements SpellEffect {
 
         Location dropLoc = blockLocation.clone().add(0.5, 0.5, 0.5);
         BlockState state = block.getState();
+        // TFが setDropItems(false) した(=ドロップ処理をTF自身が引き受ける意図)場合、この自前ドロップ処理
+        // を丸ごと抑止する。ブロックの除去(setType(AIR))自体は従来どおり行う(2026-07-26 二重ドロップ修正)。
+        boolean dropItems = breakEvent.isDropItems();
 
         // コンテナブロック（チェスト、樽等）の中身をドロップ
         // シュルカーボックスはドロップアイテム自体に中身を保持するためスキップ
         if (!isShulkerBox(blockType) && state instanceof Container container) {
-            for (ItemStack item : container.getInventory().getContents()) {
-                if (item != null && !item.getType().isAir()) {
-                    block.getWorld().dropItemNaturally(dropLoc, item);
+            if (dropItems) {
+                for (ItemStack item : container.getInventory().getContents()) {
+                    if (item != null && !item.getType().isAir()) {
+                        block.getWorld().dropItemNaturally(dropLoc, item);
+                    }
                 }
             }
             container.getInventory().clear();
@@ -97,20 +113,26 @@ public class AdvancedBreakEffect implements SpellEffect {
         // BlockStateMetaでデータを保持したままドロップ
         else if (state instanceof TileState tileState
                 && !tileState.getPersistentDataContainer().getKeys().isEmpty()) {
-            ItemStack drop = new ItemStack(blockType);
-            if (drop.getItemMeta() instanceof org.bukkit.inventory.meta.BlockStateMeta bsm) {
-                bsm.setBlockState(block.getState());
-                drop.setItemMeta(bsm);
+            if (dropItems) {
+                ItemStack drop = new ItemStack(blockType);
+                if (drop.getItemMeta() instanceof org.bukkit.inventory.meta.BlockStateMeta bsm) {
+                    bsm.setBlockState(block.getState());
+                    drop.setItemMeta(bsm);
+                }
+                block.setType(Material.AIR);
+                block.getWorld().dropItemNaturally(dropLoc, drop);
+            } else {
+                block.setType(Material.AIR);
             }
-            block.setType(Material.AIR);
-            block.getWorld().dropItemNaturally(dropLoc, drop);
-        } else {
+        } else if (dropItems) {
             // 通常ブロック: バニラドロップ
             Collection<ItemStack> drops = block.getDrops(tool);
             block.setType(Material.AIR);
             for (ItemStack drop : drops) {
                 block.getWorld().dropItemNaturally(dropLoc, drop);
             }
+        } else {
+            block.setType(Material.AIR);
         }
     }
 

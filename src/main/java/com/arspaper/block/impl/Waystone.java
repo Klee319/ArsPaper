@@ -70,17 +70,13 @@ public class Waystone extends CustomBlock implements Listener {
     }
 
     @Override
-    public ItemStack createItemStack() {
-        ItemStack item = super.createItemStack();
-        item.editMeta(meta ->
-            meta.lore(List.of(
-                Component.text("テレポートの目印となる魔法石", NamedTextColor.GRAY)
-                    .decoration(TextDecoration.ITALIC, false),
-                Component.text("ダイヤモンドブロックの上に設置", NamedTextColor.DARK_GRAY)
-                    .decoration(TextDecoration.ITALIC, false)
-            ))
+    protected List<Component> getDefaultLore() {
+        return List.of(
+            Component.text("テレポートの目印となる魔法石", NamedTextColor.GRAY)
+                .decoration(TextDecoration.ITALIC, false),
+            Component.text("ダイヤモンドブロックの上に設置", NamedTextColor.DARK_GRAY)
+                .decoration(TextDecoration.ITALIC, false)
         );
-        return item;
     }
 
     @Override

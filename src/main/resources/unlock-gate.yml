@@ -5,31 +5,34 @@
 # クラフトレシピ・儀式レシピの解放を制御する。
 #
 # perk の所持判定は PlayerData.heldPerks() のエントリと一致するかで行う。
+# perk ID は TF の PerkNaming 形式 <compact>_perk_<node>（例 arssmithing_perk_d_1）。
 # 未定義のレシピ/儀式はゲート無し（解放=従来通り使用可）。
 # TrinityForge 未ロード時は安全側（ゲート無効=使用可）に倒す。
+#
+# ■ Source of truth (SoT)
+# レシピ/儀式 → perk 対応の正本は TrinityForge の
+#   skilltree/dedicated-effects.yml（channel: recipe-gate / ritual-gate）である。
+# 本ファイルの recipe-perks / ritual-perks は空を維持し、ランタイムでは
+# TrinityForgeBridge.tfRecipeGatePerks() / tfRitualGatePerks()（skilltree 由来）と
+# union(OR) 判定する。サーバー運用で fork 側だけ一時的に上書きしたい場合のみ追記する。
+#
+# ▼ 未 gate（対象未実装のため）: skilltree の以下の「解放」は ArsPaper 側に実体が無い。
+#   実装後に dedicated-effects.yml または（一時的に）ここへ追記する。
+#   - ソースジェム武器コーティング / 上位ソースジャー / 各種コア（ウッド/ベジタブル/ミート/ジュエリー）
+#     ※ tf_core_* カタログアイテム自体は TrinityForge に残す（削除しない）。
+#   - バニラ防具・道具クラフト（石/鉄/ダイヤ/ネザライト, SMITHING A〜D）= TF 側機構で ArsPaper 外
+#   - 村人職（司祭/鍛冶師/司書取引）, 解体(SMITHING B-3-upper), スレッド欄拡張(ARS_SMITHING E)
 # ============================================================
 
 # レシピID → 必要 perk ID。
 # レシピID は登録時の NamespacedKey のキー部分（items.yml の id、
 # 防具レシピは "armor_<itemId>"）。未定義 = ゲート無し。
-# このマップが空 = 全レシピ自由クラフト（既存挙動を壊さない）。
-recipe-perks:
-  # 例（コメントアウト中。必要に応じて有効化する）:
-  # waystone: "perk.explorer"
+# 空マップ = yml 側ゲート無し（TF skilltree 側の定義は引き続き有効）。
+# 設定リファレンス(本文コメント移設先): docs/config-reference/arspaper/unlock-gate.md
+recipe-perks: {}
 
-# 儀式レシピID → 必要 perk ID。
-# 儀式レシピID は RitualRecipe.id()（items.yml/materials.yml/threads.yml の id）。
-# 未定義 = ゲート無し。空マップ = 全儀式自由実行。
-ritual-perks:
-  # 例（コメントアウト中。必要に応じて有効化する）:
-  # summon_ritual: "perk.summoner"
+ritual-perks: {}
 
-# 修繕儀式（Ars 鍛冶「修復の儀式」）の設定。
-# バニラ修繕は別 fork で廃止されるが、Ars の修繕儀式は許可する。
-# 無限修繕の抜け道を防ぐため、追加 Source コストで重くできる。
 repair-ritual:
-  # false にすると修繕儀式自体を無効化する。
   enabled: true
-  # 修繕儀式の既存 Source コストへの上乗せ量（0 = 据え置き）。
-  # 儀式レシピ側の source: でも基礎コストは調整可能。これはさらに上乗せする値。
   extra-source-cost: 0

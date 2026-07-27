@@ -2,13 +2,13 @@ package com.arspaper.item.impl;
 
 import com.arspaper.ArsPaper;
 import com.arspaper.gui.SpellCraftingGui;
+import com.arspaper.integration.TrinityForgeBridge;
 import com.arspaper.item.BaseCustomItem;
 import com.arspaper.item.ItemKeys;
-import com.arspaper.item.SpellBookTier;
+import com.arspaper.item.SpellBookTierData;
 import com.arspaper.spell.*;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -29,9 +29,9 @@ import java.util.UUID;
 public class SpellBook extends BaseCustomItem {
 
     private final SpellRegistry spellRegistry;
-    private final SpellBookTier bookTier;
+    private final SpellBookTierData bookTier;
 
-    public SpellBook(JavaPlugin plugin, SpellRegistry spellRegistry, SpellBookTier bookTier) {
+    public SpellBook(JavaPlugin plugin, SpellRegistry spellRegistry, SpellBookTierData bookTier) {
         super(plugin, bookTier.getItemId());
         this.spellRegistry = spellRegistry;
         this.bookTier = bookTier;
@@ -48,36 +48,16 @@ public class SpellBook extends BaseCustomItem {
     }
 
     /**
-     * ティアに応じた華やかな魔導書名を生成する。
-     * Novice: シンプルな薄紫
-     * Apprentice: 装飾付き濃紫グラデーション
-     * Archmage: 金→黄グラデーション + ボールド + 装飾シンボル
+     * ティアに応じた魔導書名を生成する。
+     *
+     * 旧実装はNOVICE単色/APPRENTICE多色グラデーション+装飾記号(✦)/ARCHMAGE金グラデーション+太字+装飾記号(✧✦)を
+     * ティアごとにswitch文でハードコードしていた。config駆動化に伴い、spellbooks.ymlの
+     * display-name / name-color から生成する単色表示に統一した（1文字ずつの色替えグラデーションと
+     * 装飾記号はconfigで表現しきれないため単色化。表示自体は崩れず、ティアごとの色分けは維持される）。
      */
-    private static Component buildTieredBookName(SpellBookTier tier) {
-        return switch (tier) {
-            case NOVICE -> Component.text("見習いの魔法書", TextColor.color(0xD4A0FF))
-                .decoration(TextDecoration.ITALIC, false);
-
-            case APPRENTICE -> Component.text("✦ ", TextColor.color(0x9966CC))
-                .append(Component.text("魔術師", TextColor.color(0xAA55DD)))
-                .append(Component.text("の", TextColor.color(0x9944CC)))
-                .append(Component.text("魔術書", TextColor.color(0x8833BB)))
-                .append(Component.text(" ✦", TextColor.color(0x9966CC)))
-                .decoration(TextDecoration.ITALIC, false);
-
-            case ARCHMAGE -> Component.text("✧✦ ", TextColor.color(0xFFD700))
-                .append(Component.text("大", TextColor.color(0xFFD700)))
-                .append(Component.text("魔", TextColor.color(0xFFCC00)))
-                .append(Component.text("導", TextColor.color(0xFFC200)))
-                .append(Component.text("士", TextColor.color(0xFFB800)))
-                .append(Component.text("の", TextColor.color(0xFFAE00)))
-                .append(Component.text("魔", TextColor.color(0xFFA400)))
-                .append(Component.text("導", TextColor.color(0xFF9A00)))
-                .append(Component.text("書", TextColor.color(0xFF9000)))
-                .append(Component.text(" ✦✧", TextColor.color(0xFFD700)))
-                .decoration(TextDecoration.ITALIC, false)
-                .decoration(TextDecoration.BOLD, true);
-        };
+    private static Component buildTieredBookName(SpellBookTierData tier) {
+        return Component.text(tier.getDisplayName(), tier.getNameColor())
+            .decoration(TextDecoration.ITALIC, false);
     }
 
     @Override
@@ -85,9 +65,9 @@ public class SpellBook extends BaseCustomItem {
         return bookTier.getCustomModelData();
     }
 
-    /** 触媒(完成品): 厳選(quality/rollSeed)の対象とする。 */
+    /** 触媒(完成品): 儀式クラフト時に品質(rollSeed + quality)を刻印する。 */
     @Override
-    protected boolean usesQualityRoll() { return true; }
+    public boolean isQualityStamped() { return true; }
 
     @Override
     public ItemStack createItemStack() {
@@ -175,9 +155,13 @@ public class SpellBook extends BaseCustomItem {
                 .getOrDefault(ItemKeys.SPELL_SLOT, PersistentDataType.INTEGER, 0);
             int tier = item.getItemMeta().getPersistentDataContainer()
                 .getOrDefault(ItemKeys.BOOK_TIER, PersistentDataType.INTEGER, 1);
+            // 要件⑥ ars-tier: skilltree由来のperkで使用可能グリフtier上限を加算する。
+            // TF未ロード時はtfArsTierUnlockBonusが0を返し、従来のmaxGlyphTierのまま(fail-open)。
             SpellCraftingGui gui = new SpellCraftingGui(
                 ArsPaper.getInstance(), player, item, slot,
-                SpellBookTier.fromTier(tier).getMaxGlyphTier()
+                ArsPaper.getInstance().getSpellBookConfig().byTier(tier).getMaxGlyphTier()
+                    + TrinityForgeBridge.tfArsTierUnlockBonus(player),
+                ArsPaper.getInstance().getSpellBookConfig().byTier(tier).getMaxGlyphs()
             );
             gui.open();
         }
@@ -241,7 +225,10 @@ public class SpellBook extends BaseCustomItem {
     private void switchSlot(Player player, ItemStack item) {
         int tier = item.getItemMeta().getPersistentDataContainer()
             .getOrDefault(ItemKeys.BOOK_TIER, PersistentDataType.INTEGER, 1);
-        int maxSlots = SpellBookTier.fromTier(tier).getMaxSlots();
+        // 要件⑥ glyph-slot-plus: skilltree由来のperkでスペルスロット数を加算する(floor/0クランプ済み)。
+        // TF未ロード時はtfGlyphSlotBonusが0を返し、従来のmaxSlotsのまま(fail-open)。
+        int maxSlots = ArsPaper.getInstance().getSpellBookConfig().byTier(tier).getMaxSlots()
+            + TrinityForgeBridge.tfGlyphSlotBonus(player);
 
         int current = item.getItemMeta().getPersistentDataContainer()
             .getOrDefault(ItemKeys.SPELL_SLOT, PersistentDataType.INTEGER, 0);
@@ -271,7 +258,7 @@ public class SpellBook extends BaseCustomItem {
         return slots.get(slot).getName();
     }
 
-    public SpellBookTier getBookTier() {
+    public SpellBookTierData getBookTier() {
         return bookTier;
     }
 }

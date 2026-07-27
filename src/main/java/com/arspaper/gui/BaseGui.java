@@ -59,7 +59,8 @@ public abstract class BaseGui implements InventoryHolder {
     protected ItemStack createButton(Material material, Component name) {
         ItemStack item = new ItemStack(material);
         item.editMeta(meta -> {
-            meta.displayName(name.decoration(TextDecoration.ITALIC, false));
+            Component safeName = name != null ? name : Component.text(material.name());
+            meta.displayName(safeName.decoration(TextDecoration.ITALIC, false));
             meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
         });
         return item;
@@ -68,7 +69,8 @@ public abstract class BaseGui implements InventoryHolder {
     protected ItemStack createButton(Material material, Component name, java.util.List<Component> lore) {
         ItemStack item = new ItemStack(material);
         item.editMeta(meta -> {
-            meta.displayName(name.decoration(TextDecoration.ITALIC, false));
+            Component safeName = name != null ? name : Component.text(material.name());
+            meta.displayName(safeName.decoration(TextDecoration.ITALIC, false));
             meta.lore(lore.stream()
                 .map(l -> l.decoration(TextDecoration.ITALIC, false))
                 .toList());

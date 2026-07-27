@@ -201,7 +201,12 @@ public class RecipeBrowserGui extends BaseGui {
             ItemStack resultDisplay = entry.iconItem.clone();
             if (entry.amount > 1) resultDisplay.setAmount(entry.amount);
             resultDisplay.editMeta(meta -> {
-                List<Component> resultLore = new ArrayList<>();
+                List<Component> resultLore = meta.lore() == null
+                    ? new ArrayList<>()
+                    : new ArrayList<>(meta.lore());
+                if (!resultLore.isEmpty()) {
+                    resultLore.add(Component.empty());
+                }
                 if (entry.amount > 1) {
                     resultLore.add(Component.text("完成数: " + entry.amount + "個", NamedTextColor.GREEN)
                         .decoration(TextDecoration.ITALIC, false));
@@ -231,15 +236,21 @@ public class RecipeBrowserGui extends BaseGui {
     private ItemStack createIngredientDisplay(String ingredientStr) {
         if (ingredientStr.startsWith("custom:")) {
             String customId = ingredientStr.substring("custom:".length());
-            return ArsPaper.getInstance().getItemRegistry().get(customId)
-                .map(item -> {
-                    ItemStack stack = item.createItemStack();
-                    stack.editMeta(meta -> meta.lore(List.of(
-                        Component.text(localize(ingredientStr), NamedTextColor.AQUA)
-                            .decoration(TextDecoration.ITALIC, false))));
-                    return stack;
-                })
-                .orElse(createButton(Material.BARRIER, Component.text(customId, NamedTextColor.RED)));
+            // ArsPaperカスタムを優先し、無ければTrinityForgeカタログアイテムへフォールバック
+            // (localize() と対称。以前はTFカタログ素材がBARRIER表示になっていた)。
+            ItemStack stack = ArsPaper.getInstance().getItemRegistry().get(customId)
+                .map(item -> item.createItemStack())
+                .orElseGet(() -> com.arspaper.integration.TrinityForgeBridge.createCatalogIdentity(customId));
+            if (stack != null) {
+                stack.editMeta(meta -> meta.lore(List.of(
+                    Component.text(localize(ingredientStr), NamedTextColor.AQUA)
+                        .decoration(TextDecoration.ITALIC, false))));
+                return stack;
+            }
+            return createButton(Material.BARRIER, Component.text(customId, NamedTextColor.RED));
+        }
+        if (ingredientStr.startsWith("list:")) {
+            return createMaterialListDisplay(ingredientStr);
         }
         Material mat = Material.matchMaterial(ingredientStr);
         if (mat != null) {
@@ -251,6 +262,62 @@ public class RecipeBrowserGui extends BaseGui {
             return stack;
         }
         return createButton(Material.BARRIER, Component.text(ingredientStr, NamedTextColor.RED));
+    }
+
+    /**
+     * {@code list:<id>}(TrinityForge 素材互換リスト)の表示用アイテムを生成する。
+     * 代表アイコン(先頭Material or 先頭customメンバ)にリスト名と「いずれか1つ」のメンバ一覧を
+     * lore で添える。TF未ロード / 未定義リストのときは BARRIER。
+     */
+    private ItemStack createMaterialListDisplay(String ingredientStr) {
+        String listId = ingredientStr.substring("list:".length());
+        java.util.Set<Material> mats =
+            com.arspaper.integration.TrinityForgeBridge.resolveMaterialList(listId);
+        java.util.Set<String> customIds =
+            com.arspaper.integration.TrinityForgeBridge.resolveMaterialListCustomIds(listId);
+
+        ItemStack stack = null;
+        Material iconMat = mats.stream().findFirst().orElse(null);
+        if (iconMat != null) {
+            stack = new ItemStack(iconMat);
+        } else {
+            String firstCustom = customIds.stream().findFirst().orElse(null);
+            if (firstCustom != null) {
+                stack = ArsPaper.getInstance().getItemRegistry().get(firstCustom)
+                    .map(item -> item.createItemStack())
+                    .orElseGet(() -> com.arspaper.integration.TrinityForgeBridge.createCatalogIdentity(firstCustom));
+            }
+        }
+        if (stack == null) {
+            return createButton(Material.BARRIER, Component.text(ingredientStr, NamedTextColor.RED));
+        }
+
+        String label = com.arspaper.integration.TrinityForgeBridge.materialListLabel(listId);
+        List<Component> lore = new ArrayList<>();
+        lore.add(detailText("互換素材リスト (いずれか1つ)", NamedTextColor.AQUA));
+        int shown = 0;
+        final int limit = 12;
+        boolean truncated = false;
+        for (Material m : mats) {
+            if (shown >= limit) { truncated = true; break; }
+            lore.add(detailText("・" + localizeMaterial(m), NamedTextColor.GRAY));
+            shown++;
+        }
+        for (String cid : customIds) {
+            if (shown >= limit) { truncated = true; break; }
+            lore.add(detailText("・" + localize("custom:" + cid), NamedTextColor.GRAY));
+            shown++;
+        }
+        if (truncated) {
+            lore.add(detailText("…ほか", NamedTextColor.DARK_GRAY));
+        }
+        ItemStack finalStack = stack;
+        finalStack.editMeta(meta -> {
+            meta.displayName(Component.text(label, NamedTextColor.WHITE)
+                .decoration(TextDecoration.ITALIC, false));
+            meta.lore(lore);
+        });
+        return finalStack;
     }
 
     /**
@@ -415,46 +482,83 @@ public class RecipeBrowserGui extends BaseGui {
             entries.add(entry);
         }
 
-        // 作業台レシピ
+        // 作業台レシピ (Ars RecipeManager 登録分)
         for (Map.Entry<NamespacedKey, Object> recipeEntry : plugin.getRecipeManager().getRegisteredRecipes().entrySet()) {
-            Object recipeObj = recipeEntry.getValue();
-            RecipeEntry entry = new RecipeEntry();
-            entry.id = recipeEntry.getKey().getKey();
-            if (!seenIds.add(entry.id)) continue; // 重複排除
-            entry.isRitual = false;
+            RecipeEntry entry = workbenchEntryOf(recipeEntry.getKey().getKey(), recipeEntry.getValue());
+            if (entry == null || !seenIds.add(entry.id)) continue; // 重複排除
+            entries.add(entry);
+        }
 
-            if (recipeObj instanceof ShapedRecipe shaped) {
-                entry.displayName = cleanDisplayName(shaped.getResult());
-                entry.iconItem = shaped.getResult().clone();
-                entry.icon = shaped.getResult().getType();
-                entry.amount = shaped.getResult().getAmount();
-                entry.shape = List.of(shaped.getShape());
-
-                Map<String, String> ingMap = new HashMap<>();
-                for (Map.Entry<Character, org.bukkit.inventory.RecipeChoice> choiceEntry : shaped.getChoiceMap().entrySet()) {
-                    ingMap.put(String.valueOf(choiceEntry.getKey()), describeChoice(choiceEntry.getValue()));
+        // 作業台レシピ (TrinityForge catalog 登録分)。
+        // Bukkit全体のrecipeIteratorでは他プラグインの動的レシピを列挙できない環境があるため、
+        // TFのCatalogRecipeRegistrarが持つ登録済みキーを直接取得する。
+        for (NamespacedKey key : com.arspaper.integration.TrinityForgeBridge.catalogWorkbenchRecipeKeys()) {
+            org.bukkit.inventory.Recipe recipeObj = org.bukkit.Bukkit.getRecipe(key);
+            if (recipeObj == null) continue;
+            RecipeEntry entry = workbenchEntryOf(key.getKey(), recipeObj);
+            if (entry == null || !seenIds.add(entry.id)) continue;
+            // custom:素材はMaterialChoiceでは判別できないため、TF側のパース済みspecで上書きする。
+            // このときshape(パターン行)も必ずTF spec由来へ揃える: Bukkitの getShape() は
+            // サーバ再構築時にパターン文字を振り直すため、config元記号のingredientMapと突き合わせると
+            // 全スロットがnull一致=素材が一切描画されない(木の棒すら出ない/ホバー素材リストも空)。
+            var tokens = com.arspaper.integration.TrinityForgeBridge.catalogWorkbenchIngredients(key);
+            if (tokens != null && !tokens.isEmpty()) {
+                entry.ingredientMap = tokens;
+                var specShape = com.arspaper.integration.TrinityForgeBridge.catalogWorkbenchShape(key);
+                if (specShape != null && !specShape.isEmpty()) {
+                    entry.shape = specShape;
                 }
-                entry.ingredientMap = ingMap;
-            } else if (recipeObj instanceof ShapelessRecipe shapeless) {
-                entry.displayName = cleanDisplayName(shapeless.getResult());
-                entry.iconItem = shapeless.getResult().clone();
-                entry.icon = shapeless.getResult().getType();
-                entry.amount = shapeless.getResult().getAmount();
-
-                Map<String, String> ingMap = new HashMap<>();
-                List<org.bukkit.inventory.RecipeChoice> choices = shapeless.getChoiceList();
-                for (int i = 0; i < choices.size(); i++) {
-                    ingMap.put(String.valueOf(i + 1), describeChoice(choices.get(i)));
-                }
-                entry.ingredientMap = ingMap;
-            } else {
-                continue; // 未知のレシピタイプはスキップ
             }
-
+            // Bukkit/Valhalla側の結果表示ではなく、items/catalog.yml の固定identity
+            // (表示名・CMD・革色・発光・flavor lore)をレシピブラウザの正とする。
+            ItemStack catalogDisplay =
+                    com.arspaper.integration.TrinityForgeBridge.catalogWorkbenchDisplayItem(key);
+            if (catalogDisplay != null) {
+                entry.displayName = cleanDisplayName(catalogDisplay);
+                entry.iconItem = catalogDisplay;
+                entry.icon = catalogDisplay.getType();
+            }
             entries.add(entry);
         }
 
         return entries;
+    }
+
+    /** 作業台レシピ(Shaped/Shapeless)をRecipeEntryへ変換する。未知タイプはnull。 */
+    private RecipeEntry workbenchEntryOf(String id, Object recipeObj) {
+        RecipeEntry entry = new RecipeEntry();
+        entry.id = id;
+        entry.isRitual = false;
+
+        if (recipeObj instanceof ShapedRecipe shaped) {
+            entry.displayName = cleanDisplayName(shaped.getResult());
+            entry.iconItem = shaped.getResult().clone();
+            entry.icon = shaped.getResult().getType();
+            entry.amount = shaped.getResult().getAmount();
+            entry.shape = List.of(shaped.getShape());
+
+            Map<String, String> ingMap = new HashMap<>();
+            for (Map.Entry<Character, org.bukkit.inventory.RecipeChoice> choiceEntry : shaped.getChoiceMap().entrySet()) {
+                ingMap.put(String.valueOf(choiceEntry.getKey()), describeChoice(choiceEntry.getValue()));
+            }
+            entry.ingredientMap = ingMap;
+            return entry;
+        }
+        if (recipeObj instanceof ShapelessRecipe shapeless) {
+            entry.displayName = cleanDisplayName(shapeless.getResult());
+            entry.iconItem = shapeless.getResult().clone();
+            entry.icon = shapeless.getResult().getType();
+            entry.amount = shapeless.getResult().getAmount();
+
+            Map<String, String> ingMap = new HashMap<>();
+            List<org.bukkit.inventory.RecipeChoice> choices = shapeless.getChoiceList();
+            for (int i = 0; i < choices.size(); i++) {
+                ingMap.put(String.valueOf(i + 1), describeChoice(choices.get(i)));
+            }
+            entry.ingredientMap = ingMap;
+            return entry;
+        }
+        return null; // 未知のレシピタイプはスキップ
     }
 
     /**
@@ -465,42 +569,17 @@ public class RecipeBrowserGui extends BaseGui {
 
         // === カスタムアイテム結果の詳細 ===
         if (entry.resultCustomId != null) {
-            // スペルブック
+            // スペルブック（spellbooks.ymlのidで直接引く。旧実装のswitch文はconfig駆動化に伴い廃止）
             if (entry.resultCustomId.startsWith("spell_book_")) {
-                com.arspaper.item.SpellBookTier tier = switch (entry.resultCustomId) {
-                    case "spell_book_novice" -> com.arspaper.item.SpellBookTier.NOVICE;
-                    case "spell_book_apprentice" -> com.arspaper.item.SpellBookTier.APPRENTICE;
-                    case "spell_book_archmage" -> com.arspaper.item.SpellBookTier.ARCHMAGE;
-                    default -> null;
-                };
+                com.arspaper.item.SpellBookTierData tier = plugin.getSpellBookConfig().byId(entry.resultCustomId);
                 if (tier != null) {
                     lore.add(Component.empty());
                     lore.add(detailText("スロット数: " + tier.getMaxSlots(), NamedTextColor.AQUA));
                     lore.add(detailText("グリフTier上限: " + tier.getMaxGlyphTier(), NamedTextColor.AQUA));
                 }
             }
-            // 防具
-            if (entry.resultCustomId.contains("_helmet") || entry.resultCustomId.contains("_chestplate")
-                    || entry.resultCustomId.contains("_leggings") || entry.resultCustomId.contains("_boots")) {
-                String setId = entry.resultCustomId.replaceAll("_(helmet|chestplate|leggings|boots)$", "");
-                var armorConfig = plugin.getArmorConfigManager();
-                if (armorConfig != null) {
-                    var config = armorConfig.getSetById(setId);
-                    if (config != null) {
-                        lore.add(Component.empty());
-                        if (config.getManaBonus() > 0)
-                            lore.add(detailText("マナ: +" + config.getManaBonus(), NamedTextColor.BLUE));
-                        if (config.getManaRegen() > 0)
-                            lore.add(detailText("リジェン: +" + config.getManaRegen() + "/s", NamedTextColor.AQUA));
-                        if (config.getThreadSlots() > 0)
-                            lore.add(detailText("スレッド: " + config.getThreadSlots() + "スロット", NamedTextColor.DARK_AQUA));
-                        String slot = entry.resultCustomId.substring(setId.length() + 1);
-                        int defense = config.getDefenseForSlot(slot);
-                        if (defense > 0)
-                            lore.add(detailText("防御: " + defense, NamedTextColor.GRAY));
-                    }
-                }
-            }
+            // 防具: TrinityForgeのitem-catalog/item-stats供給に一本化されたため、
+            // ArsPaper側の防具詳細lore表示は撤去(防具レシピもArsPaper側では登録しない)。
         }
 
         // === スレッド詳細 ===
@@ -635,13 +714,22 @@ public class RecipeBrowserGui extends BaseGui {
     private String localize(String materialOrCustom) {
         if (materialOrCustom == null) return "不明";
 
-        // カスタムアイテム: レジストリから表示名を取得
+        // 素材互換リスト: TF の list:<id> をラベル + 「(いずれか)」で表示する。
+        if (materialOrCustom.startsWith("list:")) {
+            String listId = materialOrCustom.substring("list:".length());
+            return com.arspaper.integration.TrinityForgeBridge.materialListLabel(listId) + " (いずれか)";
+        }
+
+        // カスタムアイテム: レジストリから表示名を取得（Ars未登録ならTFカタログ表示名へフォールバック）
         if (materialOrCustom.startsWith("custom:")) {
             String customId = materialOrCustom.substring("custom:".length());
             return ArsPaper.getInstance().getItemRegistry().get(customId)
                 .map(item -> net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
-                    .serialize(item.getDisplayName()))
-                .orElse(customId);
+                    .serialize(item.resolveDisplayName()))
+                .orElseGet(() -> {
+                    String tfName = com.arspaper.integration.TrinityForgeBridge.catalogDisplayNamePlain(customId);
+                    return tfName != null ? tfName : customId;
+                });
         }
 
         // バニラ素材: Material名を日本語化

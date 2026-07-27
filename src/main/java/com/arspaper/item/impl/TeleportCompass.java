@@ -57,17 +57,13 @@ public class TeleportCompass extends BaseCustomItem {
     }
 
     @Override
-    public ItemStack createItemStack() {
-        ItemStack item = super.createItemStack();
-        item.editMeta(meta ->
-            meta.lore(List.of(
-                Component.text("ウェイストーンに右クリックで紐づけ", NamedTextColor.GRAY)
-                    .decoration(TextDecoration.ITALIC, false),
-                Component.text("右クリックでテレポート", NamedTextColor.DARK_GRAY)
-                    .decoration(TextDecoration.ITALIC, false)
-            ))
+    protected List<Component> getDefaultLore() {
+        return List.of(
+            Component.text("ウェイストーンに右クリックで紐づけ", NamedTextColor.GRAY)
+                .decoration(TextDecoration.ITALIC, false),
+            Component.text("右クリックでテレポート", NamedTextColor.DARK_GRAY)
+                .decoration(TextDecoration.ITALIC, false)
         );
-        return item;
     }
 
     @Override
@@ -212,12 +208,8 @@ public class TeleportCompass extends BaseCustomItem {
             pdc.remove(LINKED_Y);
             pdc.remove(LINKED_Z);
             pdc.remove(LINKED_NAME);
-            meta.lore(List.of(
-                Component.text("ウェイストーンに右クリックで紐づけ", NamedTextColor.GRAY)
-                    .decoration(TextDecoration.ITALIC, false),
-                Component.text("右クリックでテレポート", NamedTextColor.DARK_GRAY)
-                    .decoration(TextDecoration.ITALIC, false)
-            ));
+            // functional-items.yml のlore上書きがあれば尊重する(なければハードコード既定値)。
+            meta.lore(resolveLore());
         });
     }
 }

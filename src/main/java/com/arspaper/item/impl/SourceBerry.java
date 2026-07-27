@@ -5,7 +5,6 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
-import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.List;
@@ -40,16 +39,12 @@ public class SourceBerry extends BaseCustomItem {
     }
 
     @Override
-    public ItemStack createItemStack() {
-        ItemStack item = super.createItemStack();
-        item.editMeta(meta ->
-            meta.lore(List.of(
-                Component.text("魔力を帯びた不思議なベリー", NamedTextColor.GRAY)
-                    .decoration(TextDecoration.ITALIC, false),
-                Component.text("食べるとマナを" + MANA_RESTORE + "回復", NamedTextColor.AQUA)
-                    .decoration(TextDecoration.ITALIC, false)
-            ))
+    protected List<Component> getDefaultLore() {
+        return List.of(
+            Component.text("魔力を帯びた不思議なベリー", NamedTextColor.GRAY)
+                .decoration(TextDecoration.ITALIC, false),
+            Component.text("食べるとマナを" + MANA_RESTORE + "回復", NamedTextColor.AQUA)
+                .decoration(TextDecoration.ITALIC, false)
         );
-        return item;
     }
 }

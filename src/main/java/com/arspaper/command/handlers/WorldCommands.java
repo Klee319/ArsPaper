@@ -1,6 +1,7 @@
 package com.arspaper.command.handlers;
 
 import com.arspaper.ArsPaper;
+import com.arspaper.spell.GlyphNames;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.entity.Player;
@@ -81,7 +82,7 @@ public final class WorldCommands {
                 var comp = plugin.getSpellRegistry().get(key);
                 if (comp != null) {
                     if (sb.length() > 2) sb.append(", ");
-                    sb.append(comp.getDisplayName());
+                    sb.append(GlyphNames.display(comp));
                 }
             }
             player.sendMessage(Component.text(sb.toString(), NamedTextColor.GRAY));

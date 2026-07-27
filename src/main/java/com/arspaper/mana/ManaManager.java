@@ -41,6 +41,22 @@ public class ManaManager implements Listener {
     private final java.util.Map<UUID, Long> lastCastTime = new java.util.concurrent.ConcurrentHashMap<>();
     private static final int PERCENT_DIVISOR = 100;
 
+    /**
+     * 要件⑥ source-auto-consume: 直近の{@link #consumeMana}呼び出しでSource補填によって賄われた
+     * マナ量を、呼び出し元(SpellCaster)が読み取れるようにするための受け渡し変数。
+     * consumeMana呼び出し直後、同一スレッド(メインスレッド前提)で即座に読むこと。
+     * これはsource→mana変換遮断のため、キャンセル時のマナ返還からSource補填分を除外する用途で使う
+     * (Source自体を返還する経路が複雑なため、最小実装として「補填分は返還しない」を採る)。
+     */
+    private final ThreadLocal<Integer> lastSourceConvertedAmount = ThreadLocal.withInitial(() -> 0);
+
+    /**
+     * 直近のconsumeMana呼び出しでSource補填によって賄われたマナ量を返す(0ならSource補填なし)。
+     */
+    public int getLastSourceConvertedAmount() {
+        return lastSourceConvertedAmount.get();
+    }
+
     public ManaManager(JavaPlugin plugin, ManaConfig config) {
         this.plugin = plugin;
         this.config = config;
@@ -51,8 +67,8 @@ public class ManaManager implements Listener {
         this.regenTask = plugin.getServer().getScheduler().runTaskTimer(
             plugin,
             this::tickRegeneration,
-            config.regenIntervalTicks(),
-            config.regenIntervalTicks()
+            ManaBaseStats.regenIntervalTicks(),
+            ManaBaseStats.regenIntervalTicks()
         );
 
         // 統計フラッシュタスク（5分ごとにバッファをPDCへ書き込み）。
@@ -80,7 +96,7 @@ public class ManaManager implements Listener {
 
     public int getCurrentMana(Player player) {
         PersistentDataContainer pdc = player.getPersistentDataContainer();
-        return pdc.getOrDefault(ManaKeys.CURRENT_MANA, PersistentDataType.INTEGER, config.defaultMaxMana());
+        return pdc.getOrDefault(ManaKeys.CURRENT_MANA, PersistentDataType.INTEGER, ManaBaseStats.defaultMax());
     }
 
     public int getMaxMana(Player player) {
@@ -99,7 +115,10 @@ public class ManaManager implements Listener {
         int armorBonus = pdc.getOrDefault(ManaKeys.ARMOR_MANA_BONUS, PersistentDataType.INTEGER, 0);
         int threadBonus = pdc.getOrDefault(ManaKeys.THREAD_MANA_BONUS, PersistentDataType.INTEGER, 0);
         int enchantBonus = pdc.getOrDefault(ManaKeys.ENCHANT_MANA_BONUS, PersistentDataType.INTEGER, 0);
-        int fixedMax = config.defaultMaxMana() + glyphBonus + armorBonus + threadBonus + enchantBonus + worldMana.maxBonus();
+        int skillManaBonus = (int) Math.round(
+                com.arspaper.integration.TrinityForgeBridge.tfNativeMaxManaBonus(player));
+        int fixedMax = ManaBaseStats.defaultMax() + glyphBonus + armorBonus + threadBonus
+                + enchantBonus + skillManaBonus + worldMana.maxBonus();
 
         // %上昇（装備由来）を固定値合計に乗算。上限はconfigでクランプ。デフォルト0%なら従来挙動。
         int maxPercent = Math.min(
@@ -135,7 +154,7 @@ public class ManaManager implements Listener {
     private boolean isIdle(Player player) {
         Long last = lastCastTime.get(player.getUniqueId());
         if (last == null) return true;
-        return System.currentTimeMillis() - last >= config.idleSeconds() * 1000L;
+        return System.currentTimeMillis() - last >= ManaBaseStats.idleSeconds() * 1000L;
     }
 
     /**
@@ -155,9 +174,21 @@ public class ManaManager implements Listener {
     }
 
     public boolean consumeMana(Player player, int amount) {
+        lastSourceConvertedAmount.set(0);
         if (isInfiniteMana(player)) return true;
         int current = getCurrentMana(player);
-        if (current < amount) return false;
+        if (current < amount) {
+            // 要件⑥ source-auto-consume(Ars鍛冶A-2): マナ不足時、skilltree由来のperkを持つプレイヤーは
+            // インベントリ内の設定済みアイテム(mana.source-auto-consume.items)をマナ代わりに変換消費して
+            // 補填する。perk未所持/TF未ロード/対象アイテム不足時はconvertedが0のまま返り、従来どおり
+            // マナ不足として不発になる(fail-open)。
+            int deficit = amount - current;
+            int converted = com.arspaper.integration.SourceAutoConsume.tryConvert(
+                player, deficit, config.sourceAutoConsumeItems());
+            if (converted < deficit) return false;
+            current += converted;
+            lastSourceConvertedAmount.set(converted);
+        }
         setCurrentMana(player, current - amount);
         // 累計マナ消費量をバッファに記録（PDC書き込みは定期フラッシュで行う）
         if (amount > 0) {
@@ -167,24 +198,35 @@ public class ManaManager implements Listener {
     }
 
     /**
-     * デバッグモード（マナ無限）をトグルする。PDCに永続化されるため再参加・再起動後も維持される。
+     * デバッグモード（マナ無限 + パーク解放ゲート全バイパス）をトグルする。
+     * PDCに永続化されるため再参加・再起動後も維持される。
      * @return トグル後の状態（true=ON）
      */
     public boolean toggleInfiniteMana(Player player) {
-        boolean current = isInfiniteMana(player);
-        if (current) {
-            player.getPersistentDataContainer().remove(DEBUG_MODE_KEY);
-            plugin.getLogger().info("[Debug] Debug mode OFF for " + player.getName());
-            return false;
-        } else {
+        boolean next = !isInfiniteMana(player);
+        setInfiniteMana(player, next);
+        return next;
+    }
+
+    /** デバッグモードを明示的に ON/OFF する。 */
+    public void setInfiniteMana(Player player, boolean enabled) {
+        if (enabled) {
             player.getPersistentDataContainer().set(DEBUG_MODE_KEY, PersistentDataType.BYTE, (byte) 1);
             plugin.getLogger().info("[Debug] Debug mode ON for " + player.getName());
-            return true;
+        } else {
+            player.getPersistentDataContainer().remove(DEBUG_MODE_KEY);
+            plugin.getLogger().info("[Debug] Debug mode OFF for " + player.getName());
         }
     }
 
+    /** {@code /ars debug} 相当。マナ無限に加え、グリフ/レシピ/儀式のパーク解放ゲートを全通過させる。 */
     public boolean isInfiniteMana(Player player) {
         return player.getPersistentDataContainer().has(DEBUG_MODE_KEY);
+    }
+
+    /** {@link #isInfiniteMana(Player)} のエイリアス（ゲート判定側の読みやすさ用）。 */
+    public boolean isDebugMode(Player player) {
+        return isInfiniteMana(player);
     }
 
     public void addMana(Player player, int amount) {
@@ -194,11 +236,16 @@ public class ManaManager implements Listener {
     }
 
     public void setCurrentMana(Player player, int mana) {
-        player.getPersistentDataContainer().set(
-            ManaKeys.CURRENT_MANA, PersistentDataType.INTEGER, mana
-        );
+        // max低下（パーク再振り分け/TF未ロード等）で永続化済みcurrentがmaxを超えたまま残ると、
+        // tickRegeneration の `current >= max` 早期returnにより回復が永久停止し、BossBarも100%超で
+        // 描画され続ける。永続化前に[0, max]へクランプする。getMaxMana はここから setCurrentMana を
+        // 呼ばない（再帰安全）ため、素直に先に呼んでクランプ幅を確定できる。
         int max = getMaxMana(player);
-        BossBar bar = barDisplay.update(player.getUniqueId(), mana, max);
+        int clamped = Math.max(0, Math.min(mana, max));
+        player.getPersistentDataContainer().set(
+            ManaKeys.CURRENT_MANA, PersistentDataType.INTEGER, clamped
+        );
+        BossBar bar = barDisplay.update(player.getUniqueId(), clamped, max);
         player.showBossBar(bar);
     }
 
@@ -214,14 +261,26 @@ public class ManaManager implements Listener {
         }
 
         PersistentDataContainer pdc = player.getPersistentDataContainer();
-        int baseRate = pdc.getOrDefault(ManaKeys.REGEN_RATE, PersistentDataType.INTEGER, config.defaultRegenRate());
+        int baseRate = pdc.getOrDefault(ManaKeys.REGEN_RATE, PersistentDataType.INTEGER, ManaBaseStats.defaultRegenRate());
         int threadBonus = pdc.getOrDefault(ManaKeys.THREAD_REGEN_BONUS, PersistentDataType.INTEGER, 0);
         int enchantBonus = pdc.getOrDefault(ManaKeys.ENCHANT_REGEN_BONUS, PersistentDataType.INTEGER, 0);
         int armorBonus = pdc.getOrDefault(ManaKeys.ARMOR_REGEN_BONUS, PersistentDataType.INTEGER, 0);
         int flatRate = baseRate + threadBonus + enchantBonus + armorBonus + worldMana.regenBonus();
+        // skilltree regenノード由来の回復%上昇。ノード多重取得で合算値が際限なく積み上がるため、
+        // 装備由来%上昇(THREAD_REGEN_PERCENT)と同じ config.maxPercentCap() でクランプする
+        // (詠唱コスト実質0化を防ぐ安全弁)。
+        double skillRegen = com.arspaper.integration.TrinityForgeBridge.tfNativeManaRegenBonus(player);
+        if (skillRegen > 0.0) {
+            double cappedSkillRegen = Math.min(skillRegen, config.maxPercentCap() / (double) PERCENT_DIVISOR);
+            flatRate += (int) Math.round(flatRate * cappedSkillRegen);
+        }
 
         // 回復速度%上昇（装備由来）を固定値合計に乗算。デフォルト0%なら従来挙動。
-        int regenPercent = pdc.getOrDefault(ManaKeys.THREAD_REGEN_PERCENT, PersistentDataType.INTEGER, 0);
+        // %回復も getMaxMana の maxPercentCap パターンを踏襲し config 上限でクランプ。
+        // 不正/巨大な THREAD_REGEN_PERCENT による暴走回復（毎tick満タン化）を防ぐ。
+        int regenPercent = Math.min(
+            pdc.getOrDefault(ManaKeys.THREAD_REGEN_PERCENT, PersistentDataType.INTEGER, 0),
+            config.maxPercentCap());
         if (regenPercent <= 0) return flatRate;
         return flatRate + (int) Math.round(flatRate * regenPercent / (double) PERCENT_DIVISOR);
     }
@@ -232,9 +291,11 @@ public class ManaManager implements Listener {
      */
     private int getIdleRecoveryBonus(Player player, int max) {
         if (!isIdle(player)) return 0;
-        int bonus = config.idleBonusFlat();
-        if (config.idleBonusPercent() > 0) {
-            bonus += (int) Math.round(max * config.idleBonusPercent() / (double) PERCENT_DIVISOR);
+        int bonus = ManaBaseStats.idleBonusFlat();
+        double idleBonusPercent = ManaBaseStats.idleBonusPercent();
+        if (idleBonusPercent > 0) {
+            // ManaBaseStats は分数[0,1]で返す(TF側 PERCENT stat の保存形式)ため /100 補正は不要。
+            bonus += (int) Math.round(max * idleBonusPercent);
         }
         return bonus;
     }

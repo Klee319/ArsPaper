@@ -1,8 +1,8 @@
 package com.arspaper.gui;
 
 import com.arspaper.ArsPaper;
+import com.arspaper.integration.TrinityForgeBridge;
 import com.arspaper.item.ItemKeys;
-import com.arspaper.item.SpellBookTier;
 import com.arspaper.item.impl.SpellBook;
 import com.arspaper.spell.*;
 import net.kyori.adventure.text.Component;
@@ -250,9 +250,11 @@ public class SpellSettingsGui extends BaseGui {
     private void openCraftingGui(Player player) {
         int tier = spellBookItem.getItemMeta().getPersistentDataContainer()
             .getOrDefault(ItemKeys.BOOK_TIER, PersistentDataType.INTEGER, 1);
+        // 要件⑥ ars-tier: skilltree由来のperkで使用可能グリフtier上限を加算する(fail-open)。
         SpellCraftingGui gui = new SpellCraftingGui(
             plugin, player, spellBookItem, spellSlot,
-            SpellBookTier.fromTier(tier).getMaxGlyphTier()
+            plugin.getSpellBookConfig().byTier(tier).getMaxGlyphTier()
+                + TrinityForgeBridge.tfArsTierUnlockBonus(player)
         );
         gui.open();
     }

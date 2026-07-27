@@ -1,0 +1,73 @@
+# ArsPaper - スレッド・セット効果 (thread-sets.yml)
+# 防具にソケットした「スレッド」の【同種の合計装備個数】に応じた累積セット効果ボーナスを定義します。
+# 戦闘ステはTrinityForgeのパイプラインへ合流します(装備中の全防具スレを集計→攻撃/防御に反映)。
+#
+# ■ このファイルが定義するもの = セット効果(個数ボーナス)だけ
+#   スレッド1個ごとの個別ステは【TrinityForge の stats/item-stats.yml】側で MATERIAL#CMD キーに定義します。
+#   各スレッドは固有のトリム材(baseMaterial) + CustomModelData(300002〜300016) を持ちます。例:
+#     mana_regen      -> TIDE_ARMOR_TRIM_SMITHING_TEMPLATE#300002
+#     mana_boost      -> WARD_ARMOR_TRIM_SMITHING_TEMPLATE#300003
+#     damage_mana_recovery -> WILD_ARMOR_TRIM_SMITHING_TEMPLATE#300013
+#   (全16種の material#cmd は ThreadType enum 参照。item-stats.yml にそのキーで fixed: を書けばスレ単体のステになる)
+#
+# ■ セット効果の加算モデル = 累積しきい値式
+#   同種スレッドの合計装備個数 N に対し、N 以上の全しきい値のボーナスを【合算】します。
+#   例: 3個で {A}、5個で {B} を定義 → 5個装着時は A + B の両方が乗る(3個分にも到達しているため)。
+#
+# ■ 利用可能なステキー(item-stats.yml と同一。canonical化されるので大小/区切りは無視)
+#   攻撃系: attack-power, flat-bonus-damage, percent-bonus-damage, crit-chance, crit-damage,
+#           penetration, damage-modifier, fixed-damage, bleed-chance, bleed-damage
+#   防御系: phys-resistance, magic-resistance, flat-defense, damage-reduction, dodge-chance,
+#           armor-defense-rate, armor-strength
+#   ※ 割合系(crit-chance / penetration / 各resistance / damage-reduction / dodge-chance / armor-defense-rate)は
+#     0.0〜1.0 の割合値。
+#
+#   ⚠ armor-defense-rate(防御率%)の注意: この値はバニラ防具の防御率(上限0.8)へ【加算的に】積み上がります。
+#     合計が1.0に達すると、貫通0の相手からの物理を実質無効化します(clampで1.0上限)。
+#     セット効果で armor-defense-rate を盛る場合は、バニラ防具分(最大0.8)と合わせて過剰にならない値に留めてください。
+#     (恒常的な物理無効を避けたい場合は damage-reduction や flat-defense を使う方が安全です)
+#
+# ■ 記入例(累積しきい値):
+#   thread-sets:
+#     mana_regen:
+#       thresholds:
+#         3: { percent-bonus-damage: 0.05, flat-defense: 1.0 }   # 3個以上で発動
+#         5: { percent-bonus-damage: 0.10 }                       # 5個以上で更に加算(=合計0.15)
+#
+# 下は全スレッド種の雛形(thresholds 空 = セット効果なし)。必要なものにしきい値を書き足してください。
+
+# 設定リファレンス(本文コメント移設先): docs/config-reference/arspaper/thread-sets.md
+thread-sets:
+  mana_regen:
+    thresholds: {}
+  mana_boost:
+    thresholds: {}
+
+  speed:
+    thresholds: {}
+  jump_boost:
+    thresholds: {}
+  night_vision:
+    thresholds: {}
+  fire_resistance:
+    thresholds: {}
+  dolphins_grace:
+    thresholds: {}
+  conduit_power:
+    thresholds: {}
+  hero_of_the_village:
+    thresholds: {}
+  health_boost:
+    thresholds: {}
+
+  hit_mana_recovery:
+    thresholds: {}
+  damage_mana_recovery:
+    thresholds: {}
+
+  spell_cost_down:
+    thresholds: {}
+  flight:
+    thresholds: {}
+  backpack:
+    thresholds: {}

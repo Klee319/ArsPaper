@@ -1,0 +1,130 @@
+# ============================================================
+# spellbooks.yml - 魔導書ティア定義
+# ============================================================
+# spell-books: 魔導書の段階（ティア）を配列で定義する。
+#
+# 【重要】並び順=段階（tier番号）。リストの並び順がそのままゲーム内のティア段階
+# （PDCに書き込まれるBOOK_TIER整数値、1始まり）になる。
+#   - 末尾へのティア追加は安全（既存アイテムのtier値の意味は変わらない）。
+#   - 既存要素の並び替えや途中への挿入は、既存プレイヤーが所持しているアイテムの
+#     指すティアの意味をずらしてしまうため、行う場合は移行手順やお知らせを別途用意すること。
+#
+# 各要素のフィールド:
+#   id:                 カスタムアイテムID（例: spell_book_novice）
+#   display-name:       表示名（単色表示。旧実装にあった多色グラデーション・装飾記号は
+#                        config駆動化に伴い単色化した。表示崩れはしない）
+#   name-color:         表示名の色（Hex "#RRGGBB"）
+#   max-slots:          スペルスロット数
+#   max-glyph-tier:     使用可能な最大グリフティア
+#   custom-model-data:  CustomModelData値
+#   upgrade-from:        アップグレード元のアイテムID（儀式レシピのcore-itemと対応。
+#                        最下位ティアはnull）。items.ymlのアップグレード儀式定義との
+#                        整合性は起動時に自動検証され、不一致であれば警告ログが出力される。
+#   cooldown:           発動CT(秒)。0または未設定=従来の計算CT(SpellCaster側のform別/連射CT)
+#                        にフォールバックする。魔導書アイテムを介した詠唱時のみ適用される
+#                        （バインド品からの詠唱で魔導書を触媒として使う場合も含む）。
+#   recipe:             【廃止】レシピは TrinityForge items/catalog.yml 側に統一済み。
+#                        catalog の spell_book_* recipe（ritual）の core-item と upgrade-from を
+#                        揃えること（起動時に自動検証され、不一致は警告ログが出る）。
+# ============================================================
+
+# 設定リファレンス(本文コメント移設先): docs/config-reference/arspaper/spellbooks.md
+spell-books:
+  - id: spell_book_novice
+    display-name: "見習いの魔法書"
+    name-color: "#D4A0FF"
+    max-slots: 3
+    max-glyph-tier: 1
+    custom-model-data: 100001
+    upgrade-from: null
+    cooldown: 0
+
+  - id: spell_book_apprentice
+    display-name: "魔術師の魔術書"
+    name-color: "#9966CC"
+    max-slots: 6
+    max-glyph-tier: 2
+    custom-model-data: 100002
+    upgrade-from: spell_book_novice
+    cooldown: 0
+
+  - id: spell_book_archmage
+    display-name: "大魔導士の魔導書"
+    name-color: "#FFD700"
+    max-slots: 10
+    max-glyph-tier: 3
+    custom-model-data: 100003
+    upgrade-from: spell_book_apprentice
+    cooldown: 0
+
+
+catalysts:
+  ember_wand:
+    material: BLAZE_ROD
+    display-name: "焔の杖"
+    name-color: "#FF8040"
+    custom-model-data: 400001
+    lore:
+      - "焔の力を宿した触媒"
+    bind-type: TRADEABLE
+    max-bind-tier: 2
+    mana-cost-reduction:
+      flat: 2
+      percent: 10
+    cooldown: 1.5
+    stats:
+      fixed:
+        attack-power: 5
+        mana-bonus: 10
+      per-quality:
+        attack-power: 1
+      random:
+        attack-power:
+          min: 0
+          max: 3
+
+  infinity_catalyst:
+    material: BLAZE_ROD
+    display-name: <color:#7df9ff>インフィニティの触媒</color>
+    custom-model-data: 400024
+    lore:
+      - "要調整: ステータス未設定のプレースホルダ(インフィニティ/エンドラ/ウィザー系触媒共通)"
+    stats:
+      fixed:
+        attack-power: 0
+      per-quality:
+        attack-power: 0
+      random:
+        attack-power:
+          min: 0
+          max: 0
+  dragon_catalyst:
+    material: BLAZE_ROD
+    display-name: <color:dark_purple>エンダードラゴンの触媒</color>
+    custom-model-data: 400025
+    lore:
+      - "要調整: ステータス未設定のプレースホルダ(インフィニティ/エンドラ/ウィザー系触媒共通)"
+    stats:
+      fixed:
+        attack-power: 0
+      per-quality:
+        attack-power: 0
+      random:
+        attack-power:
+          min: 0
+          max: 0
+  wither_catalyst:
+    material: BLAZE_ROD
+    display-name: <color:dark_gray>ウィザーの触媒</color>
+    custom-model-data: 400026
+    lore:
+      - "要調整: ステータス未設定のプレースホルダ(インフィニティ/エンドラ/ウィザー系触媒共通)"
+    stats:
+      fixed:
+        attack-power: 0
+      per-quality:
+        attack-power: 0
+      random:
+        attack-power:
+          min: 0
+          max: 0

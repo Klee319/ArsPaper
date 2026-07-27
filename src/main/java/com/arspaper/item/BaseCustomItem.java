@@ -1,8 +1,10 @@
 package com.arspaper.item;
 
 import com.arspaper.ArsPaper;
-import com.arspaper.integration.TrinityForgeBridge;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.TextComponent;
+import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.enchantments.Enchantment;
@@ -12,6 +14,9 @@ import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 全カスタムアイテムの抽象基底クラス。
@@ -51,33 +56,29 @@ public abstract class BaseCustomItem {
     public boolean hasEnchantGlow() { return true; }
 
     /**
-     * 厳選の既定品質(0-5)。サブクラスやドロップ経路で上書きして固定品質を指定できる。
-     * {@link #usesQualityRoll()} が false の場合はこの値がそのまま書き込まれる。
+     * 既定のlore(ハードコード)。表示名と同様、サブクラスがオーバーライドする。
+     * 既定はnull(lore無し)。functional-items.ymlの上書きが無い場合のフォールバック値として使う。
      */
-    protected int defaultQuality() { return 0; }
+    protected List<Component> getDefaultLore() { return null; }
 
     /**
-     * 品質を selection.yml の分布から抽選するか。
-     * false（既定）なら {@link #defaultQuality()} を使う。
-     * サブクラスやドロップ経路で true にすると分布抽選が有効になる。
+     * 品質(rollSeed + quality)を刻印すべき「完成品(装備/触媒)」か。既定 false。
+     * 儀式クラフト経路({@code RitualManager})が true のものだけ、生成者のArs鍛冶スキルで品質を刻印する
+     * (craft-quality一本化)。素材・消耗品は false のまま — 一意な rollSeed 刻印はスタック不能化を招くため。
+     * バニラ卓クラフトは TrinityForge の CraftQualityListener が別途 MaterialTier で判定し刻印する。
      */
-    protected boolean usesQualityRoll() { return false; }
-
-    /** 生成時の品質を決定する（抽選 or 既定値）。常に 0-5 にクランプして返す。 */
-    protected int rollQuality() {
-        if (usesQualityRoll()) {
-            return SelectionConfig.get().rollQuality(defaultQuality());
-        }
-        return SelectionConfig.clamp(defaultQuality());
-    }
+    public boolean isQualityStamped() { return false; }
 
     /** アイテムスタックを新規生成 */
     public ItemStack createItemStack() {
-        ItemStack item = new ItemStack(getBaseMaterial());
+        ItemStack item = new ItemStack(resolveMaterial());
+        Component resolvedDisplayName = resolveDisplayName();
+        List<Component> resolvedLore = resolveLore();
+        boolean glow = resolveEnchantGlow();
         item.editMeta(meta -> {
-            meta.displayName(getDisplayName());
+            meta.displayName(resolvedDisplayName);
             // Geyser互換: itemName も設定（Bedrockでベース素材名が表示される問題の対策）
-            meta.itemName(getDisplayName());
+            meta.itemName(resolvedDisplayName);
             // Geyser互換: CustomModelDataを無効化してアイテム透明化を防止
             if (!isCustomModelDataDisabled()) {
                 meta.setCustomModelData(getCustomModelData());
@@ -87,17 +88,15 @@ public abstract class BaseCustomItem {
                 PersistentDataType.STRING,
                 itemId
             );
-            // 厳選: usesQualityRoll()==true の装備・完成品系のみ、生成毎にユニークな rollSeed と
-            // 品質(0-5)を TrinityForge ItemData(PDC) へ追記する。
-            // ステ値はベイクせず、TrinityForge 側が rollSeed + quality + テーブルから live 導出する。
-            // 素材系サブクラス（消耗品・中間素材等）はここをスキップし、PDC差によるスタック不能化を防ぐ。
-            // TrinityForge 未ロード時は no-op（既存 PDC は壊さない）。
-            if (usesQualityRoll()) {
-                long rollSeed = java.util.concurrent.ThreadLocalRandom.current().nextLong();
-                TrinityForgeBridge.writeItemRoll(meta, rollSeed, rollQuality());
+            if (resolvedLore != null) {
+                meta.lore(resolvedLore);
             }
+            // 品質(rollSeed + quality)はここでは刻印しない。バニラ卓クラフトは TrinityForge の
+            // CraftQualityListener がスキル駆動で刻印し、儀式クラフトは RitualManager が
+            // TrinityForgeBridge.stampCraftedQuality で刻印する(craft-quality一本化)。コマンド付与等の
+            // 非クラフト生成は品質0のまま(生成者スキルが無いため baseline)。
             // エンチャントオーラ（防具以外のカスタムアイテムに光沢を付与）
-            if (hasEnchantGlow()) {
+            if (glow) {
                 meta.addEnchant(Enchantment.UNBREAKING, 1, true);
                 meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
             }
@@ -105,6 +104,66 @@ public abstract class BaseCustomItem {
             meta.addItemFlags(ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
         });
         return item;
+    }
+
+    /**
+     * functional-items.yml の表示名上書きを適用したComponentを返す。
+     * 上書きが未設定、またはgetDisplayName()がプレーンなTextComponentでない場合は
+     * ハードコードされた表示名（色/装飾込み）をそのまま返す。
+     * Material/CustomModelData/内部ID(itemId)は一切変更しない。
+     */
+    public Component resolveDisplayName() {
+        Component hardcoded = getDisplayName();
+        ArsPaper instance = ArsPaper.getInstance();
+        FunctionalItemConfig config = instance != null ? instance.getFunctionalItemConfig() : null;
+        String override = config != null ? config.displayNameOverride(itemId) : null;
+
+        if (override != null && !override.isBlank() && hardcoded instanceof TextComponent text) {
+            return text.content(override);
+        }
+        return hardcoded;
+    }
+
+    /**
+     * functional-items.yml のlore上書きを適用したComponentリストを返す。
+     * 上書きが未設定の場合は{@link #getDefaultLore()}(ハードコード)をそのまま返す(null=lore無し)。
+     * 上書き文字列はcatalog.ymlと同じMiniMessage記法で解釈する。
+     */
+    public List<Component> resolveLore() {
+        ArsPaper instance = ArsPaper.getInstance();
+        FunctionalItemConfig config = instance != null ? instance.getFunctionalItemConfig() : null;
+        List<String> override = config != null ? config.loreOverride(itemId) : null;
+
+        if (override != null) {
+            return override.stream()
+                .map(line -> MiniMessage.miniMessage().deserialize(line == null ? "" : line)
+                    .decoration(TextDecoration.ITALIC, false))
+                .collect(Collectors.toList());
+        }
+        return getDefaultLore();
+    }
+
+    /**
+     * functional-items.yml のエンチャント光上書きを適用した値を返す。
+     * 上書きが未設定の場合は{@link #hasEnchantGlow()}(ハードコード既定値)を返す。
+     */
+    public boolean resolveEnchantGlow() {
+        ArsPaper instance = ArsPaper.getInstance();
+        FunctionalItemConfig config = instance != null ? instance.getFunctionalItemConfig() : null;
+        Boolean override = config != null ? config.enchantGlowOverride(itemId) : null;
+        return override != null ? override : hasEnchantGlow();
+    }
+
+    /**
+     * functional-items.yml の材質上書きを適用した値を返す。
+     * 上書きが未設定(またはブロック系等、上書き非対応のアイテム)の場合は
+     * {@link #getBaseMaterial()}(ハードコード既定値)を返す。
+     */
+    public Material resolveMaterial() {
+        ArsPaper instance = ArsPaper.getInstance();
+        FunctionalItemConfig config = instance != null ? instance.getFunctionalItemConfig() : null;
+        Material override = config != null ? config.materialOverride(itemId) : null;
+        return override != null ? override : getBaseMaterial();
     }
 
     /** config.ymlのgeyser.disable-custom-model-data設定を参照 */
