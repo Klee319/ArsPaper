@@ -116,6 +116,18 @@ alchemical:
     SPLASH_POTION: 8
     LINGERING_POTION: 10
     DRAGON_BREATH: 30
+    # --- ソース階梯の触媒 (2026-07-31 追加) ---
+    # 「注いだソースより多く返る」= 強化ループの本体。倍率は段が上がるほど大きい
+    # (shard 5倍 -> crystal 5.5倍 -> condenser 8倍 -> engine 約18倍)。
+    # 実質のボトルネックは素材(石炭/ソースジェム/ネザライト)の供給量と儀式を回す回数で、
+    # ソース自体は詰まらない ―― これが意図した設計。速度を変えたいときはこの4行を触るのが
+    # 最短のレバー(下げれば全体が線形に遅くなる)。
+    # ⚠ infinity_source_core はここに書かない。到達証明を焼べられるようにすると、
+    #    第2目標の達成物が消費されてしまう(図鑑には残るが手元から消える)。
+    "custom:source_shard": 500
+    "custom:source_crystal": 18000
+    "custom:source_condenser": 700000
+    "custom:source_engine": 30000000
 
 items:
   volcanic_sourcelink:

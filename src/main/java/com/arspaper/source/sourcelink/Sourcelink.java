@@ -130,7 +130,8 @@ public abstract class Sourcelink extends CustomBlock {
 
             String blockId = tile.getPersistentDataContainer()
                 .get(BlockKeys.CUSTOM_BLOCK_ID, PersistentDataType.STRING);
-            if (!"source_jar".equals(blockId)) continue;
+            // 2026-07-31: 上位ジャーへも注げるように sourcejars.yml 定義の全ジャーへ拡張。
+            if (!com.arspaper.block.impl.SourceJar.isSourceJarId(blockId)) continue;
 
             // 無限ソースジャーはスキップ（書き込み不要）
             if (com.arspaper.block.impl.SourceJar.isInfinite(tile)) continue;

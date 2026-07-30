@@ -782,7 +782,7 @@ materials:
         - ii
   breeze_rod_3x:
     base_material: BREEZE_ROD
-    custom_model_data: 100
+    custom_model_data: 130
     display_name: "&764倍圧縮ブリーズロッド"
     lore: []
     recipe:
@@ -920,15 +920,18 @@ materials:
       shape:
         - ii
         - ii
-  tf_core_meat:
-    base_material: LEATHER
-    custom_model_data: 5103
-    display_name: ミートコア
+  # 2026-07-31 追加: 4系統目のコア。切削(DIGGING)ツリー側の到達点として置く
+  # (ウッド=伐採 / ベジタブル・ミート=農業 / ジュエリー=採掘 と対になる)。
+  # 解放ゲートは skilltree/digging.yml E ノードの recipe:tf_core_dirt。
+  tf_core_dirt:
+    base_material: DIRT
+    custom_model_data: 5106
+    display_name: ダートコア
     enchant_glow: false
     lore:
-      - "&7&o右クリックで治癒・生命のグリフを解放する。"
+      - "&7&o右クリックで大地のグリフを解放する。"
       - ""
-      - "&5脈打つ命を宿す核"
+      - "&5積み重なった時間を宿す核"
     recipe:
       method: workbench
       type: shaped
@@ -936,16 +939,17 @@ materials:
         - abc
         - def
         - ghi
+      # 素材重さはジュエリーコアと同等(型は tf_core_wood のコメント参照)。
       ingredients:
-        a: COOKED_PORKCHOP
-        b: COOKED_CHICKEN
-        c: COOKED_MUTTON
-        d: COOKED_RABBIT
-        e: custom:compressed_cooked_beef_1x
-        f: COOKED_COD
-        g: COOKED_SALMON
-        h: LEATHER
-        i: ROTTEN_FLESH
+        a: custom:dirt_3x
+        b: custom:guardian_spine
+        c: custom:dirt_3x
+        d: custom:endermite_soot
+        e: custom:emerald_block_3x
+        f: custom:husk_cloth
+        g: custom:dirt_3x
+        h: custom:parched_sandy_bone
+        i: custom:dirt_3x
   tf_core_jewelry:
     base_material: EMERALD
     custom_model_data: 5104
@@ -972,6 +976,33 @@ materials:
         g: custom:lapis_block_3x
         h: custom:emerald_block_3x
         i: custom:quartz_block_3x
+  tf_core_meat:
+    base_material: LEATHER
+    custom_model_data: 5103
+    display_name: ミートコア
+    enchant_glow: false
+    lore:
+      - "&7&o右クリックで治癒・生命のグリフを解放する。"
+      - ""
+      - "&5脈打つ命を宿す核"
+    recipe:
+      method: workbench
+      type: shaped
+      shape:
+        - abc
+        - def
+        - ghi
+      # 2026-07-31: 素材重さをジュエリーコアと同等へ(型は tf_core_wood のコメント参照)。
+      ingredients:
+        a: custom:compressed_cooked_beef_3x
+        b: custom:hoglin_tusk
+        c: custom:compressed_cooked_beef_3x
+        d: custom:piglin_ear
+        e: custom:emerald_block_3x
+        f: custom:piglin_brute_plate
+        g: custom:compressed_cooked_beef_3x
+        h: custom:ravager_hide
+        i: custom:compressed_cooked_beef_3x
   tf_core_vegetable:
     base_material: WHEAT
     custom_model_data: 5102
@@ -988,16 +1019,17 @@ materials:
         - abc
         - def
         - ghi
+      # 2026-07-31: 素材重さをジュエリーコアと同等へ(型は tf_core_wood のコメント参照)。
       ingredients:
-        a: PUMPKIN
-        b: MELON
-        c: CARROT
-        d: POTATO
-        e: HAY_BLOCK
-        f: BEETROOT
-        g: SUGAR_CANE
-        h: WHEAT
-        i: DRIED_KELP_BLOCK
+        a: custom:compressed_bread_3x
+        b: custom:pillager_plate
+        c: custom:compressed_bread_3x
+        d: custom:witch_elixir
+        e: custom:emerald_block_3x
+        f: custom:ravager_hide
+        g: custom:compressed_bread_3x
+        h: custom:skeleton_horse_bone
+        i: custom:compressed_bread_3x
   tf_core_wood:
     base_material: STICK
     custom_model_data: 5101
@@ -1007,6 +1039,13 @@ materials:
       - "&7&o右クリックで自然のグリフを解放する。"
       - ""
       - "&5森の記憶が宿る核"
+    # 【2026-07-31 コア4種の素材重さをジュエリーコアと同等へ】
+    # 以前はバニラ原木9種だけで作れたため、ジュエリーコア(9 x 729倍ブロック)と比べて
+    # 桁が3つ違う「見た目だけエンドコンテンツ」だった。共通の型は
+    #   四隅   = そのコアの系統の729倍圧縮アイテム(かさの担保)
+    #   四辺   = 高レベル敵/EMダンジョン限定のモブ素材4種(狩る動機の担保)
+    #   中央   = 729倍圧縮エメラルドブロック(4種で共通のアンカー)
+    # モブ素材はクラフト不可なので、圧縮だけを自動化しても作れない。
     recipe:
       method: workbench
       type: shaped
@@ -1015,15 +1054,15 @@ materials:
         - def
         - ghi
       ingredients:
-        a: OAK_LOG
-        b: SPRUCE_LOG
-        c: BIRCH_LOG
-        d: JUNGLE_LOG
-        e: custom:oak_wood_1x
-        f: ACACIA_LOG
-        g: DARK_OAK_LOG
-        h: MANGROVE_LOG
-        i: CHERRY_LOG
+        a: custom:oak_wood_3x
+        b: custom:bogged_mossy_bone
+        c: custom:oak_wood_3x
+        d: custom:stray_cloth
+        e: custom:emerald_block_3x
+        f: custom:husk_cloth
+        g: custom:oak_wood_3x
+        h: custom:parched_sandy_bone
+        i: custom:oak_wood_3x
   tf_crystal_apple:
     base_material: ENCHANTED_GOLDEN_APPLE
     custom_model_data: 5201
@@ -1088,6 +1127,10 @@ materials:
       - "&7&oジャンク品を分解して得られる金属片"
       - ""
       - "&5何かの素材に使えそうだ"
+  # 【解体で返るスクラップ】base_material(見た目)と recipe.result(4個で戻る素材)は別物。
+  # インゴットより小さい欠片に見せるため base は NUGGET 系にしているが、戻るのはインゴット。
+  # 2026-07-26: result を明示。未指定だと UnifiedRecipeLoader が "custom:<自分自身>" を既定にするため、
+  # 「4個 -> 自分自身1個」という純粋な破壊レシピになり、解体で得たスクラップに用途が無くなる。
   plank_scrap:
     base_material: OAK_PLANKS
     custom_model_data: 5311
@@ -1098,8 +1141,6 @@ materials:
       - ""
       - "&5役割を終えた"
     recipe:
-      # 2026-07-26: result を明示。未指定だと UnifiedRecipeLoader が "custom:<自分自身>" を既定にするため、
-      # 「4個 → 自分自身1個」という純粋な破壊レシピになり、解体で得たスクラップに用途が無くなっていた。
       result: OAK_PLANKS
       method: inventory
       type: shaped
@@ -1110,7 +1151,7 @@ materials:
         - ii
       amount: 1
   copper_ingot_scrap:
-    base_material: COPPER_INGOT
+    base_material: COPPER_NUGGET
     custom_model_data: 5312
     display_name: "&6銅スクラップ"
     enchant_glow: false
@@ -1119,7 +1160,7 @@ materials:
       - ""
       - "&5決して自然の姿ではない"
     recipe:
-      result: COPPER_INGOT  # 2026-07-26: 未指定だと自分自身に戻る破壊レシピになる(plank_scrap参照)
+      result: COPPER_INGOT  # 未指定だと自分自身に戻る破壊レシピになる(plank_scrap 上のコメント参照)
       method: inventory
       type: shaped
       ingredients:
@@ -1129,7 +1170,7 @@ materials:
         - ii
       amount: 1
   iron_ingot_scrap:
-    base_material: IRON_INGOT
+    base_material: IRON_NUGGET
     custom_model_data: 5313
     display_name: "&f鉄スクラップ"
     enchant_glow: false
@@ -1138,7 +1179,7 @@ materials:
       - ""
       - "&5意思をもって行っている"
     recipe:
-      result: IRON_INGOT  # 2026-07-26: 未指定だと自分自身に戻る破壊レシピになる(plank_scrap参照)
+      result: IRON_INGOT  # 未指定だと自分自身に戻る破壊レシピになる(plank_scrap 上のコメント参照)
       method: inventory
       type: shaped
       ingredients:
@@ -1148,7 +1189,7 @@ materials:
         - ii
       amount: 1
   gold_ingot_scrap:
-    base_material: GOLD_INGOT
+    base_material: GOLD_NUGGET
     custom_model_data: 5314
     display_name: "&e金スクラップ"
     enchant_glow: false
@@ -1157,7 +1198,7 @@ materials:
       - ""
       - "&5いわば人工物である証明"
     recipe:
-      result: GOLD_INGOT  # 2026-07-26: 未指定だと自分自身に戻る破壊レシピになる(plank_scrap参照)
+      result: GOLD_INGOT  # 未指定だと自分自身に戻る破壊レシピになる(plank_scrap 上のコメント参照)
       method: inventory
       type: shaped
       ingredients:
@@ -1167,16 +1208,16 @@ materials:
         - ii
       amount: 1
   diamond_scrap:
-    base_material: DIAMOND
+    base_material: COPPER_NUGGET
     custom_model_data: 5315
     display_name: "&bダイヤモンドスクラップ"
-    enchant_glow: false
+    enchant_glow: true
     lore:
       - "&7&oダイヤ装備を解体して得られる結晶片。4個でダイヤモンドに戻せる。"
       - ""
       - "&5役立つものだと"
     recipe:
-      result: DIAMOND  # 2026-07-26: 未指定だと自分自身に戻る破壊レシピになる(plank_scrap参照)
+      result: DIAMOND  # 未指定だと自分自身に戻る破壊レシピになる(plank_scrap 上のコメント参照)
       method: inventory
       type: shaped
       ingredients:
@@ -1186,7 +1227,7 @@ materials:
         - ii
       amount: 1
   netherite_ingot_scrap:
-    base_material: NETHERITE_INGOT
+    base_material: NETHERITE_SCRAP
     custom_model_data: 5316
     display_name: "&8ネザライトスクラップ"
     enchant_glow: false
@@ -1195,7 +1236,7 @@ materials:
       - ""
       - "&5そう主に示すだろう"
     recipe:
-      result: NETHERITE_INGOT  # 2026-07-26: 未指定だと自分自身に戻る破壊レシピになる(plank_scrap参照)
+      result: NETHERITE_INGOT  # 未指定だと自分自身に戻る破壊レシピになる(plank_scrap 上のコメント参照)
       method: inventory
       type: shaped
       ingredients:
@@ -1214,7 +1255,7 @@ materials:
       - ""
       - "&5使い古されたもの"
     recipe:
-      result: LEATHER  # 2026-07-26: 未指定だと自分自身に戻る破壊レシピになる(plank_scrap参照)
+      result: LEATHER  # 未指定だと自分自身に戻る破壊レシピになる(plank_scrap 上のコメント参照)
       method: inventory
       type: shaped
       ingredients:
@@ -1233,7 +1274,7 @@ materials:
       - ""
       - "&5生物も例外ではない"
     recipe:
-      result: TURTLE_SCUTE  # 2026-07-26: 未指定だと自分自身に戻る破壊レシピになる(plank_scrap参照)
+      result: TURTLE_SCUTE  # 未指定だと自分自身に戻る破壊レシピになる(plank_scrap 上のコメント参照)
       method: inventory
       type: shaped
       ingredients:
@@ -1242,39 +1283,6 @@ materials:
         - ii
         - ii
       amount: 1
-  dragon_scale:
-    base_material: TURTLE_SCUTE
-    custom_model_data: 86
-    display_name: "&fエンダードラゴンの鱗"
-    lore:
-      - "&7エンダードラゴンの体表を覆う硬質の鱗。"
-      - ""
-      - "&5天空の覇者が纏いし鎧。"
-  elder_guardian_spike:
-    base_material: PRISMARINE_SHARD
-    custom_model_data: 100013
-    display_name: "&bエルダーガーディアンの棘"
-    lore:
-      - "&7エルダーガーディアンの体から突き出た鋭い棘。"
-      - ""
-      - "&5深海の守護者の意志。"
-  wither_skull_fragment:
-    base_material: WITHER_SKELETON_SKULL
-    custom_model_data: 87
-    display_name: "&8ウィザーの頭蓋骨"
-    lore:
-      - "&7ウィザーが討伐時に落とす禍々しい頭蓋骨の欠片。"
-      - "&8※設置可能アイテムのため地面に置くと通常のウィザースケルトンの頭に見えます(回収すれば元の見た目に戻ります)。"
-      - ""
-      - "&5終焉を告げる呪い。"
-  warden_tendril:
-    base_material: ECHO_SHARD
-    custom_model_data: 100082
-    display_name: "&3ウォーデンの触覚"
-    lore:
-      - "&7ウォーデンの触覚状の器官。深き闇の記憶を宿す。"
-      - ""
-      - "&5深層の番人の警告。"
   reinforced_fiber:
     base_material: STRING
     custom_model_data: 100022
@@ -1349,9 +1357,42 @@ materials:
         r: PHANTOM_MEMBRANE
         c: LEATHER
         d: DIAMOND
+  dragon_scale:
+    base_material: TURTLE_SCUTE
+    custom_model_data: 86
+    display_name: "&fエンダードラゴンの鱗"
+    lore:
+      - "&7エンダードラゴンの体表を覆う硬質の鱗。"
+      - ""
+      - "&5天空の覇者が纏いし鎧。"
+  elder_guardian_spike:
+    base_material: PRISMARINE_SHARD
+    custom_model_data: 100013
+    display_name: "&bエルダーガーディアンの棘"
+    lore:
+      - "&7エルダーガーディアンの体から突き出た鋭い棘。"
+      - ""
+      - "&5深海の守護者の意志。"
+  wither_skull_fragment:
+    base_material: WITHER_SKELETON_SKULL
+    custom_model_data: 87
+    display_name: "&8ウィザーの頭蓋骨"
+    lore:
+      - "&7ウィザーが討伐時に落とす禍々しい頭蓋骨の欠片。"
+      - "&8※設置可能アイテムのため地面に置くと通常のウィザースケルトンの頭に見えます(回収すれば元の見た目に戻ります)。"
+      - ""
+      - "&5終焉を告げる呪い。"
+  warden_tendril:
+    base_material: ECHO_SHARD
+    custom_model_data: 100082
+    display_name: "&3ウォーデンの触覚"
+    lore:
+      - "&7ウォーデンの触覚状の器官。深き闇の記憶を宿す。"
+      - ""
+      - "&5深層の番人の警告。"
   echo_shard_2x:
     base_material: ECHO_SHARD
-    custom_model_data: 100081
+    custom_model_data: 100084
     display_name: "&316倍圧縮残響の欠片"
     lore: []
     recipe:
@@ -1365,7 +1406,7 @@ materials:
         - ii
   wither_rose_2x:
     base_material: WITHER_ROSE
-    custom_model_data: 106
+    custom_model_data: 5430
     display_name: "&f16倍圧縮ウィザーローズ"
     lore: []
     recipe:
@@ -1377,6 +1418,398 @@ materials:
       shape:
         - ii
         - ii
+  # ============================================================
+  # 高レベル敵/EMダンジョン限定のモブ素材 (2026-07-31 追加)
+  # ------------------------------------------------------------
+  # recipe を持たない = クラフト不可。入手経路は combat/mob-level-table.yml の add-drops
+  # (レベル帯 x EntityType で絞る)と combat/mob-overrides.yml の drops (EMボス個別)だけ。
+  # ドロップ側は必ず custom:<このid> で書くこと(素のidだとバニラMaterial扱いで解決に失敗する)。
+  # 用途はコア系レシピ・醸造(crafting-features.yml brew-unlocks)・儀式。
+  # 「敵を選んで狩る」動機を作るのが目的なので、汎用素材で代替可能にしないこと。
+  # ============================================================
+  ravager_hide:
+    base_material: LEATHER
+    custom_model_data: 5401
+    display_name: "&8ラヴェジャーの革"
+    enchant_glow: false
+    lore:
+      - "&7&o襲撃獣の分厚い皮。並の刃は通らない。"
+      - ""
+      - "&5突進の記憶"
+  piglin_brute_plate:
+    base_material: GOLD_INGOT
+    custom_model_data: 5402
+    display_name: "&6ピグリンブルートの鎧片"
+    enchant_glow: false
+    lore:
+      - "&7&o砦の守り手が纏っていた黄金の鎧の破片。"
+      - ""
+      - "&5砦は誰にも渡さない"
+  pillager_plate:
+    base_material: IRON_INGOT
+    custom_model_data: 5403
+    display_name: "&7ピリジャーの鎧片"
+    enchant_glow: false
+    lore:
+      - "&7&o略奪者の粗末な当て金。数だけが武器だった。"
+      - ""
+      - "&5群れの残骸"
+  witch_elixir:
+    base_material: GLASS_BOTTLE
+    custom_model_data: 5404
+    display_name: "&5ウィッチの秘薬"
+    enchant_glow: false
+    lore:
+      - "&7&o魔女が最後まで手放さなかった小瓶。中身は不明。"
+      - ""
+      - "&5誰にも教えない配合"
+  piglin_ear:
+    base_material: RABBIT_HIDE
+    custom_model_data: 5405
+    display_name: "&dピグリンの耳"
+    enchant_glow: false
+    lore:
+      - "&7&o黄金の足音だけを聞き分けた耳。"
+      - ""
+      - "&5取引の記憶"
+  stray_cloth:
+    base_material: STRING
+    custom_model_data: 5406
+    display_name: "&bストレイの布片"
+    enchant_glow: false
+    lore:
+      - "&7&o凍てついた骨に張り付いていた布。まだ冷たい。"
+      - ""
+      - "&5解けない霜"
+  skeleton_horse_bone:
+    base_material: BONE
+    custom_model_data: 5407
+    display_name: "&fスケルトンホースの骨"
+    enchant_glow: false
+    lore:
+      - "&7&o嵐の夜にだけ現れる骸馬の脚骨。"
+      - ""
+      - "&5雷鳴とともに"
+  endermite_soot:
+    base_material: GUNPOWDER
+    custom_model_data: 5408
+    display_name: "&5エンダーマイトの煤"
+    enchant_glow: false
+    lore:
+      - "&7&o次元の隙間から零れ落ちた黒い粉。"
+      - ""
+      - "&5ここに在るべきでない"
+  hoglin_tusk:
+    base_material: BONE
+    custom_model_data: 5409
+    display_name: "&cホグリンの牙"
+    enchant_glow: false
+    lore:
+      - "&7&o歪んだ森の獣の牙。折れてなお鋭い。"
+      - ""
+      - "&5突かれた者は覚えている"
+  guardian_spine:
+    base_material: PRISMARINE_SHARD
+    custom_model_data: 5410
+    display_name: "&3ガーディアンの棘"
+    enchant_glow: false
+    lore:
+      - "&7&o海底神殿の番人の棘。触れると微かに震える。"
+      - ""
+      - "&5見張りは終わらない"
+  husk_cloth:
+    base_material: STRING
+    custom_model_data: 5411
+    display_name: "&6ハスクの布片"
+    enchant_glow: false
+    lore:
+      - "&7&o砂に晒され続けた衣の残骸。水気が一切ない。"
+      - ""
+      - "&5渇きだけが残った"
+  bogged_mossy_bone:
+    base_material: BONE
+    custom_model_data: 5412
+    display_name: "&2ボグドの苔むした骨"
+    enchant_glow: false
+    lore:
+      - "&7&o沼地で苔に覆われた骨。湿った土の匂いがする。"
+      - ""
+      - "&5沈んだまま朽ちた"
+  parched_sandy_bone:
+    base_material: BONE
+    custom_model_data: 5413
+    display_name: "&e砂まみれの骨"
+    enchant_glow: false
+    lore:
+      - "&7&o乾き切った骨。砂を払っても砂が出てくる。"
+      - ""
+      - "&5渇いた者の残り"
+
+  # ============================================================
+  # コア系の素材重さを揃えるための圧縮段 (2026-07-31 追加)
+  # ------------------------------------------------------------
+  # 既存の圧縮系と同じ規約: _1x = バニラ9個、以降は「1段前を9個」。reversible: true で戻せる。
+  # コア4種の素材重さをジュエリーコア(9 x 729倍ブロック)と同等にするため 3x まで用意する。
+  # ============================================================
+  oak_wood_2x:
+    base_material: OAK_LOG
+    custom_model_data: 5421
+    display_name: "&681倍圧縮オークの原木"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:oak_wood_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  oak_wood_3x:
+    base_material: OAK_LOG
+    custom_model_data: 5422
+    display_name: "&6729倍圧縮オークの原木"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:oak_wood_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  compressed_bread_2x:
+    base_material: BREAD
+    custom_model_data: 5423
+    display_name: "&e81倍圧縮パン"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:compressed_bread_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  compressed_bread_3x:
+    base_material: BREAD
+    custom_model_data: 5424
+    display_name: "&e729倍圧縮パン"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:compressed_bread_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  compressed_cooked_beef_2x:
+    base_material: COOKED_BEEF
+    custom_model_data: 5425
+    display_name: "&c81倍圧縮ステーキ"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:compressed_cooked_beef_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  compressed_cooked_beef_3x:
+    base_material: COOKED_BEEF
+    custom_model_data: 5426
+    display_name: "&c729倍圧縮ステーキ"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:compressed_cooked_beef_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  dirt_1x:
+    base_material: DIRT
+    custom_model_data: 5427
+    display_name: "&69倍圧縮土"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: DIRT
+      shape:
+        - iii
+        - iii
+        - iii
+  dirt_2x:
+    base_material: DIRT
+    custom_model_data: 5428
+    display_name: "&681倍圧縮土"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:dirt_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  dirt_3x:
+    base_material: DIRT
+    custom_model_data: 5429
+    display_name: "&6729倍圧縮土"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:dirt_2x
+      shape:
+        - iii
+        - iii
+        - iii
+
+  # ============================================================
+  # ソース階梯の触媒 (2026-07-31 追加) — 「1億ソース」目標の生産側
+  # ------------------------------------------------------------
+  # 【ループの形】ソースを注いで触媒を作る -> その触媒をソースリンクへ焼べると、
+  # 注いだ量より多くのソースが返る。返り倍率は段が上がるほど大きい
+  # (sourcelinks.yml alchemical で設定。shard 5倍 -> engine 約18倍)。
+  # つまり「素材(石炭/ソースジェム/ネザライト)の供給量」と「儀式を回す回数」だけが
+  # 実質のボトルネックになる。クッキークリッカーの upgrade と同じ構造。
+  #
+  # 【儀式1回で4個できる理由】result-amount: 4。1段上へ行くには前段が8個要るので、
+  # 4個ずつ出さないと儀式回数が段ごとに8倍に膨らみ、最終段まで4000回以上になってしまう。
+  # 4個出しなら「engine 8個」までの必要儀式回数が概ね 16+8+4+2 = 30回程度に収まる。
+  # ここが「作業厨で1ヶ月」に合わせる最重要レバーなので、重すぎ/軽すぎはこの数字で直す。
+  #
+  # 【見た目】いずれも custom_model_data を持つが、リソースパック側のモデルは未作成。
+  # 未作成の CMD は上書きが引かれないので、当面はベースアイテム(アメジストの欠片など)の
+  # 見た目で出る。テクスチャを足すときは既に採番済みのこの CMD をそのまま使うこと。
+  # ============================================================
+  source_shard:
+    base_material: AMETHYST_SHARD
+    custom_model_data: 5441
+    display_name: "&bソースの欠片"
+    enchant_glow: true
+    lore:
+      - "&7&o凝ったソースの結晶。焼べると注いだ量より多くが返る。"
+      - ""
+      - "&3焼べると 500 ソース"
+    recipe:
+      method: ritual
+      core-item: AMETHYST_SHARD
+      pedestal-items:
+        - COAL x4
+      source: 100
+      result: custom:source_shard
+      result-amount: 4
+  source_crystal:
+    base_material: PRISMARINE_CRYSTALS
+    custom_model_data: 5442
+    display_name: "&3ソース結晶"
+    enchant_glow: true
+    lore:
+      - "&7&o欠片を束ねて育てた結晶。内側で光が回っている。"
+      - ""
+      - "&3焼べると 18,000 ソース"
+    recipe:
+      method: ritual
+      core-item: custom:source_shard
+      pedestal-items:
+        - custom:source_shard x7
+        - GLOWSTONE_DUST x4
+      source: 2500
+      result: custom:source_crystal
+      result-amount: 4
+  source_condenser:
+    base_material: HEART_OF_THE_SEA
+    custom_model_data: 5443
+    display_name: "&9ソース凝縮器"
+    enchant_glow: true
+    lore:
+      - "&7&o結晶を圧して作った核。触れると指先が痺れる。"
+      - ""
+      - "&3焼べると 700,000 ソース"
+    recipe:
+      method: ritual
+      core-item: custom:source_crystal
+      pedestal-items:
+        - custom:source_crystal x7
+        - custom:source_gem x4
+      source: 60000
+      result: custom:source_condenser
+      result-amount: 4
+  source_engine:
+    base_material: CONDUIT
+    custom_model_data: 5444
+    display_name: "&5ソース機関"
+    enchant_glow: true
+    lore:
+      - "&7&o自分でソースを回し始めた装置。もう止め方が分からない。"
+      - ""
+      - "&3焼べると 30,000,000 ソース"
+    recipe:
+      method: ritual
+      core-item: custom:source_condenser
+      pedestal-items:
+        - custom:source_condenser x7
+        - NETHERITE_INGOT x4
+      source: 1000000
+      result: custom:source_engine
+      result-amount: 4
+  infinity_source_core:
+    base_material: NETHER_STAR
+    custom_model_data: 5445
+    display_name: "&6&l無限ソース核"
+    enchant_glow: true
+    lore:
+      - "&7&oここまでに築いた貯蔵設備そのものを焚べた結果。"
+      - "&7&o1億のソースが1点に折り畳まれている。"
+      - ""
+      - "&e第2の目標「1億ソース」の到達証明"
+      - "&8※ 焼べられない(焼べたら証明が消える)"
+    recipe:
+      # 到達証明なので result-amount は 1。特異点の壺4個 + ソース機関8個を溶かす。
+      # 「1億の証明」は文字どおり、それまでに積み上げた設備を焚べた結果になる。
+      # 儀式コスト 4500万は「5個目の特異点の壺」に貯めてから回すことを想定している
+      # (4個はペデスタルへ載せて溶けるので、燃料タンクは別に1個要る)。
+      method: ritual
+      core-item: custom:source_singularity_jar
+      pedestal-items:
+        - custom:source_singularity_jar x3
+        - custom:source_engine x8
+      source: 45000000
+      result: custom:infinity_source_core
+      result-amount: 1
+
 _editor:
   categories:
     material:
@@ -1458,6 +1891,15 @@ _editor:
           - breeze_rod_3x
           - wither_rose_2x
           - echo_shard_2x
+          - oak_wood_2x
+          - oak_wood_3x
+          - compressed_bread_2x
+          - compressed_bread_3x
+          - compressed_cooked_beef_2x
+          - compressed_cooked_beef_3x
+          - dirt_1x
+          - dirt_2x
+          - dirt_3x
       - id: cat_1784733247787
         label: コア
         itemIds:
@@ -1465,6 +1907,7 @@ _editor:
           - tf_core_jewelry
           - tf_core_vegetable
           - tf_core_wood
+          - tf_core_dirt
       - id: cat_1784733270033
         label: ガチャ券
         itemIds:
@@ -1494,6 +1937,26 @@ _editor:
           - elder_guardian_spike
           - wither_skull_fragment
           - warden_tendril
+          - ravager_hide
+          - piglin_brute_plate
+          - pillager_plate
+          - witch_elixir
+          - piglin_ear
+          - stray_cloth
+          - skeleton_horse_bone
+          - endermite_soot
+          - hoglin_tusk
+          - guardian_spine
+          - husk_cloth
+          - bogged_mossy_bone
+          - parched_sandy_bone
+      - label: ソース階梯
+        itemIds:
+          - source_shard
+          - source_crystal
+          - source_condenser
+          - source_engine
+          - infinity_source_core
   orders:
     material:
       - source_gem
@@ -1556,8 +2019,8 @@ _editor:
       - dragon_breath_2x
       - dragon_breath_3x
       - wither_rose_1x
-      - tf_core_meat
       - tf_core_jewelry
+      - tf_core_meat
       - tf_core_vegetable
       - tf_core_wood
       - tf_crystal_apple
@@ -1568,7 +2031,6 @@ _editor:
       - tf_gacha_ticket_4
       - tf_gacha_ticket_5
       - tf_scrap
-      - plank_scrap
       - copper_ingot_scrap
       - iron_ingot_scrap
       - gold_ingot_scrap
@@ -1576,11 +2038,13 @@ _editor:
       - netherite_ingot_scrap
       - leather_scrap
       - turtle_scute_scrap
-      - dragon_scale
-      - elder_guardian_spike
-      - wither_skull_fragment
-      - warden_tendril
       - reinforced_fiber
       - heavy_metal
       - hard_metal
       - reinforced_leather
+      - dragon_scale
+      - elder_guardian_spike
+      - wither_skull_fragment
+      - warden_tendril
+      - echo_shard_2x
+      - wither_rose_2x

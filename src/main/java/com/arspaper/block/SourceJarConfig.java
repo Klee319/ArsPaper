@@ -99,4 +99,16 @@ public final class SourceJarConfig {
     public Map<String, JarDef> all() {
         return jars;
     }
+
+    /**
+     * sourcejars.yml に定義済みのジャーidかどうか。
+     *
+     * <p>2026-07-31 追加。儀式のソース吸い出し(RitualManager)・ソースリンクの注ぎ込み(Sourcelink)・
+     * パーティクル(BlockParticleTask)が {@code "source_jar".equals(blockId)} と決め打ちしていたため、
+     * yml に上位ジャーを足しても「置けるが儀式もソースリンクも見ないブロック」になっていた。
+     * 判定をこの1箇所へ集約して、yml に足すだけで全経路が追従するようにする。
+     */
+    public boolean isJar(String id) {
+        return id != null && jars.containsKey(id);
+    }
 }

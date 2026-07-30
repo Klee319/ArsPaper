@@ -150,15 +150,22 @@ public class BlockParticleTask extends BukkitRunnable implements Listener {
         switch (blockId) {
             case "scribing_table" ->
                 world.spawnParticle(Particle.ENCHANT, center, 3, 0.3, 0.2, 0.3, 0.5);
-            case "source_jar" ->
-                world.spawnParticle(Particle.END_ROD, center, 1, 0.2, 0.2, 0.2, 0.02);
+            // 2026-07-31: 上位ジャー(sourcejars.yml に足したid)も同じ演出にする。
+            // ジャーだけ id 決め打ちだと、上位ジャーが「光らないブロック」になって
+            // 「これは本当にジャーとして機能しているのか」がプレイヤーから見て判らない。
             case "ritual_core" ->
                 world.spawnParticle(Particle.DUST, center, 1, 0.3, 0.2, 0.3, 0,
                     new Particle.DustOptions(Color.fromRGB(140, 0, 50), 0.7f));
             case "pedestal" ->
                 world.spawnParticle(Particle.DUST, center, 2, 0.2, 0.2, 0.2, 0,
                     new Particle.DustOptions(Color.fromRGB(128, 0, 255), 0.8f));
-            default -> spawnSourcelinkParticle(world, center, blockId);
+            default -> {
+                if (com.arspaper.block.impl.SourceJar.isSourceJarId(blockId)) {
+                    world.spawnParticle(Particle.END_ROD, center, 1, 0.2, 0.2, 0.2, 0.02);
+                } else {
+                    spawnSourcelinkParticle(world, center, blockId);
+                }
+            }
         }
     }
 

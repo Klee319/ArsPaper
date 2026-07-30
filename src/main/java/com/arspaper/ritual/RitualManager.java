@@ -435,7 +435,9 @@ public class RitualManager {
     }
 
     private boolean hasEnoughSource(Location center, int amount) {
-        int totalAvailable = 0;
+        // 2026-07-31: long で積む。上位ジャー(容量5000万)を並べると int では溢れる
+        // (605マス x 5000万 = 3.0e10)。溢れると合計が負に化けて「十分あるのに足りない」判定になる。
+        long totalAvailable = 0;
         int searchRadius = 5;
         for (int x = -searchRadius; x <= searchRadius; x++) {
             for (int y = -2; y <= 2; y++) {
@@ -444,7 +446,8 @@ public class RitualManager {
                     if (!(block.getState() instanceof TileState tileState)) continue;
                     String blockId = tileState.getPersistentDataContainer()
                         .get(BlockKeys.CUSTOM_BLOCK_ID, PersistentDataType.STRING);
-                    if (!"source_jar".equals(blockId)) continue;
+                    // 2026-07-31: 上位ジャーも吸えるように sourcejars.yml 定義の全ジャーへ拡張。
+                    if (!SourceJar.isSourceJarId(blockId)) continue;
                     totalAvailable += SourceJar.getSourceAmount(tileState);
                     if (totalAvailable >= amount) return true;
                 }
@@ -456,7 +459,8 @@ public class RitualManager {
     private boolean consumeSourceFromNearby(Location center, int amount) {
         record JarInfo(TileState tileState, int available) {}
         List<JarInfo> jars = new ArrayList<>();
-        int totalAvailable = 0;
+        // 2026-07-31: hasEnoughSource と同じ理由で long。
+        long totalAvailable = 0;
         int searchRadius = 5;
 
         for (int x = -searchRadius; x <= searchRadius; x++) {
@@ -467,7 +471,8 @@ public class RitualManager {
 
                     String blockId = tileState.getPersistentDataContainer()
                         .get(BlockKeys.CUSTOM_BLOCK_ID, PersistentDataType.STRING);
-                    if (!"source_jar".equals(blockId)) continue;
+                    // 2026-07-31: 上位ジャーも吸えるように sourcejars.yml 定義の全ジャーへ拡張。
+                    if (!SourceJar.isSourceJarId(blockId)) continue;
 
                     int available = SourceJar.getSourceAmount(tileState);
                     if (available > 0) {
@@ -504,7 +509,8 @@ public class RitualManager {
                     if (!(block.getState() instanceof TileState tileState)) continue;
                     String blockId = tileState.getPersistentDataContainer()
                         .get(BlockKeys.CUSTOM_BLOCK_ID, PersistentDataType.STRING);
-                    if (!"source_jar".equals(blockId)) continue;
+                    // 2026-07-31: 上位ジャーも吸えるように sourcejars.yml 定義の全ジャーへ拡張。
+                    if (!SourceJar.isSourceJarId(blockId)) continue;
                     int added = SourceJar.addSource(tileState, remaining);
                     remaining -= added;
                 }

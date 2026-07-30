@@ -39,13 +39,71 @@ public class SourceJar extends CustomBlock {
         super(plugin, "source_jar");
     }
 
-    /** sourcejars.yml の capacity を反映する（通常ジャー）。 */
+    /**
+     * 上位ジャー用。sourcejars.yml の任意のidで同じ実装を使い回す。
+     *
+     * <p>見た目 (material / display-name / CMD / lore) と容量は各インスタンスが自身のidで
+     * {@code jars.<id>} を引くので、yml に足すだけで反映される。カスタムソースリンクの
+     * {@code Sourcelink(plugin, id)} と同じ形。
+     */
+    public SourceJar(JavaPlugin plugin, String id) {
+        super(plugin, id);
+    }
+
+    /**
+     * sourcejars.yml の {@code source_jar} の capacity を「idが引けなかったとき」の
+     * フォールバックとして保持する。ジャーごとの実容量は {@link #maxSource(TileState)}。
+     */
     public static void applyConfiguredCapacity(int capacity) {
         configuredMaxSource = capacity < 0 ? Integer.MAX_VALUE : Math.max(1, capacity);
     }
 
+    /** フォールバック容量。ブロックが分かっているなら {@link #maxSource(TileState)} を使うこと。 */
     public static int maxSource() {
         return configuredMaxSource;
+    }
+
+    /**
+     * そのブロック個体の容量。PDC のジャーid ({@code custom_block_id}) から sourcejars.yml を引く。
+     *
+     * <p>2026-07-31 追加。以前は容量が static 1 値だったため、yml に上位ジャーを足しても
+     * 全ジャーが同じ容量で頭打ちになり「上位ジャー階梯」が成立しなかった。
+     * id が引けない場合(設定から消えた/旧データ)はフォールバックへ落とす — 既に置かれている
+     * ブロックを無容量にして中身を消すよりは、既定容量で動かし続ける方が安全。
+     *
+     * <p>クリエイティブジャーは {@code custom_block_id} を意図的に {@code "source_jar"} で
+     * 書いている(ジャーとして扱わせるため)が、無限判定は {@code SOURCE_INFINITE} フラグ側で
+     * 行うのでここで通常容量に解決されても問題ない。
+     */
+    public static int maxSource(TileState tileState) {
+        ArsPaper ars = ArsPaper.getInstance();
+        if (ars == null || ars.getSourceJarConfig() == null) {
+            return configuredMaxSource;
+        }
+        String blockId = tileState.getPersistentDataContainer()
+                .get(BlockKeys.CUSTOM_BLOCK_ID, PersistentDataType.STRING);
+        if (blockId == null) {
+            return configuredMaxSource;
+        }
+        return ars.getSourceJarConfig().get(blockId)
+                .map(SourceJarConfig.JarDef::effectiveCapacity)
+                .orElse(configuredMaxSource);
+    }
+
+    /**
+     * sourcejars.yml に定義済みのジャーidかどうか。儀式・ソースリンク・パーティクルの
+     * 「これはジャーか」判定はすべてここを通す({@code "source_jar"} の決め打ちを置き換えた)。
+     * 設定が読めない場合は既定の2種だけを真とみなし、最低限の互換を保つ。
+     */
+    public static boolean isSourceJarId(String blockId) {
+        if (blockId == null) {
+            return false;
+        }
+        ArsPaper ars = ArsPaper.getInstance();
+        if (ars == null || ars.getSourceJarConfig() == null) {
+            return "source_jar".equals(blockId) || "creative_source_jar".equals(blockId);
+        }
+        return ars.getSourceJarConfig().isJar(blockId);
     }
 
     private Optional<SourceJarConfig.JarDef> jarDef() {
@@ -88,9 +146,14 @@ public class SourceJar extends CustomBlock {
                 .decoration(TextDecoration.ITALIC, false));
     }
 
+    /** このジャー種別の容量。アイテム状態(TileStateが無い)でも正しい上限を lore に出すために使う。 */
+    private int declaredCapacity() {
+        return jarDef().map(SourceJarConfig.JarDef::effectiveCapacity).orElse(maxSource());
+    }
+
     private List<Component> loreWithSource(int source) {
         List<Component> lore = new ArrayList<>(flavorLore());
-        lore.add(Component.text("ソース: " + source + " / " + maxSource(), NamedTextColor.AQUA)
+        lore.add(Component.text("ソース: " + source + " / " + declaredCapacity(), NamedTextColor.AQUA)
                 .decoration(TextDecoration.ITALIC, false));
         return lore;
     }
@@ -162,7 +225,7 @@ public class SourceJar extends CustomBlock {
                 .get(ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING);
             if ("source_berry".equals(customId) && !isInfinite(tileState)) {
                 int currentSource = getSourceAmount(tileState);
-                if (currentSource >= maxSource()) {
+                if (currentSource >= maxSource(tileState)) {
                     player.sendMessage(Component.text("ソースジャーは満タンです", NamedTextColor.YELLOW));
                     return;
                 }
@@ -171,7 +234,8 @@ public class SourceJar extends CustomBlock {
                 hand.setAmount(hand.getAmount() - 1);
                 int added = setSourceAmount(tileState, currentSource + SOURCE_PER_BERRY) - currentSource;
                 player.sendMessage(Component.text(
-                    "ソースを" + added + "追加しました (" + getSourceAmount(tileState) + "/" + maxSource() + ")",
+                    "ソースを" + added + "追加しました ("
+                        + getSourceAmount(tileState) + "/" + maxSource(tileState) + ")",
                     NamedTextColor.AQUA));
                 player.playSound(player.getLocation(),
                     org.bukkit.Sound.BLOCK_BREWING_STAND_BREW,
@@ -190,7 +254,7 @@ public class SourceJar extends CustomBlock {
         } else {
             int source = getSourceAmount(tileState);
             player.sendMessage(Component.text(
-                "ソース: " + source + " / " + maxSource(), NamedTextColor.AQUA
+                "ソース: " + source + " / " + maxSource(tileState), NamedTextColor.AQUA
             ));
         }
     }
@@ -207,7 +271,7 @@ public class SourceJar extends CustomBlock {
      * TileStateからSource量を取得。無限の場合は常にmaxSource()。
      */
     public static int getSourceAmount(TileState tileState) {
-        if (isInfinite(tileState)) return maxSource();
+        if (isInfinite(tileState)) return maxSource(tileState);
         return tileState.getPersistentDataContainer()
             .getOrDefault(BlockKeys.SOURCE_AMOUNT, PersistentDataType.INTEGER, 0);
     }
@@ -218,7 +282,7 @@ public class SourceJar extends CustomBlock {
      * @return 実際に設定された量
      */
     public static int setSourceAmount(TileState tileState, int amount) {
-        int clamped = Math.clamp(amount, 0, maxSource());
+        int clamped = Math.clamp(amount, 0, maxSource(tileState));
         tileState.getPersistentDataContainer().set(
             BlockKeys.SOURCE_AMOUNT, PersistentDataType.INTEGER, clamped
         );
@@ -233,7 +297,7 @@ public class SourceJar extends CustomBlock {
      */
     public static int addSource(TileState tileState, int amount) {
         int current = getSourceAmount(tileState);
-        int added = Math.min(amount, maxSource() - current);
+        int added = Math.min(amount, maxSource(tileState) - current);
         if (added > 0) {
             setSourceAmount(tileState, current + added);
         }

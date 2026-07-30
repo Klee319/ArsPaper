@@ -294,6 +294,8 @@ public class ArsPaper extends JavaPlugin {
         // sourcelinks.yml items: のカスタムid定義を登録する。既定ブロック/アイテムの後に行うことで、
         // 既存idとの衝突を検知してスキップできる (上書き事故防止)。
         registerCustomSourcelinks();
+        // sourcejars.yml jars: の上位ジャーを登録する (source_jar / creative_source_jar 以外)。
+        registerCustomSourceJars();
 
         // 全カスタムアイテム(素材/魔導書/触媒/スレッド等)の識別(material+CMD)をTrinityForgeの
         // ExternalItemRegistryへ反映する。custom:<id> レシピのper-slot識別(CatalogWorkbenchListener)
@@ -635,6 +637,39 @@ public class ArsPaper extends JavaPlugin {
         }
     }
 
+    /**
+     * sourcejars.yml の {@code jars:} に書かれた上位ジャーをブロック/アイテムとして登録する
+     * (2026-07-31 追加)。
+     *
+     * <p>それまでジャーは {@code source_jar} / {@code creative_source_jar} の2種だけがハードコードで
+     * 登録されていたため、yml に上位ジャーを足しても<b>ブロックとして存在せず、置くことすらできなかった</b>。
+     * 容量も static 1 値だったので、仮に置けても全ジャー同容量で「上位ジャー」に意味が無かった。
+     * ここで登録し、容量は {@link SourceJar#maxSource(org.bukkit.block.TileState)} が個体ごとに引く。
+     *
+     * <p>見た目 (material / display-name / CMD / lore) は {@link SourceJar} 側が自身のidで
+     * {@code jars.<id>} を参照するので、yml に書くだけで反映される。カスタムソースリンクと同じ形。
+     * 再登録(reload)は同idの上書きなので冪等。設定から消したidの登録解除は再起動が必要
+     * (残っていても設置済みブロックが動き続けるだけで実害は無い)。
+     */
+    private void registerCustomSourceJars() {
+        for (String id : sourceJarConfig.all().keySet()) {
+            if (blockRegistry.has(id)) {
+                continue;
+            }
+            // 既存の非ブロックアイテム (source_berry 等) と同じ id は上書きしない。
+            if (itemRegistry.has(id)) {
+                getLogger().warning("sourcejars.yml: jars." + id
+                    + " conflicts with an existing item id — skipped (choose another id)");
+                continue;
+            }
+            SourceJar jar = new SourceJar(this, id);
+            blockRegistry.register(jar);
+            itemRegistry.register(jar);
+            getLogger().info("Registered source jar '" + id + "' (capacity="
+                + sourceJarConfig.capacityOf(id) + ")");
+        }
+    }
+
     private void registerListeners() {
         var pluginManager = getServer().getPluginManager();
         pluginManager.registerEvents(new CustomItemListener(itemRegistry), this);
@@ -844,5 +879,9 @@ public class ArsPaper extends JavaPlugin {
             sourceJarConfig.reload();
         }
         SourceJar.applyConfiguredCapacity(sourceJarConfig.capacityOf("source_jar"));
+        // reloadで新しく追加された上位ジャーを登録する (既存idはスキップされる)。
+        if (blockRegistry != null) {
+            registerCustomSourceJars();
+        }
     }
 }

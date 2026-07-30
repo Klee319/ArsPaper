@@ -29,6 +29,11 @@ public final class ArsGiveAllowlist {
         if (id.endsWith("_sourcelink")) {
             return true;
         }
+        // 2026-07-31: sourcejars.yml に足した上位ジャーも配布可能にする。
+        // ここを忘れると「ブロックとしては登録されているのに /ars give で出せない」ジャーができる。
+        if (com.arspaper.block.impl.SourceJar.isSourceJarId(id)) {
+            return true;
+        }
         // カスタムid (sourcelinks.yml items:) のソースリンクも配布可能にする
         com.arspaper.ArsPaper ars = com.arspaper.ArsPaper.getInstance();
         return ars != null && ars.getBlockRegistry().get(id)
