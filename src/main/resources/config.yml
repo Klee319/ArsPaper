@@ -2,207 +2,82 @@
 # ArsPaper Configuration
 # ============================================================
 # プラグインの基本設定ファイル。
-# スレッドの設定は threads.yml で管理する。
-# グリフの設定は glyphs.yml で管理する。
+# スレッドの設定は threads.yml、グリフの設定は glyphs.yml、
+# ソースリンク/ジャーは sourcelinks.yml / sourcejars.yml で管理する。
+#
+# 【2026-07-30 復旧】このファイルは 17c9f65「TrinityForge 連携の未コミット分を
+# まとめて保存」で誤って sourcelinks.yml の内容(volcanic:/mycelial:/alchemical:/items:)へ
+# 上書きされていた。ヘッダのコメントだけが残っていたのは
+# 「先頭の連続する # ブロックだけを復元する」editor の保存仕様によるもの。
+# getter が既定値を持つためエラーもログも出ず、稼働サーバでも
+# form-cooldowns / mana / enchantments / mob-drops / loot が
+# 全て「既定値のまま」で動いていた。
+#
+# 復旧時に 6b9e66a 版へ単純に戻すことはしていない —— マナ基礎値
+# (default-max / default-regen-rate / regen-interval-ticks / recovery.*) と
+# ars-magic の EXP、geyser の CMD 設定は TrinityForge 側へ移管済みで、
+# ここに書いても効かない「死にキー」になるため意図的に除外した。
+#   マナ基礎値の真源 = TrinityForge combat/base-stats.yml の
+#     mana-max-base / mana-regen-base / mana-regen-interval-ticks /
+#     mana-onhit-percent / mana-onattack-percent / mana-idle-* (ManaBaseStats 経由)
+#   ARS_MAGIC の EXP  = TrinityForge stats/skill-exp.yml
+#
+# 設定リファレンス(本文コメント移設先): docs/config-reference/arspaper/config.md
 # ============================================================
 
-# ============================================================
-# form別クールダウン (MAGIC_BALANCE)
-# ============================================================
-# 形態(form)ごとに独立したクールダウン秒数を設定する。
-# プレイヤー × form 単位で独立してCTが管理される。
-# - 0 または未定義 = 従来のクールダウン（連射増強で短縮される計算CT）にフォールバック。
-# - キーは form の NamespacedKey のキー部分（例: projectile, beam, touch, self,
-#   underfoot, overhead, burst, orbit）。
+# form別クールダウン(秒)。プレイヤー × form 単位で独立して管理される。
+# 0 または未定義 = 従来の計算クールダウン(連射増強で短縮される)にフォールバック。
+# キーは form の NamespacedKey のキー部分。語彙は spell-form-vocabulary と同じ全10種。
+form-cooldowns:
+  projectile: 0
+  beam: 0
+  touch: 0
+  self: 0
+  underfoot: 0
+  overhead: 0
+  burst: 0
+  orbit: 0
+  linger: 0
+  wall: 0
 
-volcanic:
-  materials:
-    STICK: 1
-    BAMBOO: 1
-    WHITE_CARPET: 1
-    OAK_SLAB: 1
-    SPRUCE_SLAB: 1
-    BIRCH_SLAB: 1
-    JUNGLE_SLAB: 1
-    ACACIA_SLAB: 1
-    DARK_OAK_SLAB: 1
-    MANGROVE_SLAB: 1
-    CHERRY_SLAB: 1
-    BAMBOO_SLAB: 1
-    OAK_PLANKS: 1
-    SPRUCE_PLANKS: 1
-    BIRCH_PLANKS: 1
-    JUNGLE_PLANKS: 1
-    ACACIA_PLANKS: 1
-    DARK_OAK_PLANKS: 1
-    MANGROVE_PLANKS: 1
-    CHERRY_PLANKS: 1
-    BAMBOO_PLANKS: 1
-    OAK_LOG: 3
-    SPRUCE_LOG: 3
-    BIRCH_LOG: 3
-    JUNGLE_LOG: 3
-    ACACIA_LOG: 3
-    DARK_OAK_LOG: 3
-    MANGROVE_LOG: 3
-    CHERRY_LOG: 3
-    CHARCOAL: 5
-    COAL: 5
-    BLAZE_ROD: 10
-    DRIED_KELP_BLOCK: 10
-    COAL_BLOCK: 45
-    LAVA_BUCKET: 100
-mycelial:
-  materials:
-    MELON_SLICE: 1
-    SWEET_BERRIES: 1
-    GLOW_BERRIES: 1
-    APPLE: 1
-    CARROT: 1
-    POTATO: 1
-    BEETROOT: 1
-    DRIED_KELP: 3
-    SPIDER_EYE: 3
-    COD: 3
-    SALMON: 3
-    CHICKEN: 3
-    MUTTON: 3
-    BEEF: 3
-    PORKCHOP: 3
-    TROPICAL_FISH: 5
-    RABBIT: 5
-    COOKIE: 5
-    BAKED_POTATO: 5
-    BREAD: 5
-    COOKED_COD: 5
-    COOKED_SALMON: 5
-    BEETROOT_SOUP: 5
-    COOKED_CHICKEN: 5
-    MUSHROOM_STEW: 7
-    SUSPICIOUS_STEW: 7
-    POISONOUS_POTATO: 10
-    COOKED_MUTTON: 10
-    COOKED_PORKCHOP: 10
-    COOKED_BEEF: 10
-    COOKED_RABBIT: 15
-    GOLDEN_CARROT: 15
-    RABBIT_STEW: 30
-    PUMPKIN_PIE: 30
-    GOLDEN_APPLE: 75
-alchemical:
-  materials:
-    GLASS_BOTTLE: 1
-    SUGAR: 1
-    GUNPOWDER: 1
-    REDSTONE: 1
-    GLOWSTONE_DUST: 1
-    SPIDER_EYE: 1
-    NETHER_WART: 3
-    FERMENTED_SPIDER_EYE: 3
-    GLISTERING_MELON_SLICE: 3
-    GOLDEN_CARROT: 3
-    PUFFERFISH: 3
-    MAGMA_CREAM: 3
-    BLAZE_POWDER: 8
-    RABBIT_FOOT: 8
-    PHANTOM_MEMBRANE: 8
-    TURTLE_HELMET: 8
-    GHAST_TEAR: 15
-    EXPERIENCE_BOTTLE: 15
-    POTION: 5
-    SPLASH_POTION: 8
-    LINGERING_POTION: 10
-    DRAGON_BREATH: 30
-items:
-  volcanic_sourcelink:
-    material: FURNACE
-    display-name: ヴォルカニックソースリンク
-    custom-model-data: 200003
-    lore:
-      - 燃料を燃やしてソースを生成
-      - 燃料を手に持って右クリックで投入
-    recipe:
-      method: ritual
-      core-item: FURNACE
-      pedestal-items:
-        - NETHERRACK x2
-        - MAGMA_BLOCK x2
-        - BLAZE_POWDER x2
-        - custom:source_gem
-      source: 300
-      result: custom:volcanic_sourcelink
-      type: shapeless
-      ingredients: []
-  mycelial_sourcelink:
-    material: SMOKER
-    display-name: マイセリアルソースリンク
-    custom-model-data: 200004
-    lore:
-      - 食料を消費してソースを生成
-      - 食料を手に持って右クリックで投入
-    recipe:
-      method: ritual
-      core-item: SMOKER
-      pedestal-items:
-        - MYCELIUM x2
-        - BROWN_MUSHROOM
-        - RED_MUSHROOM
-        - BONE_MEAL
-        - custom:source_gem x2
-      source: 300
-      result: custom:mycelial_sourcelink
-      type: shapeless
-      ingredients: []
-  alchemical_sourcelink:
-    material: BLAST_FURNACE
-    display-name: アルケミカルソースリンク
-    custom-model-data: 200005
-    lore:
-      - 醸造素材を消費してソースを生成
-    recipe:
-      method: ritual
-      core-item: BLAST_FURNACE
-      pedestal-items:
-        - GLASS_BOTTLE x2
-        - NETHER_WART x2
-        - BLAZE_POWDER x2
-        - custom:source_gem x2
-      source: 400
-      result: custom:alchemical_sourcelink
-      type: shapeless
-      ingredients: []
-  vitalic_sourcelink:
-    material: BARREL
-    display-name: バイタリックソースリンク
-    custom-model-data: 200006
-    lore:
-      - 生命の力でソースを生成
-    recipe:
-      method: ritual
-      core-item: BARREL
-      pedestal-items:
-        - BONE x2
-        - ROTTEN_FLESH x2
-        - GOLDEN_APPLE
-        - custom:source_gem x2
-      source: 400
-      result: custom:vitalic_sourcelink
-      type: shapeless
-      ingredients: []
-  botanical_sourcelink:
-    material: BEEHIVE
-    display-name: ボタニカルソースリンク
-    custom-model-data: 200007
-    lore:
-      - 植物の成長からソースを生成
-    recipe:
-      method: ritual
-      core-item: BEEHIVE
-      pedestal-items:
-        - WHEAT x2
-        - GOLD_INGOT x2
-        - custom:source_gem x2
-      source: 300
-      result: custom:botanical_sourcelink
-      type: shapeless
-      ingredients: []
+mana:
+  # グリフ1つ解放ごとのマナ上限ボーナス
+  per-glyph-unlock-bonus: 5
+  # マナ最大値%上昇の上限(%)。装備由来の%上昇(threads.yml の mana-max-percent)をここでクランプする
+  max-percent-cap: 100
+  # マナ不足時にインベントリから消費してマナへ変換するアイテム。
+  # Ars鍛冶 A-2 の perk (mana-unlock-effect) を持っている間だけ働く。
+  # キー = アイテムID(Arsカスタムid または TFカタログid) / 値 = 1個あたりのマナ変換量(1以上の整数)。
+  # 空にすると perk を取っても何も起きない(機構は生きているが変換対象が無い状態)。
+  source-auto-consume:
+    items:
+      source_gem: 100
+
+# カスタムエンチャント(マナ回復/マナ増強/共有)のレベル別効果量。
+# 配列の添字がレベルで、先頭(Lv0)は未使用のプレースホルダ。
+enchantments:
+  mana-regen-per-level: [0, 1, 3, 6]
+  mana-boost-per-level: [0, 15, 30, 50]
+  max-level: 3
+
+# モブ討伐時の追加ドロップ。
+mob-drops:
+  # ウォーデン討伐で残響の欠片を落とすか(ドロップ増加エンチャントで個数が増える)
+  warden-echo-shard: false
+  warden-echo-shard-min: 0
+  warden-echo-shard-max: 2
+
+# バニラのルートチェストへの追加抽選(LootTableListener)。
+# 対象の構造物はホワイトリストで制限しており、村やトライアルチャンバーのような
+# 大量チェストは除外している。
+loot:
+  enabled: true
+  # カスタムエンチャント本が入る確率(チェスト1個あたり)
+  enchant-book-chance: 0.05
+  # エンチャント金リンゴが入る確率(チェスト1個あたり)
+  enchanted-golden-apple-chance: 0.01
+
+# 魔法によるプレイヤー間ダメージを許可するか。/ars pvp で実行時に切り替えると
+# このキーへ書き戻される。
+pvp:
+  enabled: true

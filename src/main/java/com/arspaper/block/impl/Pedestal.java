@@ -2,9 +2,10 @@ package com.arspaper.block.impl;
 
 import com.arspaper.ArsPaper;
 import com.arspaper.block.CustomBlock;
-import com.arspaper.item.ItemKeys;
+import com.arspaper.integration.TrinityForgeBridge;
 import com.arspaper.ritual.RitualIngredient;
 import com.arspaper.util.ItemFrameHelper;
+import com.arspaper.util.PdcHelper;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -20,6 +21,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Pedestal - 儀式の素材を置く台座。
@@ -124,11 +126,9 @@ public class Pedestal extends CustomBlock {
             handItem.setAmount(handItem.getAmount() - 1);
             ItemFrameHelper.updateDisplayFrame(block.getLocation(), toStore);
 
-            String customId = toStore.getItemMeta() != null
-                ? toStore.getItemMeta().getPersistentDataContainer()
-                    .get(ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING)
-                : null;
-            String displayName = customId != null ? "custom:" + customId : toStore.getType().name();
+            String displayName = PdcHelper.getCrossPluginItemId(toStore)
+                .map(id -> "custom:" + id)
+                .orElseGet(() -> toStore.getType().name());
             player.sendMessage(Component.text(displayName + " を台座に設置しました",
                 NamedTextColor.GREEN));
         } else {
@@ -142,14 +142,12 @@ public class Pedestal extends CustomBlock {
     private static void saveStoredItem(PersistentDataContainer pdc, ItemStack item) {
         // 完全なアイテムデータをバイト配列で保存
         pdc.set(PEDESTAL_ITEM_DATA_KEY, PersistentDataType.BYTE_ARRAY, item.serializeAsBytes());
-        // 後方互換 + RitualIngredient判定用にMaterial名とカスタムIDも保存
+        // 後方互換 + RitualIngredient判定用にMaterial名とカスタムIDも保存。
+        // カスタムIDは Ars/TF 両方のPDCキーを見る(TFカタログ品を核/台座にする儀式が成立しなくなるため)。
         pdc.set(PEDESTAL_ITEM_KEY, PersistentDataType.STRING, item.getType().name());
-        String customId = item.getItemMeta() != null
-            ? item.getItemMeta().getPersistentDataContainer()
-                .get(ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING)
-            : null;
-        if (customId != null) {
-            pdc.set(PEDESTAL_CUSTOM_ID_KEY, PersistentDataType.STRING, customId);
+        Optional<String> customId = PdcHelper.getCrossPluginItemId(item);
+        if (customId.isPresent()) {
+            pdc.set(PEDESTAL_CUSTOM_ID_KEY, PersistentDataType.STRING, customId.get());
         } else {
             pdc.remove(PEDESTAL_CUSTOM_ID_KEY);
         }
@@ -187,16 +185,21 @@ public class Pedestal extends CustomBlock {
 
     /**
      * 後方互換: Material名+カスタムIDからItemStackを再生成する。
+     * カスタムIDは Ars レジストリ → TFカタログ の順に解決する(id空間を2プラグインで分担しているため)。
      */
     private static ItemStack resolveFromLegacy(String materialName, String customId) {
         if (customId != null && !customId.isEmpty()) {
-            return ArsPaper.getInstance().getItemRegistry()
+            ItemStack ars = ArsPaper.getInstance().getItemRegistry()
                 .get(customId)
                 .map(item -> item.createItemStack())
-                .orElseGet(() -> {
-                    Material mat = Material.matchMaterial(materialName);
-                    return mat != null ? new ItemStack(mat, 1) : null;
-                });
+                .orElse(null);
+            if (ars != null) {
+                return ars;
+            }
+            ItemStack tf = TrinityForgeBridge.createCatalogIdentity(customId);
+            if (tf != null) {
+                return tf;
+            }
         }
         Material mat = Material.matchMaterial(materialName);
         return mat != null ? new ItemStack(mat, 1) : null;
@@ -210,6 +213,15 @@ public class Pedestal extends CustomBlock {
         String customId = pdc.get(PEDESTAL_CUSTOM_ID_KEY, PersistentDataType.STRING);
         if (customId != null && !customId.isEmpty()) {
             return RitualIngredient.ofCustom(customId);
+        }
+        // 旧jarで設置済みの台座の救済: TFカタログ品は customId キーが書かれていないので、
+        // シリアライズ済み実体から解決し直す(設置し直させないため)。
+        ItemStack stored = restoreStoredItem(pdc);
+        if (stored != null) {
+            Optional<String> migrated = PdcHelper.getCrossPluginItemId(stored);
+            if (migrated.isPresent()) {
+                return RitualIngredient.ofCustom(migrated.get());
+            }
         }
 
         String matName = pdc.get(PEDESTAL_ITEM_KEY, PersistentDataType.STRING);

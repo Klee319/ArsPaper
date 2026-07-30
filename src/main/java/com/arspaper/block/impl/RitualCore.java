@@ -2,10 +2,12 @@ package com.arspaper.block.impl;
 
 import com.arspaper.ArsPaper;
 import com.arspaper.block.CustomBlock;
+import com.arspaper.integration.TrinityForgeBridge;
 import com.arspaper.item.ItemKeys;
 import com.arspaper.ritual.RitualIngredient;
 import com.arspaper.ritual.RitualManager;
 import com.arspaper.util.ItemFrameHelper;
+import com.arspaper.util.PdcHelper;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -142,11 +144,9 @@ public class RitualCore extends CustomBlock {
             // 色付き防具等のデータを保持するためフルコピーを表示に使用
             ItemFrameHelper.updateHeadDisplay(block.getLocation(), toStore);
 
-            String customId = toStore.getItemMeta() != null
-                ? toStore.getItemMeta().getPersistentDataContainer()
-                    .get(ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING)
-                : null;
-            String displayName = customId != null ? "custom:" + customId : toStore.getType().name();
+            String displayName = PdcHelper.getCrossPluginItemId(toStore)
+                .map(id -> "custom:" + id)
+                .orElseGet(() -> toStore.getType().name());
             player.sendMessage(Component.text(displayName + " をコアに設置しました",
                 NamedTextColor.GREEN));
         } else {
@@ -162,12 +162,10 @@ public class RitualCore extends CustomBlock {
         // 完全なアイテムデータをバイト配列で保存
         pdc.set(CORE_ITEM_DATA_KEY, PersistentDataType.BYTE_ARRAY, item.serializeAsBytes());
 
-        // 後方互換 + RitualIngredient判定用
+        // 後方互換 + RitualIngredient判定用。
+        // カスタムIDは Ars/TF 両方のPDCキーを見る(TFカタログ品を核にする儀式が成立しなくなるため)。
         pdc.set(CORE_ITEM_KEY, PersistentDataType.STRING, item.getType().name());
-        String customId = item.getItemMeta() != null
-            ? item.getItemMeta().getPersistentDataContainer()
-                .get(ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING)
-            : null;
+        String customId = PdcHelper.getCrossPluginItemId(item).orElse(null);
         if (customId != null) {
             pdc.set(CORE_CUSTOM_ID_KEY, PersistentDataType.STRING, customId);
         } else {
@@ -242,16 +240,21 @@ public class RitualCore extends CustomBlock {
 
     /**
      * 後方互換: Material名+カスタムIDからItemStackを再生成する。
+     * カスタムIDは Ars レジストリ → TFカタログ の順に解決する(id空間を2プラグインで分担しているため)。
      */
     private static ItemStack resolveFromLegacy(String materialName, String customId) {
         if (customId != null && !customId.isEmpty()) {
-            return ArsPaper.getInstance().getItemRegistry()
+            ItemStack ars = ArsPaper.getInstance().getItemRegistry()
                 .get(customId)
                 .map(item -> item.createItemStack())
-                .orElseGet(() -> {
-                    Material mat = Material.matchMaterial(materialName);
-                    return mat != null ? new ItemStack(mat, 1) : null;
-                });
+                .orElse(null);
+            if (ars != null) {
+                return ars;
+            }
+            ItemStack tf = TrinityForgeBridge.createCatalogIdentity(customId);
+            if (tf != null) {
+                return tf;
+            }
         }
         Material mat = Material.matchMaterial(materialName);
         return mat != null ? new ItemStack(mat, 1) : null;
@@ -265,6 +268,15 @@ public class RitualCore extends CustomBlock {
         String customId = pdc.get(CORE_CUSTOM_ID_KEY, PersistentDataType.STRING);
         if (customId != null && !customId.isEmpty()) {
             return RitualIngredient.ofCustom(customId);
+        }
+        // 旧jarで設置済みのコアの救済: TFカタログ品は customId キーが書かれていないので、
+        // シリアライズ済み実体から解決し直す(設置し直させないため)。
+        ItemStack stored = restoreStoredItem(pdc);
+        if (stored != null) {
+            String migrated = PdcHelper.getCrossPluginItemId(stored).orElse(null);
+            if (migrated != null) {
+                return RitualIngredient.ofCustom(migrated);
+            }
         }
         String matName = pdc.get(CORE_ITEM_KEY, PersistentDataType.STRING);
         if (matName == null || matName.isEmpty()) return null;

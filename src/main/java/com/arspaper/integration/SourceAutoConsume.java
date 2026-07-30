@@ -1,12 +1,10 @@
 package com.arspaper.integration;
 
 import com.arspaper.item.ItemKeys;
-import org.bukkit.NamespacedKey;
+import com.arspaper.util.PdcHelper;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
-import org.bukkit.persistence.PersistentDataContainer;
-import org.bukkit.persistence.PersistentDataType;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,10 +19,9 @@ import java.util.Map;
  * (itemId -&gt; 1個あたりのマナ変換量)で定義される。itemId は次のいずれかのPDCキーで解決する:
  * <ul>
  *   <li>Arsカスタムアイテムid ({@link ItemKeys#CUSTOM_ITEM_ID}, 例: {@code source_berry})</li>
- *   <li>TrinityForgeカタログid (生{@link NamespacedKey} {@code trinityforge:item_catalog_id}を
- *       {@link PersistentDataType#STRING} で読む。TFへのコンパイル依存を避けるため、TF自身のAPI型は
- *       使わず横断PDC読取のパターンを踏襲する)</li>
+ *   <li>TrinityForgeカタログid ({@code trinityforge:catalog_id})</li>
  * </ul>
+ * どちらも {@link com.arspaper.util.PdcHelper#getCrossPluginItemId} で解決する。
  *
  * <p>TF未ロード/perk未所持時は{@link TrinityForgeBridge#tfEffectActive}が{@code false}を返すため、
  * 呼び出し元(ManaManager#consumeMana)は従来どおりマナ不足として扱う(fail-open)。
@@ -34,10 +31,6 @@ public final class SourceAutoConsume {
 
     private SourceAutoConsume() {
     }
-
-    /** TrinityForgeカタログアイテムのid識別PDCキー(trinityforge:item_catalog_id)。 */
-    private static final NamespacedKey TF_CATALOG_ID_KEY =
-        new NamespacedKey("trinityforge", "item_catalog_id");
 
     /**
      * プレイヤーのインベントリから、不足マナ量(deficitMana)を満たすだけのアイテムをマナへ変換消費する。
@@ -105,17 +98,14 @@ public final class SourceAutoConsume {
     /**
      * ItemStackのid(Arsカスタムid優先、無ければTFカタログid)を解決する。
      * どちらのPDCキーも持たない/メタ無しのアイテムは {@code null}(=変換対象外)。
+     *
+     * <p>【2026-07-30 修正】以前はTFカタログキーを {@code trinityforge:item_catalog_id} と
+     * 手書きしており、実在するキーは {@code trinityforge:catalog_id} なので<b>TFカタログ品が
+     * 一切マッチしなかった</b>(Ars素材だけが変換されていた)。キー名の手書きをやめ、
+     * TFの定数を参照する {@link PdcHelper#getCrossPluginItemId} へ一本化した。
      */
     private static String resolveItemId(ItemStack stack) {
-        if (!stack.hasItemMeta()) {
-            return null;
-        }
-        PersistentDataContainer pdc = stack.getItemMeta().getPersistentDataContainer();
-        String arsId = pdc.get(ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING);
-        if (arsId != null && !arsId.isBlank()) {
-            return arsId;
-        }
-        return pdc.get(TF_CATALOG_ID_KEY, PersistentDataType.STRING);
+        return PdcHelper.getCrossPluginItemId(stack).orElse(null);
     }
 
     /**
