@@ -289,3 +289,18 @@ ritual_effects:
       - PRISMARINE_SHARD x2
       - custom:source_gem x3
     source: 1200
+  # 2026-07-31 追加: スレッド厳選の振り直し。
+  # コアに効果付きスレッドを1個だけ置いて回すと、主ステ/サブステが再抽選される
+  # (抽選内容は thread-rolls.yml 側。コアのスレッドは消費されない)。
+  # core-item を書いていないのは意図的 ── 振り直す対象は「プレイヤーが持ってきたスレッド」で、
+  # レシピ側で固定できないため。RitualRecipe は core-item が null なら任意のコアを許す。
+  # 費用はペデスタルの素材とソースだけ。厳選は「沼」なので回数を回せる価格に置いてある
+  # (ソースを消費先として使うことで、1億ソースの強化ループにもシンクを作っている)。
+  thread_reroll:
+    name: スレッド厳選の振り直し
+    effect-type: thread_reroll
+    effect-params: {}
+    pedestal-items:
+      - custom:source_gem x4
+      - AMETHYST_SHARD x4
+    source: 2000

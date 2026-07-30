@@ -3,6 +3,7 @@ package com.arspaper.gui;
 import com.arspaper.ArsPaper;
 import com.arspaper.integration.TrinityForgeBridge;
 import com.arspaper.item.*;
+import com.arspaper.item.impl.ThreadItem;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import net.kyori.adventure.text.Component;
@@ -40,6 +41,12 @@ public class ThreadGui extends BaseGui {
     private final int threadSlotCount;
     private final String armorDisplayName;
     private final List<String> threadSlots;
+    /**
+     * threadSlots と<b>同じ添字</b>で対応する厳選結果の文字列（未厳選は空文字）。
+     * 装着したスレッド個体の当たり外れを防具側で保持するために要る ── ID だけを持っていた
+     * 従来形式では、厳選した個体を装着した瞬間に個体差が消えていた。
+     */
+    private final List<String> threadSlotRolls;
 
     /**
      * レガシーコンストラクタ（後方互換）。
@@ -65,6 +72,7 @@ public class ThreadGui extends BaseGui {
         this.armorDisplayName = resolveArmorDisplayName(armorItem);
 
         this.threadSlots = loadThreadSlots(armorItem);
+        this.threadSlotRolls = loadThreadSlotRolls(armorItem, this.threadSlots.size());
     }
 
     /**
@@ -94,7 +102,7 @@ public class ThreadGui extends BaseGui {
             int guiSlot = THREAD_SLOT_START + i;
             if (guiSlot >= inventory.getSize()) break; // GUI範囲外防止
             String threadId = (i < threadSlots.size()) ? threadSlots.get(i) : null;
-            inventory.setItem(guiSlot, createThreadSlotButton(i, threadId));
+            inventory.setItem(guiSlot, createThreadSlotButton(i, threadId, rollAt(i)));
         }
 
         // 閉じるボタン: 最終行の右端
@@ -139,7 +147,11 @@ public class ThreadGui extends BaseGui {
             // スロットにスレッドがある → 取り外し
             ThreadType threadType = ThreadType.fromId(currentThread);
             if (threadType != null && threadType.hasEffect()) {
+                // 取り外しでは【装着時の厳選値をそのまま返す】。createThreadItemStack は新品を作るので
+                // 中で改めて抽選されてしまう ── 上書きしないと「外して付け直すだけで厳選し直せる」
+                // 無限リロールになる。
                 ItemStack threadItem = createThreadItemStack(threadType);
+                restoreRoll(threadItem, rollAt(slotIndex));
                 if (threadType.isBackpackThread()) {
                     BackpackGui.transferDataToThread(armorItem, threadItem);
                 }
@@ -150,6 +162,7 @@ public class ThreadGui extends BaseGui {
                 }
             }
             threadSlots.set(slotIndex, null);
+            setRollAt(slotIndex, "");
             saveThreadSlots();
             player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.5f, 1.2f);
             render();
@@ -214,6 +227,9 @@ public class ThreadGui extends BaseGui {
                 BackpackGui.transferDataFromThread(threadStack, armorItem);
             }
 
+            // 厳選値は【消費前の】スタックから読む(消費でスタックが空になると読めなくなる)。
+            String socketedRoll = ThreadRoll.rawOf(threadStack);
+
             // アイテム消費
             if (fromCursor) {
                 cursor.setAmount(cursor.getAmount() - 1);
@@ -223,6 +239,7 @@ public class ThreadGui extends BaseGui {
             }
 
             threadSlots.set(slotIndex, threadType.getId());
+            setRollAt(slotIndex, socketedRoll);
             saveThreadSlots();
             player.playSound(player.getLocation(), Sound.BLOCK_ENCHANTMENT_TABLE_USE, 0.5f, 1.5f);
             render();
@@ -268,7 +285,7 @@ public class ThreadGui extends BaseGui {
         return createButton(armorItem.getType(), Component.text(armorDisplayName), lore);
     }
 
-    private ItemStack createThreadSlotButton(int index, String threadId) {
+    private ItemStack createThreadSlotButton(int index, String threadId, String encodedRoll) {
         if (threadId == null) {
             return createButton(Material.LIME_STAINED_GLASS_PANE,
                 Component.text("空きスロット " + (index + 1), NamedTextColor.GREEN),
@@ -282,6 +299,7 @@ public class ThreadGui extends BaseGui {
         }
 
         List<Component> lore = new ArrayList<>(ArsPaper.getInstance().getThreadConfig().getEffectLore(type));
+        ThreadRoll.decode(encodedRoll).ifPresent(roll -> lore.addAll(ThreadItem.rollLore(roll)));
         lore.add(Component.text("クリックで取り外し", NamedTextColor.DARK_GRAY)
             .decoration(TextDecoration.ITALIC, false));
 
@@ -329,6 +347,67 @@ public class ThreadGui extends BaseGui {
         return migrated;
     }
 
+    /** 厳選結果を添字で読む（範囲外/未設定は空文字）。 */
+    private String rollAt(int index) {
+        return (index >= 0 && index < threadSlotRolls.size() && threadSlotRolls.get(index) != null)
+                ? threadSlotRolls.get(index) : "";
+    }
+
+    private void setRollAt(int index, String encoded) {
+        while (threadSlotRolls.size() <= index) {
+            threadSlotRolls.add("");
+        }
+        threadSlotRolls.set(index, encoded == null ? "" : encoded);
+    }
+
+    /**
+     * 返却するスレッドへ、装着時の厳選値と lore を書き戻す。
+     * {@code createThreadItemStack} が新品として付けた厳選行を先に取り除いてから入れ直す
+     * （そうしないと lore に2個体ぶんの数値が並ぶ）。
+     */
+    private static void restoreRoll(ItemStack threadItem, String encodedRoll) {
+        ThreadRoll saved = ThreadRoll.decode(encodedRoll).orElse(null);
+        if (saved == null) {
+            return;
+        }
+        List<Component> freshLore = ThreadRoll.decode(ThreadRoll.rawOf(threadItem))
+                .map(ThreadItem::rollLore).orElse(List.of());
+        threadItem.editMeta(meta -> {
+            ThreadRoll.write(meta.getPersistentDataContainer(), saved);
+            List<Component> current = meta.lore() == null ? List.<Component>of() : meta.lore();
+            List<Component> rebuilt = new ArrayList<>();
+            for (Component line : current) {
+                if (!freshLore.contains(line)) {
+                    rebuilt.add(line);
+                }
+            }
+            rebuilt.addAll(ThreadItem.rollLore(saved));
+            meta.lore(rebuilt);
+        });
+    }
+
+    private static List<String> loadThreadSlotRolls(ItemStack armor, int slotCount) {
+        List<String> rolls = new ArrayList<>();
+        if (armor != null && armor.hasItemMeta()) {
+            String json = armor.getItemMeta().getPersistentDataContainer()
+                    .get(ItemKeys.THREAD_SLOT_ROLLS, PersistentDataType.STRING);
+            if (json != null) {
+                try {
+                    List<String> parsed = GSON.fromJson(json, new TypeToken<List<String>>(){}.getType());
+                    if (parsed != null) {
+                        rolls.addAll(parsed);
+                    }
+                } catch (Exception ignored) {
+                    // 壊れていれば「厳選なし」として扱う。装着済みスレッド自体は THREAD_SLOTS 側に残る。
+                }
+            }
+        }
+        while (rolls.size() < slotCount) {
+            rolls.add("");
+        }
+        return rolls;
+    }
+
     private void saveThreadSlots() {
         armorItem.editMeta(meta -> {
             PersistentDataContainer pdc = meta.getPersistentDataContainer();
@@ -336,6 +415,12 @@ public class ThreadGui extends BaseGui {
             List<Component> nextOwned = buildThreadLore();
             meta.lore(ThreadLoreMerge.merge(meta.lore(), previousOwned, nextOwned));
             pdc.set(ItemKeys.THREAD_SLOTS, PersistentDataType.STRING, GSON.toJson(threadSlots));
+            if (threadSlotRolls.stream().anyMatch(entry -> entry != null && !entry.isBlank())) {
+                pdc.set(ItemKeys.THREAD_SLOT_ROLLS, PersistentDataType.STRING, GSON.toJson(threadSlotRolls));
+            } else {
+                // 全部空なら書かない ＝ 厳選導入前の防具とまったく同じ PDC 形状に戻す。
+                pdc.remove(ItemKeys.THREAD_SLOT_ROLLS);
+            }
             pdc.set(ItemKeys.THREAD_LORE, PersistentDataType.STRING, serializeThreadLore(nextOwned));
             pdc.remove(ItemKeys.THREAD_TYPE);
             // エンチャントオーラを明示的に保持（editMetaでオーラが消失する問題の対策）
@@ -358,6 +443,9 @@ public class ThreadGui extends BaseGui {
                 if (type != null) {
                     lore.add(Component.text("  " + (i + 1) + ": " + type.getDisplayName(), type.getColor())
                         .decoration(TextDecoration.ITALIC, false));
+                    int slotIndex = i;
+                    ThreadRoll.decode(rollAt(slotIndex))
+                        .ifPresent(roll -> lore.addAll(ThreadItem.rollLore(roll)));
                 }
             }
         }

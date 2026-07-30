@@ -88,6 +88,9 @@ public final class AdminCommands {
         plugin.getThreadConfig().reload(plugin.getConfig());
 
         // スレッド・セット効果設定リロード(thread-sets.yml)
+        if (plugin.getThreadRollConfig() != null) {
+            plugin.getThreadRollConfig().reload();
+        }
         if (plugin.getThreadSetConfig() != null) {
             plugin.getThreadSetConfig().reload();
         }

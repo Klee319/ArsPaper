@@ -33,9 +33,11 @@ public class RitualManager {
     private static final int PEDESTAL_DISTANCE = 2;
     /**
      * コアアイテムを消費せず、効果側がコアの中身を変換して同じコアへ書き戻す effect-type 群。
-     * "thread"（空スレッド→型付きスレッド）に加え、"thread_slot_expand"（装備のスレッド枠+1儀式）が該当。
+     * "thread"（空スレッド→型付きスレッド）に加え、"thread_slot_expand"（装備のスレッド枠+1儀式）と
+     * "thread_reroll"（スレッドの厳選振り直し。コアのスレッドをその場で書き換える）が該当。
      */
-    private static final Set<String> CORE_PRESERVING_EFFECT_TYPES = Set.of("thread", "thread_slot_expand");
+    private static final Set<String> CORE_PRESERVING_EFFECT_TYPES =
+            Set.of("thread", "thread_slot_expand", "thread_reroll");
     private final RitualRecipeRegistry recipeRegistry;
     private final RitualEffectRegistry effectRegistry;
     /** 儀式の perk 解放ゲート + 修繕儀式コスト設定の参照。 */

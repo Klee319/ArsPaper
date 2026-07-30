@@ -80,6 +80,7 @@ public class ArsPaper extends JavaPlugin {
     private ArmorManaListener armorManaListener;
     private ThreadConfig threadConfig;
     private ThreadSetConfig threadSetConfig;
+    private ThreadRollConfig threadRollConfig;
     private SpellBookConfig spellBookConfig;
     private CatalystConfig catalystConfig;
     private com.arspaper.loot.LootTableListener lootTableListener;
@@ -127,6 +128,7 @@ public class ArsPaper extends JavaPlugin {
         ritualEffectRegistry.register("mob_summon", new MobSummonRitualEffect());
         ritualEffectRegistry.register("enchant_book", new EnchantBookRitualEffect());
         ritualEffectRegistry.register("thread_slot_expand", new ThreadSlotExpandRitualEffect());
+        ritualEffectRegistry.register("thread_reroll", new ThreadRerollRitualEffect());
 
         // 儀式レシピ読み込み（UnifiedRecipeLoaderから）
         ritualRecipeRegistry = new RitualRecipeRegistry(this);
@@ -268,6 +270,10 @@ public class ArsPaper extends JavaPlugin {
 
         // スレッド・セット効果設定(thread-sets.yml, TrinityForge戦闘連携)
         threadSetConfig = new ThreadSetConfig(this);
+
+        // スレッドの厳選(thread-rolls.yml)。ThreadItem#createItemStack が「アイテムを1個作るたび」に
+        // ここから抽選するので、ThreadItem の登録(下の itemRegistry.register)より前にロードしておく。
+        threadRollConfig = new ThreadRollConfig(this);
 
         // 魔導書ティア設定（spellbooks.ymlから動的登録）
         spellBookConfig = new SpellBookConfig(this);
@@ -773,6 +779,10 @@ public class ArsPaper extends JavaPlugin {
 
     public ThreadConfig getThreadConfig() {
         return threadConfig;
+    }
+
+    public ThreadRollConfig getThreadRollConfig() {
+        return threadRollConfig;
     }
 
     public ThreadSetConfig getThreadSetConfig() {

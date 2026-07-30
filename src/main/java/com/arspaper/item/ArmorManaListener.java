@@ -221,6 +221,16 @@ public class ArmorManaListener implements Listener {
                 TrinityForgeBridge.resolveFullItemStats(armorPiece),
                 player);
             List<ThreadType> threads = collectThreads(pdc, effectiveSlotCap);
+            // 厳選(個体差)ステは装着スロットごとに違うので、種類の合計とは別に足す。
+            // THREAD_SLOT_ROLLS を持たない防具(厳選導入前)は空リストになり、従来の挙動と一致する。
+            try {
+                for (String encodedRoll : collectThreadRolls(pdc, effectiveSlotCap)) {
+                    ThreadRoll.statsOf(encodedRoll)
+                            .forEach((key, value) -> threadCombatStats.merge(key, value, Double::sum));
+                }
+            } catch (Throwable tfUnavailable) {
+                // 厳選が読めないだけでマナ/飛行/ポーションを止めない(fail-open)。
+            }
             for (ThreadType thread : threads) {
                 totalThreadMana += threadConfig.getManaBonus(thread);
                 totalThreadRegen += threadConfig.getRegenBonus(thread);
@@ -393,6 +403,33 @@ public class ArmorManaListener implements Listener {
      *                       上限超過分(例: 拡張枠perk喪失後に残る5枠目以降のスレッド)は無視する
      *                       (PDCデータ自体は保持したまま、ステ適用のみ除外する)。
      */
+    /**
+     * 装着済みスレッドの厳選結果を実効枠数までスロット順に読む。
+     *
+     * <p>{@code THREAD_SLOTS} と同じ添字で対応するが、<b>「スレッドが入っていないスロット」も
+     * 空文字として残っている</b>ので、空文字はそのまま {@link ThreadRoll#statsOf} が空マップを返す。
+     * 枠数が減る方向へ変わっても配列は消さない（枠が戻れば復活する）── {@code collectThreads} と
+     * 同じ方針。
+     */
+    private static List<String> collectThreadRolls(PersistentDataContainer pdc, int effectiveSlots) {
+        if (effectiveSlots <= 0) {
+            return List.of();
+        }
+        String json = pdc.get(ItemKeys.THREAD_SLOT_ROLLS, PersistentDataType.STRING);
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+        try {
+            List<String> rolls = GSON.fromJson(json, new TypeToken<List<String>>(){}.getType());
+            if (rolls == null) {
+                return List.of();
+            }
+            return rolls.subList(0, Math.min(rolls.size(), effectiveSlots));
+        } catch (RuntimeException malformed) {
+            return List.of();
+        }
+    }
+
     private static List<ThreadType> collectThreads(PersistentDataContainer pdc, int effectiveSlots) {
         java.util.ArrayList<ThreadType> result = new java.util.ArrayList<>();
         if (effectiveSlots <= 0) {

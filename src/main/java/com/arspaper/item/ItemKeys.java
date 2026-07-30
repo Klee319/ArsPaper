@@ -47,6 +47,20 @@ public final class ItemKeys {
     /** スレッドアイテムのタイプID */
     public static final NamespacedKey THREAD_ITEM_TYPE = new NamespacedKey(NAMESPACE, "thread_item_type");
 
+    /**
+     * スレッドアイテム個体の厳選結果（{@link ThreadRoll#encode()} の文字列）。
+     * 生成時に焼き込むので、thread-rolls.yml を後から変えても既存個体は変わらない。
+     */
+    public static final NamespacedKey THREAD_ROLL = new NamespacedKey(NAMESPACE, "thread_roll");
+
+    /**
+     * 防具に装着済みスレッドの厳選結果（JSON配列。{@link #THREAD_SLOTS} と<b>同じ添字</b>で対応する）。
+     * <p>キーを分けているのは後方互換のため: 既存の防具はこのキーを持たないので「厳選なし」＝
+     * 現行とまったく同じ挙動になり、移行処理が一切要らない。{@link #THREAD_SLOTS} の形式を
+     * 変えるとロード時の分岐が必要になり、失敗すると装着済みスレッドが消える。
+     */
+    public static final NamespacedKey THREAD_SLOT_ROLLS = new NamespacedKey(NAMESPACE, "thread_slot_rolls");
+
     /** スペルブックのUUID（個体識別用） */
     public static final NamespacedKey SPELL_BOOK_UUID = new NamespacedKey(NAMESPACE, "spell_book_uuid");
 
