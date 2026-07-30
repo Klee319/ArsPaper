@@ -4,6 +4,7 @@ import com.arspaper.ArsPaper;
 import com.arspaper.item.BaseCustomItem;
 import com.arspaper.ritual.CatalogRitualRegistrar;
 import com.trinityforge.TrinityForge;
+import com.trinityforge.integration.ars.ArsProgressionBridge;
 import com.trinityforge.combat.AddonCombatStats;
 import com.trinityforge.combat.AttackStats;
 import com.trinityforge.combat.CombatHitResult;
@@ -323,6 +324,21 @@ public final class TrinityForgeBridge {
      * {@code null} / resolver未初期化 / 例外時も {@code 0.0} にフォールバックし、attack-power 未設定の
      * 触媒では従来どおりグリフダメージがそのまま基礎ダメージになる（挙動不変）。
      */
+    /**
+     * {@link #catalystAttackPowerAddend} の公開版(2026-07-30 ユーザー確定)。
+     *
+     * <p><b>防御無視ダメージ（{@code SolarEffect}/{@code LunarEffect} の直接HP減少）専用の入口。</b>
+     * 対称パイプラインを通さない＝守備力・耐性・回避・会心のいずれも適用されないが、
+     * 「触媒に攻撃力を積んでも一切強くならない」のはさすがに直感に反するので、
+     * <b>攻撃力(attack-power)だけ</b>は基礎ダメージへ加算する。防御無視という性格は維持する。
+     *
+     * <p>通常のダメージ魔法は必ず {@code SpellContext#dealSpellDamage} を使うこと —
+     * こちらは会心も貫通も出血も発生しない。
+     */
+    public static double magicAttackPowerAddend(ItemStack catalyst) {
+        return catalystAttackPowerAddend(catalyst);
+    }
+
     private static double catalystAttackPowerAddend(ItemStack catalyst) {
         if (catalyst == null) {
             return 0.0;
@@ -649,16 +665,17 @@ public final class TrinityForgeBridge {
     }
 
     /**
-     * Finalizes a TrinityForge catalog ritual craft result: quality stamp for tiered equipment only
-     * (materials stay stackable), and SOULBOUND owner stamp to the crafter when applicable.
+     * Finalizes a TrinityForge catalog ritual craft result: Ars smithing quality/EXP for tiered
+     * equipment or Ars registry quality targets (materials stay stackable), and SOULBOUND owner stamp
+     * to the crafter when applicable.
      */
     public static void finalizeCatalogRitualResult(ItemStack item, Player crafter) {
         if (item == null || crafter == null || item.getType().isAir()) {
             return;
         }
         try {
-            if (MaterialTier.of(item.getType()).isEquipment()) {
-                stampCraftedQuality(item, crafter);
+            if (MaterialTier.of(item.getType()).isEquipment() || isArsQualityStamped(item)) {
+                finalizeArsSmithingResult(item, crafter);
             }
             if (!item.hasItemMeta()) {
                 return;
@@ -675,6 +692,34 @@ public final class TrinityForgeBridge {
         } catch (Throwable t) {
             // TF API mismatch: leave the identity item as-is.
         }
+    }
+
+    /**
+     * Completes one Ars smithing production action. Quality and EXP deliberately share this boundary:
+     * both native Ars ritual results and {@code tfcatalog:} ritual results therefore use the same
+     * finished-item use-level scaling configured by TrinityForge.
+     */
+    public static void finalizeArsSmithingResult(ItemStack item, Player crafter) {
+        if (item == null || crafter == null || item.getType().isAir()) {
+            return;
+        }
+        stampCraftedQuality(item, crafter);
+        try {
+            ArsProgressionBridge.grantSmithingCraftExp(ArsPaper.getInstance(), crafter, item);
+        } catch (Throwable t) {
+            // TF absent / older API: keep the successfully crafted and quality-stamped result.
+        }
+    }
+
+    private static boolean isArsQualityStamped(ItemStack item) {
+        if (item == null || !item.hasItemMeta() || ArsPaper.getInstance() == null) {
+            return false;
+        }
+        String id = item.getItemMeta().getPersistentDataContainer().get(
+                com.arspaper.item.ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING);
+        return id != null && ArsPaper.getInstance().getItemRegistry().get(id)
+                .map(BaseCustomItem::isQualityStamped)
+                .orElse(false);
     }
 
     /**
@@ -1454,44 +1499,6 @@ public final class TrinityForgeBridge {
             return 0;
         }
         return (int) Math.floor(value);
-    }
-
-    /** TF未ロード時のみ使うフォールバック(2026-07-25 config editor T3: config.yml側は削除・統合済み)。 */
-    private static final double FALLBACK_ARS_MAGIC_EXP_PER_CAST = 2.0;
-    private static final double FALLBACK_ARS_MAGIC_EXP_PER_MANA = 0.1;
-
-    /**
-     * ARS_MAGIC EXP rate per cast. Prefers TF {@code stats/skill-exp.yml}; falls back to a fixed
-     * constant when TrinityForge is not loaded (2026-07-25 config editor T3: ArsPaper's own
-     * {@code config.yml ars-magic.exp-per-cast} was removed — skill-exp.yml is now the single source).
-     */
-    public static double arsMagicExpPerCast() {
-        try {
-            TrinityForge tf = TrinityForge.getInstance();
-            if (tf != null) {
-                return tf.config().skillExp().arsMagicExpPerCast();
-            }
-        } catch (Throwable ignored) {
-            // fail-open to fallback constant
-        }
-        return FALLBACK_ARS_MAGIC_EXP_PER_CAST;
-    }
-
-    /**
-     * ARS_MAGIC additional EXP per mana consumed. Prefers TF {@code stats/skill-exp.yml}; falls back
-     * to a fixed constant when TrinityForge is not loaded (2026-07-25 config editor T3: see
-     * {@link #arsMagicExpPerCast()}).
-     */
-    public static double arsMagicExpPerMana() {
-        try {
-            TrinityForge tf = TrinityForge.getInstance();
-            if (tf != null) {
-                return tf.config().skillExp().arsMagicExpPerMana();
-            }
-        } catch (Throwable ignored) {
-            // fail-open to fallback constant
-        }
-        return FALLBACK_ARS_MAGIC_EXP_PER_MANA;
     }
 
     /**

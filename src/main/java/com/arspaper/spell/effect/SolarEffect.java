@@ -68,9 +68,11 @@ public class SolarEffect implements SpellEffect {
         if (caster == null) return;
         UUID casterUUID = caster.getUniqueId();
 
-        double damage = config.getParam("solar", "base-damage", BASE_DAMAGE)
-            + config.getParam("solar", "amplify-damage-bonus", AMPLIFY_DAMAGE_BONUS)
-                * context.getAmplifyLevel();
+        // 2026-07-30: 防御無視(直接HP減少)の性格は維持したまま、触媒の攻撃力だけは基礎へ乗せる。
+        double damage = context.defenseIgnoringDamage(
+            config.getParam("solar", "base-damage", BASE_DAMAGE)
+                + config.getParam("solar", "amplify-damage-bonus", AMPLIFY_DAMAGE_BONUS)
+                    * context.getAmplifyLevel());
         double radiusPerAoe = config.getParam("solar", "radius-per-aoe", 1.0);
         double radius = config.getParam("solar", "base-radius", BASE_RADIUS)
             + context.getAoeRadiusLevel() * radiusPerAoe;

@@ -201,6 +201,21 @@ public class SpellContext {
      * @param target    ダメージ対象
      * @param spellBase スペル基礎ダメージ（Ars攻撃力 + 増減グリフを内包済み・最低0）
      */
+    /**
+     * <b>防御無視ダメージ用の基礎ダメージ</b>(2026-07-30 ユーザー確定)。
+     * 日輪/月輪のように「守備力・耐性を無視して直接HPを削る」性格のエフェクトが、
+     * それでも<b>触媒の攻撃力(attack-power)だけは反映する</b>ために使う。
+     *
+     * <p>会心/貫通/出血/回避は一切かからない。防御無視でない普通のダメージ魔法は
+     * 必ず {@link #dealSpellDamage} を通すこと。
+     *
+     * @param spellBase グリフ由来の基礎ダメージ(増減グリフ適用済み)
+     * @return {@code spellBase + 触媒の攻撃力}(触媒なし/TF未ロード時は {@code spellBase} のまま)
+     */
+    public double defenseIgnoringDamage(double spellBase) {
+        return spellBase + com.arspaper.integration.TrinityForgeBridge.magicAttackPowerAddend(catalyst);
+    }
+
     public void dealSpellDamage(LivingEntity target, double spellBase) {
         Player caster = getCaster();
         if (caster == null || target == null || spellBase <= 0) {
