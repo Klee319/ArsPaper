@@ -38,35 +38,132 @@
 
 # 設定リファレンス(本文コメント移設先): docs/config-reference/arspaper/thread-sets.md
 thread-sets:
+  # ------------------------------------------------------------------
+  # 2026-07-31 設定。ここが全種 thresholds: {} だったため、
+  # 「セット効果」という仕組みが実装済みなのに 1 個も存在しない状態だった。
+  #
+  # ■ しきい値の到達可能性(これを外すと永久に発動しないティアになる)
+  #   threads.yml の max は【防具1部位あたり】の上限。装備は4部位なので
+  #   到達可能な合計個数 = max x 4、かつ item-stats.yml の thread-slots 合計
+  #   (現状の1式で 2+3+2+2 = 9枠。スレッド枠拡張の儀式で増える)が実際の天井になる。
+  #     max 3 (mana_regen / mana_boost / health_boost)   -> 3 / 6 段
+  #     max 2 (hit_mana_recovery / damage_mana_recovery) -> 3 / 6 段
+  #     max 1・重複不可(speed 以下の常時効果系)          -> 2 / 4 段(4=全部位)
+  #   6 個は 9 枠のうち 6 枠を1種に捧げる重い投資なので、そこだけ第2ステを足している。
+  #
+  # ■ 方針: 1種に寄せるほど「その系統のビルド」になるよう、種ごとに伸びる軸を変えている。
+  #   縦(単純な火力の総和)を伸ばすのではなく、横(会心型/回避型/受け型/出血型)を分ける。
+  #
+  # ■ armor-defense-rate は意図的に使っていない。
+  #   これはバニラ防具の防御率(上限0.8)へ加算されるので、セット効果で盛ると貫通0の相手からの
+  #   物理を実質無効化できてしまう。受け系は damage-reduction / phys-flat-defense /
+  #   magic-flat-defense / armor-strength で表現する。
+  # ------------------------------------------------------------------
+
+  # 詠唱を回し続ける型。継戦の見返りとして与ダメの割合追加。
   mana_regen:
-    thresholds: {}
+    thresholds:
+      3:
+        percent-bonus-damage: 0.04
+      6:
+        percent-bonus-damage: 0.06
+        magic-resistance: 0.05
+  # マナ総量に寄せる型。一発を重くする(会心ダメージ)。
   mana_boost:
-    thresholds: {}
+    thresholds:
+      3:
+        crit-damage: 0.10
+      6:
+        crit-damage: 0.15
+        crit-chance: 0.03
 
+  # 常時移動が速い型。避けて手数で押す。
   speed:
-    thresholds: {}
+    thresholds:
+      2:
+        dodge-chance: 0.03
+      4:
+        dodge-chance: 0.04
+        crit-chance: 0.03
+  # 空中からの一撃を狙う型。
   jump_boost:
-    thresholds: {}
+    thresholds:
+      2:
+        crit-damage: 0.06
+      4:
+        crit-damage: 0.09
+  # 暗所での索敵型。固定値の追加ダメージなので低火力帯ほど効く。
   night_vision:
-    thresholds: {}
+    thresholds:
+      2:
+        flat-bonus-damage: 2.0
+      4:
+        flat-bonus-damage: 3.0
+  # ネザー適性型。魔法耐性へ寄せる。
   fire_resistance:
-    thresholds: {}
+    thresholds:
+      2:
+        magic-resistance: 0.04
+      4:
+        magic-resistance: 0.06
+  # 水中適性型。物理耐性へ寄せる。
   dolphins_grace:
-    thresholds: {}
+    thresholds:
+      2:
+        phys-resistance: 0.04
+      4:
+        phys-resistance: 0.06
+  # 海底神殿型。魔法守備力を積む。
   conduit_power:
-    thresholds: {}
+    thresholds:
+      2:
+        magic-flat-defense: 2.0
+      4:
+        magic-flat-defense: 3.0
+        damage-reduction: 0.02
+  # 支援型。attack-power は近接ベースへ加算されるので、素の武器が弱いうちほど効く。
   hero_of_the_village:
-    thresholds: {}
+    thresholds:
+      2:
+        attack-power: 1.0
+      4:
+        attack-power: 2.0
+  # 純粋な受け型。物理と魔法の守備力を両方積む。
   health_boost:
-    thresholds: {}
+    thresholds:
+      3:
+        damage-reduction: 0.03
+        phys-flat-defense: 2.0
+      6:
+        damage-reduction: 0.04
+        magic-flat-defense: 2.0
 
+  # 被弾を前提に立つ型。会心軽減(防具強度)と回避で「大きい一発」を潰す。
   hit_mana_recovery:
-    thresholds: {}
+    thresholds:
+      3:
+        armor-strength: 0.06
+      6:
+        armor-strength: 0.08
+        dodge-chance: 0.03
+  # 殴り続ける型。会心から出血へ繋ぐ。
   damage_mana_recovery:
-    thresholds: {}
+    thresholds:
+      3:
+        crit-chance: 0.04
+      6:
+        bleed-chance: 0.06
+        bleed-damage: 2.0
 
+  # 詠唱コスト型。max 1 なので到達上限は4個。貫通で硬い相手を通す。
   spell_cost_down:
-    thresholds: {}
+    thresholds:
+      2:
+        penetration: 0.04
+      4:
+        penetration: 0.06
+  # flight / backpack は単体の利便性が既に最大級なので、
+  # セット効果は意図的に与えない(戦闘ステまで付くと他のスレッドを選ぶ理由が消える)。
   flight:
     thresholds: {}
   backpack:

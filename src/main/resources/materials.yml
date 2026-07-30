@@ -1810,6 +1810,225 @@ materials:
       result: custom:infinity_source_core
       result-amount: 1
 
+  # ============================================================
+  # ダンジョンの印 (2026-07-31 追加) — 図鑑にボス討伐を載せるための代替手段
+  # ------------------------------------------------------------
+  # 図鑑のモブ記録はバニラ EntityType 単位なので(CollectionListener が
+  # event.getEntityType().name() を使う)、「世界を繋ぐ者を倒した」を直接書けない。
+  # そこでダンジョンごとに最終ボスから 100% 落ちる印アイテムを置き、
+  # 図鑑カテゴリ dungeon にまとめて「どこを踏破したか」の一覧にする。
+  # 印そのものには用途を持たせない(集めること自体が目的)。捨てても図鑑からは消えない。
+  #
+  # 配線先は combat/mob-overrides.yml の drops:。実ワールド名は連番が付く
+  # (em_id_the_mines_1 等)ので、必ず設計図ワールド名の側に書くこと。
+  # ============================================================
+  dungeon_seal_mines:
+    base_material: BRICK
+    custom_model_data: 5461
+    display_name: "&e鉱山の印"
+    enchant_glow: true
+    lore:
+      - "&7&o鉱山の主を討った証。"
+      - ""
+      - "&6踏破の証明(図鑑に記録される)"
+  dungeon_seal_deep_mines:
+    base_material: BRICK
+    custom_model_data: 5462
+    display_name: "&e深層鉱山の印"
+    enchant_glow: true
+    lore:
+      - "&7&o深層鉱山の主を討った証。"
+      - ""
+      - "&6踏破の証明(図鑑に記録される)"
+  dungeon_seal_quarry:
+    base_material: BRICK
+    custom_model_data: 5463
+    display_name: "&e採石場の印"
+    enchant_glow: true
+    lore:
+      - "&7&o採石場の主を討った証。"
+      - ""
+      - "&6踏破の証明(図鑑に記録される)"
+  dungeon_seal_cave:
+    base_material: BRICK
+    custom_model_data: 5464
+    display_name: "&e灼熱の洞窟の印"
+    enchant_glow: true
+    lore:
+      - "&7&o灼熱の洞窟の主を討った証。"
+      - ""
+      - "&6踏破の証明(図鑑に記録される)"
+  dungeon_seal_bridge:
+    base_material: BRICK
+    custom_model_data: 5465
+    display_name: "&e古橋の印"
+    enchant_glow: true
+    lore:
+      - "&7&o古橋の聖所の主を討った証。"
+      - ""
+      - "&6踏破の証明(図鑑に記録される)"
+  dungeon_seal_city:
+    base_material: BRICK
+    custom_model_data: 5466
+    display_name: "&e地下都市の印"
+    enchant_glow: true
+    lore:
+      - "&7&oドワーフの地下都市の主を討った証。"
+      - ""
+      - "&6踏破の証明(図鑑に記録される)"
+  dungeon_seal_climb:
+    base_material: BRICK
+    custom_model_data: 5467
+    display_name: "&e登攀路の印"
+    enchant_glow: true
+    lore:
+      - "&7&o登攀路の主を討った証。"
+      - ""
+      - "&6踏破の証明(図鑑に記録される)"
+  dungeon_seal_palace:
+    base_material: BRICK
+    custom_model_data: 5468
+    display_name: "&e宮殿の印"
+    enchant_glow: true
+    lore:
+      - "&7&o宮殿の主を討った証。"
+      - ""
+      - "&6踏破の証明(図鑑に記録される)"
+  dungeon_seal_knight_castle:
+    base_material: BRICK
+    custom_model_data: 5469
+    display_name: "&e騎士団の城の印"
+    enchant_glow: true
+    lore:
+      - "&7&o騎士団の城の主を討った証。"
+      - ""
+      - "&6踏破の証明(図鑑に記録される)"
+  dungeon_seal_sewer_maze:
+    base_material: BRICK
+    custom_model_data: 5470
+    display_name: "&e下水道迷宮の印"
+    enchant_glow: true
+    lore:
+      - "&7&o下水道迷宮の主を討った証。"
+      - ""
+      - "&6踏破の証明(図鑑に記録される)"
+  dungeon_seal_steamworks:
+    base_material: BRICK
+    custom_model_data: 5471
+    display_name: "&e蒸気機関工房の印"
+    enchant_glow: true
+    lore:
+      - "&7&o蒸気機関工房の主を討った証。"
+      - ""
+      - "&6踏破の証明(図鑑に記録される)"
+  dungeon_seal_nether_bell:
+    base_material: BRICK
+    custom_model_data: 5472
+    display_name: "&eネザーの鐘の印"
+    enchant_glow: true
+    lore:
+      - "&7&oネザーの鐘の主を討った証。"
+      - ""
+      - "&6踏破の証明(図鑑に記録される)"
+  dungeon_seal_nether_wastes:
+    base_material: BRICK
+    custom_model_data: 5473
+    display_name: "&eネザーの荒野の印"
+    enchant_glow: true
+    lore:
+      - "&7&oネザーの荒野の主を討った証。"
+      - ""
+      - "&6踏破の証明(図鑑に記録される)"
+  dungeon_seal_dark_cathedral:
+    base_material: BRICK
+    custom_model_data: 5474
+    display_name: "&e闇の大聖堂の印"
+    enchant_glow: true
+    lore:
+      - "&7&o闇の大聖堂の主を討った証。"
+      - ""
+      - "&6踏破の証明(図鑑に記録される)"
+  dungeon_seal_enchant_trial:
+    base_material: BRICK
+    custom_model_data: 5475
+    display_name: "&eエンチャント試練の印"
+    enchant_glow: true
+    lore:
+      - "&7&oエンチャント試練 10の主を討った証。"
+      - ""
+      - "&6踏破の証明(図鑑に記録される)"
+  dungeon_seal_fireworks:
+    base_material: BRICK
+    custom_model_data: 5476
+    display_name: "&e花火工房の印"
+    enchant_glow: true
+    lore:
+      - "&7&o花火工房の主を討った証。"
+      - ""
+      - "&6踏破の証明(図鑑に記録される)"
+  dungeon_seal_hallosseum:
+    base_material: BRICK
+    custom_model_data: 5477
+    display_name: "&eハロウィン闘技場の印"
+    enchant_glow: true
+    lore:
+      - "&7&oハロウィン闘技場の主を討った証。"
+      - ""
+      - "&6踏破の証明(図鑑に記録される)"
+  dungeon_seal_north_pole:
+    base_material: BRICK
+    custom_model_data: 5478
+    display_name: "&e北極の印"
+    enchant_glow: true
+    lore:
+      - "&7&o北極ミニダンジョンの主を討った証。"
+      - ""
+      - "&6踏破の証明(図鑑に記録される)"
+  dungeon_seal_binder:
+    base_material: BRICK
+    custom_model_data: 5479
+    display_name: "&e世界を繋ぐ者の印"
+    enchant_glow: true
+    lore:
+      - "&7&o世界を繋ぐ者の聖所の主を討った証。"
+      - ""
+      - "&6踏破の証明(図鑑に記録される)"
+
+  # ============================================================
+  # EMダンジョン限定素材 (2026-07-31 追加)
+  # ------------------------------------------------------------
+  # ダンジョンの外では絶対に手に入らない3種。制作(儀式/醸造)と厳選の入口になる。
+  # recipe を持たない = mob-overrides.yml の drops: だけが入手経路。
+  # ============================================================
+  binder_fragment:
+    base_material: NETHERITE_SCRAP
+    custom_model_data: 5451
+    display_name: "&d次元の破片"
+    enchant_glow: true
+    lore:
+      - "&7&o世界を繋いでいた縫い目の切れ端。"
+      - "&7&o持っているだけで方角が分からなくなる。"
+      - ""
+      - "&5最終装備の主素材"
+  reality_thread_core:
+    base_material: ECHO_SHARD
+    custom_model_data: 5452
+    display_name: "&b現実の芯"
+    enchant_glow: true
+    lore:
+      - "&7&o解けた現実を巻き取った芯。スレッドを編み直せる。"
+      - ""
+      - "&3スレッド再抽選の触媒"
+  abyssal_ingot:
+    base_material: NETHERITE_INGOT
+    custom_model_data: 5453
+    display_name: "&8深淵の合金"
+    enchant_glow: true
+    lore:
+      - "&7&o高位のダンジョン主だけが体内に抱える金属。"
+      - ""
+      - "&5中間装備と儀式の触媒"
+
 _editor:
   categories:
     material:
@@ -1950,6 +2169,32 @@ _editor:
           - husk_cloth
           - bogged_mossy_bone
           - parched_sandy_bone
+      - label: ダンジョンの印
+        itemIds:
+          - dungeon_seal_mines
+          - dungeon_seal_deep_mines
+          - dungeon_seal_quarry
+          - dungeon_seal_cave
+          - dungeon_seal_bridge
+          - dungeon_seal_city
+          - dungeon_seal_climb
+          - dungeon_seal_palace
+          - dungeon_seal_knight_castle
+          - dungeon_seal_sewer_maze
+          - dungeon_seal_steamworks
+          - dungeon_seal_nether_bell
+          - dungeon_seal_nether_wastes
+          - dungeon_seal_dark_cathedral
+          - dungeon_seal_enchant_trial
+          - dungeon_seal_fireworks
+          - dungeon_seal_hallosseum
+          - dungeon_seal_north_pole
+          - dungeon_seal_binder
+      - label: EM限定素材
+        itemIds:
+          - binder_fragment
+          - reality_thread_core
+          - abyssal_ingot
       - label: ソース階梯
         itemIds:
           - source_shard
