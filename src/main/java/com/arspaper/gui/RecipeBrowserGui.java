@@ -43,6 +43,11 @@ import java.util.Set;
  * 並べ替え・絞り込みのロジック自体は {@link RecipeBrowserFilter}、1件分のデータは
  * {@link RecipeEntry} に切り出してある。
  *
+ * <p><b>2026-07-28 改修（儀式レシピの詳細画面）:</b> 以前は一覧で儀式レシピをクリックしても
+ * 何も起きず、素材は lore の名前だけで実アイテムのプレビューが見られなかった。儀式にも
+ * 詳細画面（{@link #renderRitualDetail()}）を用意し、中央=コア・周囲8マス=ペデスタル素材を
+ * 実アイテムで並べる。素材⇔レシピの相互ジャンプも作業台と同じように働く。
+ *
  * <p>検索入力にチャットを使うのは、砧(anvil)GUI 方式が Bedrock/Geyser で
  * どう見えるかをこちらで実機確認できないため。チャット入力なら Java/Bedrock で同じ挙動になる。
  */
@@ -68,6 +73,11 @@ public class RecipeBrowserGui extends BaseGui {
 
     /** 3×3 グリッドのGUIスロット（行×列）。素材クリック判定にも使う。 */
     private static final int[][] GRID_SLOTS = {{10, 11, 12}, {19, 20, 21}, {28, 29, 30}};
+    /** 儀式詳細: 中央=コア。周囲8マスにペデスタル素材を（同一素材は集約して）並べる。 */
+    private static final int RITUAL_CORE_SLOT = 20;
+    private static final int[] RITUAL_PEDESTAL_SLOTS = {10, 11, 12, 19, 21, 28, 29, 30};
+    /** 儀式詳細: 必要Source表示スロット。 */
+    private static final int RITUAL_SOURCE_SLOT = 33;
     /** TrinityForge カタログレシピの NamespacedKey 接頭辞（TF {@code CatalogRecipeRegistrar} と対）。 */
     private static final String CATALOG_KEY_PREFIX = "catalog_";
 
@@ -76,8 +86,9 @@ public class RecipeBrowserGui extends BaseGui {
     private List<RecipeEntry> visible;
     private int currentPage = 0;
 
-    private RecipeBrowserFilter.SortMode sortMode = RecipeBrowserFilter.SortMode.DEFAULT;
-    private RecipeBrowserFilter.FilterMode filterMode = RecipeBrowserFilter.FilterMode.ALL;
+    // 既定の並び順は名前順(2026-07-30 ユーザー確定)。登録順は巡回の最後に置いてある。
+    private RecipeBrowserFilter.SortMode sortMode = RecipeBrowserFilter.SortMode.NAME;
+    private RecipeBrowserFilter.KindMode kindMode = RecipeBrowserFilter.KindMode.ALL;
     private String searchTerm = "";
 
     /**
@@ -95,6 +106,13 @@ public class RecipeBrowserGui extends BaseGui {
     /** 素材ジャンプで潜った詳細画面の履歴（戻るボタンで1つずつ浮上する）。 */
     private final Deque<RecipeEntry> detailHistory = new ArrayDeque<>();
 
+    /**
+     * 詳細画面で「どのスロットにどの素材トークンを描いたか」。作業台/儀式のどちらの詳細でも
+     * 描画時にここへ記録し、クリック判定は必ずこのマップだけを見る（描画とクリック判定で
+     * スロット計算を二重に持つと、儀式のように配置ルールが違う画面を足したときに必ずズレるため）。
+     */
+    private final Map<Integer, String> detailSlotTokens = new HashMap<>();
+
     public RecipeBrowserGui(Player viewer) {
         super(viewer, 6, Component.text("レシピ一覧", NamedTextColor.DARK_PURPLE)
             .decoration(TextDecoration.ITALIC, false));
@@ -106,7 +124,7 @@ public class RecipeBrowserGui extends BaseGui {
     /** 並べ替え・絞り込み・検索・関連表示を適用し直す(描画はしない)。 */
     private void refresh() {
         List<RecipeEntry> base = related == null ? allRecipes : relatedEntries(related);
-        this.visible = RecipeBrowserFilter.arrange(base, sortMode, filterMode, searchTerm, this::isUnlocked);
+        this.visible = RecipeBrowserFilter.arrange(base, sortMode, kindMode, searchTerm);
         int totalPages = Math.max(1, (int) Math.ceil((double) visible.size() / ITEMS_PER_PAGE));
         if (currentPage > totalPages - 1) {
             currentPage = totalPages - 1;
@@ -140,10 +158,9 @@ public class RecipeBrowserGui extends BaseGui {
         inventory.setItem(BTN_SORT, createButton(Material.HOPPER,
             Component.text("並べ替え: " + sortMode.label(), NamedTextColor.AQUA),
             sortLore(sortMode)));
-        inventory.setItem(BTN_FILTER, createButton(
-            filterMode == RecipeBrowserFilter.FilterMode.LOCKED ? Material.IRON_BARS : Material.LIME_DYE,
-            Component.text("表示: " + filterMode.label(), NamedTextColor.AQUA),
-            List.of(detailText("クリックで切り替え（並べ替えとは独立）", NamedTextColor.DARK_GRAY))));
+        inventory.setItem(BTN_FILTER, createButton(kindIcon(kindMode),
+            Component.text("表示: " + kindMode.label(), NamedTextColor.AQUA),
+            kindLore(kindMode)));
         inventory.setItem(BTN_SEARCH, createButton(
             searchTerm.isEmpty() ? Material.SPYGLASS : Material.WRITABLE_BOOK,
             Component.text(searchTerm.isEmpty() ? "名前検索" : "検索中: " + searchTerm, NamedTextColor.YELLOW),
@@ -179,7 +196,7 @@ public class RecipeBrowserGui extends BaseGui {
             lore.add(detailText("検索: " + searchTerm, NamedTextColor.YELLOW));
         }
         lore.add(detailText("並べ替え: " + sortMode.label(), NamedTextColor.DARK_GRAY));
-        lore.add(detailText("表示: " + filterMode.label(), NamedTextColor.DARK_GRAY));
+        lore.add(detailText("表示: " + kindMode.label(), NamedTextColor.DARK_GRAY));
         return createButton(Material.PAPER,
             Component.text("ページ " + (currentPage + 1) + " / " + totalPages, NamedTextColor.WHITE),
             lore);
@@ -207,7 +224,7 @@ public class RecipeBrowserGui extends BaseGui {
             return true;
         }
         if (slot == BTN_FILTER) {
-            filterMode = filterMode.next();
+            kindMode = kindMode.next();
             currentPage = 0;
             refresh();
             render();
@@ -236,9 +253,10 @@ public class RecipeBrowserGui extends BaseGui {
             return true;
         }
 
-        // レシピアイテムクリック → 作業台レシピなら詳細GUI
+        // レシピアイテムクリック → 詳細GUI（2026-07-28: 儀式レシピもここへ入る。以前は
+        // 儀式だけ弾いていたため「クリックしても素材アイテムのプレビューが出ない」状態だった）
         RecipeEntry clicked = getEntryAtSlot(slot);
-        if (clicked != null && !clicked.isRitual) {
+        if (clicked != null) {
             detailMode = true;
             detailEntry = clicked;
             detailHistory.clear();
@@ -273,34 +291,11 @@ public class RecipeBrowserGui extends BaseGui {
             showUsages(detailEntry.resultToken, clicker);
             return true;
         }
-        String ingredient = ingredientTokenAtSlot(detailEntry, slot);
+        String ingredient = detailSlotTokens.get(slot);
         if (ingredient != null) {
             jumpToProducers(ingredient, clicker);
         }
         return true;
-    }
-
-    /** 詳細画面の3×3グリッドのスロットに置かれている素材トークンを返す（無ければ null）。 */
-    private String ingredientTokenAtSlot(RecipeEntry entry, int slot) {
-        if (!entry.shape.isEmpty()) {
-            for (int row = 0; row < entry.shape.size() && row < 3; row++) {
-                String rowStr = entry.shape.get(row);
-                for (int col = 0; col < rowStr.length() && col < 3; col++) {
-                    if (GRID_SLOTS[row][col] != slot) continue;
-                    char c = rowStr.charAt(col);
-                    if (c == ' ') return null;
-                    return entry.ingredientMap.get(String.valueOf(c));
-                }
-            }
-            return null;
-        }
-        int idx = 0;
-        for (String ing : entry.ingredientMap.values()) {
-            if (idx >= 9) break;
-            if (GRID_SLOTS[idx / 3][idx % 3] == slot) return ing;
-            idx++;
-        }
-        return null;
     }
 
     /**
@@ -315,7 +310,7 @@ public class RecipeBrowserGui extends BaseGui {
                 NamedTextColor.GRAY));
             return;
         }
-        if (producers.size() == 1 && !producers.get(0).isRitual) {
+        if (producers.size() == 1) {
             if (detailEntry != null) detailHistory.push(detailEntry);
             detailEntry = producers.get(0);
             renderDetail();
@@ -513,6 +508,140 @@ public class RecipeBrowserGui extends BaseGui {
      *   Row 5: [border...] [戻る] [border...]
      */
     private void renderDetail() {
+        detailSlotTokens.clear();
+        if (detailEntry != null && detailEntry.isRitual) {
+            renderRitualDetail();
+            return;
+        }
+        renderWorkbenchDetail();
+    }
+
+    /**
+     * 儀式レシピの詳細表示(2026-07-28 新設): 中央にコアアイテム、その周囲8マスに
+     * ペデスタル素材を「同一素材は集約(個数=スタック数)」して実アイテムで並べる。
+     *
+     * <p>作業台レシピと同じく素材クリックで生産レシピへ飛べる。一覧のloreだけでは
+     * 「どのアイテムか」が名前でしか分からず、custom素材だと実物と結び付かなかったため、
+     * 儀式にも実アイテムのプレビューを与えるのがこの画面の目的。
+     *
+     * レイアウト (6行):
+     *   Row 1: [_][P][P][P][_][→][結果][_][_]
+     *   Row 2: [_][P][コア][P][_][_][_][_][_]
+     *   Row 3: [_][P][P][P][_][必要素材][_][Source][_]
+     *   Row 5: [border...] [戻る] [border...]
+     */
+    private void renderRitualDetail() {
+        inventory.clear();
+        fillBorder(Material.GRAY_STAINED_GLASS_PANE);
+        RecipeEntry entry = detailEntry;
+
+        inventory.setItem(4, createButton(Material.BREWING_STAND,
+            Component.text(entry.displayName, NamedTextColor.GOLD)
+                .decoration(TextDecoration.ITALIC, false),
+            List.of(Component.text("§6【儀式レシピ】").decoration(TextDecoration.ITALIC, false),
+                detailText("儀式コアの周囲(距離2)のペデスタルに素材を置いて発動", NamedTextColor.DARK_GRAY))));
+
+        // コアアイテム(無い儀式もある: コア不要レシピ)
+        if (entry.coreItem != null) {
+            ItemStack core = createIngredientDisplay(entry.coreItem);
+            if (core != null) {
+                core.editMeta(meta -> {
+                    List<Component> lore = meta.lore() == null ? new ArrayList<>() : new ArrayList<>(meta.lore());
+                    lore.add(detailText("儀式コアに置く", NamedTextColor.YELLOW));
+                    meta.lore(lore);
+                });
+                inventory.setItem(RITUAL_CORE_SLOT, withJumpHint(core, entry.coreItem));
+                detailSlotTokens.put(RITUAL_CORE_SLOT, entry.coreItem);
+            }
+        } else {
+            inventory.setItem(RITUAL_CORE_SLOT, createButton(Material.LIGHT_GRAY_STAINED_GLASS_PANE,
+                Component.text("コアアイテム不要", NamedTextColor.GRAY)));
+        }
+
+        // ペデスタル素材(同一素材は集約してスタック数で表現)
+        Map<String, Integer> pedestals = aggregateCounts(entry.ingredients);
+        int index = 0;
+        int overflow = 0;
+        for (Map.Entry<String, Integer> counted : pedestals.entrySet()) {
+            if (index >= RITUAL_PEDESTAL_SLOTS.length) {
+                overflow++;
+                continue;
+            }
+            String token = counted.getKey();
+            int amount = counted.getValue();
+            ItemStack display = createIngredientDisplay(token);
+            if (display == null) {
+                continue;
+            }
+            display.setAmount(Math.max(1, Math.min(64, amount)));
+            display.editMeta(meta -> {
+                List<Component> lore = meta.lore() == null ? new ArrayList<>() : new ArrayList<>(meta.lore());
+                lore.add(detailText("ペデスタルに " + amount + " 個", NamedTextColor.AQUA));
+                meta.lore(lore);
+            });
+            int slot = RITUAL_PEDESTAL_SLOTS[index];
+            inventory.setItem(slot, withJumpHint(display, token));
+            detailSlotTokens.put(slot, token);
+            index++;
+        }
+
+        // 矢印 + 結果
+        inventory.setItem(14, createButton(Material.ARROW, Component.text("→", NamedTextColor.WHITE)));
+        inventory.setItem(DETAIL_RESULT_SLOT, resultDisplayOf(entry));
+
+        // 必要素材サマリー(コア + ペデスタル全量)。8種を超えた分はここにだけ載る。
+        inventory.setItem(24, createRitualSummary(entry, pedestals, overflow));
+
+        if (entry.source > 0) {
+            inventory.setItem(RITUAL_SOURCE_SLOT, createButton(Material.AMETHYST_SHARD,
+                Component.text("必要Source: " + entry.source, NamedTextColor.AQUA),
+                List.of(detailText("周囲のソースジャーから供給される", NamedTextColor.DARK_GRAY))));
+        }
+
+        inventory.setItem(DETAIL_BACK_SLOT, createButton(Material.DARK_OAK_DOOR,
+            Component.text(detailHistory.isEmpty() ? "← 一覧に戻る" : "← 前のレシピに戻る",
+                NamedTextColor.YELLOW),
+            List.of(detailText("素材をクリックすると、その素材を作るレシピへ移動します",
+                NamedTextColor.DARK_GRAY))));
+    }
+
+    /** 儀式詳細の「必要素材」まとめ(コア + ペデスタル + Source)。 */
+    private ItemStack createRitualSummary(RecipeEntry entry, Map<String, Integer> pedestals, int overflow) {
+        List<Component> lore = new ArrayList<>();
+        if (entry.coreItem != null) {
+            lore.add(Component.text("コア: " + localize(entry.coreItem), NamedTextColor.YELLOW)
+                .decoration(TextDecoration.ITALIC, false));
+        }
+        for (Map.Entry<String, Integer> counted : pedestals.entrySet()) {
+            lore.add(Component.text(localize(counted.getKey()) + " ×" + counted.getValue(), NamedTextColor.GRAY)
+                .decoration(TextDecoration.ITALIC, false));
+        }
+        if (entry.source > 0) {
+            lore.add(Component.text("Source: " + entry.source, NamedTextColor.AQUA)
+                .decoration(TextDecoration.ITALIC, false));
+        }
+        if (overflow > 0) {
+            lore.add(detailText("※ 種類が多いため、盤面には8種類までしか表示できません",
+                NamedTextColor.DARK_GRAY));
+        }
+        return createButton(Material.BOOK, Component.text("必要素材", NamedTextColor.WHITE), lore);
+    }
+
+    /** 素材トークンの並びを「トークン → 個数」へ集約する(順序は初出順を保つ)。 */
+    private static Map<String, Integer> aggregateCounts(List<String> tokens) {
+        Map<String, Integer> counts = new java.util.LinkedHashMap<>();
+        if (tokens == null) {
+            return counts;
+        }
+        for (String token : tokens) {
+            if (token != null) {
+                counts.merge(token, 1, Integer::sum);
+            }
+        }
+        return counts;
+    }
+
+    private void renderWorkbenchDetail() {
         inventory.clear();
         fillBorder(Material.GRAY_STAINED_GLASS_PANE);
         RecipeEntry entry = detailEntry;
@@ -540,6 +669,7 @@ public class RecipeBrowserGui extends BaseGui {
                         String ingValue = entry.ingredientMap.get(ingKey);
                         if (ingValue != null) {
                             inventory.setItem(guiSlot, withJumpHint(createIngredientDisplay(ingValue), ingValue));
+                            detailSlotTokens.put(guiSlot, ingValue);
                         }
                     }
                 }
@@ -551,6 +681,7 @@ public class RecipeBrowserGui extends BaseGui {
                 if (idx >= 9) break;
                 int row = idx / 3, col = idx % 3;
                 inventory.setItem(gridSlots[row][col], withJumpHint(createIngredientDisplay(ing), ing));
+                detailSlotTokens.put(gridSlots[row][col], ing);
                 idx++;
             }
         }
@@ -560,6 +691,24 @@ public class RecipeBrowserGui extends BaseGui {
             Component.text("→", NamedTextColor.WHITE)));
 
         // 結果アイテム (slot 15)
+        inventory.setItem(DETAIL_RESULT_SLOT, resultDisplayOf(entry));
+
+        // 素材個数サマリー (slot 24-25)
+        inventory.setItem(24, createMaterialSummary(entry));
+
+        // 戻るボタン (slot 49)
+        inventory.setItem(DETAIL_BACK_SLOT, createButton(Material.DARK_OAK_DOOR,
+            Component.text(detailHistory.isEmpty() ? "← 一覧に戻る" : "← 前のレシピに戻る",
+                NamedTextColor.YELLOW),
+            List.of(detailText("素材をクリックすると、その素材を作るレシピへ移動します",
+                NamedTextColor.DARK_GRAY))));
+    }
+
+    /**
+     * 詳細画面の完成品スロットに置く表示アイテム(作業台/儀式で共通)。
+     * 完成数・効果詳細lore・「クリック: これを使うレシピ一覧」の案内を載せる。
+     */
+    private ItemStack resultDisplayOf(RecipeEntry entry) {
         if (entry.iconItem != null) {
             ItemStack resultDisplay = entry.iconItem.clone();
             if (entry.amount > 1) resultDisplay.setAmount(entry.amount);
@@ -582,26 +731,19 @@ public class RecipeBrowserGui extends BaseGui {
                 }
                 if (!resultLore.isEmpty()) meta.lore(resultLore);
             });
-            inventory.setItem(DETAIL_RESULT_SLOT, resultDisplay);
-        } else {
-            ItemStack resultDisplay = new ItemStack(entry.icon);
-            if (entry.amount > 1) resultDisplay.setAmount(entry.amount);
-            if (entry.resultToken != null) {
-                resultDisplay.editMeta(meta -> meta.lore(List.of(
-                    detailText("クリック: これを使うレシピ一覧", NamedTextColor.DARK_GRAY))));
-            }
-            inventory.setItem(DETAIL_RESULT_SLOT, resultDisplay);
+            return resultDisplay;
         }
-
-        // 素材個数サマリー (slot 24-25)
-        inventory.setItem(24, createMaterialSummary(entry));
-
-        // 戻るボタン (slot 49)
-        inventory.setItem(DETAIL_BACK_SLOT, createButton(Material.DARK_OAK_DOOR,
-            Component.text(detailHistory.isEmpty() ? "← 一覧に戻る" : "← 前のレシピに戻る",
-                NamedTextColor.YELLOW),
-            List.of(detailText("素材をクリックすると、その素材を作るレシピへ移動します",
-                NamedTextColor.DARK_GRAY))));
+        ItemStack resultDisplay = new ItemStack(entry.icon);
+        if (entry.amount > 1) resultDisplay.setAmount(entry.amount);
+        List<Component> lore = new ArrayList<>();
+        appendDetailLore(entry, lore);
+        if (entry.resultToken != null) {
+            lore.add(detailText("クリック: これを使うレシピ一覧", NamedTextColor.DARK_GRAY));
+        }
+        if (!lore.isEmpty()) {
+            resultDisplay.editMeta(meta -> meta.lore(lore));
+        }
+        return resultDisplay;
     }
 
     /**
@@ -766,6 +908,9 @@ public class RecipeBrowserGui extends BaseGui {
                 lore.add(Component.text("Source: " + entry.source, NamedTextColor.AQUA)
                     .decoration(TextDecoration.ITALIC, false));
             }
+            lore.add(Component.empty());
+            lore.add(Component.text("クリックで配置を確認", NamedTextColor.DARK_GRAY)
+                .decoration(TextDecoration.ITALIC, false));
         } else {
             // 作業台レシピ: 素材個数のみ表示（クリックで配置詳細GUI）
             appendWorkbenchSummaryLore(entry, lore);
@@ -844,7 +989,7 @@ public class RecipeBrowserGui extends BaseGui {
                 if (itemOpt.isPresent()) {
                     entry.iconItem = itemOpt.get().createItemStack();
                     entry.icon = itemOpt.get().getBaseMaterial();
-                } else {
+                } else if (!applyCatalogRitualIdentity(entry, recipe)) {
                     entry.icon = Material.ENCHANTED_BOOK;
                 }
             } else if (recipe.resultMaterial() != null) {
@@ -938,6 +1083,51 @@ public class RecipeBrowserGui extends BaseGui {
             applySortKeys(entry);
         }
         return entries;
+    }
+
+    /**
+     * <b>「儀式レシピのアイコンが全てエンチャント本になる」バグの修正 (2026-07-30)</b>。
+     *
+     * <p>{@link com.arspaper.ritual.CatalogRitualRegistrar} が登録する TrinityForge カタログ儀式は
+     * 結果IDが {@code tfcatalog:<catalogId>} で、これは <b>ArsPaper の itemRegistry には存在しない</b>
+     * (TF側カタログのIDなので当然)。従来はそこで検索に失敗して一律 {@link Material#ENCHANTED_BOOK}
+     * へ倒れていたため、TFカタログ由来の儀式レシピが<b>全部同じ本アイコン</b>になり、
+     * 表示名・lore・並べ替えキーも結果アイテム由来にならずハードコード同然に見えていた。
+     *
+     * <p>ここで TF カタログの identity アイテム(表示名/CMD/革色/発光/flavor lore まで入った実物)を
+     * 引き直し、作業台レシピの TF カタログ経路
+     * ({@code catalogWorkbenchDisplayItem} を使う分岐)と同じ見た目に揃える。
+     * 併せて {@code resultToken} も {@code custom:<catalogId>} へ直す — 従来は
+     * {@code "custom:" + resultId} = {@code custom:tfcatalog:<id>} という素材語彙に存在しない
+     * トークンになっており、素材⇔レシピの相互ジャンプが無言で外れていた。
+     *
+     * @return TFカタログ由来として解決できたら true(呼び出し側はフォールバックしない)
+     */
+    private boolean applyCatalogRitualIdentity(RecipeEntry entry, RitualRecipe recipe) {
+        String resultId = recipe.resultId();
+        if (resultId == null
+                || !resultId.startsWith(com.arspaper.ritual.CatalogRitualRegistrar.RESULT_PREFIX)) {
+            return false;
+        }
+        String catalogId = resultId.substring(
+                com.arspaper.ritual.CatalogRitualRegistrar.RESULT_PREFIX.length());
+        if (catalogId.isBlank()) {
+            return false;
+        }
+        entry.resultCustomId = catalogId;
+        entry.resultToken = "custom:" + catalogId;
+        ItemStack identity = com.arspaper.integration.TrinityForgeBridge.createCatalogIdentity(catalogId);
+        if (identity == null) {
+            return false;
+        }
+        entry.iconItem = identity;
+        entry.icon = identity.getType();
+        // 表示名も TF カタログの正(MiniMessage解決済み)へ揃える。儀式の「×N」接尾辞は付け直す。
+        String name = cleanDisplayName(identity);
+        if (name != null && !name.isBlank()) {
+            entry.displayName = recipe.resultAmount() > 1 ? name + " ×" + recipe.resultAmount() : name;
+        }
+        return true;
     }
 
     /**
@@ -1204,6 +1394,30 @@ public class RecipeBrowserGui extends BaseGui {
         }
         lore.add(detailText("種別=item-stats の使用スキル(無ければ素材)", NamedTextColor.DARK_GRAY));
         return lore;
+    }
+
+    /**
+     * レシピ種別ボタンの lore(純粋関数)。{@link #sortLore} と同じ「全モード列挙 + 選択中だけ
+     * ▶ 緑」の形式に揃える — 同じ列に並ぶ2つのボタンで見た目の作法が違うと押し間違えるため。
+     */
+    static List<Component> kindLore(RecipeBrowserFilter.KindMode current) {
+        List<Component> lore = new ArrayList<>();
+        lore.add(detailText("クリックで表示するレシピ種別を切り替え", NamedTextColor.GRAY));
+        for (RecipeBrowserFilter.KindMode mode : RecipeBrowserFilter.KindMode.values()) {
+            lore.add(detailText((mode == current ? "▶ " : "  ") + mode.label(),
+                mode == current ? NamedTextColor.GREEN : NamedTextColor.DARK_GRAY));
+        }
+        lore.add(detailText("並べ替えとは独立", NamedTextColor.DARK_GRAY));
+        return lore;
+    }
+
+    /** レシピ種別ボタンのアイコン: 作業台は作業台ブロック、儀式は儀式の核に対応する見た目。 */
+    private static Material kindIcon(RecipeBrowserFilter.KindMode mode) {
+        return switch (mode) {
+            case ALL -> Material.LIME_DYE;
+            case WORKBENCH -> Material.CRAFTING_TABLE;
+            case RITUAL -> Material.AMETHYST_CLUSTER;
+        };
     }
 
     private String localize(String materialOrCustom) {

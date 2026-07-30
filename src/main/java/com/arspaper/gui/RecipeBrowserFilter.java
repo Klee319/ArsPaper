@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -37,12 +36,17 @@ final class RecipeBrowserFilter {
     private RecipeBrowserFilter() {
     }
 
-    /** 並べ替えモード。ボタン1つで {@link #next()} 順に巡回する。 */
+    /**
+     * 並べ替えモード。ボタン1つで {@link #next()} 順に巡回する。
+     *
+     * <p><b>宣言順がそのまま巡回順であり、先頭が初期値</b>(2026-07-30 ユーザー確定
+     * 「ソート順の規定を名前にし、登録順は一番下に」)。登録順は最後に置いてある。
+     */
     enum SortMode {
-        DEFAULT("既定(登録順)"),
         NAME("名前順"),
         KIND("種別順(スキル→素材)"),
-        LEVEL("使用可能レベル順");
+        LEVEL("使用可能レベル順"),
+        DEFAULT("登録順");
 
         private final String label;
 
@@ -60,15 +64,21 @@ final class RecipeBrowserFilter {
         }
     }
 
-    /** 解放状態の絞り込み。ソートとは独立したボタンで巡回する。 */
-    enum FilterMode {
+    /**
+     * レシピ種別の絞り込み。ソートとは独立したボタンで巡回する。
+     *
+     * <p>2026-07-30 ユーザー確定で、従来の「解放済み/未解放」ボタンをこれに置換した。
+     * 解放状態は各レシピのアイコン(施錠表示)で分かる一方、作業台と儀式は同じ一覧に
+     * 混在していて探しづらかったため。
+     */
+    enum KindMode {
         ALL("すべて"),
-        UNLOCKED("解放済みのみ"),
-        LOCKED("未解放のみ");
+        WORKBENCH("作業台レシピ"),
+        RITUAL("儀式レシピ");
 
         private final String label;
 
-        FilterMode(String label) {
+        KindMode(String label) {
             this.label = label;
         }
 
@@ -76,30 +86,35 @@ final class RecipeBrowserFilter {
             return label;
         }
 
-        FilterMode next() {
-            FilterMode[] values = values();
+        KindMode next() {
+            KindMode[] values = values();
             return values[(ordinal() + 1) % values.length];
+        }
+
+        /** このモードが対象とするレシピか。{@link #ALL} は常に true。 */
+        boolean accepts(RecipeEntry entry) {
+            return switch (this) {
+                case ALL -> true;
+                case WORKBENCH -> !entry.isRitual;
+                case RITUAL -> entry.isRitual;
+            };
         }
     }
 
     /**
      * 絞り込み → 並べ替えを適用した新しいリストを返す(引数のリストは変更しない)。
      *
-     * @param unlocked レシピが解放済みかを返す述語。{@link FilterMode#ALL} のときは呼ばれない。
-     * @param search   ワイルドカード検索語。null/空なら検索なし。
+     * @param kind   表示するレシピ種別(作業台/儀式/すべて)。
+     * @param search ワイルドカード検索語。null/空なら検索なし。
      */
-    static List<RecipeEntry> arrange(List<RecipeEntry> source, SortMode sort, FilterMode filter,
-                                     String search, Predicate<RecipeEntry> unlocked) {
+    static List<RecipeEntry> arrange(List<RecipeEntry> source, SortMode sort, KindMode kind,
+                                     String search) {
         List<RecipeEntry> result = new ArrayList<>();
         Pattern pattern = compileGlob(search);
         for (RecipeEntry entry : source) {
             if (entry == null) continue;
             if (pattern != null && !pattern.matcher(entry.sortName()).matches()) continue;
-            if (filter != FilterMode.ALL) {
-                boolean open = unlocked == null || unlocked.test(entry);
-                if (filter == FilterMode.UNLOCKED && !open) continue;
-                if (filter == FilterMode.LOCKED && open) continue;
-            }
+            if (kind != null && !kind.accepts(entry)) continue;
             result.add(entry);
         }
         Comparator<RecipeEntry> comparator = comparatorFor(sort);

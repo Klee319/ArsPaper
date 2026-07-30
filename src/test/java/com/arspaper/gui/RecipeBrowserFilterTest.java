@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Set;
-import java.util.function.Predicate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -33,14 +32,12 @@ class RecipeBrowserFilterTest {
         return entries.stream().map(e -> e.displayName).toList();
     }
 
-    private static final Predicate<RecipeEntry> ALL_UNLOCKED = e -> true;
-
     @Test
     @DisplayName("既定は収集順のまま並べ替えない")
     void defaultKeepsCollectionOrder() {
         List<RecipeEntry> src = List.of(entry("ゼータ", "", 0), entry("アルファ", "", 0));
         List<RecipeEntry> out = RecipeBrowserFilter.arrange(src,
-            RecipeBrowserFilter.SortMode.DEFAULT, RecipeBrowserFilter.FilterMode.ALL, null, ALL_UNLOCKED);
+            RecipeBrowserFilter.SortMode.DEFAULT, RecipeBrowserFilter.KindMode.ALL, null);
         assertEquals(List.of("ゼータ", "アルファ"), names(out));
     }
 
@@ -49,7 +46,7 @@ class RecipeBrowserFilterTest {
     void sortsByName() {
         List<RecipeEntry> src = List.of(entry("banana", "", 0), entry("Apple", "", 0));
         List<RecipeEntry> out = RecipeBrowserFilter.arrange(src,
-            RecipeBrowserFilter.SortMode.NAME, RecipeBrowserFilter.FilterMode.ALL, null, ALL_UNLOCKED);
+            RecipeBrowserFilter.SortMode.NAME, RecipeBrowserFilter.KindMode.ALL, null);
         assertEquals(List.of("Apple", "banana"), names(out));
     }
 
@@ -61,7 +58,7 @@ class RecipeBrowserFilterTest {
             entry("弓", "BOW", 5),
             entry("剣A", "SWORD", 30));
         List<RecipeEntry> out = RecipeBrowserFilter.arrange(src,
-            RecipeBrowserFilter.SortMode.KIND, RecipeBrowserFilter.FilterMode.ALL, null, ALL_UNLOCKED);
+            RecipeBrowserFilter.SortMode.KIND, RecipeBrowserFilter.KindMode.ALL, null);
         assertEquals(List.of("弓", "剣A", "剣B"), names(out));
     }
 
@@ -70,24 +67,34 @@ class RecipeBrowserFilterTest {
     void sortsByLevel() {
         List<RecipeEntry> src = List.of(entry("上級", "", 40), entry("初級", "", 1), entry("中級", "", 15));
         List<RecipeEntry> out = RecipeBrowserFilter.arrange(src,
-            RecipeBrowserFilter.SortMode.LEVEL, RecipeBrowserFilter.FilterMode.ALL, null, ALL_UNLOCKED);
+            RecipeBrowserFilter.SortMode.LEVEL, RecipeBrowserFilter.KindMode.ALL, null);
         assertEquals(List.of("初級", "中級", "上級"), names(out));
     }
 
     @Test
-    @DisplayName("解放済み/未解放は別ボタン相当の独立フィルタとして効く")
-    void filtersByUnlockState() {
-        RecipeEntry open = entry("解放済み", "", 0);
-        RecipeEntry locked = entry("未解放", "", 0);
-        List<RecipeEntry> src = List.of(open, locked);
-        Predicate<RecipeEntry> unlocked = e -> e == open;
+    @DisplayName("作業台/儀式は別ボタン相当の独立フィルタとして効く (2026-07-30 解放状態から置換)")
+    void filtersByRecipeKind() {
+        RecipeEntry bench = entry("作業台レシピ", "", 0);
+        RecipeEntry ritual = entry("儀式レシピ", "", 0);
+        ritual.isRitual = true;
+        List<RecipeEntry> src = List.of(bench, ritual);
 
-        assertEquals(List.of("解放済み", "未解放"), names(RecipeBrowserFilter.arrange(src,
-            RecipeBrowserFilter.SortMode.DEFAULT, RecipeBrowserFilter.FilterMode.ALL, null, unlocked)));
-        assertEquals(List.of("解放済み"), names(RecipeBrowserFilter.arrange(src,
-            RecipeBrowserFilter.SortMode.DEFAULT, RecipeBrowserFilter.FilterMode.UNLOCKED, null, unlocked)));
-        assertEquals(List.of("未解放"), names(RecipeBrowserFilter.arrange(src,
-            RecipeBrowserFilter.SortMode.DEFAULT, RecipeBrowserFilter.FilterMode.LOCKED, null, unlocked)));
+        assertEquals(List.of("作業台レシピ", "儀式レシピ"), names(RecipeBrowserFilter.arrange(src,
+            RecipeBrowserFilter.SortMode.DEFAULT, RecipeBrowserFilter.KindMode.ALL, null)));
+        assertEquals(List.of("作業台レシピ"), names(RecipeBrowserFilter.arrange(src,
+            RecipeBrowserFilter.SortMode.DEFAULT, RecipeBrowserFilter.KindMode.WORKBENCH, null)));
+        assertEquals(List.of("儀式レシピ"), names(RecipeBrowserFilter.arrange(src,
+            RecipeBrowserFilter.SortMode.DEFAULT, RecipeBrowserFilter.KindMode.RITUAL, null)));
+    }
+
+    @Test
+    @DisplayName("並べ替えの巡回は名前順から始まり、登録順が最後に来る (2026-07-30 ユーザー確定)")
+    void sortCycleStartsAtNameAndEndsAtDefault() {
+        RecipeBrowserFilter.SortMode[] modes = RecipeBrowserFilter.SortMode.values();
+        assertEquals(RecipeBrowserFilter.SortMode.NAME, modes[0], "既定(先頭)は名前順");
+        assertEquals(RecipeBrowserFilter.SortMode.DEFAULT, modes[modes.length - 1], "登録順は最後");
+        assertEquals(RecipeBrowserFilter.SortMode.NAME, RecipeBrowserFilter.SortMode.DEFAULT.next(),
+            "最後まで回ったら名前順へ戻る");
     }
 
     @Test
@@ -95,7 +102,7 @@ class RecipeBrowserFilterTest {
     void plainSearchIsSubstring() {
         List<RecipeEntry> src = List.of(entry("鉄の剣", "", 0), entry("金の斧", "", 0));
         List<RecipeEntry> out = RecipeBrowserFilter.arrange(src,
-            RecipeBrowserFilter.SortMode.DEFAULT, RecipeBrowserFilter.FilterMode.ALL, "剣", ALL_UNLOCKED);
+            RecipeBrowserFilter.SortMode.DEFAULT, RecipeBrowserFilter.KindMode.ALL, "剣");
         assertEquals(List.of("鉄の剣"), names(out));
     }
 
@@ -106,11 +113,11 @@ class RecipeBrowserFilterTest {
             entry("iron_sword", "", 0), entry("iron_axe", "", 0), entry("gold_sword", "", 0));
 
         assertEquals(List.of("iron_sword", "iron_axe"), names(RecipeBrowserFilter.arrange(src,
-            RecipeBrowserFilter.SortMode.DEFAULT, RecipeBrowserFilter.FilterMode.ALL, "IRON_*", ALL_UNLOCKED)));
+            RecipeBrowserFilter.SortMode.DEFAULT, RecipeBrowserFilter.KindMode.ALL, "IRON_*")));
         assertEquals(List.of("iron_sword", "gold_sword"), names(RecipeBrowserFilter.arrange(src,
-            RecipeBrowserFilter.SortMode.DEFAULT, RecipeBrowserFilter.FilterMode.ALL, "*_sword", ALL_UNLOCKED)));
+            RecipeBrowserFilter.SortMode.DEFAULT, RecipeBrowserFilter.KindMode.ALL, "*_sword")));
         assertEquals(List.of("iron_axe"), names(RecipeBrowserFilter.arrange(src,
-            RecipeBrowserFilter.SortMode.DEFAULT, RecipeBrowserFilter.FilterMode.ALL, "iron_?xe", ALL_UNLOCKED)));
+            RecipeBrowserFilter.SortMode.DEFAULT, RecipeBrowserFilter.KindMode.ALL, "iron_?xe")));
     }
 
     @Test
@@ -118,7 +125,7 @@ class RecipeBrowserFilterTest {
     void regexMetaCharsAreLiteral() {
         List<RecipeEntry> src = List.of(entry("a+b", "", 0), entry("aab", "", 0));
         List<RecipeEntry> out = RecipeBrowserFilter.arrange(src,
-            RecipeBrowserFilter.SortMode.DEFAULT, RecipeBrowserFilter.FilterMode.ALL, "a+b", ALL_UNLOCKED);
+            RecipeBrowserFilter.SortMode.DEFAULT, RecipeBrowserFilter.KindMode.ALL, "a+b");
         assertEquals(List.of("a+b"), names(out));
     }
 
