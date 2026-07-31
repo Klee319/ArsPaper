@@ -145,6 +145,24 @@ public class SpellCaster {
      */
     public boolean cast(Player caster, SpellRecipe recipe, boolean sharedSpell,
                         org.bukkit.inventory.ItemStack catalyst) {
+        return cast(caster, recipe, sharedSpell, catalyst, null);
+    }
+
+    /**
+     * スペルを発動する（触媒 + 詠唱に使った実アイテム付き / 2026-07-31 D6）。
+     *
+     * <p>{@code catalyst} と {@code castItem} を分ける理由: バインド詠唱では
+     * 「手に持っているバインド済みアイテム」が {@code spellbooks.yml} の {@code catalysts:} 節に
+     * 登録済みのときだけ触媒として扱われ、それ以外では触媒引数が<b>魔導書</b>になる。
+     * TFカタログの杖11本は {@code catalysts:} に無いため、杖のステータス（攻撃力 10584 等）が
+     * 完全に落ちていた。マナ削減 / CT / max-bind-tier は従来どおり {@code catalyst} が担い、
+     * ステータス供給は {@code castItem} が担う。
+     *
+     * @param castItem 実際に右クリックして詠唱したアイテム（杖など）。特定不能なら {@code null}
+     */
+    public boolean cast(Player caster, SpellRecipe recipe, boolean sharedSpell,
+                        org.bukkit.inventory.ItemStack catalyst,
+                        org.bukkit.inventory.ItemStack castItem) {
         if (recipe == null || !recipe.isValid()) {
             caster.sendMessage(Component.text("無効なスペルです！", NamedTextColor.RED));
             return false;
@@ -171,6 +189,22 @@ public class SpellCaster {
                 com.arspaper.integration.TrinityForgeBridge.useRequirementDenial(caster, catalyst);
             if (denial != null) {
                 caster.sendActionBar(denial);
+                return false;
+            }
+        }
+
+        // 2026-07-31 G10: バインド詠唱の使用条件ゲート。
+        // SpellBindListener#onRightClick は既定優先度で PlayerInteractEvent を setCancelled(true) するため、
+        // TF側 UseRequirementListener(HIGH, ignoreCancelled=true) が走らない。さらに上の catalyst 引数は
+        // 非触媒バインドでは魔導書なので、杖自身の use-level-requirement / use-skill が
+        // どの経路でも検査されず「Lv1でも infinity_cane(要Lv100)で撃てる」状態だった。
+        // castItem(=実際に右クリックしたアイテム)を同じ TF ゲートへ通して塞ぐ。
+        // catalyst と同一インスタンスのときは上で既に検査済みなので二重に出さない。
+        if (castItem != null && castItem != catalyst) {
+            net.kyori.adventure.text.Component castItemDenial =
+                com.arspaper.integration.TrinityForgeBridge.useRequirementDenial(caster, castItem);
+            if (castItemDenial != null) {
+                caster.sendActionBar(castItemDenial);
                 return false;
             }
         }
@@ -327,7 +361,7 @@ public class SpellCaster {
         // 非発動（idle）回復ボーナス判定用に最終詠唱時刻を記録
         manaManager.touchCast(caster);
 
-        SpellContext context = new SpellContext(caster, recipe, catalyst);
+        SpellContext context = new SpellContext(caster, recipe, catalyst, castItem);
         context.applyFormAugments();
         SpellForm spellForm = recipe.getForm();
         spellForm.cast(caster, context);
@@ -348,16 +382,6 @@ public class SpellCaster {
             return false;
         }
 
-        // ARS_MAGIC(魔法柱スキル)へEXPを付与（TrinityForge連携）。
-        // 到達条件＝詠唱成功確定点: 全perkゲート通過・マナ消費成立(consumeMana==true)・
-        // スペル発動後にエフェクトがキャンセルしていない（上のisCancelled分岐でreturn済み）。
-        // 誤付与防止の担保:
-        //  - 非プレイヤー詠唱（儀式/タレット等）: これらはSpellCaster.castを経由せず、
-        //    本メソッドのcaster型はPlayer固定のため、そもそもここには到達しない。
-        //  - マナ不足/CT中/各ゲート不通過: いずれも上流でreturnしており未到達。
-        //  - 二重付与なし: 1回のcast成功につき1回のみ呼ばれる（cost = 実消費マナ）。
-        grantArsMagicExp(caster, cost);
-
         // P9: 触媒詠唱成功時にアイテムクールダウンゲージ(武器CT相当)を表示する。触媒の実クールダウン
         // (catalystData.cooldownMs())をフォールバック秒として渡し、触媒の解決済みitem-cooldownステが
         // あればそちらを優先する。触媒未使用(catalystData==null)の詠唱には何も表示しない(従来挙動)。
@@ -370,38 +394,6 @@ public class SpellCaster {
         caster.sendActionBar(Component.text("§d" + recipe.getName()));
 
         return true;
-    }
-
-    /**
-     * ARS_MAGIC カスタムスキルへEXPを付与する（プレイヤー詠唱成功時のみ）。
-     * amount = ars-magic.exp-per-cast + ars-magic.exp-per-mana * cost（config駆動）。
-     * TF {@code stats/skill-exp.yml} が権威。TrinityForge 未ロード時のみ ArsPaper config.yml にフォールバック。
-     *
-     * <p>TrinityForge未ロード（{@code TrinityForge.getInstance()==null}）時は呼ばない（fail-open）。
-     * TF進行サービス未初期化/amount<=0 は進行ブリッジが内部でno-op化し、
-     * 例外も内部で握るため、ここでの追加ハンドリングは不要。
-     *
-     * <p>{@code dungeon-only-exp=true}（既定）の場合、詠唱者が現在いるワールドが
-     * {@link com.trinityforge.dungeon.DungeonWorldRegistry} 登録済みのダンジョンワールドでなければ
-     * EXPは付与しない（マナ消費・詠唱自体は本メソッド到達前に完了しており影響しない）。
-     *
-     * @param player 詠唱に成功したプレイヤー
-     * @param cost   その詠唱で実際に消費したマナ量
-     */
-    private void grantArsMagicExp(Player player, int cost) {
-        com.trinityforge.TrinityForge tf = com.trinityforge.TrinityForge.getInstance();
-        if (tf == null) {
-            return; // TF未ロード: 付与しない（例外を出さない）
-        }
-        // ダンジョンワールド限定EXP(stats/skill-exp.yml dungeon-only-exp)。
-        // マナ消費/詠唱自体は呼び出し元で既に完了済みのため、ここではEXP付与のみを抑止する。
-        if (tf.config().skillExp().dungeonOnlyExp()
-                && !tf.dungeonWorldRegistry().isDungeonWorld(player.getWorld().getUID())) {
-            return;
-        }
-        double amount = com.arspaper.integration.TrinityForgeBridge.arsMagicExpPerCast()
-            + com.arspaper.integration.TrinityForgeBridge.arsMagicExpPerMana() * cost;
-        com.trinityforge.integration.ars.ArsProgressionBridge.grantMagicExp(tf, player, amount);
     }
 
     /**

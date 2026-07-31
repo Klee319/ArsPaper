@@ -43,7 +43,7 @@ public class WindshearEffect implements SpellEffect {
         double damage = baseDamage + amplifyBonus * context.getAmplifyLevel() + heightBonus;
 
         // 対称パイプラインへ供給し最終ダメージを適用
-        context.dealSpellDamage(target, damage);
+        context.dealSpellDamage(target, damage, id.getKey());
 
         Location loc = target.getLocation().add(0, 1, 0);
         loc.getWorld().spawnParticle(Particle.CLOUD, loc, 20, 0.4, 0.4, 0.4, 0.15);

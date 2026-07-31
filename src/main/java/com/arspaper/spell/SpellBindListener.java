@@ -103,10 +103,18 @@ public class SpellBindListener implements Listener {
             return;
         }
         // 触媒判定: バインド先(手持ちアイテム)自体が触媒(catalysts.yml登録品)なら、
-        // その触媒のステ/マナ減/CTを反映するため触媒引数にはheld itemを渡す。
+        // その触媒のマナ減/CT/max-bind-tierを反映するため触媒引数にはheld itemを渡す。
         // 触媒でなければ従来どおりスペルの本体であるスペルブック ItemStack を渡す。
         ItemStack catalystArg = (heldCatalyst != null) ? item : bookItem;
-        ArsPaper.getInstance().getSpellCaster().cast(player, recipe, sharedSpell, catalystArg);
+        // 2026-07-31 D6: ステータス供給元は触媒引数と別に運ぶ。TFカタログの杖11本
+        // (BLAZE_ROD#400002〜#400014 等)は spellbooks.yml の catalysts: に載っていないため、
+        // 触媒引数だけでは杖の攻撃力(最上位で 10584)が魔導書に化けて完全に落ちていた。
+        // 実際にステ源として採用されるのは use-skill: ARS_MAGIC を持つ品だけ
+        // (TrinityForgeBridge#resolveMagicStatSource)。剣やツルハシにバインドしても
+        // 近接ステは魔法に乗らない。
+        ItemStack castItem = item;
+        ArsPaper.getInstance().getSpellCaster()
+            .cast(player, recipe, sharedSpell, catalystArg, castItem);
     }
 
     /**

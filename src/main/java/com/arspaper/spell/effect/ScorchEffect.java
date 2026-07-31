@@ -46,7 +46,7 @@ public class ScorchEffect implements SpellEffect {
         }
 
         // 対称パイプラインへ供給し最終ダメージを適用
-        context.dealSpellDamage(target, damage);
+        context.dealSpellDamage(target, damage, id.getKey());
         spawnScorchFx(target.getLocation());
     }
 

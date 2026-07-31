@@ -125,7 +125,7 @@ public class SonicBoomEffect implements SpellEffect {
             if (distSq > hitRadius * hitRadius) continue;
 
             // 対称パイプラインへ供給し最終ダメージを適用
-            context.dealSpellDamage(nearby, damage);
+            context.dealSpellDamage(nearby, damage, id.getKey());
         }
 
         // ビジュアル: ソニックブームパーティクル

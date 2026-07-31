@@ -219,7 +219,10 @@ public class SpellBook extends BaseCustomItem {
         SpellRecipe recipe = slots.get(slot);
         boolean sharedSpell = com.arspaper.enchant.ArsEnchantments.hasShareEnchant(item);
         // 触媒＝詠唱に使ったスペルブック ItemStack（会心/貫通を魔法ダメージへ連携）。
-        ArsPaper.getInstance().getSpellCaster().cast(player, recipe, sharedSpell, item);
+        // 2026-07-31 D6: castItem は明示的に null。魔導書を直接右クリックして詠唱する経路では
+        // 「魔導書自身のステータスを魔法へ持ち込まない」現行仕様を厳密に維持する
+        // （魔導書は item-stats.yml に一切エントリが無く攻撃力0だが、将来ステが付いても乗らないことを保証する）。
+        ArsPaper.getInstance().getSpellCaster().cast(player, recipe, sharedSpell, item, null);
     }
 
     private void switchSlot(Player player, ItemStack item) {

@@ -110,7 +110,7 @@ public class HeavyImpactEffect implements SpellEffect {
                     // ノックバック無効化（衝撃波は押し出さない）
                     org.bukkit.util.Vector velocity = entity.getVelocity().clone();
                     // 対称パイプラインへ供給し最終ダメージを適用
-                    context.dealSpellDamage(entity, damagePerHit);
+                    context.dealSpellDamage(entity, damagePerHit, id.getKey());
                     entity.setVelocity(velocity);
                 }
 
@@ -150,7 +150,7 @@ public class HeavyImpactEffect implements SpellEffect {
                     if (!context.isValidAoeTarget(entity, onlineCaster)) continue;
                     entity.setNoDamageTicks(0);
                     // 対称パイプラインへ供給し最終ダメージを適用
-                    context.dealSpellDamage(entity, damagePerHit);
+                    context.dealSpellDamage(entity, damagePerHit, id.getKey());
                 }
 
                 // 残留パーティクル

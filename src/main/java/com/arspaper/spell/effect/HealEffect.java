@@ -41,7 +41,7 @@ public class HealEffect implements SpellEffect {
             // アンデッドにはマジックダメージ。
             // 増強(amplify)は amount 算出に既に内包済みのため、対称パイプラインへの
             // 二重適用を避けるためここでは加算しない（他Effectと同じ dealSpellDamage 経路）。
-            context.dealSpellDamage(target, amount);
+            context.dealSpellDamage(target, amount, id.getKey());
         } else {
             // 通常エンティティ・プレイヤーを回復
             double maxHealth = target.getMaxHealth();

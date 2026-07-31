@@ -45,6 +45,17 @@ public class SpellContext {
      * 儀式・タレット等の非プレイヤー詠唱では特定できないため {@code null}（従来どおり plain(0) フォールバック）。
      */
     private final ItemStack catalyst;
+    /**
+     * 実際に右クリックして詠唱したアイテム（2026-07-31 D6）。バインド詠唱では
+     * {@code catalyst} が「{@code catalysts.yml} 登録済みの触媒」または<b>魔導書</b>に化けるため、
+     * 杖のステータス（攻撃力・会心・貫通等）を拾う唯一の経路がこれになる。
+     *
+     * <p>魔導書直接詠唱・儀式・タレット等では {@code null}（従来どおり攻撃力は乗らない）。
+     * {@code use-skill: ARS_MAGIC} を持つ品だけがステ源として採用される判定は
+     * {@code TrinityForgeBridge#resolveMagicStatSource} 側にある（剣にバインドして近接ステで
+     * 魔法を撃つ抜け道を塞ぐため）。
+     */
+    private final ItemStack castItem;
 
     // === キャンセルフラグ（エフェクトがマナ消費なしで中止する場合に使用） ===
     private boolean cancelled = false;
@@ -92,11 +103,23 @@ public class SpellContext {
      * @param catalyst 詠唱に使った触媒 ItemStack。特定不能なら {@code null}
      */
     public SpellContext(Player caster, SpellRecipe recipe, ItemStack catalyst) {
+        this(caster, recipe, catalyst, null);
+    }
+
+    /**
+     * 触媒 + 詠唱に使った実アイテム付きコンテキスト（2026-07-31 D6）。
+     *
+     * @param catalyst 詠唱に使った触媒 ItemStack（{@code catalysts.yml} 登録品、または非触媒バインド
+     *                 詠唱では魔導書本体）。特定不能なら {@code null}
+     * @param castItem 実際に右クリックして詠唱したアイテム（杖など）。特定不能なら {@code null}
+     */
+    public SpellContext(Player caster, SpellRecipe recipe, ItemStack catalyst, ItemStack castItem) {
         this.casterUuid = caster.getUniqueId();
         this.recipe = recipe;
         this.components = recipe.getComponents();
         // 生成毎に呼び出し側スタックへ影響しないよう防御的コピー（不変扱い）。
         this.catalyst = (catalyst != null) ? catalyst.clone() : null;
+        this.castItem = (castItem != null) ? castItem.clone() : null;
     }
 
     private SpellContext(SpellContext other) {
@@ -104,6 +127,7 @@ public class SpellContext {
         this.recipe = other.recipe;
         this.components = other.components;
         this.catalyst = other.catalyst;
+        this.castItem = other.castItem;
     }
 
     /**
@@ -111,6 +135,13 @@ public class SpellContext {
      */
     public ItemStack getCatalyst() {
         return catalyst;
+    }
+
+    /**
+     * 実際に右クリックして詠唱したアイテム（杖など）を返す。特定できない場合は {@code null}。
+     */
+    public ItemStack getCastItem() {
+        return castItem;
     }
 
     public Player getCaster() {
@@ -213,18 +244,33 @@ public class SpellContext {
      * @return {@code spellBase + 触媒の攻撃力}(触媒なし/TF未ロード時は {@code spellBase} のまま)
      */
     public double defenseIgnoringDamage(double spellBase) {
-        return spellBase + com.arspaper.integration.TrinityForgeBridge.magicAttackPowerAddend(catalyst);
+        return spellBase + com.arspaper.integration.TrinityForgeBridge
+            .magicAttackPowerAddend(catalyst, castItem);
     }
 
     public void dealSpellDamage(LivingEntity target, double spellBase) {
+        dealSpellDamage(target, spellBase, null);
+    }
+
+    /**
+     * {@link #dealSpellDamage(LivingEntity, double)} のグリフID付き版（2026-07-31 G5）。
+     *
+     * <p>ダメージ系エフェクトは必ずこちらを使い、自分のグリフID（{@code getId().getKey()}）を渡すこと。
+     * TF の {@code glyph_damage_multiplier_bonus}（スキルツリー「害悪強化」等）は
+     * {@code stats/glyph-damage-boost.yml} に列挙されたグリフにだけ乗る設計で、
+     * <b>ここでIDを渡さないと該当グリフでも倍率が無言で乗らない</b>（lore には出るのに効かない状態に戻る）。
+     *
+     * @param glyphId ダメージを出したグリフのID。不明なら {@code null}（倍率なし）
+     */
+    public void dealSpellDamage(LivingEntity target, double spellBase, String glyphId) {
         Player caster = getCaster();
         if (caster == null || target == null || spellBase <= 0) {
             return;
         }
-        // 触媒（ワンド/スペルブック）の会心/貫通を対称パイプラインへ連携する。
-        // catalyst==null（儀式/タレット等の非プレイヤー詠唱）では plain(0) フォールバック。
+        // 杖/触媒の攻撃力・会心/貫通を対称パイプラインへ連携する。
+        // ステ供給元が特定できない（儀式/タレット等の非プレイヤー詠唱）場合は plain(0) フォールバック。
         double finalDamage = com.arspaper.integration.TrinityForgeBridge
-            .magicalFinalDamage(casterUuid, target, spellBase, catalyst);
+            .magicalFinalDamage(casterUuid, target, spellBase, catalyst, castItem, glyphId);
         // #6: 負の最終魔法ダメージは対象を回復させる(TF物理側 CombatListener と対称。負クランプ設定時のみ発生)。
         // 0 は何もしない。正のときのみ MAGIC ダメージソースで適用する。
         if (finalDamage < 0) {

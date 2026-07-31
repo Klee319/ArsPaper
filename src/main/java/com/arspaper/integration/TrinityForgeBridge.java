@@ -141,43 +141,76 @@ public final class TrinityForgeBridge {
     }
 
     /**
-     * スペル基礎ダメージを対称パイプラインへ供給し、触媒の攻撃ステを乗せた最終魔法ダメージを返す。
+     * 旧シグネチャ（触媒のみ）。{@code castItem}(詠唱に使った実アイテム)を知らない呼び出し元向けに温存する。
+     * 挙動は {@code castItem == null} の場合と同一で、ステ供給元は「catalysts.yml 登録済みの触媒」だけ。
+     */
+    public static double magicalFinalDamage(UUID casterUuid, LivingEntity victim, double spellBase,
+                                            ItemStack catalyst) {
+        return magicalFinalDamage(casterUuid, victim, spellBase, catalyst, null, null);
+    }
+
+    /**
+     * グリフID無しの5引数版。{@code glyph_damage_multiplier_bonus}(グリフ別ダメージ倍率)は掛からない。
+     */
+    public static double magicalFinalDamage(UUID casterUuid, LivingEntity victim, double spellBase,
+                                            ItemStack catalyst, ItemStack castItem) {
+        return magicalFinalDamage(casterUuid, victim, spellBase, catalyst, castItem, null);
+    }
+
+    /**
+     * スペル基礎ダメージを対称パイプラインへ供給し、杖/触媒の攻撃ステを乗せた最終魔法ダメージを返す。
      *
-     * <p>触媒（ワンド/スペルブック）の会心・貫通等は {@link WeaponAttackStatResolver#forItem} で
-     * {@link AttackStats} に導出し、対称パイプラインへ供給する。増減グリフ(Amplify/Dampen)は
-     * 呼び出し側で {@code spellBase} に内包済み・会心/貫通はTF側という層分離を維持するため、
-     * ここでは {@code spellBase} に触媒ステを二重計上しない（TF側 AttackStats が別レイヤーで加味する）。
+     * <p>ステ供給元（杖 or 登録済み触媒）の選択は {@link #resolveMagicStatSource} が担う。
+     * その会心・貫通等は {@link WeaponAttackStatResolver#forItem} 系で {@link AttackStats} に導出し、
+     * 対称パイプラインへ供給する。増減グリフ(Amplify/Dampen)は呼び出し側で {@code spellBase} に
+     * 内包済み・会心/貫通はTF側という層分離を維持するため、{@code spellBase} には
+     * 攻撃力(attack-power)以外のステを二重計上しない（TF側 AttackStats が別レイヤーで加味する）。
      *
      * <p>フォールバック（挙動不変の安全策）:
      * <ul>
      *   <li>TF未ロード（{@link #combatService()}==null）→ {@code spellBase} を素通し（fail-open）。</li>
-     *   <li>触媒が {@code null} / 取得失敗 / resolver未初期化 → {@link AttackStats#plain(0)} 相当で計算。</li>
+     *   <li>ステ供給元が無い / 取得失敗 / resolver未初期化 → {@link AttackStats#plain(0)} 相当で計算。</li>
      * </ul>
      *
      * @param casterUuid 詠唱者UUID
      * @param victim     被弾エンティティ（{@code PersistentDataHolder}）
      * @param spellBase  スペル基礎ダメージ（Ars攻撃力 + 増減グリフを内包済み）
-     * @param catalyst   詠唱に使った触媒 ItemStack（ワンド/スペルブック）。特定不能なら {@code null}
+     * @param catalyst   詠唱に使った触媒 ItemStack（{@code catalysts.yml} 登録品、または非触媒バインド
+     *                   詠唱では魔導書本体）。特定不能なら {@code null}
+     * @param castItem   実際に右クリックして詠唱したアイテム（杖など）。{@code use-skill: ARS_MAGIC}
+     *                   を持つ場合だけステ供給元として採用する。特定不能なら {@code null}
+     * @param glyphId    ダメージを出したグリフのID（{@code "harm"} 等）。TF の
+     *                   {@code glyph_damage_multiplier_bonus} の適用対象判定に使う。不明なら {@code null}
      * @return 8stepパイプライン後の最終ダメージ。サービス未ロード時は {@code spellBase} をそのまま返す
      */
     public static double magicalFinalDamage(UUID casterUuid, LivingEntity victim, double spellBase,
-                                            ItemStack catalyst) {
+                                            ItemStack catalyst, ItemStack castItem, String glyphId) {
         SymmetricCombatService service = combatService();
         if (service == null) {
             warnUnavailableOnce();
             return spellBase;
         }
-        // 仕様(ARSPAPER_FORK_SPEC「デフォルト魔法ダメージ＝Arsスペル攻撃力 ＋ 触媒の攻撃力ステ」):
-        // 魔法基礎ダメージ = グリフ基礎ダメージ(spellBase) ＋ 触媒の攻撃力(attack-power)。
-        // 物理(vanilla base + attack_power)と対称の加算。触媒に attack-power が定義されていなければ
-        // 加算値 0（グリフダメージ据え置き＝従来挙動）。attack-power の加算源は従来どおり触媒のみ
-        // (Change 1 は「全ステ合算」対象を攻撃ステ(会心/貫通/固定ダメージ等)に限定し、ベース加算式は
-        // 変更しない)。
-        double effectiveBase = spellBase + catalystAttackPowerAddend(catalyst);
+        // 仕様(ARSPAPER_FORK_SPEC / MAGIC_BALANCE_SPEC「デフォルト魔法ダメージ＝Arsスペル攻撃力
+        // ＋ 触媒の攻撃力ステ」): 魔法基礎ダメージ = グリフ基礎ダメージ(spellBase)
+        // ＋ 杖の攻撃力(attack-power) × combat/damage.yml の magical.attack-power-scale。
+        // 物理(vanilla base + attack_power)と対称の加算。attack-power が無い/係数0なら加算値0
+        // (グリフダメージ据え置き＝従来挙動)。
+        //
+        // 2026-07-31 D6: ここへ渡すステ供給元(statSource)は「catalysts.yml 登録品の触媒」だけでは
+        // なく「実際に詠唱に使った杖(castItem)」も含む。TFカタログの杖11本は catalysts.yml に
+        // 載っていないため、以前は触媒引数が魔導書に化けて杖の attack-power が完全に落ちていた。
+        ItemStack statSource = resolveMagicStatSource(catalyst, castItem);
+        double effectiveBase = MagicStatSourcePolicy.effectiveBase(
+                spellBase, itemAttackPower(statSource), magicalAttackPowerScale());
+        // 課題G5: glyph_damage_multiplier_bonus(TF公開API TrinityForge#glyphDamageMultiplier)は
+        // lore に出るのにフォーク側の呼び出し元が1つも無く効いていなかった。基礎ダメージ層で掛ける
+        // (理由は MagicStatSourcePolicy#applyGlyphMultiplier の javadoc)。
+        effectiveBase = MagicStatSourcePolicy.applyGlyphMultiplier(
+                effectiveBase, glyphDamageMultiplier(casterUuid, glyphId));
         try {
             // service が effectiveBase を defaultDamage として注入し、攻撃ステ(会心/貫通等)を別レイヤーで加味する。
             CombatHitResult hit = service.magicalFinalDamageResult(
-                    casterUuid, victim, effectiveBase, resolveMagicAttackStats(casterUuid, catalyst));
+                    casterUuid, victim, effectiveBase, resolveMagicAttackStats(casterUuid, statSource));
             if (hit.crit()) {
                 CritFlash.play(victim);
             }
@@ -189,7 +222,7 @@ public final class TrinityForgeBridge {
             // 注意: 将来 magicalFinalDamage を「算出だけ」に使う呼び出し元(applyMagicDamageへ進まない)
             // が増えた場合、この出血ロールは実際にダメージが適用されない攻撃に対しても空撃ちする。
             if (hit.damage() > 0.0 && casterUuid != null) {
-                notifyMagicBleed(casterUuid, victim, catalyst, hit.damage());
+                notifyMagicBleed(casterUuid, victim, statSource, hit.damage());
             }
             return hit.damage();
         } catch (Throwable t) {
@@ -211,14 +244,14 @@ public final class TrinityForgeBridge {
      *
      * <p>TF未ロード / API不整合 / 例外時は no-op(fail-open) — 魔法ダメージの適用自体には一切影響しない。
      */
-    private static void notifyMagicBleed(UUID casterUuid, LivingEntity victim, ItemStack catalyst,
+    private static void notifyMagicBleed(UUID casterUuid, LivingEntity victim, ItemStack statSource,
                                           double finalDamage) {
         try {
             TrinityForge tf = TrinityForge.getInstance();
             if (tf == null) {
                 return;
             }
-            Map<String, Double> attackerStats = resolveMagicBleedAggregate(casterUuid, catalyst);
+            Map<String, Double> attackerStats = resolveMagicBleedAggregate(casterUuid, statSource);
             tf.applyMagicBleed(attackerStats, victim, casterUuid, finalDamage);
         } catch (Throwable t) {
             // TF未ロード / API不整合: 出血ロールをスキップ(魔法ダメージ自体の適用には影響しない)。
@@ -226,32 +259,34 @@ public final class TrinityForgeBridge {
     }
 
     /**
-     * {@link #resolveMagicAttackStats} と同じ集約対象(触媒判定・メインハンド除外)を、生の
+     * {@link #resolveMagicAttackStats} と同じ集約対象(同一の statSource・メインハンド除外)を、生の
      * canonical stat map として返す。bleed-chance/bleed-damage は {@link AttackStats} のフィールドに
      * 含まれないため、この専用ヘルパで別途取得する(課題1: 魔法ダメージが読む集約と出血が読む集約を
-     * 一致させる要件)。詠唱者がオフライン等で解決できない場合は、非プレイヤー詠唱時の
-     * {@link #resolveCatalystStats} と対称に、触媒自身のフル解決ステ({@link #resolveFullItemStats})
-     * まで(触媒nullなら空集約)にフォールバックする。
+     * 一致させる要件 — <b>片方だけ statSource を変えるとこの一致が崩れる</b>ので必ず両方へ同じ
+     * {@code statSource} を渡すこと)。詠唱者がオフライン等で解決できない場合は、非プレイヤー詠唱時の
+     * {@link #resolveCatalystStats} と対称に、statSource 自身のフル解決ステ
+     * ({@link #resolveFullItemStats}) まで(statSource が null なら空集約)にフォールバックする。
+     *
+     * @param statSource {@link #resolveMagicStatSource} が選んだステ供給元。無ければ {@code null}
      */
-    private static Map<String, Double> resolveMagicBleedAggregate(UUID casterUuid, ItemStack catalyst) {
+    private static Map<String, Double> resolveMagicBleedAggregate(UUID casterUuid, ItemStack statSource) {
         try {
             Player caster = casterUuid != null ? Bukkit.getPlayer(casterUuid) : null;
             if (caster == null) {
-                return catalyst != null
-                        ? new LinkedHashMap<>(resolveFullItemStats(catalyst)) : new LinkedHashMap<>();
+                return statSource != null
+                        ? new LinkedHashMap<>(resolveFullItemStats(statSource)) : new LinkedHashMap<>();
             }
             TrinityForge tf = TrinityForge.getInstance();
             if (tf == null) {
-                return catalyst != null
-                        ? new LinkedHashMap<>(resolveFullItemStats(catalyst)) : new LinkedHashMap<>();
+                return statSource != null
+                        ? new LinkedHashMap<>(resolveFullItemStats(statSource)) : new LinkedHashMap<>();
             }
             PlayerStatAggregator aggregator = tf.playerStatAggregator();
             if (aggregator == null) {
-                return catalyst != null
-                        ? new LinkedHashMap<>(resolveFullItemStats(catalyst)) : new LinkedHashMap<>();
+                return statSource != null
+                        ? new LinkedHashMap<>(resolveFullItemStats(statSource)) : new LinkedHashMap<>();
             }
-            return new LinkedHashMap<>(aggregator.aggregateExcludingMainhandWith(
-                    caster, isRegisteredCatalyst(catalyst) ? catalyst : null));
+            return new LinkedHashMap<>(aggregator.aggregateExcludingMainhandWith(caster, statSource));
         } catch (Throwable t) {
             return new LinkedHashMap<>();
         }
@@ -260,45 +295,136 @@ public final class TrinityForgeBridge {
     /**
      * Change 1(P10 魔法アグリゲーション): 魔法攻撃側の攻撃ステ(会心/貫通/固定ダメージ等)集計元。
      * <ul>
-     *   <li>触媒詠唱: (キャスターのメインハンドを除く装備＝防具4部位＋オフハンド適用時＋パーク＋アドオン)
-     *       ＋ 触媒自身の解決済みステ(品質/ランダムロール込み)。</li>
-     *   <li>非触媒バインド詠唱(触媒未使用): 上記のメインハンド除く装備のみ。</li>
+     *   <li>杖/触媒詠唱: (キャスターのメインハンドを除く装備＝防具4部位＋オフハンド適用時＋パーク＋アドオン)
+     *       ＋ statSource 自身の解決済みステ(品質/ランダムロール込み)。</li>
+     *   <li>ステ供給元なし(魔導書直接詠唱・剣にバインド等): 上記のメインハンド除く装備のみ。</li>
      * </ul>
-     * メインハンドの武器ステを意図的に除外するのは、触媒使用時は触媒自身のステで代替し、触媒不使用時は
-     * 従来どおりメインハンド(スペルブック本体等)のステを魔法へ持ち込まないため。
+     * メインハンドの武器ステを意図的に除外するのは、TF側 {@code aggregateExcludingMainhandWith} が
+     * 構造的にメインハンドを集約しないため。杖はメインハンドにあるので、{@code statSource} として
+     * 明示的に渡す必要がある(渡さないとどちらの経路にも入らず二重に落ちる — D6 の (3))。
      *
      * <p>フォールバック(挙動不変の安全策・fail-open): 詠唱者がオフライン/UUID未特定(儀式・タレット等の
      * 非プレイヤー詠唱)、TF未ロード、集計器/リゾルバ未初期化、または集計中の例外時は、
-     * 従来どおり触媒のみのステ({@link #resolveCatalystStats})にフォールバックする(触媒nullなら
-     * {@link AttackStats#plain(0)})。
+     * 従来どおり statSource のみのステ({@link #resolveCatalystStats})にフォールバックする
+     * (statSource が null なら {@link AttackStats#plain(0)})。
+     *
+     * @param statSource {@link #resolveMagicStatSource} が選んだステ供給元。無ければ {@code null}
      */
-    private static AttackStats resolveMagicAttackStats(UUID casterUuid, ItemStack catalyst) {
+    private static AttackStats resolveMagicAttackStats(UUID casterUuid, ItemStack statSource) {
         try {
             Player caster = casterUuid != null ? Bukkit.getPlayer(casterUuid) : null;
             if (caster == null) {
-                return resolveCatalystStats(catalyst);
+                return resolveCatalystStats(statSource);
             }
             TrinityForge tf = TrinityForge.getInstance();
             if (tf == null) {
-                return resolveCatalystStats(catalyst);
+                return resolveCatalystStats(statSource);
             }
             WeaponAttackStatResolver resolver = tf.weaponAttackStats();
             PlayerStatAggregator aggregator = tf.playerStatAggregator();
             if (resolver == null || aggregator == null) {
-                return resolveCatalystStats(catalyst);
+                return resolveCatalystStats(statSource);
             }
-            // 「触媒キャスト」か「非触媒バインド詠唱(魔導書本体を経由)」かは、catalyst引数のnull有無ではなく
-            // 実際にcatalysts.yml登録品かどうかで判定する — SpellBindListenerは非触媒バインドでも
-            // bookItem(魔導書ItemStack)をcatalyst引数として渡す(SpellContext.dealSpellDamage)ため、
-            // null非nullだけでは区別できない(NON-catalyst caseは魔導書自身のステを持ち込んではならない)。
-            // 触媒ステは「合算してから乗算」の内側に含める(触媒自身の乗算レイヤ含む) — 近接パスで
-            // メインハンド武器が乗算対象に含まれるのと対称にするため、TF側の集計APIへ触媒を渡す。
+            // statSource は「合算してから乗算」の内側に含める(その品自身の乗算レイヤ含む) — 近接パスで
+            // メインハンド武器が乗算対象に含まれるのと対称にするため、TF側の集計APIへ渡す。
             Map<String, Double> attackerStats = new LinkedHashMap<>(
-                    aggregator.aggregateExcludingMainhandWith(
-                            caster, isRegisteredCatalyst(catalyst) ? catalyst : null));
+                    aggregator.aggregateExcludingMainhandWith(caster, statSource));
             return resolver.bridgeStats(attackerStats);
         } catch (Throwable t) {
-            return resolveCatalystStats(catalyst);
+            return resolveCatalystStats(statSource);
+        }
+    }
+
+    /**
+     * 魔法の攻撃ステ供給元を決める(2026-07-31 D6)。
+     *
+     * <ol>
+     *   <li>{@code castItem}(実際に右クリックして詠唱したアイテム)が {@code use-skill: ARS_MAGIC} を
+     *       持つ、または {@code catalysts.yml} 登録品なら <b>castItem</b>。TFカタログの杖11本
+     *       ({@code BLAZE_ROD#400002}〜{@code #400014} 等)がここで拾われる。</li>
+     *   <li>そうでなければ従来どおり、{@code catalyst} が {@code catalysts.yml} 登録済みの触媒のときだけ
+     *       <b>catalyst</b>。</li>
+     *   <li>どちらでもなければ {@code null}(攻撃力も攻撃ステも乗らない)。</li>
+     * </ol>
+     *
+     * <p><b>{@code use-skill} で絞る理由(オーケストレータ決定)</b>: {@code SpellBindListener#canBind}
+     * は任意のアイテムにスペルをバインドできるため、castItem を無条件にステ源にすると
+     * <b>ネザライトの剣やツルハシの近接ステが魔法に乗る</b>(＝近接の上位互換で魔法を撃てる)。
+     *
+     * <p><b>{@code bookItem} を渡してはいけない</b>: 非触媒バインド詠唱では {@code catalyst} 引数が
+     * 魔導書 ItemStack になる。魔導書のステを魔法へ持ち込まないという現行仕様を維持するため、
+     * ここは「登録済み触媒か」で必ず絞る(null 非 null では区別できない)。
+     */
+    private static ItemStack resolveMagicStatSource(ItemStack catalyst, ItemStack castItem) {
+        boolean castItemAccepted = castItem != null
+                && !castItem.getType().isAir()
+                && acceptsAsMagicStatSource(castItem);
+        return switch (MagicStatSourcePolicy.chooseStatSource(
+                castItemAccepted, isRegisteredCatalyst(catalyst))) {
+            case CAST_ITEM -> castItem;
+            case CATALYST -> catalyst;
+            case NONE -> null;
+        };
+    }
+
+    /**
+     * {@code item} を魔法のステ供給元として認めるか。TF の {@code use-skill}(=item-stats.yml が真源)が
+     * {@code ARS_MAGIC} なら認める。{@code use-skill} が引けない品
+     * ({@code catalysts.yml} の動的登録のみで item-stats.yml にエントリが無い触媒など)は、
+     * 従来どおり {@code catalysts.yml} 登録の有無で認める(既存挙動の保全)。
+     */
+    private static boolean acceptsAsMagicStatSource(ItemStack item) {
+        try {
+            ItemUseGate gate = itemUseGate(item);
+            if (gate != null && MagicStatSourcePolicy.isMagicUseSkill(gate.skill())) {
+                return true;
+            }
+        } catch (Throwable t) {
+            // TF未ロード/例外: 下の catalysts.yml 判定へ落とす(fail-open)。
+        }
+        return isRegisteredCatalyst(item);
+    }
+
+    /**
+     * {@code combat/damage.yml} の {@code magical.attack-power-scale}(杖の攻撃力を魔法基礎ダメージへ
+     * 加算するときの係数)。TF未ロード/例外時は既定 1.0(=仕様どおり100%加算)。
+     */
+    private static double magicalAttackPowerScale() {
+        try {
+            TrinityForge tf = TrinityForge.getInstance();
+            if (tf == null || tf.config() == null) {
+                return MagicStatSourcePolicy.DEFAULT_ATTACK_POWER_SCALE;
+            }
+            return tf.config().combatDamage().magicalAttackPowerScale();
+        } catch (Throwable t) {
+            return MagicStatSourcePolicy.DEFAULT_ATTACK_POWER_SCALE;
+        }
+    }
+
+    /**
+     * 課題G5: TF の {@code glyph_damage_multiplier_bonus}(スキルツリー「害悪強化」等)を、
+     * グリフIDごとに解決した倍率として返す。TF公開API {@link TrinityForge#glyphDamageMultiplier} が
+     * 「どのグリフが対象か」({@code stats/glyph-damage-boost.yml})の真源を持つので、
+     * フォーク側に対象リストを複製しない。
+     *
+     * <p>詠唱者がオフライン / グリフID不明 / TF未ロード / 例外時は {@code 1.0}(no-op)。
+     */
+    private static double glyphDamageMultiplier(UUID casterUuid, String glyphId) {
+        if (casterUuid == null || glyphId == null || glyphId.isBlank()) {
+            return 1.0;
+        }
+        try {
+            TrinityForge tf = TrinityForge.getInstance();
+            if (tf == null) {
+                return 1.0;
+            }
+            Player caster = Bukkit.getPlayer(casterUuid);
+            if (caster == null) {
+                return 1.0;
+            }
+            return tf.glyphDamageMultiplier(caster, glyphId);
+        } catch (Throwable t) {
+            return 1.0;
         }
     }
 
@@ -318,14 +444,14 @@ public final class TrinityForgeBridge {
     }
 
     /**
-     * 触媒の攻撃力(attack-power)を「グリフ基礎ダメージへの加算値」として返す（仕様の加算合成）。
+     * 杖/触媒の攻撃力(attack-power)を「グリフ基礎ダメージへの加算値」として返す（仕様の加算合成）。
+     * 加算量には {@code combat/damage.yml} の {@code magical.attack-power-scale} が掛かる。
      *
-     * <p>触媒に attack-power が定義されていない（{@code <= 0}）場合は {@code 0.0}（グリフダメージ据え置き）。
-     * {@code null} / resolver未初期化 / 例外時も {@code 0.0} にフォールバックし、attack-power 未設定の
-     * 触媒では従来どおりグリフダメージがそのまま基礎ダメージになる（挙動不変）。
-     */
-    /**
-     * {@link #catalystAttackPowerAddend} の公開版(2026-07-30 ユーザー確定)。
+     * <p>attack-power が定義されていない（{@code <= 0}）場合や係数が 0 のときは {@code 0.0}
+     * （グリフダメージ据え置き）。{@code null} / resolver未初期化 / 例外時も {@code 0.0} に
+     * フォールバックする（挙動不変）。
+     *
+     * <p>2026-07-30 ユーザー確定の公開版。
      *
      * <p><b>防御無視ダメージ（{@code SolarEffect}/{@code LunarEffect} の直接HP減少）専用の入口。</b>
      * 対称パイプラインを通さない＝守備力・耐性・回避・会心のいずれも適用されないが、
@@ -336,11 +462,26 @@ public final class TrinityForgeBridge {
      * こちらは会心も貫通も出血も発生しない。
      */
     public static double magicAttackPowerAddend(ItemStack catalyst) {
-        return catalystAttackPowerAddend(catalyst);
+        return magicAttackPowerAddend(catalyst, null);
     }
 
-    private static double catalystAttackPowerAddend(ItemStack catalyst) {
-        if (catalyst == null) {
+    /**
+     * {@link #magicAttackPowerAddend(ItemStack)} の castItem 付き版(2026-07-31 D6)。
+     * 詠唱に使った実アイテム(杖)を渡すと、{@code catalysts.yml} 未登録の杖でも攻撃力が乗る。
+     * 加算量は {@code combat/damage.yml} の {@code magical.attack-power-scale} で係数が掛かる。
+     */
+    public static double magicAttackPowerAddend(ItemStack catalyst, ItemStack castItem) {
+        ItemStack statSource = resolveMagicStatSource(catalyst, castItem);
+        return MagicStatSourcePolicy.scaledAttackPower(
+                itemAttackPower(statSource), magicalAttackPowerScale());
+    }
+
+    /**
+     * {@code item} の解決済み attack-power(品質/ランダムロール込み)。
+     * {@code null} / TF未ロード / resolver未初期化 / 例外時は {@code 0.0}(fail-open)。
+     */
+    private static double itemAttackPower(ItemStack item) {
+        if (item == null) {
             return 0.0;
         }
         try {
@@ -352,7 +493,7 @@ public final class TrinityForgeBridge {
             if (resolver == null) {
                 return 0.0;
             }
-            double power = resolver.attackPowerOf(catalyst);
+            double power = resolver.attackPowerOf(item);
             return power > 0 ? power : 0.0;
         } catch (Throwable t) {
             return 0.0;
