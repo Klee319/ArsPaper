@@ -7,6 +7,7 @@ import com.arspaper.command.handlers.GlyphCommands;
 import com.arspaper.command.handlers.RankingCommands;
 import com.arspaper.command.handlers.SpellCommands;
 import com.arspaper.command.handlers.StatusCommands;
+import com.arspaper.command.handlers.ThreadCommands;
 import com.arspaper.command.handlers.WorldCommands;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -193,6 +194,11 @@ public final class ArsCommand {
                         if (!(ctx.getSource().getSender() instanceof Player player)) return 0;
                         return StatusCommands.executeStatus(plugin, player);
                     })
+                )
+                // 手持ち装備(武器・触媒・ツール)のスレッド装着GUI。着用防具はスニーク+右クリックの
+                // 既存トリガー(ThreadGuiOpenListener)のままで、こちらはその衝突回避用の入口。
+                .then(Commands.literal("thread")
+                    .executes(ctx -> ThreadCommands.executeThread(plugin, ctx.getSource().getSender()))
                 )
                 .then(Commands.literal("pvp")
                     .requires(src -> src.getSender().hasPermission("arspaper.admin"))

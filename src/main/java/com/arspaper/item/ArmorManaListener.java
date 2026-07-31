@@ -41,6 +41,11 @@ import java.util.Set;
  * 防具システム(armors.yml)は撤去済みで、マナ/Ars系ステはTrinityForgeのitem-catalog/item-statsから
  * 供給される。防具4部位に加えメインハンド・オフハンド(offhand-stats-apply対象のみ)を含む
  * 全装備スロットでマナ系ステを集約する。被ダメ/与ダメ時のマナ回復もここで処理する。
+ *
+ * <p><b>2026-07-31 (F2)</b>: 装着スレッドの収集も防具4部位限定をやめ、メインハンド・
+ * オフハンド(offhand-stats-apply対象のみ)へ広げた。ただし<b>広げたのは数値だけ</b>で、
+ * 常時ポーション効果・飛行・バックパックは着用防具に留める ── 線引きと理由は
+ * {@link ThreadApplicationPolicy} の javadoc に一元化してある。
  */
 public class ArmorManaListener implements Listener {
 
@@ -69,9 +74,20 @@ public class ArmorManaListener implements Listener {
         if (!(event.getWhoClicked() instanceof Player player)) return;
         // 防具スロット/シフトクリックに加え、オフハンドスロット(raw slot 40)への直接クリックでも
         // 再計算をスケジュールする。全装備スロット集約化に伴い、武器持ち替えでマナ最大値を追従させる必要がある。
+        //
+        // 2026-07-31 (F2): ホットバー(slot 0-8)への直接クリックと数字キーのホットバースワップも
+        // 対象に加えた。装着スレッドのステがメインハンドからも乗るようになったため、
+        // 「インベントリ画面で選択中のホットバー枠の武器を入れ替える」経路が漏れていると
+        // ホイールを回すまでステが古いまま残る(PlayerItemHeldEvent は選択スロットが
+        // 変わらないので飛ばない)。
+        boolean ownInventory = event.getClickedInventory() == player.getInventory();
+        boolean heldSlotTouched = ownInventory && event.getSlot() >= 0 && event.getSlot() <= 8;
+        boolean offhandSlotTouched = ownInventory && event.getSlot() == 40;
         if (event.getSlotType() == InventoryType.SlotType.ARMOR
             || event.isShiftClick()
-            || (event.getClickedInventory() == player.getInventory() && event.getSlot() == 40)) {
+            || event.getHotbarButton() >= 0
+            || heldSlotTouched
+            || offhandSlotTouched) {
             scheduleRecalc(player);
         }
     }
@@ -151,6 +167,28 @@ public class ArmorManaListener implements Listener {
     }
 
     /**
+     * 集計中の合計値をまとめて運ぶ入れ物。装備1点ぶんの収集を
+     * {@link #collectThreadsInto} へ切り出すために必要(int の out 引数を10本並べる代わり)。
+     */
+    private static final class ThreadTotals {
+        int manaBonus;
+        int manaRegen;
+        int hitRecovery;
+        int damageRecovery;
+        int threadMana;
+        int threadRegen;
+        int costReduction;
+        int manaMaxPercent;
+        int regenPercent;
+        boolean flightThread;
+        final Set<PotionEffectType> potions = new HashSet<>();
+        /** 装着スレッド1個ごとの厳選ステ + item-stats ステの合計(canonical化はTF側)。 */
+        final Map<String, Double> combatStats = new LinkedHashMap<>();
+        /** 同種スレッドの合計個数(thread-sets.yml の累積しきい値判定用)。 */
+        final Map<ThreadType, Integer> counts = new EnumMap<>(ThreadType.class);
+    }
+
+    /**
      * プレイヤーの装備中アイテムのマナボーナス合計を再計算する。
      *
      * <p>防具は廃止済みで、TrinityForgeのitem-catalog/item-statsから供給される前提となったため、
@@ -159,34 +197,21 @@ public class ArmorManaListener implements Listener {
      * ただしオフハンドは、そのアイテムが {@code offhand-stats-apply: true} の場合のみ加算対象とする
      * ({@link TrinityForgeBridge#offhandStatsApply}で判定)。
      * TF item-statsが唯一のソースであり、armors.yml由来の加算・4部位セットボーナスは廃止した。
+     *
+     * <p><b>装着スレッドも同じ3スロット群から集める(2026-07-31 F2)。</b>ただし
+     * 常時ポーション効果・飛行・バックパックは着用防具のみ
+     * ({@link ThreadApplicationPolicy#appliesAmbientEffects})。
      */
     public static void recalculateArmorBonus(Player player) {
-        int totalBonus = 0;
-        int totalArmorRegen = 0;
-        int totalHitRecovery = 0;
-        int totalDamageRecovery = 0;
-        int totalThreadMana = 0;
-        int totalThreadRegen = 0;
+        ThreadTotals totals = new ThreadTotals();
         int totalEnchantMana = 0;
         int totalEnchantRegen = 0;
-        int totalCostReduction = 0;
-        int totalMaxPercent = 0;
-        int totalRegenPercent = 0;
-        boolean hasFlightThread = false;
-        Set<PotionEffectType> activeThreadPotions = new HashSet<>();
-
-        // 戦闘ステ連携(TrinityForge): 装着スレッド1個ごとの item-stats ステ合計 + 同種合計個数。
-        // ループ後に thread-sets.yml のセット効果を足し、AddonCombatStats チャネルでプレイヤーPDCへ書き出す。
-        Map<String, Double> threadCombatStats = new LinkedHashMap<>();
-        Map<ThreadType, Integer> threadCounts = new EnumMap<>(ThreadType.class);
 
         ThreadConfig threadConfig = ArsPaper.getInstance().getThreadConfig();
 
-        // 防具4部位: エンチャントボーナス + TF item-statsマナ加算 + スレッド収集(既存どおり防具限定)。
+        // 防具4部位: エンチャントボーナス + TF item-statsマナ加算 + スレッド収集(常時効果もここだけ)。
         for (ItemStack armorPiece : player.getInventory().getArmorContents()) {
             if (armorPiece == null || !armorPiece.hasItemMeta()) continue;
-
-            PersistentDataContainer pdc = armorPiece.getItemMeta().getPersistentDataContainer();
 
             // エンチャントボーナス（防具限定機能のため従来どおり防具4部位のみ走査）
             try {
@@ -204,79 +229,40 @@ public class ArmorManaListener implements Listener {
             }
 
             // TF item-statsマナ加算（唯一のソース）
-            int[] delta = tfManaDeltas(armorPiece);
-            totalBonus += delta[0];
-            totalArmorRegen += delta[1];
-            totalHitRecovery += delta[2];
-            totalDamageRecovery += delta[3];
-
-            // スレッドボーナス計算（ThreadConfigで効果量をオーバーライド）。
-            // スレッドは性質上、防具スロットのアイテムPDCにのみ格納されるため引き続き防具限定で収集する。
-            // 実効枠数(装備自身のitem-stats thread_slots)を超える分のスレッドは適用しない。GUI側
-            // (ThreadGui)と同じ TrinityForgeBridge#tfEffectiveThreadSlotCap を使い、表示と効果を一致させる。
-            // 枠数が減る方向に変わっても PDC上のスレッドデータ自体は消さない(枠が戻れば復活する)。
-            // 2026-07-26: 装着者のperk/ステータスで枠を増やす経路(thread_slot_cap_bonus)は
-            // 「スレッド枠拡張の儀式」と機能が重複するため廃止済み。枠は装備側だけで決まる。
-            int effectiveSlotCap = TrinityForgeBridge.tfEffectiveThreadSlotCap(
-                TrinityForgeBridge.resolveFullItemStats(armorPiece),
-                player);
-            List<ThreadType> threads = collectThreads(pdc, effectiveSlotCap);
-            // 厳選(個体差)ステは装着スロットごとに違うので、種類の合計とは別に足す。
-            // THREAD_SLOT_ROLLS を持たない防具(厳選導入前)は空リストになり、従来の挙動と一致する。
-            try {
-                for (String encodedRoll : collectThreadRolls(pdc, effectiveSlotCap)) {
-                    ThreadRoll.statsOf(encodedRoll)
-                            .forEach((key, value) -> threadCombatStats.merge(key, value, Double::sum));
-                }
-            } catch (Throwable tfUnavailable) {
-                // 厳選が読めないだけでマナ/飛行/ポーションを止めない(fail-open)。
-            }
-            for (ThreadType thread : threads) {
-                totalThreadMana += threadConfig.getManaBonus(thread);
-                totalThreadRegen += threadConfig.getRegenBonus(thread);
-                totalCostReduction += threadConfig.getCostReduction(thread);
-                totalMaxPercent += threadConfig.getManaMaxPercent(thread);
-                totalRegenPercent += threadConfig.getRegenPercent(thread);
-                totalHitRecovery += threadConfig.getHitManaRecovery(thread);
-                totalDamageRecovery += threadConfig.getDamageManaRecovery(thread);
-                if (thread.hasPotionEffect()) {
-                    activeThreadPotions.add(thread.getPotionEffect());
-                }
-                if (thread.isFlightThread()) {
-                    hasFlightThread = true;
-                }
-
-                // 戦闘ステ: 同種個数を数え、スレ単体の item-stats ステ(material#cmd)を合算する。
-                // TF連携は完全に隔離: 万一のlinkageエラー等でも下のマナ/飛行/ポーション処理を止めない。
-                threadCounts.merge(thread, 1, Integer::sum);
-                try {
-                    TrinityForgeBridge.resolveItemStats(thread.getBaseMaterial(), thread.getCustomModelData())
-                            .forEach((key, value) -> threadCombatStats.merge(key, value, Double::sum));
-                } catch (Throwable tfUnavailable) {
-                    // TF未ロード等: このスレの戦闘ステはスキップ(マナ機能は無影響)。
-                }
-            }
+            addTfManaDeltas(totals, armorPiece);
+            collectThreadsInto(totals, armorPiece, player, threadConfig,
+                    ThreadApplicationPolicy.SlotOrigin.WORN_ARMOR);
         }
 
         // メインハンド: 武器/触媒などは加算。防具を手持ちした場合は着用時のみ(二重加算防止)。
         ItemStack mainHand = player.getInventory().getItemInMainHand();
         if (!isWornOnlyArmorMaterial(mainHand)) {
-            int[] mainHandDelta = tfManaDeltas(mainHand);
-            totalBonus += mainHandDelta[0];
-            totalArmorRegen += mainHandDelta[1];
-            totalHitRecovery += mainHandDelta[2];
-            totalDamageRecovery += mainHandDelta[3];
+            addTfManaDeltas(totals, mainHand);
+            collectThreadsInto(totals, mainHand, player, threadConfig,
+                    ThreadApplicationPolicy.SlotOrigin.MAIN_HAND);
         }
 
         // オフハンド: そのアイテムの offhand-stats-apply=true の場合のみ加算対象。
         ItemStack offhand = player.getInventory().getItemInOffHand();
         if (offhandStatsApplies(offhand)) {
-            int[] offhandDelta = tfManaDeltas(offhand);
-            totalBonus += offhandDelta[0];
-            totalArmorRegen += offhandDelta[1];
-            totalHitRecovery += offhandDelta[2];
-            totalDamageRecovery += offhandDelta[3];
+            addTfManaDeltas(totals, offhand);
+            collectThreadsInto(totals, offhand, player, threadConfig,
+                    ThreadApplicationPolicy.SlotOrigin.OFF_HAND);
         }
+
+        int totalBonus = totals.manaBonus;
+        int totalArmorRegen = totals.manaRegen;
+        int totalHitRecovery = totals.hitRecovery;
+        int totalDamageRecovery = totals.damageRecovery;
+        int totalThreadMana = totals.threadMana;
+        int totalThreadRegen = totals.threadRegen;
+        int totalCostReduction = totals.costReduction;
+        int totalMaxPercent = totals.manaMaxPercent;
+        int totalRegenPercent = totals.regenPercent;
+        boolean hasFlightThread = totals.flightThread;
+        Set<PotionEffectType> activeThreadPotions = totals.potions;
+        Map<String, Double> threadCombatStats = totals.combatStats;
+        Map<ThreadType, Integer> threadCounts = totals.counts;
 
         // 2026-07-26 マナ系ステ穴埋め(縮小版タスク4'、オーケストレータ決定): hit_mana_recovery/
         // damage_mana_recoveryは、mana_bonus/mana_regenと違いArsNativeBridge(パーク/役職/永続バフ/
@@ -340,6 +326,87 @@ public class ArmorManaListener implements Listener {
     }
 
     /**
+     * 装備1点ぶんの装着スレッドを {@code totals} へ足し込む(防具4部位／メインハンド／オフハンド共通)。
+     *
+     * <p>実効枠数(装備自身のitem-stats {@code thread_slots})を超える分のスレッドは適用しない。GUI側
+     * ({@link com.arspaper.gui.ThreadGui})と同じ {@link TrinityForgeBridge#tfEffectiveThreadSlotCap}
+     * を使い、表示と効果を一致させる。枠数が減る方向に変わっても PDC上のスレッドデータ自体は
+     * 消さない(枠が戻れば復活する)。
+     * 2026-07-26: 装着者のperk/ステータスで枠を増やす経路({@code thread_slot_cap_bonus})は
+     * 「スレッド枠拡張の儀式」と機能が重複するため廃止済み。枠は装備側だけで決まる。
+     *
+     * <p><b>{@code origin} で変わるのは常時効果だけ</b>。数値(マナ系・厳選ステ・セット効果個数)は
+     * どのスロットでも同じように足すが、ポーション効果と飛行は
+     * {@link ThreadApplicationPolicy#appliesAmbientEffects} が真のスロット(=着用防具)でのみ拾う
+     * ── 手持ちで発動させると持ち替えのたびに点滅するため(線引きの理由は
+     * {@link ThreadApplicationPolicy} の javadoc)。
+     */
+    private static void collectThreadsInto(ThreadTotals totals, ItemStack item, Player player,
+                                           ThreadConfig threadConfig,
+                                           ThreadApplicationPolicy.SlotOrigin origin) {
+        if (item == null || item.getType().isAir() || !item.hasItemMeta()) {
+            return;
+        }
+        if (!ThreadApplicationPolicy.appliesNumericStats(origin)) {
+            return;
+        }
+        PersistentDataContainer pdc = item.getItemMeta().getPersistentDataContainer();
+
+        int effectiveSlotCap = TrinityForgeBridge.tfEffectiveThreadSlotCap(
+                TrinityForgeBridge.resolveFullItemStats(item), player);
+        if (effectiveSlotCap <= 0) {
+            return;
+        }
+        boolean ambient = ThreadApplicationPolicy.appliesAmbientEffects(origin);
+
+        // 厳選(個体差)ステは装着スロットごとに違うので、種類の合計とは別に足す。
+        // THREAD_SLOT_ROLLS を持たない装備(厳選導入前)は空リストになり、従来の挙動と一致する。
+        try {
+            for (String encodedRoll : collectThreadRolls(pdc, effectiveSlotCap)) {
+                ThreadRoll.statsOf(encodedRoll)
+                        .forEach((key, value) -> totals.combatStats.merge(key, value, Double::sum));
+            }
+        } catch (Throwable tfUnavailable) {
+            // 厳選が読めないだけでマナ/飛行/ポーションを止めない(fail-open)。
+        }
+
+        for (ThreadType thread : collectThreads(pdc, effectiveSlotCap)) {
+            totals.threadMana += threadConfig.getManaBonus(thread);
+            totals.threadRegen += threadConfig.getRegenBonus(thread);
+            totals.costReduction += threadConfig.getCostReduction(thread);
+            totals.manaMaxPercent += threadConfig.getManaMaxPercent(thread);
+            totals.regenPercent += threadConfig.getRegenPercent(thread);
+            totals.hitRecovery += threadConfig.getHitManaRecovery(thread);
+            totals.damageRecovery += threadConfig.getDamageManaRecovery(thread);
+            if (ambient && thread.hasPotionEffect()) {
+                totals.potions.add(thread.getPotionEffect());
+            }
+            if (ambient && thread.isFlightThread()) {
+                totals.flightThread = true;
+            }
+
+            // 戦闘ステ: 同種個数を数え、スレ単体の item-stats ステ(material#cmd)を合算する。
+            // TF連携は完全に隔離: 万一のlinkageエラー等でも上のマナ/飛行/ポーション処理を止めない。
+            totals.counts.merge(thread, 1, Integer::sum);
+            try {
+                TrinityForgeBridge.resolveItemStats(thread.getBaseMaterial(), thread.getCustomModelData())
+                        .forEach((key, value) -> totals.combatStats.merge(key, value, Double::sum));
+            } catch (Throwable tfUnavailable) {
+                // TF未ロード等: このスレの戦闘ステはスキップ(マナ機能は無影響)。
+            }
+        }
+    }
+
+    /** {@link #tfManaDeltas} の結果を {@code totals} のマナ系4カウンタへ足す。 */
+    private static void addTfManaDeltas(ThreadTotals totals, ItemStack item) {
+        int[] delta = tfManaDeltas(item);
+        totals.manaBonus += delta[0];
+        totals.manaRegen += delta[1];
+        totals.hitRecovery += delta[2];
+        totals.damageRecovery += delta[3];
+    }
+
+    /**
      * 指定アイテムのTF item-statsから、マナ系4種(mana_bonus/mana_regen/hit_mana_recovery/
      * damage_mana_recovery)を [bonus, regen, hitRecovery, damageRecovery] の順で返す。
      * 装備品の「実際の」CustomModelDataで解決する(未設定ならnullを渡し、TF側のmaterialのみ解決に委ねる)。
@@ -376,28 +443,21 @@ public class ArmorManaListener implements Listener {
         }
     }
 
-    /** 防具は装着スロットでのみマナ寄与。手持ち二重加算を防ぐ。 */
+    /**
+     * 防具は装着スロットでのみマナ/スレッド寄与。手持ち二重加算を防ぐ
+     * ({@link ThreadApplicationPolicy#isArmorSlotMaterial} が判定の正本)。
+     */
     private static boolean isWornOnlyArmorMaterial(ItemStack item) {
         if (item == null || item.getType().isAir()) {
             return false;
         }
-        try {
-            return switch (com.trinityforge.stats.EquipmentSlotResolver.resolve(item.getType())) {
-                case HEAD, CHEST, LEGS, FEET -> true;
-                default -> false;
-            };
-        } catch (Throwable tfUnavailable) {
-            String name = item.getType().name();
-            return name.endsWith("_HELMET") || name.equals("TURTLE_HELMET")
-                    || name.endsWith("_CHESTPLATE") || name.equals("ELYTRA")
-                    || name.endsWith("_LEGGINGS") || name.endsWith("_BOOTS");
-        }
+        return ThreadApplicationPolicy.isArmorSlotMaterial(item.getType());
     }
 
     /**
-     * 防具PDCのスレッドJSONからステ適用対象のスレッド一覧を収集する。
+     * 装備PDCのスレッドJSONからステ適用対象のスレッド一覧を収集する。
      *
-     * @param pdc            防具アイテムのPDC
+     * @param pdc            装備アイテムのPDC(防具4部位／メインハンド／オフハンドいずれも)
      * @param effectiveSlots 装着者に対する実効スレッド枠上限(基本枠+拡張枠perk保有時のみ拡張分)。
      *                       PDC格納順(=GUIのスロット順)の先頭からこの枠数までのみ適用対象とし、
      *                       上限超過分(例: 拡張枠perk喪失後に残る5枠目以降のスレッド)は無視する
@@ -409,7 +469,7 @@ public class ArmorManaListener implements Listener {
      * <p>{@code THREAD_SLOTS} と同じ添字で対応するが、<b>「スレッドが入っていないスロット」も
      * 空文字として残っている</b>ので、空文字はそのまま {@link ThreadRoll#statsOf} が空マップを返す。
      * 枠数が減る方向へ変わっても配列は消さない（枠が戻れば復活する）── {@code collectThreads} と
-     * 同じ方針。
+     * 同じ方針。防具に限らず手持ち装備(武器/触媒/ツール)のPDCも同じ形式で読む。
      */
     private static List<String> collectThreadRolls(PersistentDataContainer pdc, int effectiveSlots) {
         if (effectiveSlots <= 0) {

@@ -26,24 +26,32 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 防具スレッドスロット管理GUI。
+ * スレッドスロット管理GUI。
  * 防具システム(armors.yml)は撤去済みのため、スレッド枠容量はTrinityForgeのitem-stats
  * (canonicalキー thread_slots)から取得する。
+ *
+ * <p><b>2026-07-31 (F2)</b>: 対象は防具に限らない ── 武器・触媒・ツールも
+ * {@code thread_slots} を持つので、{@code /ars thread} から同じGUIを開く。
+ * 語彙を「防具」から中立(「対象」)へ直したのはそのため。手持ち装備では常時効果
+ * (ポーション/飛行)が出ない・バックパックは装着できないという線引きを
+ * {@link com.arspaper.item.ThreadApplicationPolicy} が持ち、ここはその表示と入口ゲートを担う。
  */
 public class ThreadGui extends BaseGui {
 
     private static final Gson GSON = new Gson();
-    private static final int ARMOR_INFO_SLOT = 1;
+    private static final int INFO_SLOT = 1;
     private static final int THREAD_SLOT_START = 10;
     private static final int CLOSE_SLOT = 26;
 
-    private final ItemStack armorItem;
+    private final ItemStack targetItem;
     private final int threadSlotCount;
-    private final String armorDisplayName;
+    private final String targetDisplayName;
+    /** 対象が「着用スロットへ入る防具」か。常時効果の可否とバックパック装着可否を分ける。 */
+    private final boolean targetIsArmor;
     private final List<String> threadSlots;
     /**
      * threadSlots と<b>同じ添字</b>で対応する厳選結果の文字列（未厳選は空文字）。
-     * 装着したスレッド個体の当たり外れを防具側で保持するために要る ── ID だけを持っていた
+     * 装着したスレッド個体の当たり外れを装備側で保持するために要る ── ID だけを持っていた
      * 従来形式では、厳選した個体を装着した瞬間に個体差が消えていた。
      */
     private final List<String> threadSlotRolls;
@@ -51,52 +59,54 @@ public class ThreadGui extends BaseGui {
     /**
      * レガシーコンストラクタ（後方互換）。
      */
-    public ThreadGui(Player viewer, ItemStack armorItem) {
-        this(viewer, armorItem, null);
+    public ThreadGui(Player viewer, ItemStack targetItem) {
+        this(viewer, targetItem, null);
     }
 
     /**
      * 統合コンストラクタ。pluginパラメータは既存呼び出し箇所との互換のために残しているが未使用。
      */
-    public ThreadGui(Player viewer, ItemStack armorItem, JavaPlugin plugin) {
-        super(viewer, calculateGuiRows(armorItem, viewer), Component.text("スレッドスロット", NamedTextColor.DARK_PURPLE)
+    public ThreadGui(Player viewer, ItemStack targetItem, JavaPlugin plugin) {
+        super(viewer, calculateGuiRows(targetItem, viewer), Component.text("スレッドスロット", NamedTextColor.DARK_PURPLE)
             .decoration(TextDecoration.ITALIC, false));
-        this.armorItem = armorItem;
+        this.targetItem = targetItem;
 
-        Map<String, Double> tfStats = resolveArmorItemStats(armorItem);
+        Map<String, Double> tfStats = resolveTargetItemStats(targetItem);
         // 枠数は装備自身のitem-stats(thread_slots)だけで決まる。拡張は「スレッド枠拡張の儀式」
         // ({@link com.arspaper.ritual.effect.ThreadSlotExpandRitualEffect})が装備のPDCを直接書き換えて
         // 行うため、ここで装着者のperk/ステータスを見る必要はない(2026-07-26: TFステータス経由で
         // 枠を増やす thread_slot_cap_bonus は儀式と機能が重複するため廃止)。
         this.threadSlotCount = TrinityForgeBridge.tfEffectiveThreadSlotCap(tfStats, viewer);
-        this.armorDisplayName = resolveArmorDisplayName(armorItem);
+        this.targetDisplayName = resolveTargetDisplayName(targetItem);
+        this.targetIsArmor = targetItem != null
+                && ThreadApplicationPolicy.isArmorSlotMaterial(targetItem.getType());
 
-        this.threadSlots = loadThreadSlots(armorItem);
-        this.threadSlotRolls = loadThreadSlotRolls(armorItem, this.threadSlots.size());
+        this.threadSlots = loadThreadSlots(targetItem);
+        this.threadSlotRolls = loadThreadSlotRolls(targetItem, this.threadSlots.size());
     }
 
     /**
-     * 防具アイテムの「実際の」CustomModelDataでTF item-statsを解決する。
+     * 対象アイテムの「実際の」CustomModelDataでTF item-statsを解決する。
      */
-    private static Map<String, Double> resolveArmorItemStats(ItemStack armorItem) {
-        return TrinityForgeBridge.resolveFullItemStats(armorItem);
+    private static Map<String, Double> resolveTargetItemStats(ItemStack targetItem) {
+        return TrinityForgeBridge.resolveFullItemStats(targetItem);
     }
 
     /**
-     * 防具の表示名をGUI情報表示用に取得する。表示名未設定時はMaterial名にフォールバックする。
+     * 対象の表示名をGUI情報表示用に取得する。表示名未設定時はMaterial名にフォールバックする。
      */
-    private static String resolveArmorDisplayName(ItemStack armorItem) {
-        if (armorItem != null && armorItem.hasItemMeta() && armorItem.getItemMeta().hasDisplayName()) {
-            return PlainTextComponentSerializer.plainText().serialize(armorItem.getItemMeta().displayName());
+    private static String resolveTargetDisplayName(ItemStack targetItem) {
+        if (targetItem != null && targetItem.hasItemMeta() && targetItem.getItemMeta().hasDisplayName()) {
+            return PlainTextComponentSerializer.plainText().serialize(targetItem.getItemMeta().displayName());
         }
-        return armorItem != null ? armorItem.getType().name() : "不明";
+        return targetItem != null ? targetItem.getType().name() : "不明";
     }
 
     @Override
     public void render() {
         fillBorder(Material.BLACK_STAINED_GLASS_PANE);
 
-        inventory.setItem(ARMOR_INFO_SLOT, createArmorInfoButton());
+        inventory.setItem(INFO_SLOT, createTargetInfoButton());
 
         for (int i = 0; i < threadSlotCount; i++) {
             int guiSlot = THREAD_SLOT_START + i;
@@ -153,7 +163,7 @@ public class ThreadGui extends BaseGui {
                 ItemStack threadItem = createThreadItemStack(threadType);
                 restoreRoll(threadItem, rollAt(slotIndex));
                 if (threadType.isBackpackThread()) {
-                    BackpackGui.transferDataToThread(armorItem, threadItem);
+                    BackpackGui.transferDataToThread(targetItem, threadItem);
                 }
                 if (player.getInventory().firstEmpty() == -1) {
                     player.getWorld().dropItemNaturally(player.getLocation(), threadItem);
@@ -200,6 +210,17 @@ public class ThreadGui extends BaseGui {
                 return;
             }
 
+            // バックパックは着用中の防具にしか装着させない。収納データは装着先アイテムのPDCへ入るが、
+            // 取り出し口の /ars backpack は着用防具しか走査しないため、武器へ入れると中身へ
+            // 二度と辿り着けなくなる(データ喪失)。入口で止めるのが唯一安全な形。
+            if (!targetIsArmor && !ThreadApplicationPolicy.canSocketOutsideArmor(threadType)) {
+                player.sendMessage(Component.text(
+                    "バックパックのスレッドは防具にしか装着できません（収納の取り出しが"
+                        + "着用中の防具からしか行えないため）", NamedTextColor.RED));
+                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
+                return;
+            }
+
             // 重複チェック + 最大積載量チェック
             ThreadConfig threadCfg = ArsPaper.getInstance().getThreadConfig();
             if (!threadCfg.isStackable(threadType.getId())) {
@@ -224,7 +245,7 @@ public class ThreadGui extends BaseGui {
             }
 
             if (threadType.isBackpackThread()) {
-                BackpackGui.transferDataFromThread(threadStack, armorItem);
+                BackpackGui.transferDataFromThread(threadStack, targetItem);
             }
 
             // 厳選値は【消費前の】スタックから読む(消費でスタックが空になると読めなくなる)。
@@ -268,21 +289,33 @@ public class ThreadGui extends BaseGui {
         return type != null && type.hasEffect();
     }
 
-    private ItemStack createArmorInfoButton() {
-        List<Component> lore = List.of(
-            Component.text("セット: " + armorDisplayName, NamedTextColor.GRAY)
-                .decoration(TextDecoration.ITALIC, false),
-            Component.text("スレッドスロット: " + threadSlotCount, NamedTextColor.AQUA)
-                .decoration(TextDecoration.ITALIC, false),
-            Component.empty(),
-            Component.text("スロットをクリックしてスレッドを", NamedTextColor.DARK_GRAY)
-                .decoration(TextDecoration.ITALIC, false),
-            Component.text("セット/取り外しできます", NamedTextColor.DARK_GRAY)
-                .decoration(TextDecoration.ITALIC, false)
-        );
+    private ItemStack createTargetInfoButton() {
+        List<Component> lore = new ArrayList<>();
+        lore.add(Component.text("対象: " + targetDisplayName, NamedTextColor.GRAY)
+            .decoration(TextDecoration.ITALIC, false));
+        lore.add(Component.text("スレッドスロット: " + threadSlotCount, NamedTextColor.AQUA)
+            .decoration(TextDecoration.ITALIC, false));
+        lore.add(Component.empty());
+        lore.add(Component.text("スロットをクリックしてスレッドを", NamedTextColor.DARK_GRAY)
+            .decoration(TextDecoration.ITALIC, false));
+        lore.add(Component.text("セット/取り外しできます", NamedTextColor.DARK_GRAY)
+            .decoration(TextDecoration.ITALIC, false));
+        if (!targetIsArmor) {
+            // 手持ち装備で「効くもの/効かないもの」をここで先に見せる。
+            // 装着してから気づく形にすると「枠だけあって効かない」という F2 と同じ体験になる。
+            lore.add(Component.empty());
+            lore.add(Component.text("手持ち装備(武器・触媒・ツール)です", NamedTextColor.YELLOW)
+                .decoration(TextDecoration.ITALIC, false));
+            lore.add(Component.text("  効く: ステータス・セット効果", NamedTextColor.DARK_GRAY)
+                .decoration(TextDecoration.ITALIC, false));
+            lore.add(Component.text("  効かない: 常時ポーション効果・飛行", NamedTextColor.DARK_GRAY)
+                .decoration(TextDecoration.ITALIC, false));
+            lore.add(Component.text("  装着不可: バックパック", NamedTextColor.DARK_GRAY)
+                .decoration(TextDecoration.ITALIC, false));
+        }
         // displayName() はカスタム名未設定アイテムでは null。コンストラクタで解決済みの
-        // Material名フォールバックを使い、バニラ防具でも情報ボタンを安全に生成する。
-        return createButton(armorItem.getType(), Component.text(armorDisplayName), lore);
+        // Material名フォールバックを使い、バニラ装備でも情報ボタンを安全に生成する。
+        return createButton(targetItem.getType(), Component.text(targetDisplayName), lore);
     }
 
     private ItemStack createThreadSlotButton(int index, String threadId, String encodedRoll) {
@@ -299,6 +332,11 @@ public class ThreadGui extends BaseGui {
         }
 
         List<Component> lore = new ArrayList<>(ArsPaper.getInstance().getThreadConfig().getEffectLore(type));
+        if (!targetIsArmor && ThreadApplicationPolicy.isAmbientOnlyEffect(type)) {
+            // 効果lore(「移動速度上昇 (装備中常時)」等)は防具前提の文言なので、手持ちでは嘘になる。
+            lore.add(Component.text("※この装備では常時効果は発動しません", NamedTextColor.RED)
+                .decoration(TextDecoration.ITALIC, false));
+        }
         ThreadRoll.decode(encodedRoll).ifPresent(roll -> lore.addAll(ThreadItem.rollLore(roll)));
         lore.add(Component.text("クリックで取り外し", NamedTextColor.DARK_GRAY)
             .decoration(TextDecoration.ITALIC, false));
@@ -315,12 +353,12 @@ public class ThreadGui extends BaseGui {
     }
 
     /**
-     * 防具のスレッドスロット数に応じてGUIの行数を決定する。
+     * 対象装備のスレッドスロット数に応じてGUIの行数を決定する。
      * 5スロット以上は4行、それ以外は3行。
      * thread-slot-expansion加算後の実効枠数で判定する（コンストラクタのthreadSlotCountと整合）。
      */
-    private static int calculateGuiRows(ItemStack armorItem, Player viewer) {
-        Map<String, Double> tfStats = resolveArmorItemStats(armorItem);
+    private static int calculateGuiRows(ItemStack targetItem, Player viewer) {
+        Map<String, Double> tfStats = resolveTargetItemStats(targetItem);
         int threadSlots = TrinityForgeBridge.tfEffectiveThreadSlotCap(tfStats, viewer);
         return threadSlots > 4 ? 4 : 3;
     }
@@ -409,7 +447,7 @@ public class ThreadGui extends BaseGui {
     }
 
     private void saveThreadSlots() {
-        armorItem.editMeta(meta -> {
+        targetItem.editMeta(meta -> {
             PersistentDataContainer pdc = meta.getPersistentDataContainer();
             List<Component> previousOwned = loadOwnedThreadLore(pdc);
             List<Component> nextOwned = buildThreadLore();
