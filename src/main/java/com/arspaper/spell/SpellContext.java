@@ -233,19 +233,49 @@ public class SpellContext {
      * @param spellBase スペル基礎ダメージ（Ars攻撃力 + 増減グリフを内包済み・最低0）
      */
     /**
-     * <b>防御無視ダメージ用の基礎ダメージ</b>(2026-07-30 ユーザー確定)。
-     * 日輪/月輪のように「守備力・耐性を無視して直接HPを削る」性格のエフェクトが、
-     * それでも<b>触媒の攻撃力(attack-power)だけは反映する</b>ために使う。
+     * <b>防御無視ダメージ用の基礎ダメージ</b>（日輪/月輪の直接HP減少）。
+     * <b>グリフ基礎＋増減グリフだけ</b>で、杖・触媒の攻撃力(attack-power)は<b>絶対に乗せない</b>。
      *
-     * <p>会心/貫通/出血/回避は一切かからない。防御無視でない普通のダメージ魔法は
+     * <p><b>この線引きの根拠（2026-07-31 F4。2026-07-30 に一度 attack-power を乗せたのを撤回）</b>:
+     * ユーザー確定方針「魔法ダメージに攻撃力を100%加算し近接と対等にする」は
+     * <b>通常ダメージ経路（{@link #dealSpellDamage} → TF の対称パイプライン）の話</b>である。
+     * 防御無視ダメージは {@code setHealth} で直接HPを削る＝{@code EntityDamageEvent} すら発火せず、
+     * 守備力・耐性・回避・トーテム・盾・TF の {@code PvpDamagePolicy} の<b>いずれも通らない</b>。
+     * <b>近接側にこれと対応する経路が存在しない</b>ので、そもそも「対等性」の対象外であり、
+     * ここに伸びる値（attack-power は Lv100 帯で10000超）を足すと軽減不能の即死ボタンになる。
+     * 杖の攻撃力を活かしたいなら {@link #dealSpellDamage} を使うダメージグリフを使うのが正しい。
+     *
+     * <p>会心/貫通/出血/回避も一切かからない。防御無視でない普通のダメージ魔法は
      * 必ず {@link #dealSpellDamage} を通すこと。
      *
+     * <p>戻り値は<b>そのまま HP から引いてはいけない</b> —
+     * {@link DefenseIgnoringDamagePolicy#cappedDamage} で「対象の最大体力比」の上限
+     * （1発／1詠唱の累計）を必ず通すこと。理由は同クラスの javadoc 参照。
+     *
      * @param spellBase グリフ由来の基礎ダメージ(増減グリフ適用済み)
-     * @return {@code spellBase + 触媒の攻撃力}(触媒なし/TF未ロード時は {@code spellBase} のまま)
+     * @return {@code spellBase} そのまま（この経路には装備由来のステを一切合成しない）
      */
     public double defenseIgnoringDamage(double spellBase) {
-        return spellBase + com.arspaper.integration.TrinityForgeBridge
-            .magicAttackPowerAddend(catalyst, castItem);
+        return spellBase;
+    }
+
+    /**
+     * 対象の最大体力。属性が読めない環境では {@code 0} を返し、
+     * {@link DefenseIgnoringDamagePolicy#cappedDamage} 側で<b>割合上限だけが無効化される</b>
+     * （TF の {@code PvpDamagePolicy#maxHealthOf} と同じ安全側の流儀）。
+     * 日輪/月輪が同じ読み方を二重実装しないための共有ヘルパ。
+     */
+    public static double maxHealthOf(LivingEntity target) {
+        if (target == null) {
+            return 0.0;
+        }
+        try {
+            org.bukkit.attribute.AttributeInstance attribute =
+                target.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH);
+            return attribute == null ? 0.0 : Math.max(0.0, attribute.getValue());
+        } catch (RuntimeException | NoSuchFieldError | NoClassDefFoundError ignored) {
+            return 0.0;
+        }
     }
 
     public void dealSpellDamage(LivingEntity target, double spellBase) {

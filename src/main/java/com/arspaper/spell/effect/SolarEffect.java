@@ -1,5 +1,6 @@
 package com.arspaper.spell.effect;
 
+import com.arspaper.spell.DefenseIgnoringDamagePolicy;
 import com.arspaper.spell.GlyphConfig;
 import com.arspaper.spell.SpellContext;
 import com.arspaper.spell.SpellEffect;
@@ -18,7 +19,9 @@ import org.bukkit.scheduler.BukkitTask;
 import com.arspaper.spell.SpellTaskLimiter;
 
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -68,11 +71,21 @@ public class SolarEffect implements SpellEffect {
         if (caster == null) return;
         UUID casterUUID = caster.getUniqueId();
 
-        // 2026-07-30: 防御無視(直接HP減少)の性格は維持したまま、触媒の攻撃力だけは基礎へ乗せる。
+        // 2026-07-31 F4: 防御無視(直接HP減少)なので杖の攻撃力は乗せない(理由は
+        // SpellContext#defenseIgnoringDamage の javadoc)。グリフ基礎＋増幅だけ。
         double damage = context.defenseIgnoringDamage(
             config.getParam("solar", "base-damage", BASE_DAMAGE)
                 + config.getParam("solar", "amplify-damage-bonus", AMPLIFY_DAMAGE_BONUS)
                     * context.getAmplifyLevel());
+        // 防御無視は EntityDamageEvent を出さない=トーテム/守備力/PvP抑制が効かないので、
+        // 「対象の最大体力比」でワンショットを構造的に不可能にする(DefenseIgnoringDamagePolicy 参照)。
+        double maxPercentPerHit = config.getParam("solar", "max-damage-percent-of-max-health",
+            DefenseIgnoringDamagePolicy.DEFAULT_MAX_PERCENT_PER_HIT);
+        double maxPercentPerCast = config.getParam("solar", "max-cast-damage-percent-of-max-health",
+            DefenseIgnoringDamagePolicy.DEFAULT_MAX_PERCENT_PER_CAST);
+        // 1詠唱(=この召喚1体)あたりの累計を対象ごとに数える。召喚のたびに作り直すので
+        // 「詠唱をまたいで持ち越さない」= 撃ち直せば再度削れる(ただし1詠唱では確殺以上に伸びない)。
+        Map<UUID, Double> dealtPerTarget = new HashMap<>();
         double radiusPerAoe = config.getParam("solar", "radius-per-aoe", 1.0);
         double radius = config.getParam("solar", "base-radius", BASE_RADIUS)
             + context.getAoeRadiusLevel() * radiusPerAoe;
@@ -118,7 +131,8 @@ public class SolarEffect implements SpellEffect {
                         .toList();
 
                     for (LivingEntity target : targets) {
-                        fireFlameProjectile(center, target, damage, onlineCaster);
+                        fireFlameProjectile(center, target, damage, onlineCaster,
+                            dealtPerTarget, maxPercentPerHit, maxPercentPerCast);
                     }
                 }
             }
@@ -126,11 +140,19 @@ public class SolarEffect implements SpellEffect {
         SpellTaskLimiter.registerPerCaster("solar", casterUUID, task, maxSummons);
     }
 
-    private void fireFlameProjectile(Location from, LivingEntity target, double damage, Player caster) {
+    private void fireFlameProjectile(Location from, LivingEntity target, double damage, Player caster,
+                                     Map<UUID, Double> dealtPerTarget,
+                                     double maxPercentPerHit, double maxPercentPerCast) {
         // クリエイティブ/スペクテイターは対象外
         if (target instanceof Player p
             && (p.getGameMode() == org.bukkit.GameMode.CREATIVE
                 || p.getGameMode() == org.bukkit.GameMode.SPECTATOR)) return;
+
+        // 防御無視ダメージの上限(1発/1詠唱累計)を最初に確定する。累計を使い切っていれば
+        // 弾自体を撃たない(演出だけ出て何も起きない、という無駄と誤解を避ける)。
+        double applied = DefenseIgnoringDamagePolicy.cappedDamage(damage, SpellContext.maxHealthOf(target),
+            dealtPerTarget.getOrDefault(target.getUniqueId(), 0.0), maxPercentPerHit, maxPercentPerCast);
+        if (applied <= 0) return;
 
         Location targetLoc = target.getLocation().add(0, target.getHeight() / 2, 0);
 
@@ -144,8 +166,9 @@ public class SolarEffect implements SpellEffect {
             from.getWorld().spawnParticle(Particle.SMALL_FLAME, point, 1, 0.1, 0.1, 0.1, 0.01);
         }
 
-        // 防御無視ダメージ（直接HP減少）
-        double finalHP = Math.max(0, target.getHealth() - damage);
+        // 防御無視ダメージ（直接HP減少）。上限適用後の applied だけを引く(生の damage は使わない)。
+        dealtPerTarget.merge(target.getUniqueId(), applied, Double::sum);
+        double finalHP = Math.max(0, target.getHealth() - applied);
         target.setHealth(finalHP);
         if (finalHP <= 0) return;
 

@@ -60,13 +60,25 @@ class MagicStatSourceWiringTest {
     }
 
     @Test
-    @DisplayName("SpellContext は castItem を bridge の両経路(通常ダメージ/防御無視)へ渡す")
+    @DisplayName("SpellContext は castItem を通常ダメージ経路へ渡す")
     void spellContextForwardsCastItemToBridge() throws Exception {
         String context = read("spell/SpellContext.java");
         assertTrue(context.contains("magicalFinalDamage(casterUuid, target, spellBase, catalyst, castItem, glyphId)"),
                 "dealSpellDamage は castItem と glyphId を bridge へ渡す必要がある");
-        assertTrue(context.contains("magicAttackPowerAddend(catalyst, castItem)"),
-                "defenseIgnoringDamage(日輪/月輪) も castItem を渡す必要がある");
+    }
+
+    @Test
+    @DisplayName("防御無視ダメージ(日輪/月輪)には attack-power を合成しない")
+    void defenseIgnoringDamageCarriesNoAttackPower() throws Exception {
+        // 2026-07-31 F4 指摘1(a): defenseIgnoringDamage は setHealth で直接HPを削る経路で、
+        // EntityDamageEvent すら発火しない=守備力・耐性・回避・不死のトーテム・盾・TF の
+        // PvpDamagePolicy のいずれも通らない。ここへ attack-power(Lv100帯の杖で10000超)を足すと
+        // 軽減不能の即死ボタンになる。「魔法へ攻撃力100%加算」はあくまで通常ダメージ経路の仕様。
+        assertFalse(read("spell/SpellContext.java").contains("magicAttackPowerAddend"),
+                "defenseIgnoringDamage は attack-power を合成してはならない(D6 の対象外経路)");
+        assertFalse(read("integration/TrinityForgeBridge.java").contains("public static double magicAttackPowerAddend"),
+                "防御無視ダメージ専用の attack-power 加算入口は撤去済みである必要がある"
+                        + "(残すと同じ即死バグへ配線し直される)");
     }
 
     @Test

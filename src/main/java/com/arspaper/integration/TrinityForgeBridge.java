@@ -443,38 +443,12 @@ public final class TrinityForgeBridge {
         }
     }
 
-    /**
-     * 杖/触媒の攻撃力(attack-power)を「グリフ基礎ダメージへの加算値」として返す（仕様の加算合成）。
-     * 加算量には {@code combat/damage.yml} の {@code magical.attack-power-scale} が掛かる。
-     *
-     * <p>attack-power が定義されていない（{@code <= 0}）場合や係数が 0 のときは {@code 0.0}
-     * （グリフダメージ据え置き）。{@code null} / resolver未初期化 / 例外時も {@code 0.0} に
-     * フォールバックする（挙動不変）。
-     *
-     * <p>2026-07-30 ユーザー確定の公開版。
-     *
-     * <p><b>防御無視ダメージ（{@code SolarEffect}/{@code LunarEffect} の直接HP減少）専用の入口。</b>
-     * 対称パイプラインを通さない＝守備力・耐性・回避・会心のいずれも適用されないが、
-     * 「触媒に攻撃力を積んでも一切強くならない」のはさすがに直感に反するので、
-     * <b>攻撃力(attack-power)だけ</b>は基礎ダメージへ加算する。防御無視という性格は維持する。
-     *
-     * <p>通常のダメージ魔法は必ず {@code SpellContext#dealSpellDamage} を使うこと —
-     * こちらは会心も貫通も出血も発生しない。
-     */
-    public static double magicAttackPowerAddend(ItemStack catalyst) {
-        return magicAttackPowerAddend(catalyst, null);
-    }
-
-    /**
-     * {@link #magicAttackPowerAddend(ItemStack)} の castItem 付き版(2026-07-31 D6)。
-     * 詠唱に使った実アイテム(杖)を渡すと、{@code catalysts.yml} 未登録の杖でも攻撃力が乗る。
-     * 加算量は {@code combat/damage.yml} の {@code magical.attack-power-scale} で係数が掛かる。
-     */
-    public static double magicAttackPowerAddend(ItemStack catalyst, ItemStack castItem) {
-        ItemStack statSource = resolveMagicStatSource(catalyst, castItem);
-        return MagicStatSourcePolicy.scaledAttackPower(
-                itemAttackPower(statSource), magicalAttackPowerScale());
-    }
+    // 2026-07-31 F4: 「防御無視ダメージ(日輪/月輪の直接HP減少)へ杖の attack-power を加算する」入口
+    // (旧 magicAttackPowerAddend) は撤去した。setHealth 経路は EntityDamageEvent すら発火しないため
+    // 守備力・耐性・回避・トーテム・盾・TF の PvpDamagePolicy のいずれも通らず、そこへ伸びる値
+    // (Lv100帯の杖で10000超)を足すと軽減不能の即死になっていた。攻撃力の加算は
+    // magicalFinalDamage(=対称パイプラインを通る通常ダメージ経路)だけの機能である。
+    // 詳細な線引きは SpellContext#defenseIgnoringDamage の javadoc に記録してある。
 
     /**
      * {@code item} の解決済み attack-power(品質/ランダムロール込み)。
