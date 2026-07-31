@@ -1,0 +1,181 @@
+# ============================================================
+# ArsPaper 構造物ルートチェストへの追加抽選 (loot-tables.yml)
+# ============================================================
+# 「構造物を漁る旨み」を作るファイル。バニラのルートテーブルが生成される瞬間
+# (LootGenerateEvent) に割り込んで、ここに書いたアイテムを確率で足す。
+#
+# 【なぜ yml になったか】以前は対象構造物 15 件と追加する 2 品が Java 側の
+# ハードコードだった。本番の資源サーバには構造物生成のデータパック
+# (Dungeons and Taverns 等) を入れる予定で、そのチェストは
+# `<データパックのnamespace>:chests/...` という別 namespace のルートテーブルを使う。
+# ハードコードのままだとデータパックのチェストには何も入らないので、
+# 対象と中身を丸ごと設定へ出した。
+#
+# ------------------------------------------------------------
+# enabled: 全体スイッチ。false でこのファイルの抽選を止める
+#          (ウォーデンの残響の欠片は config.yml の mob-drops 側なので影響しない)
+#
+# pools.<プールID>:
+#   tables:  対象ルートテーブル。書き方は3通りで、どれを混ぜてもよい
+#     - simple_dungeon                      … パスの最後の要素と一致(バニラはこれで十分)
+#     - minecraft:chests/simple_dungeon     … 完全一致
+#     - dungeons_and_taverns:*              … その namespace のルートテーブル全部
+#   rolls:   抽選回数(1-16)。各候補について rolls 回だけ独立に確率判定する。
+#            1 なら「候補ごとに1回ずつ判定」＝従来と同じ挙動。
+#   entries: 候補
+#     - type:  item(既定) / enchant-book
+#              enchant-book はマナ回復速度・マナ最大値・共有のどれかを
+#              ランダムなレベルで持つカスタムエンチャント本を手続き生成する
+#       item:  バニラ Material 名 (DIAMOND) または custom:<ID>。
+#              custom: は ArsPaper の登録アイテム(materials.yml / thread_*)と
+#              TrinityForge の catalog.yml を両方引く。
+#              thread_* を指定するとスレッド生成時の厳選(個体差)がそのまま乗る。
+#       chance: 0.0-1.0。1判定あたりの確率
+#       min / max: 個数の範囲(省略時 1)
+#
+# 【バランスの考え方】
+# ・構造物は「厳選スレッドの入手経路」として設計している。ステータスの上限を
+#   上げる縦強化はここに置かない(縦は世界を繋ぐ者だけ)。増えるのは横の選択肢。
+# ・作業厨が同じ構造物を再訪して稼ぐ経路にならないよう、構造物チェストは
+#   1ワールドにつき有限。数値インフレを起こす素材(ソース結晶など)は低確率に留める。
+# ・村・トライアルチャンバー・難破船のような「大量にあるチェスト」は
+#   意図的に対象外。無限湧きの構造物を入れると経済が壊れる。
+# ============================================================
+
+# 設定リファレンス(本文コメント移設先): docs/config-reference/arspaper/loot-tables.md
+enabled: true
+
+pools:
+
+  # --- 従来の挙動(ハードコード時代と同一の確率) --------------------------
+  # 対象15件はバニラの「有限で、探索の目的地になる」構造物だけを選んである。
+  vanilla_structure_extras:
+    tables:
+      - abandoned_mineshaft
+      - desert_pyramid
+      - jungle_temple
+      - simple_dungeon
+      - stronghold_corridor
+      - stronghold_crossing
+      - stronghold_library
+      - woodland_mansion
+      - end_city_treasure
+      - bastion_treasure
+      - bastion_other
+      - bastion_hoglin_stable
+      - bastion_bridge
+      - ancient_city
+      - buried_treasure
+    rolls: 1
+    entries:
+      - type: enchant-book
+        chance: 0.05
+      - item: ENCHANTED_GOLDEN_APPLE
+        chance: 0.01
+
+  # --- 浅い構造物: 厳選スレッドの入口 -----------------------------------
+  # 序盤に出会う構造物。スレッドの「数値が振れる」体験を早い段階で見せる役。
+  # ここで出るのはマナ系の基礎3種で、上位効果のスレッドは儀式側に残してある。
+  shallow_structure_threads:
+    tables:
+      - abandoned_mineshaft
+      - desert_pyramid
+      - jungle_temple
+      - simple_dungeon
+      - buried_treasure
+    rolls: 1
+    entries:
+      - item: custom:thread_mana_regen
+        chance: 0.04
+      - item: custom:thread_mana_boost
+        chance: 0.04
+      - item: custom:thread_health_boost
+        chance: 0.03
+      - item: custom:source_shard
+        chance: 0.10
+        min: 1
+        max: 2
+
+  # --- 中位構造物: 厳選の本番 -------------------------------------------
+  # 要塞と森の洋館。到達に手間がかかる分、被弾/攻撃マナ回復とコスト軽減
+  # (ビルドの方向性が分かれるスレッド)を出す。
+  mid_structure_threads:
+    tables:
+      - stronghold_corridor
+      - stronghold_crossing
+      - stronghold_library
+      - woodland_mansion
+    rolls: 1
+    entries:
+      - item: custom:thread_hit_mana_recovery
+        chance: 0.05
+      - item: custom:thread_damage_mana_recovery
+        chance: 0.05
+      - item: custom:thread_spell_cost_down
+        chance: 0.05
+      - item: custom:source_shard
+        chance: 0.14
+        min: 1
+        max: 3
+      - item: custom:reality_thread_core
+        chance: 0.02
+
+  # --- 深部構造物: 再抽選触媒がまとまって出る唯一の場所 ------------------
+  # ネザー要塞跡・古代都市・エンドシティ。厳選を回すための「現実の芯」は
+  # こことダンジョン主のドロップが主経路。
+  deep_structure_threads:
+    tables:
+      - bastion_treasure
+      - bastion_other
+      - bastion_hoglin_stable
+      - bastion_bridge
+      - ancient_city
+      - end_city_treasure
+    rolls: 1
+    entries:
+      - item: custom:thread_mana_regen
+        chance: 0.07
+      - item: custom:thread_mana_boost
+        chance: 0.07
+      - item: custom:thread_health_boost
+        chance: 0.06
+      - item: custom:thread_spell_cost_down
+        chance: 0.06
+      - item: custom:reality_thread_core
+        chance: 0.06
+      - item: custom:source_crystal
+        chance: 0.03
+
+  # --- データパック構造物 (後日追加) --------------------------------------
+  # Dungeons and Taverns を資源サーバへ入れたら、ここが自動で効き始める。
+  # namespace ワイルドカードなので、個々のルートテーブル名を調べる必要はない。
+  # 導入前は該当テーブルが生成されないだけで、警告も副作用も出ない。
+  #
+  # 【namespace の確認方法】データパックを入れたサーバで
+  #   /data get entity @s  ではなく、チェストを開いた時のログ、または
+  #   datapacks/<pack>/data/<namespace>/loot_table/... のディレクトリ名を見る。
+  # 別名だった場合はこの tables: を書き換えるだけでよい。
+  datapack_structure_threads:
+    tables:
+      - dungeons_and_taverns:*
+      - dungeons_and_taverns_stronghold_overhaul:*
+    rolls: 1
+    entries:
+      - type: enchant-book
+        chance: 0.05
+      - item: custom:thread_mana_regen
+        chance: 0.04
+      - item: custom:thread_mana_boost
+        chance: 0.04
+      - item: custom:thread_hit_mana_recovery
+        chance: 0.04
+      - item: custom:thread_damage_mana_recovery
+        chance: 0.04
+      - item: custom:thread_spell_cost_down
+        chance: 0.04
+      - item: custom:source_shard
+        chance: 0.12
+        min: 1
+        max: 3
+      - item: custom:reality_thread_core
+        chance: 0.03

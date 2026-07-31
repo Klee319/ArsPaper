@@ -67,15 +67,9 @@ mob-drops:
   warden-echo-shard-min: 0
   warden-echo-shard-max: 2
 
-# バニラのルートチェストへの追加抽選(LootTableListener)。
-# 対象の構造物はホワイトリストで制限しており、村やトライアルチャンバーのような
-# 大量チェストは除外している。
-loot:
-  enabled: true
-  # カスタムエンチャント本が入る確率(チェスト1個あたり)
-  enchant-book-chance: 0.05
-  # エンチャント金リンゴが入る確率(チェスト1個あたり)
-  enchanted-golden-apple-chance: 0.01
+# 構造物ルートチェストへの追加抽選は loot-tables.yml へ移した(2026-07-31)。
+# データパック(Dungeons and Taverns 等)の構造物を対象に足せるようにするため、
+# 対象テーブルと中身をまとめて設定へ出してある。ここの loot: は読まれない。
 
 # 魔法によるプレイヤー間ダメージを許可するか。/ars pvp で実行時に切り替えると
 # このキーへ書き戻される。

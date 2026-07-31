@@ -1,6 +1,7 @@
 package com.arspaper.loot;
 
 import com.arspaper.enchant.ArsEnchantments;
+import com.arspaper.item.ItemCostRef;
 import com.arspaper.item.ItemKeys;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -17,46 +18,56 @@ import org.bukkit.inventory.meta.EnchantmentStorageMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * バニラのルートチェストにカスタムエンチャント本とエンチャント金リンゴを低確率で追加する。
- * 対象はホワイトリストで制限し、村やトライアルチャンバー等の大量チェストは除外。
+ * 構造物のルートチェストへ追加抽選を差し込む。対象と中身は {@code loot-tables.yml}（{@link LootTableConfig}）。
+ *
+ * <p>チェストを漁る動機を「厳選スレッド」に置いている。{@code custom:thread_*} を指定すると
+ * {@code ThreadItem.createItemStack()} が個体差を振るので、このクラス側に厳選のコードは要らない。
  */
 public class LootTableListener implements Listener {
 
-    private static final Set<String> ALLOWED_LOOT_TABLES = Set.of(
-        "abandoned_mineshaft", "desert_pyramid", "jungle_temple",
-        "simple_dungeon", "stronghold_corridor", "stronghold_crossing",
-        "stronghold_library", "woodland_mansion", "end_city_treasure",
-        "bastion_treasure", "bastion_other", "bastion_hoglin_stable",
-        "bastion_bridge", "ancient_city", "buried_treasure"
-    );
+    /**
+     * 1回の生成で追加できるスタック数の上限。yml の桁を間違えても
+     * バニラのルートを押し出してチェストから溢れさせないための保険。
+     */
+    private static final int MAX_ADDED_PER_EVENT = 12;
 
     private static final String[] ENCHANT_IDS = {"mana_regen", "mana_boost", "share"};
 
     private final JavaPlugin plugin;
-    private boolean enabled;
-    private double enchantBookChance;
-    private double enchantedGoldenAppleChance;
+    private final LootTableConfig config;
+    /** 解決できなかった item の警告を1回だけ出すための記録。毎チェストでログが溢れるのを防ぐ。 */
+    private final Set<String> warnedItems = new HashSet<>();
     private boolean wardenEchoShard;
     private int wardenEchoShardMin;
     private int wardenEchoShardMax;
 
     public LootTableListener(JavaPlugin plugin) {
         this.plugin = plugin;
-        reloadConfig();
+        // LootTableConfig のコンストラクタが読み込むので、ここで reload は呼ばない(二重ロードになる)。
+        this.config = new LootTableConfig(plugin);
+        loadWardenSettings();
     }
 
     public void reloadConfig() {
-        enabled = plugin.getConfig().getBoolean("loot.enabled", true);
-        enchantBookChance = plugin.getConfig().getDouble("loot.enchant-book-chance", 0.05);
-        enchantedGoldenAppleChance = plugin.getConfig().getDouble("loot.enchanted-golden-apple-chance", 0.02);
+        config.reload();
+        warnedItems.clear();
+        loadWardenSettings();
+    }
+
+    private void loadWardenSettings() {
         wardenEchoShard = plugin.getConfig().getBoolean("mob-drops.warden-echo-shard", true);
         wardenEchoShardMin = plugin.getConfig().getInt("mob-drops.warden-echo-shard-min", 1);
         wardenEchoShardMax = plugin.getConfig().getInt("mob-drops.warden-echo-shard-max", 3);
+    }
+
+    public LootTableConfig getConfig() {
+        return config;
     }
 
     /**
@@ -87,21 +98,69 @@ public class LootTableListener implements Listener {
 
     @EventHandler
     public void onLootGenerate(LootGenerateEvent event) {
-        if (!enabled) return;
+        if (!config.isEnabled()) return;
         if (event.getLootTable() == null) return;
 
-        String key = event.getLootTable().getKey().getKey();
-        String tableName = key.contains("/") ? key.substring(key.lastIndexOf('/') + 1) : key;
-        if (!ALLOWED_LOOT_TABLES.contains(tableName)) return;
+        // getKey().getKey() はパスだけ(namespace が落ちる)なので、namespace を保った文字列で判定する。
+        // データパックの構造物は minecraft 以外の namespace を使うため、ここが落ちると当たらない。
+        String tableKey = event.getLootTable().getKey().toString();
+        List<LootTableConfig.Pool> pools = config.poolsFor(tableKey);
+        if (pools.isEmpty()) return;
 
         ThreadLocalRandom random = ThreadLocalRandom.current();
-
-        if (random.nextDouble() < enchantBookChance) {
-            event.getLoot().add(createRandomEnchantBook(random));
+        int added = 0;
+        for (LootTableConfig.Pool pool : pools) {
+            for (int roll = 0; roll < pool.rolls(); roll++) {
+                for (LootTableConfig.Entry entry : pool.entries()) {
+                    if (added >= MAX_ADDED_PER_EVENT) return;
+                    if (random.nextDouble() >= entry.chance()) continue;
+                    ItemStack stack = createStack(entry, random);
+                    if (stack == null) continue;
+                    event.getLoot().add(stack);
+                    added++;
+                }
+            }
         }
+    }
 
-        if (random.nextDouble() < enchantedGoldenAppleChance) {
-            event.getLoot().add(new ItemStack(Material.ENCHANTED_GOLDEN_APPLE));
+    /** 抽選に当たった候補を実体化する。解決できなければ null（ログは item ごとに1回だけ）。 */
+    private ItemStack createStack(LootTableConfig.Entry entry, ThreadLocalRandom random) {
+        if (entry.enchantBook()) {
+            return createRandomEnchantBook(random);
+        }
+        int amount = entry.min() >= entry.max() ? entry.min() : random.nextInt(entry.min(), entry.max() + 1);
+        ItemCostRef ref;
+        try {
+            ref = ItemCostRef.parse(entry.item());
+        } catch (IllegalArgumentException malformed) {
+            warnOnce(entry.item(), "アイテム指定が壊れています: " + malformed.getMessage());
+            return null;
+        }
+        // ItemCostRef#createStack は未登録のカスタムIDに対して PAPER を返す仕様なので、
+        // ここで存在を確かめる。確かめないと「チェストから紙が出る」だけで原因が分からない。
+        if (ref.custom() && !isKnownCustom(ref.id())) {
+            warnOnce(entry.item(), "カスタムアイテムが未登録のためスキップします");
+            return null;
+        }
+        ItemStack stack = ref.createStack(amount);
+        if (stack.getType().isAir()) {
+            warnOnce(entry.item(), "Material として解決できないためスキップします");
+            return null;
+        }
+        return stack;
+    }
+
+    private boolean isKnownCustom(String id) {
+        com.arspaper.ArsPaper ars = com.arspaper.ArsPaper.getInstance();
+        if (ars != null && ars.getItemRegistry() != null && ars.getItemRegistry().has(id)) {
+            return true;
+        }
+        return com.arspaper.integration.TrinityForgeBridge.createCatalogIdentity(id) != null;
+    }
+
+    private void warnOnce(String item, String message) {
+        if (warnedItems.add(item)) {
+            plugin.getLogger().warning("[" + LootTableConfig.FILE_NAME + "] " + item + ": " + message);
         }
     }
 
