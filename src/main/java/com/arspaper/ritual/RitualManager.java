@@ -138,9 +138,6 @@ public class RitualManager {
                 return;
             }
             reservedSource = totalSourceRequired;
-            // 第2目標「累計1億ソース」用の集計(2026-07-31)。ここは実際にジャーから吸えた直後なので、
-            // 「必要量」ではなく「本当に消費した量」だけが積まれる(不足で return した経路は通らない)。
-            TrinityForgeBridge.recordSourceSpent(player, reservedSource);
         } else {
             reservedSource = 0;
         }
@@ -265,6 +262,15 @@ public class RitualManager {
                 // Pedestalの素材を消費（再検証後のPedestalを使用）
                 consumePedestalItems(player, revalidatePedestals, recipe.pedestalItems());
 
+                // 第2目標「累計1億ソース」用の集計(2026-07-31)。
+                //
+                // **予約直後ではなくここで積む理由**: 予約後の中断・素材差し替え・効果検証失敗など
+                // 5経路が refundSource でソースをジャーへ返す。予約時点で積むと「返ってきた分も
+                // 累計に入る」ため、儀式をわざと失敗させ続けるだけで実質ゼロコストで累計を膨らませられた
+                // (累計カウンタは単調増加が要件で減算口を持たないので、後から引くこともできない)。
+                // ここまで来れば返還経路は全て通過済み＝ソースは本当に消えている。
+                TrinityForgeBridge.recordSourceSpent(player, reservedSource);
+
                 // effectType分岐
                 if (!recipe.isCraftType()) {
                     // world_effect / thread タイプ（存在は消費前に確認済み）
@@ -372,7 +378,7 @@ public class RitualManager {
                             ArsPaper.getInstance().getItemRegistry()
                                 .get(recipe.resultId())
                                 .filter(BaseCustomItem::isQualityStamped)
-                                .ifPresent(bci -> TrinityForgeBridge.stampCraftedQuality(result, player));
+                                .ifPresent(bci -> TrinityForgeBridge.finalizeArsSmithingResult(result, player));
                         }
                     }
 
