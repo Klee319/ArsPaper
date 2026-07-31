@@ -20,9 +20,24 @@ public class GuiListener implements Listener {
 
         // ThreadGui: プレイヤーインベントリ側のクリックを許可（カーソルにスレッドを載せる操作）
         // ただしshift-click/number-keyはGUIへの不正アイテム移動を防止するためキャンセル
-        if (gui instanceof ThreadGui && event.getClickedInventory() != gui.getInventory()) {
+        //
+        // 2026-07-31 (F3 指摘5): 【対象装備が入っているスロットだけは通さない】。
+        // /ars thread の対象はホットバーのスタックで、そのスロットは開いている ThreadGui の
+        // 下段に描画されている。拾ってカーソルへ載せたまま空き枠を押すと、カーソルはスレッドでは
+        // ないので在庫のスレッドが 1 個消費される一方、GUI が握っている targetItem は
+        // スロットから抜けた側なので書き込みが乗らない = プレイヤーは成功したと思って
+        // スレッドを失う。ThreadGui 側の同一性再確認は最後の砦で、こちらは
+        // 「そもそも動かせない」を担う(ドロップ/オフハンド入れ替え/数字キーも同様に塞ぐ)。
+        if (gui instanceof ThreadGui threadGui && event.getClickedInventory() != gui.getInventory()) {
             if (event.isShiftClick() || event.getClick() == org.bukkit.event.inventory.ClickType.NUMBER_KEY) {
                 event.setCancelled(true);
+                return;
+            }
+            if (touchesThreadTargetSlot(threadGui, event)) {
+                event.setCancelled(true);
+                player.sendActionBar(net.kyori.adventure.text.Component.text(
+                    "スレッド装着中の装備は動かせません",
+                    net.kyori.adventure.text.format.NamedTextColor.RED));
             }
             return;
         }
@@ -32,6 +47,28 @@ public class GuiListener implements Listener {
         if (event.getClickedInventory() != gui.getInventory()) return;
 
         gui.onClick(event.getSlot(), player, event);
+    }
+
+    /** {@link #touchesTargetSlot} をイベントから読み取る薄いラッパ。 */
+    private static boolean touchesThreadTargetSlot(ThreadGui gui, InventoryClickEvent event) {
+        return touchesTargetSlot(gui.getTargetSlot(), event.getSlot(), event.getHotbarButton());
+    }
+
+    /**
+     * スレッド装着中の対象スロットに触るクリックか。
+     *
+     * <p>対象スロット自体のクリック(左右クリック・{@code Q} のドロップ・{@code F} の
+     * オフハンド入れ替えはすべて「そのスロットをクリックした」形で来る)と、
+     * 数字キーの交換先が対象スロットの場合を弾く。
+     * {@code targetSlot} が {@link ThreadGui#UNKNOWN_TARGET_SLOT}(負)なら守る対象が無い。
+     *
+     * <p>Bukkit を触らない純粋な判定にしてある(このフォークのテスト基盤は MockBukkit を持たない)。
+     */
+    static boolean touchesTargetSlot(int targetSlot, int clickedSlot, int hotbarButton) {
+        if (targetSlot < 0) {
+            return false;
+        }
+        return clickedSlot == targetSlot || hotbarButton == targetSlot;
     }
 
     @EventHandler

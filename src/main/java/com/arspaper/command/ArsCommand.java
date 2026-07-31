@@ -4,6 +4,7 @@ import com.arspaper.ArsPaper;
 import com.arspaper.command.handlers.AdminCommands;
 import com.arspaper.command.handlers.GiveCommands;
 import com.arspaper.command.handlers.GlyphCommands;
+import com.arspaper.command.handlers.HelpCommands;
 import com.arspaper.command.handlers.RankingCommands;
 import com.arspaper.command.handlers.SpellCommands;
 import com.arspaper.command.handlers.StatusCommands;
@@ -32,6 +33,12 @@ public final class ArsCommand {
     public static void register(Commands commands, ArsPaper plugin) {
         commands.register(
             Commands.literal("ars")
+                // 引数なしの /ars はコマンド一覧。Brigadier の補完だけが発見経路だと
+                // 「存在を知っている人しか辿れない」機能ができる(2026-07-31 F3 指摘1)。
+                .executes(ctx -> HelpCommands.executeHelp(ctx.getSource().getSender()))
+                .then(Commands.literal("help")
+                    .executes(ctx -> HelpCommands.executeHelp(ctx.getSource().getSender()))
+                )
                 .then(Commands.literal("give")
                     .requires(src -> src.getSender().hasPermission("arspaper.admin"))
                     .then(Commands.argument("itemId", StringArgumentType.word())

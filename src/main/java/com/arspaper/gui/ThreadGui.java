@@ -35,6 +35,12 @@ import java.util.Map;
  * 語彙を「防具」から中立(「対象」)へ直したのはそのため。手持ち装備では常時効果
  * (ポーション/飛行)が出ない・バックパックは装着できないという線引きを
  * {@link com.arspaper.item.ThreadApplicationPolicy} が持ち、ここはその表示と入口ゲートを担う。
+ *
+ * <p><b>2026-07-31 (F3 指摘5)</b>: 対象スロット番号を受け取り、装着/取り外しの直前に
+ * <b>そのスロットの中身が今も同じ品か</b>を {@link com.arspaper.item.ThreadTargetIdentity} で
+ * 再確認する。GUI 下段には対象そのものが描画されていてクリックできるため、対象を手から
+ * 離したまま空き枠を押すと「在庫のスレッドが 1 個消えるのに装備には書き込まれない」
+ * (=データ喪失)が成立していた。不一致なら<b>スレッドを消費せず</b>中断して閉じる。
  */
 public class ThreadGui extends BaseGui {
 
@@ -42,12 +48,23 @@ public class ThreadGui extends BaseGui {
     private static final int INFO_SLOT = 1;
     private static final int THREAD_SLOT_START = 10;
     private static final int CLOSE_SLOT = 26;
+    /** 対象スロットが分からない(呼び出し側が渡していない)ことを表す値。 */
+    public static final int UNKNOWN_TARGET_SLOT = -1;
 
-    private final ItemStack targetItem;
+    /**
+     * 対象装備。同一性確認が通るたびに<b>スロットのライブスタックへ差し替える</b> ──
+     * Bukkit のスタックは移動や {@code editMeta} で別インスタンスに化けるため、
+     * 開いたときの参照を握り続けると書き込みがスロットへ乗らないことがある。
+     */
+    private ItemStack targetItem;
     private final int threadSlotCount;
     private final String targetDisplayName;
     /** 対象が「着用スロットへ入る防具」か。常時効果の可否とバックパック装着可否を分ける。 */
     private final boolean targetIsArmor;
+    /** 対象が入っているプレイヤーインベントリのスロット番号({@link #UNKNOWN_TARGET_SLOT} = 不明)。 */
+    private final int targetSlot;
+    /** 開いたときの対象の同一性。装着直前にスロットの中身と突き合わせる。 */
+    private final com.arspaper.item.ThreadTargetIdentity targetIdentity;
     private final List<String> threadSlots;
     /**
      * threadSlots と<b>同じ添字</b>で対応する厳選結果の文字列（未厳選は空文字）。
@@ -65,11 +82,28 @@ public class ThreadGui extends BaseGui {
 
     /**
      * 統合コンストラクタ。pluginパラメータは既存呼び出し箇所との互換のために残しているが未使用。
+     *
+     * <p>対象スロットを渡さない形。装着直前の同一性確認は<b>行われない</b>ので、
+     * プレイヤー操作から開く経路では
+     * {@link #ThreadGui(Player, ItemStack, JavaPlugin, int)} を使うこと。
      */
     public ThreadGui(Player viewer, ItemStack targetItem, JavaPlugin plugin) {
+        this(viewer, targetItem, plugin, UNKNOWN_TARGET_SLOT);
+    }
+
+    /**
+     * 対象スロット付きコンストラクタ。
+     *
+     * @param targetSlot 対象が入っているプレイヤーインベントリのスロット番号
+     *                   (ホットバーなら 0-8)。装着/取り外しの直前にこのスロットの中身と
+     *                   対象の同一性を突き合わせ、離れていたら中断する(F3 指摘5)。
+     */
+    public ThreadGui(Player viewer, ItemStack targetItem, JavaPlugin plugin, int targetSlot) {
         super(viewer, calculateGuiRows(targetItem, viewer), Component.text("スレッドスロット", NamedTextColor.DARK_PURPLE)
             .decoration(TextDecoration.ITALIC, false));
         this.targetItem = targetItem;
+        this.targetSlot = targetSlot;
+        this.targetIdentity = com.arspaper.item.ThreadTargetIdentity.of(targetItem);
 
         Map<String, Double> tfStats = resolveTargetItemStats(targetItem);
         // 枠数は装備自身のitem-stats(thread_slots)だけで決まる。拡張は「スレッド枠拡張の儀式」
@@ -146,7 +180,45 @@ public class ThreadGui extends BaseGui {
         ArmorManaListener.recalculateArmorBonus(player);
     }
 
+    /**
+     * 対象がまだ同じスロットに居るかを確認し、居るなら参照をライブスタックへ更新する。
+     *
+     * <p>不一致(拾ってカーソルへ載せた／捨てた／別の品と入れ替えた)なら<b>何も消費せずに</b>
+     * 中断して GUI を閉じる ── 消費だけ通って書き込みが乗らないと、プレイヤーは成功したと
+     * 思ってスレッドを失う(F3 指摘5)。
+     *
+     * @return 続行してよいか
+     */
+    private boolean refreshTargetFromSlot(Player player) {
+        if (targetSlot == UNKNOWN_TARGET_SLOT) {
+            return true;
+        }
+        ItemStack live = player.getInventory().getItem(targetSlot);
+        if (!targetIdentity.matches(com.arspaper.item.ThreadTargetIdentity.of(live))) {
+            player.sendMessage(Component.text(
+                "対象の装備が手から離れたため中断しました（スレッドは消費していません）。",
+                NamedTextColor.RED));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
+            player.closeInventory();
+            return false;
+        }
+        this.targetItem = live;
+        return true;
+    }
+
+    /**
+     * 対象が入っているプレイヤーインベントリのスロット番号
+     * ({@link #UNKNOWN_TARGET_SLOT} = 不明)。{@code GuiListener} がこのスロットへのクリックを
+     * 通さないために要る(同一性確認は最後の砦で、そもそも動かせない方が事故が少ない)。
+     */
+    public int getTargetSlot() {
+        return targetSlot;
+    }
+
     private void handleThreadSlotClick(Player player, int slotIndex, InventoryClickEvent event) {
+        if (!refreshTargetFromSlot(player)) {
+            return;
+        }
         while (threadSlots.size() <= slotIndex) {
             threadSlots.add(null);
         }

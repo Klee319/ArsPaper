@@ -22,6 +22,11 @@ import java.util.Map;
  *
  * <p>コマンド名は {@code /ars} のサブコマンドに閉じてある ── 汎用的な非修飾名
  * ({@code /menu} 等)は先に enable した別プラグインに総取りされる事故があるため。
+ *
+ * <p><b>発見経路(2026-07-31 F3 指摘1)</b>: Brigadier の補完だけが入口だと
+ * 「そんなコマンドがある」と知っている人しか辿れない。{@link HelpCommands}({@code /ars help})に
+ * 掲載し、さらにスレッド枠を持つ装備をメインハンドに選択した時点で
+ * {@link com.arspaper.item.ThreadGuiOpenListener} がアクションバーへ案内を出す。
  */
 public final class ThreadCommands {
 
@@ -65,7 +70,9 @@ public final class ThreadCommands {
                     NamedTextColor.GRAY));
         }
 
-        new ThreadGui(player, held, plugin).open();
+        // スロット番号を必ず渡す。ThreadGui は装着直前にこのスロットの中身と対象の同一性を
+        // 突き合わせ、対象を手から離したままの装着(スレッドだけ溶ける)を止める(F3 指摘5)。
+        new ThreadGui(player, held, plugin, player.getInventory().getHeldItemSlot()).open();
         return 1;
     }
 
