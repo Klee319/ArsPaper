@@ -138,6 +138,9 @@ public class RitualManager {
                 return;
             }
             reservedSource = totalSourceRequired;
+            // 第2目標「累計1億ソース」用の集計(2026-07-31)。ここは実際にジャーから吸えた直後なので、
+            // 「必要量」ではなく「本当に消費した量」だけが積まれる(不足で return した経路は通らない)。
+            TrinityForgeBridge.recordSourceSpent(player, reservedSource);
         } else {
             reservedSource = 0;
         }

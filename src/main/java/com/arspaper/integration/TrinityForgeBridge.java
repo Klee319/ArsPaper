@@ -1749,6 +1749,37 @@ public final class TrinityForgeBridge {
         }
     }
 
+    /**
+     * 儀式で消費したソースを、TF 側の「累計カウンタ」PDC へ加算する(2026-07-31)。
+     * 第2目標「累計1億ソース」の達成判定({@code achievements.yml} の
+     * {@code trigger.type: counter} / {@code counter: source_spent})がこの値を読む。
+     *
+     * <p><b>キーを文字列で組んでいる理由</b>: TF 側の {@code PdcKeys#lifetimeCounterKey} を呼ぶと
+     * compileOnly の {@code libs/TrinityForge.jar} を作り直さないとフォークがビルドできなくなる。
+     * このカウンタは PDC への単純な加算で TF のクラスを一切必要としないため、
+     * 綴りだけ合わせて疎結合のままにしてある。TF 側は {@code LifetimeCounterKeyTest} で
+     * この文字列を固定しているので、片方だけ変わると気づける。
+     *
+     * <p>累計は単調増加でなければ意味が壊れるので、{@code amount <= 0} は無視する。
+     */
+    public static void recordSourceSpent(Player player, int amount) {
+        if (player == null || amount <= 0) {
+            return;
+        }
+        try {
+            org.bukkit.NamespacedKey key = new org.bukkit.NamespacedKey("trinityforge", "counter_source_spent");
+            PersistentDataContainer pdc = player.getPersistentDataContainer();
+            long current = pdc.getOrDefault(key, PersistentDataType.LONG, 0L);
+            long updated = current + amount;
+            if (updated < current) {
+                updated = Long.MAX_VALUE; // 飽和(1億の目標に対して事実上の無限)
+            }
+            pdc.set(key, PersistentDataType.LONG, updated);
+        } catch (Throwable t) {
+            // 集計に失敗しても儀式自体は止めない(fail-open)。
+        }
+    }
+
     private static void warnUnavailableOnce() {
         if (!unavailableLogged) {
             unavailableLogged = true;
