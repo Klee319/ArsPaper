@@ -67,6 +67,39 @@ public final class ThreadApplicationPolicy {
     }
 
     /**
+     * <b>スタックした装備へスレッドを装着させてはいけない</b>（2026-07-31 F6 指摘1・HIGH）。
+     *
+     * <p><b>複製とデータ喪失の両方が player-reachable だった</b>: Bukkit の {@code ItemMeta} は
+     * <b>スタック単位</b>なので、{@code ThreadGui#saveThreadSlots} の {@code editMeta} は
+     * スタック内の <b>N 個すべて</b>へ {@code THREAD_SLOTS} / {@code THREAD_SLOT_ROLLS} / lore を書く。
+     * 一方スレッドの消費はちょうど 1 個。したがって
+     * <ul>
+     *   <li><b>装着</b>: 5個スタックの杖へ1本装着 → スタックを分割すると
+     *       <b>スレッド1本で5本の強化済み杖</b>になる（複製）。</li>
+     *   <li><b>取り外し</b>: 返ってくるスレッドは1本だけなのに、
+     *       5本すべてからスレッドが消える（データ喪失）。</li>
+     * </ul>
+     *
+     * <p>F2 で装着 GUI を「決してスタックしない防具」から手持ち装備へ広げたことで到達可能になった。
+     * {@code thread-slots} を持つ 127 件のうち、{@code BLAZE_ROD} 触媒 11 件と {@code ENDER_EYE#85} は
+     * <b>最大スタック 64</b> である。しかも {@code CraftQualityListener} は
+     * プロトタイプ1個に {@code rollSeed} を1回だけ刻んで {@code setResult(stamped.clone())} するため、
+     * <b>シフトクラフトすると PDC がバイト単位で同一な N 個スタック</b>ができる
+     * （{@code GiveItemCommand} も同様）。「スタック可能な品はロールを持たない」という前提は成り立たない。
+     *
+     * <p>対処は「1個だけ持ってから装着させる」の一点。
+     * 入口（{@code /ars thread} / 防具のスニーク+右クリック）と
+     * 装着直前（{@code ThreadGui#refreshTargetFromSlot}）の両方で通す
+     * ── GUI を開いたあとにスタックを作り直せるため、入口だけでは塞げない。
+     *
+     * @param amount 対象スタックの個数
+     * @return 装着を拒否すべきなら true
+     */
+    public static boolean isStackTooLargeToSocket(int amount) {
+        return amount > 1;
+    }
+
+    /**
      * {@code type} を「防具ではない装備」へ装着してよいか。
      *
      * <p>バックパックだけ {@code false}。収納データの取り出し口({@code /ars backpack})が

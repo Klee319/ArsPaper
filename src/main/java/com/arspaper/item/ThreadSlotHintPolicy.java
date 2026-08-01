@@ -27,8 +27,14 @@ import java.util.concurrent.ConcurrentHashMap;
  *       ログイン中もう案内しない(枠の存在は一度知れば十分)。</li>
  * </ol>
  *
- * <p>スニーク+右クリックの案内は<b>自分から試した操作</b>なので「1セッション1回」の対象にしない
- * (知りたくて何度も試した人に無反応を返すのが一番悪い)。短い間隔ガードだけを持つ。
+ * <h2>スニーク+右クリックの案内は廃止した(2026-07-31 F6 指摘3)</h2>
+ * かつては「自分から試した操作だから毎回応答したい」という理由で、右クリック案内に
+ * 短い間隔ガード({@code INTERACT_HINT_COOLDOWN_MS = 5秒})だけを持たせていた。
+ * しかし<b>スニーク+右クリックは通常操作</b>である ── スレッド枠を持つ
+ * 弓(5件)・クロスボウ(5件)・トライデント(5件)・斧(4件)・鍬でスニーク狙撃／スニーク耕作を
+ * すると、TF の EXP/会心アクションバーを 5 秒ごとに無限に上書きし続ける。
+ * 発見経路は下の「選択時の案内」(30秒 + 同一アイテム1セッション1回)と {@code /ars help} で足りるので、
+ * 右クリック側の案内 API ごと削除した(残しておくと復活させたくなる)。
  *
  * <p>Bukkit ランタイムを必要としない純粋な状態機械だけを置く(このフォークのテスト基盤は
  * MockBukkit を持たないため)。時刻は呼び出し側から渡す。
@@ -41,9 +47,6 @@ public final class ThreadSlotHintPolicy {
      */
     public static final long SELECT_HINT_COOLDOWN_MS = 30_000L;
 
-    /** スニーク+右クリックの案内の最小間隔(ms)。自分から試した操作なので短くてよい。 */
-    public static final long INTERACT_HINT_COOLDOWN_MS = 5_000L;
-
     /**
      * 「1セッション1回」の記憶をプレイヤー1人につきいくつまで持つか。
      * インベントリを漁るだけで無制限に増える種類のキーなので上限を切る
@@ -55,7 +58,6 @@ public final class ThreadSlotHintPolicy {
     private static final String UNKNOWN_ITEM_KEY = "?";
 
     private final Map<UUID, Long> lastSelectHintAt = new ConcurrentHashMap<>();
-    private final Map<UUID, Long> lastInteractHintAt = new ConcurrentHashMap<>();
     private final Map<UUID, Set<String>> selectHintedItems = new ConcurrentHashMap<>();
 
     /**
@@ -77,6 +79,26 @@ public final class ThreadSlotHintPolicy {
     }
 
     /**
+     * この品を<b>「もう解決しなくてよい」と記録する</b>(負のキャッシュ。2026-07-31 F6 指摘5)。
+     *
+     * <p>間隔({@link #lastSelectHintAt})は<b>更新しない</b> ── 案内を出していないのに
+     * 他の品の案内まで30秒黙らせてしまうため。記録するのはアイテムキーだけ。
+     *
+     * <p><b>なぜ必要か</b>: {@link #allowSelectHint} はスレッド枠が正のときにしか呼ばれないので、
+     * 枠を1つも持たないプレイヤーでは {@link #lastSelectHintAt} が一度も書かれず
+     * {@link #isSelectHintSuppressed} が永久に {@code false} を返す。結果として
+     * <b>ホットバー操作・F入替・シフトクリックのたびに TF item-stats のフル解決が走り続ける</b>
+     * (「高い解決の前に安く足切りする」という設計の意図が、最も多いケースで働かない)。
+     * ここで評価済みとして覚えると、同一 material#CMD の解決は<b>1セッション1回</b>に収まる。
+     */
+    public void markSelectHintEvaluated(UUID playerId, String itemKey) {
+        if (playerId == null) {
+            return;
+        }
+        remember(playerId, normalizeKey(itemKey));
+    }
+
+    /**
      * 装備を選択したときの案内を出してよいか。出してよい場合は送出済みとして記録する。
      *
      * @param playerId プレイヤー
@@ -87,7 +109,13 @@ public final class ThreadSlotHintPolicy {
         if (isSelectHintSuppressed(playerId, itemKey, nowMs)) {
             return false;
         }
-        String key = normalizeKey(itemKey);
+        remember(playerId, normalizeKey(itemKey));
+        lastSelectHintAt.put(playerId, nowMs);
+        return true;
+    }
+
+    /** 「この品はもう解決/案内しない」集合へ入れる(上限つき・溢れたら古い順に忘れる)。 */
+    private void remember(UUID playerId, String key) {
         Set<String> seen = selectHintedItems.computeIfAbsent(playerId,
                 id -> Collections.synchronizedSet(new LinkedHashSet<>()));
         synchronized (seen) {
@@ -100,24 +128,6 @@ public final class ThreadSlotHintPolicy {
             }
             seen.add(key);
         }
-        lastSelectHintAt.put(playerId, nowMs);
-        return true;
-    }
-
-    /**
-     * スニーク+右クリックの案内を出してよいか。出してよい場合は送出済みとして記録する。
-     * こちらは「1セッション1回」を課さない(意図した操作なので毎回応答したい)。
-     */
-    public boolean allowInteractHint(UUID playerId, long nowMs) {
-        if (playerId == null) {
-            return false;
-        }
-        Long previous = lastInteractHintAt.get(playerId);
-        if (previous != null && nowMs - previous < INTERACT_HINT_COOLDOWN_MS) {
-            return false;
-        }
-        lastInteractHintAt.put(playerId, nowMs);
-        return true;
     }
 
     /** 退出時に状態を捨てる(常駐マップにオフラインプレイヤーを溜めない)。 */
@@ -126,7 +136,6 @@ public final class ThreadSlotHintPolicy {
             return;
         }
         lastSelectHintAt.remove(playerId);
-        lastInteractHintAt.remove(playerId);
         selectHintedItems.remove(playerId);
     }
 

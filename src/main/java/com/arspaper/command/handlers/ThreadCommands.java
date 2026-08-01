@@ -53,6 +53,18 @@ public final class ThreadCommands {
             return 0;
         }
 
+        // F6 指摘1(HIGH): ItemMeta はスタック単位なので、2個以上のスタックへ装着すると
+        // 全個体がスレッドを持ち消費は1個だけ = 複製。取り外しは逆に全個体から消える = データ喪失。
+        // BLAZE_ROD 触媒11件と ENDER_EYE#85 は最大スタック64で、シフトクラフトすると
+        // PDC が同一な N 個スタックができるため実際に到達可能(詳細は ThreadApplicationPolicy)。
+        if (ThreadApplicationPolicy.isStackTooLargeToSocket(held.getAmount())) {
+            player.sendMessage(Component.text(
+                    "同じ装備が" + held.getAmount() + "個重なっています。"
+                            + "スレッドは1個ずつしか装着できません（1個だけ手に持ってから実行してください）。",
+                    NamedTextColor.RED));
+            return 0;
+        }
+
         int slots = effectiveThreadSlots(held, player);
         if (slots <= 0) {
             player.sendMessage(Component.text(

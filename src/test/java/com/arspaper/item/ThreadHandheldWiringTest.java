@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -37,11 +38,25 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 魔導書をメインハンドに持てば成立する)。防具側の GUI 起動にも
  * {@code isCancelled()} ガードが要る。
  *
- * <p>このフォークは Bukkit ランタイム/MockBukkit を持たないため、実行では検証できない
- * 「どのスロットからスレッドを集めているか」「入口がどこにあるか」をソースの静的走査で固定する
- * ({@link ArmorManaListenerManaBonusGuardTest} と同じ流儀)。判断そのものの検証は
- * {@link ThreadApplicationPolicyTest} / {@link ThreadSlotHintPolicyTest} /
- * {@link ThreadTargetIdentityTest}。
+ * <h2>なぜソース文字列の検査なのか（2026-07-31 F6 指摘7 への回答・これ以上の対処はしない）</h2>
+ * <p>このフォークには <b>Bukkit ランタイムが無い</b>（{@code build.gradle.kts} の paper-api は
+ * {@code compileOnly}/{@code testImplementation} の API だけで、MockBukkit も
+ * {@code libs/TrinityForge.jar} の実体も入っていない）。イベントハンドラは
+ * {@code PlayerInteractEvent} / {@code InventoryClickEvent} / {@code Player} を要求するので、
+ * <b>リスナーそのものを実行する手段が原理的に無い</b>。
+ * したがってここで縛れるのは「配線が繋がっているか」「分岐の順序が正しいか」だけであり、
+ * その唯一実効的な形がソースの静的走査である（{@link ArmorManaListenerManaBonusGuardTest} と同じ流儀）。
+ * <p>純関数へ切り出せる判断は切り出して<b>本当に実行する</b>テストへ移してある —
+ * {@link ThreadApplicationPolicyTest}（スロット区分・スタック個数・バックパック）/
+ * {@link ThreadSlotHintPolicyTest}（案内のスパム防止と負のキャッシュ）/
+ * {@link ThreadTargetIdentityTest}（対象の同一性）。
+ * 「リスナー本体まで純関数化する」案は採らない: {@code onInteract} の分岐は
+ * イベントのキャンセル状態・手・アクション種別・スニーク状態という Bukkit 固有の入力の組み合わせで、
+ * それを丸ごと写した純関数を作ると<b>本物と乖離した二重定義</b>になり、
+ * 「純関数は緑なのに実サーバでは壊れている」という一番悪い形になる。
+ * 代わりに順序（index 比較）で「他リスナーとの相対関係」を固定してある。
+ * <b>この形の弱点は既知</b>: {@code if (event.isCancelled()) {} を改行やフォーマットで書き換えると
+ * 偽の失敗になる（そのときは本テストの検索文字列も直すこと）。
  */
 class ThreadHandheldWiringTest {
 
@@ -54,6 +69,16 @@ class ThreadHandheldWiringTest {
                 "ソースが見つからない(パス変更時はこのテストの相対パスも更新すること): "
                         + path.toAbsolutePath());
         return Files.readString(path);
+    }
+
+    private static int countOccurrences(String haystack, String needle) {
+        int count = 0;
+        int at = haystack.indexOf(needle);
+        while (at >= 0) {
+            count++;
+            at = haystack.indexOf(needle, at + needle.length());
+        }
+        return count;
     }
 
     // --- (2) 収集スロットの拡張 ---
@@ -131,18 +156,99 @@ class ThreadHandheldWiringTest {
     }
 
     @Test
-    @DisplayName("手持ちの案内は isCancelled で黙らない(バインド済み杖で永久に出なくなる・F3 指摘1)")
-    void handheldHintIsNotSilencedByOtherListeners() throws IOException {
+    @DisplayName("スニーク+右クリックでは案内を出さない(弓/クロスボウ/トライデント/斧/鍬の通常操作・F6 指摘3)")
+    void sneakRightClickNeverSendsAHint() throws IOException {
+        // 報告された症状は「通常操作で案内が繰り返し出る」。これらは全て非防具なので
+        // onInteract の非防具ブランチを通り、そこは何も送らずに return しなければならない。
+        for (String material : new String[] {
+                "BOW", "CROSSBOW", "TRIDENT", "NETHERITE_AXE", "NETHERITE_HOE", "BLAZE_ROD"}) {
+            assertFalse(ThreadApplicationPolicy.isArmorSlotMaterialName(material),
+                    material + " が防具扱いになっている(非防具ブランチを通らなくなる)");
+        }
+
+        String source = readSource("item", "ThreadGuiOpenListener.java");
+        assertFalse(source.contains("sendHandheldHint"),
+                "スニーク+右クリックの案内が復活している。スレッド枠を持つ弓5件・クロスボウ5件・"
+                        + "トライデント5件・斧4件・鍬でスニーク狙撃/スニーク耕作をすると、"
+                        + "TF の EXP/会心アクションバー(SkillExpFeedbackService / CombatListener)を"
+                        + "5秒ごとに無限に上書きし続ける。");
+        assertFalse(source.contains("allowInteractHint"),
+                "右クリック案内のスパム防止APIを再び呼んでいる(APIごと廃止済み)");
+
+        // 案内の送出は「選択時」の1経路だけ。
+        assertEquals(1, countOccurrences(source, "sendHint(player, slots);"),
+                "案内の送出箇所が1つではない(選択時 hintForSelectedItem だけが正しい)");
+        int selectHintGate = source.indexOf("hintPolicy.allowSelectHint(");
+        int send = source.indexOf("sendHint(player, slots);");
+        assertTrue(selectHintGate >= 0 && selectHintGate < send,
+                "唯一の案内送出が allowSelectHint ゲートの後ろにない");
+
+        // 非防具ブランチが何も送らずに return していること(GUI も開かない)。
+        int nonArmorBranch = source.indexOf("if (!isArmorPiece(item)) {");
+        int branchEnd = source.indexOf("        }", nonArmorBranch);
+        assertTrue(nonArmorBranch >= 0 && branchEnd > nonArmorBranch, "非防具ブランチが見つからない");
+        String branch = source.substring(nonArmorBranch, branchEnd);
+        assertFalse(branch.contains("sendHint") || branch.contains("sendActionBar")
+                        || branch.contains("openForHeldItem"),
+                "非防具ブランチが案内かGUIを出している: " + branch);
+    }
+
+    // --- (F6 指摘1) スタックへの装着ガード ---
+
+    @Test
+    @DisplayName("2個以上のスタックへは装着させない(入口と装着直前の両方でガード)")
+    void socketingIsRefusedForStacks() throws IOException {
+        assertFalse(ThreadApplicationPolicy.isStackTooLargeToSocket(1), "1個は装着できる必要がある");
+        assertFalse(ThreadApplicationPolicy.isStackTooLargeToSocket(0), "空/0個は別経路で弾く");
+        assertTrue(ThreadApplicationPolicy.isStackTooLargeToSocket(2),
+                "2個スタックを許すと ItemMeta がスタック単位なので複製になる");
+        assertTrue(ThreadApplicationPolicy.isStackTooLargeToSocket(64));
+
+        // 入口1: /ars thread(BLAZE_ROD 触媒11件と ENDER_EYE#85 は最大スタック64)
+        String command = readSource("command", "handlers", "ThreadCommands.java");
+        int stackGuard = command.indexOf("ThreadApplicationPolicy.isStackTooLargeToSocket(");
+        int open = command.indexOf("new ThreadGui(");
+        assertTrue(stackGuard >= 0, "/ars thread にスタックガードが無い");
+        assertTrue(stackGuard < open, "スタックガードが GUI 起動より後ろにある");
+
+        // 入口2: 防具のスニーク+右クリック(将来スタック可能な防具材質が増えても穴が開かないように)
+        String listener = readSource("item", "ThreadGuiOpenListener.java");
+        int listenerGuard = listener.indexOf("ThreadApplicationPolicy.isStackTooLargeToSocket(");
+        int listenerOpen = listener.indexOf("openForHeldItem(player, item);");
+        assertTrue(listenerGuard >= 0, "防具経路にスタックガードが無い");
+        assertTrue(listenerGuard < listenerOpen, "スタックガードが GUI 起動より後ろにある");
+
+        // 最後の砦: GUI を開いたあとにスタックを作り直せるので、装着/取り外しの直前でも見る。
+        String gui = readSource("gui", "ThreadGui.java");
+        int guiGuard = gui.indexOf("ThreadApplicationPolicy.isStackTooLargeToSocket(");
+        int consume = gui.indexOf("findThreadItemInInventory(player)");
+        assertTrue(guiGuard >= 0,
+                "refreshTargetFromSlot にスタックガードが無い。入口だけでは GUI を開いたあとに"
+                        + "スタックを作り直す経路が残る。");
+        assertTrue(guiGuard < consume, "スタックガードがスレッド消費より後ろにある");
+        assertTrue(gui.contains("同じ装備が重なっているため中断しました"),
+                "中断の理由を日本語で伝えていない");
+    }
+
+    // --- (F6 指摘5) 案内経路のコスト ---
+
+    @Test
+    @DisplayName("枠を持たない品でもフル解決は1セッション1回に収まる(足切りが実際に働く)")
+    void selectHintShortCircuitsBeforeTheExpensiveResolve() throws IOException {
         String source = readSource("item", "ThreadGuiOpenListener.java");
 
-        int hint = source.indexOf("sendHandheldHint(player, slots);");
-        int guard = source.indexOf("if (event.isCancelled()) {");
-        assertTrue(hint >= 0, "手持ちの案内呼び出しが見つからない");
-        assertTrue(guard < 0 || hint < guard,
-                "案内が isCancelled ガードより後ろにある。SpellBindListener は bookUuid/spellSlot を"
-                        + "持つアイテムの右クリックをスニーク判定より前に無条件でキャンセルするので、"
-                        + "キャンセル済みで黙ると【バインド済みの杖では案内が1度も出ない】"
-                        + "(杖はバインドして使うものなので、これが一番普通の状態)。");
+        int suppressed = source.indexOf("hintPolicy.isSelectHintSuppressed(");
+        int resolve = source.indexOf("int slots = effectiveThreadSlots(selected, player);");
+        assertTrue(suppressed >= 0 && resolve > suppressed,
+                "安い足切り(isSelectHintSuppressed)が高い解決(effectiveThreadSlots)より後ろにある");
+        assertTrue(source.contains("hintPolicy.markSelectHintEvaluated("),
+                "枠0の品を『評価済み』として覚えていない。lastSelectHintAt は allowSelectHint の"
+                        + "中でしか書かれないので、枠を1つも持たないプレイヤーでは"
+                        + "isSelectHintSuppressed が永久に false を返し、ホットバー操作ごとに"
+                        + "TF item-stats のフル解決が走り続ける。");
+        assertTrue(source.contains("pendingSelectHint.add("),
+                "シフトクリックごとに runTask が積まれる形に戻っている"
+                        + "(二重チェストの整理で約50件スケジュールされる)");
     }
 
     @Test

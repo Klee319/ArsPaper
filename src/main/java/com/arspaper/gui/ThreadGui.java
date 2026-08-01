@@ -187,22 +187,37 @@ public class ThreadGui extends BaseGui {
      * 中断して GUI を閉じる ── 消費だけ通って書き込みが乗らないと、プレイヤーは成功したと
      * 思ってスレッドを失う(F3 指摘5)。
      *
+     * <p><b>スタック個数もここで見る(2026-07-31 F6 指摘1・HIGH)</b>: {@code ItemMeta} は
+     * スタック単位なので、2個以上のスタックへ書くと全個体がスレッドを持ち消費は1個だけ = 複製、
+     * 取り外しは逆に全個体から消える = データ喪失になる。入口({@code /ars thread} / 防具の
+     * スニーク+右クリック)でも弾いているが、<b>GUI を開いたあとにスタックを作り直せる</b>ので
+     * 装着/取り外しの直前でも必ず通す(詳細は {@code ThreadApplicationPolicy#isStackTooLargeToSocket})。
+     *
      * @return 続行してよいか
      */
     private boolean refreshTargetFromSlot(Player player) {
-        if (targetSlot == UNKNOWN_TARGET_SLOT) {
-            return true;
+        if (targetSlot != UNKNOWN_TARGET_SLOT) {
+            ItemStack live = player.getInventory().getItem(targetSlot);
+            if (!targetIdentity.matches(com.arspaper.item.ThreadTargetIdentity.of(live))) {
+                player.sendMessage(Component.text(
+                    "対象の装備が手から離れたため中断しました（スレッドは消費していません）。",
+                    NamedTextColor.RED));
+                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
+                player.closeInventory();
+                return false;
+            }
+            this.targetItem = live;
         }
-        ItemStack live = player.getInventory().getItem(targetSlot);
-        if (!targetIdentity.matches(com.arspaper.item.ThreadTargetIdentity.of(live))) {
+        if (targetItem == null
+            || ThreadApplicationPolicy.isStackTooLargeToSocket(targetItem.getAmount())) {
             player.sendMessage(Component.text(
-                "対象の装備が手から離れたため中断しました（スレッドは消費していません）。",
+                "同じ装備が重なっているため中断しました（スレッドは消費していません）。"
+                    + "1個だけ手に持ってから装着してください。",
                 NamedTextColor.RED));
             player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
             player.closeInventory();
             return false;
         }
-        this.targetItem = live;
         return true;
     }
 

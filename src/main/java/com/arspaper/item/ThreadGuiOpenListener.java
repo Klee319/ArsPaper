@@ -20,6 +20,9 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * スレッド枠を持つ装備の {@link ThreadGui} 入口と、その入口の案内。
@@ -46,24 +49,37 @@ import java.util.Map;
  * このリスナー(HIGH / {@code ignoreCancelled = false})が続けて GUI を開いてしまう。
  * <b>呪文が出たなら GUI は開かない</b>のが正しいので、開く直前でキャンセル済みかを見る。
  *
- * <h2>案内は右クリックに依存させない(2026-07-31 F3 指摘1)</h2>
+ * <h2>案内は「持ち替えたとき」だけに寄せる(2026-07-31 F3 指摘1 → F6 指摘3 で縮小)</h2>
  * バインド済みの杖・武器では {@code SpellBindListener} がスニーク判定より前に無条件で
- * キャンセルするため、「キャンセル済みなら黙る」条件を付けた案内は<b>永久に出ない</b>
- * (杖はバインドして使うものなので、これが一番普通の状態だった)。そこで
- * <ol>
- *   <li>スレッド枠を持つ装備を<b>メインハンドに選択したとき</b>にも案内する
- *       (持ち替え/オフハンド入れ替え/ホットバースワップ)。スパム防止は
- *       {@link ThreadSlotHintPolicy} の二重ガード(間隔 + 同一アイテム1セッション1回)。</li>
- *   <li>スニーク+右クリックの案内からは {@code isCancelled()} 条件を<b>外した</b>
- *       (呪文が出ても案内だけは出す。アクションバーなので操作を邪魔しない)。</li>
- * </ol>
- * コマンド一覧側の発見経路は {@code /ars help}
+ * キャンセルするため、「キャンセル済みなら黙る」条件を付けた右クリック案内は<b>永久に出ない</b>
+ * (杖はバインドして使うものなので、これが一番普通の状態だった)。そこで案内を
+ * 右クリックイベントから独立させ、スレッド枠を持つ装備を<b>メインハンドに選択したとき</b>に出す
+ * (持ち替え/オフハンド入れ替え/ホットバースワップ)。スパム防止は {@link ThreadSlotHintPolicy} の
+ * 二重ガード(間隔30秒 + 同一アイテム1セッション1回)。
+ *
+ * <p><b>⚠️ スニーク+右クリックの案内は撤去した(F6 指摘3)</b>: 一時的に
+ * 「キャンセル済みでも案内は出す」形にしていたが、<b>スニーク+右クリックは通常操作</b>である ──
+ * 弓(5件)・クロスボウ(5件)・トライデント(5件)・斧(4件)・鍬はスレッド枠を持ち、
+ * スニーク狙撃やスニーク耕作は普通の遊び方なので、5秒間隔のガードでは
+ * <b>TF の EXP/会心アクションバー({@code SkillExpFeedbackService} / {@code CombatListener})を
+ * 5秒ごとに無限に上書きし続ける</b>。「自分から試した操作だから毎回応答したい」という前提が
+ * この操作には成り立たない。持ち替え時の案内(30秒 + 同一アイテム1セッション1回)と
+ * {@code /ars help} で発見経路は足りているので、右クリック側は<b>案内も GUI も出さない</b>
+ * (防具の GUI 起動だけが残る)。
+ *
+ * <p>コマンド一覧側の発見経路は {@code /ars help}
  * ({@link com.arspaper.command.handlers.HelpCommands})。
  */
 public final class ThreadGuiOpenListener implements Listener {
 
     private final JavaPlugin plugin;
     private final ThreadSlotHintPolicy hintPolicy = new ThreadSlotHintPolicy();
+    /**
+     * 次tickの案内評価を待っているプレイヤー。シフトクリック連打で {@code runTask} が
+     * 積み上がるのを1件へ畳む(F6 指摘5)。イベントはメインスレッドだが
+     * {@code forget} 系と同じ流儀で並行安全な集合にしておく。
+     */
+    private final Set<UUID> pendingSelectHint = ConcurrentHashMap.newKeySet();
 
     public ThreadGuiOpenListener(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -86,19 +102,30 @@ public final class ThreadGuiOpenListener implements Listener {
         if (item == null || item.getType().isAir()) {
             return;
         }
+        if (!isArmorPiece(item)) {
+            // 手持ち装備(武器・触媒・ツール)はこの経路では何もしない ── GUI は /ars thread が唯一の
+            // 入口で、案内も出さない。スニーク+右クリックは弓/クロスボウ/トライデント/斧/鍬の
+            // 通常操作なので、ここで喋ると TF の EXP/会心アクションバーを潰し続ける(F6 指摘3)。
+            // 発見経路は持ち替え時の案内(hintForSelectedItem)と /ars help。
+            return;
+        }
         int slots = effectiveThreadSlots(item, player);
         if (slots <= 0) {
             return;
         }
-        if (!isArmorPiece(item)) {
-            // 手持ち装備: GUI は開かず /ars thread へ誘導する(上の javadoc の二重発火対策)。
-            // 【キャンセル済みでも案内は出す】── バインド済みの杖は SpellBindListener が常に
-            // キャンセルするので、ここで黙ると案内が永久に出ない(F3 指摘1)。
-            sendHandheldHint(player, slots);
-            return;
-        }
         if (event.isCancelled()) {
             // 他リスナー(SpellBindListener 等)が既に処理済み = 呪文が出た。GUI は開かない(F3 指摘2)。
+            return;
+        }
+        // F6 指摘1(HIGH): ItemMeta はスタック単位なので、2個以上のスタックへ装着すると複製/データ喪失。
+        // 防具は通常スタックしないが、経路として同じガードを通す(将来スタック可能な防具材質が
+        // 増えても穴が開かない)。詳細は ThreadApplicationPolicy#isStackTooLargeToSocket。
+        if (ThreadApplicationPolicy.isStackTooLargeToSocket(item.getAmount())) {
+            event.setCancelled(true);
+            player.sendMessage(Component.text(
+                    "同じ装備が" + item.getAmount() + "個重なっています。"
+                            + "スレッドは1個ずつしか装着できません（1個だけ持ってから開いてください）。",
+                    NamedTextColor.RED));
             return;
         }
         event.setCancelled(true);
@@ -140,7 +167,13 @@ public final class ThreadGuiOpenListener implements Listener {
         if (!heldSlotTouched && !hotbarSwap && !event.isShiftClick()) {
             return;
         }
+        // F6 指摘5: シフトクリックは「どのインベントリでも」該当するので、二重チェストを整理すると
+        // 1クリックごとに runTask が積まれる(約50件)。同一プレイヤーの評価は次tickの1回に畳む。
+        if (!pendingSelectHint.add(player.getUniqueId())) {
+            return;
+        }
         plugin.getServer().getScheduler().runTask(plugin, () -> {
+            pendingSelectHint.remove(player.getUniqueId());
             if (player.isOnline()) {
                 hintForSelectedItem(player, player.getInventory().getItemInMainHand());
             }
@@ -151,6 +184,7 @@ public final class ThreadGuiOpenListener implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         hintPolicy.forget(event.getPlayer().getUniqueId());
+        pendingSelectHint.remove(event.getPlayer().getUniqueId());
     }
 
     /**
@@ -170,17 +204,16 @@ public final class ThreadGuiOpenListener implements Listener {
         }
         int slots = effectiveThreadSlots(selected, player);
         if (slots <= 0) {
+            // F6 指摘5: 枠を持たない品はここで「評価済み」として覚える(負のキャッシュ)。
+            // これが無いと lastSelectHintAt が一度も書かれないため isSelectHintSuppressed が
+            // 永久に false を返し、スレッド枠を1つも持たないプレイヤーのホットバー操作ごとに
+            // TF item-stats のフル解決が走り続ける(足切りが構造的に働かない)。
+            // 儀式で枠が増えた同一 material#CMD は再ログインまで案内されないが、
+            // 儀式そのものが枠の存在を伝えるので発見経路は保たれる。
+            hintPolicy.markSelectHintEvaluated(player.getUniqueId(), itemKey);
             return;
         }
         if (!hintPolicy.allowSelectHint(player.getUniqueId(), itemKey, now)) {
-            return;
-        }
-        sendHint(player, slots);
-    }
-
-    /** 手持ち装備でスレッド枠を持つ品に同じ手つきをしたとき、コマンドの入口を教える。 */
-    private void sendHandheldHint(Player player, int slots) {
-        if (!hintPolicy.allowInteractHint(player.getUniqueId(), System.currentTimeMillis())) {
             return;
         }
         sendHint(player, slots);
