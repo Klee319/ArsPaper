@@ -96,16 +96,38 @@ public class SummonedMobListener implements Listener {
     // ------------------------------------------------------------------
 
     /**
-     * 召喚モブの装備枠を開かせない。
+     * 召喚モブの装備枠を開かせない。<b>ただし、その馬に乗っている本人は例外</b>。
+     *
+     * <p><b>なぜ例外が要るか</b>: 騎乗中に E を押したときに開くのは「馬の装備画面」で、
+     * その<b>下半分がプレイヤー自身のインベントリ</b>である。バニラには騎乗中に
+     * 自分の持ち物だけを開く画面が無いので、ここを無条件でキャンセルすると
+     * <b>召喚馬に乗っている間ずっと自分のインベントリを開けなくなる</b>
+     * （しかも押すたびに赤文字が出る）。召喚馬の持続は既定60秒＋延長可能なので実害が大きい。
+     *
+     * <p>鞍の抜き取り自体は {@link #onInventoryClick} / {@link #onInventoryDrag} が
+     * 上段（＝馬の装備枠）へのクリックとドラッグを全て弾いて止めている。
+     * 開いて<b>見える</b>が<b>触れない</b>状態になるだけで、複製経路は塞がったまま。
      */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onInventoryOpen(InventoryOpenEvent event) {
-        if (!isSummonedMobInventory(event.getInventory())) return;
+        AbstractHorse horse = summonedMobOf(event.getInventory());
+        if (horse == null) return;
+        if (!(event.getPlayer() instanceof Player player)) return;
+        if (isRidingThatMob(player.getVehicle(), horse)) return;
         event.setCancelled(true);
-        if (event.getPlayer() instanceof Player player) {
-            player.sendMessage(Component.text("召喚した騎獣の装備は取り外せません",
-                    NamedTextColor.RED));
-        }
+        player.sendMessage(Component.text("召喚した騎獣の装備は取り外せません",
+                NamedTextColor.RED));
+    }
+
+    /**
+     * 開こうとしている本人が、その騎獣に<b>乗っている</b>か。
+     *
+     * <p>引数が {@code Object} なのはテストの都合。このフォークのテストには
+     * モック框架が入っていない（純関数とソース走査だけで組まれている）ので、
+     * {@code Entity} を要求すると判定そのものを1度も実行できないテストになる。
+     */
+    static boolean isRidingThatMob(Object vehicle, Object mob) {
+        return vehicle != null && mob != null && vehicle.equals(mob);
     }
 
     /**
@@ -169,9 +191,15 @@ public class SummonedMobListener implements Listener {
      * 召喚マーカー付きの騎獣が持ち主のインベントリか。
      */
     private boolean isSummonedMobInventory(Inventory inventory) {
-        if (inventory == null) return false;
+        return summonedMobOf(inventory) != null;
+    }
+
+    /** 召喚マーカー付きの騎獣が持ち主なら、その騎獣。そうでなければ {@code null}。 */
+    private AbstractHorse summonedMobOf(Inventory inventory) {
+        if (inventory == null) return null;
         InventoryHolder holder = inventory.getHolder();
-        if (!(holder instanceof AbstractHorse horse)) return false;
-        return horse.getPersistentDataContainer().has(summonedKey, PersistentDataType.BYTE);
+        if (!(holder instanceof AbstractHorse horse)) return null;
+        return horse.getPersistentDataContainer().has(summonedKey, PersistentDataType.BYTE)
+                ? horse : null;
     }
 }

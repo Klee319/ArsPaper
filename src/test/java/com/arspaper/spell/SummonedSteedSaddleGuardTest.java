@@ -57,15 +57,33 @@ class SummonedSteedSaddleGuardTest {
     }
 
     @Test
+    @DisplayName("騎乗中の本人には装備画面を開かせる(唯一の自分のインベントリへの入口なので)")
+    void theRiderMayStillOpenTheScreen() {
+        Object summonedHorse = new Object();
+        Object otherEntity = new Object();
+
+        assertTrue(SummonedMobListener.isRidingThatMob(summonedHorse, summonedHorse),
+                "騎乗中にここを塞ぐと、召喚馬に乗っている間ずっと自分の持ち物を開けなくなる"
+                        + "(バニラには騎乗中に自分のインベントリだけを開く画面が無い)");
+        assertFalse(SummonedMobListener.isRidingThatMob(null, summonedHorse),
+                "降りている相手にまで開かせると、装備枠から鞍を抜ける経路が戻る");
+        assertFalse(SummonedMobListener.isRidingThatMob(otherEntity, summonedHorse),
+                "別の乗り物に乗っている相手は騎乗者ではない");
+        assertFalse(SummonedMobListener.isRidingThatMob(summonedHorse, null));
+    }
+
+    @Test
     @DisplayName("開く・クリック・ドラッグの3経路すべてにハンドラがある")
     void allThreeInventoryEntryPointsAreGuarded() throws Exception {
         String source = Files.readString(
                 Path.of("src/main/java/com/arspaper/spell/SummonedMobListener.java"));
-        assertTrue(source.contains("InventoryOpenEvent"),
+        // import が残っているだけでも通ってしまうので @EventHandler つきのハンドラ本体を見る。
+        String flattened = source.replaceAll("\\s+", " ");
+        assertTrue(flattened.contains("public void onInventoryOpen(InventoryOpenEvent event)"),
                 "開く経路を塞いでいない");
-        assertTrue(source.contains("InventoryClickEvent"),
+        assertTrue(flattened.contains("public void onInventoryClick(InventoryClickEvent event)"),
                 "クリック経路を塞いでいない");
-        assertTrue(source.contains("InventoryDragEvent"),
+        assertTrue(flattened.contains("public void onInventoryDrag(InventoryDragEvent event)"),
                 "ドラッグ経路を塞いでいない");
     }
 

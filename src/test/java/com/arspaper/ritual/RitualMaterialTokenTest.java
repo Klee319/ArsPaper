@@ -64,8 +64,12 @@ class RitualMaterialTokenTest {
                 "消費素材を集めていない");
         assertTrue(source.contains("finalizeCatalogRitualResult(result, player, consumedTokens)"),
                 "TFカタログ儀式が定額のまま(素材を渡していない)");
-        assertTrue(source.contains("finalizeArsSmithingResult(\n")
-                        || source.contains("finalizeArsSmithingResult("),
-                "Ars カスタム儀式の経路が消えている");
+        // 旧実装にも finalizeArsSmithingResult( はあったので、「呼んでいるか」では何も守れない。
+        // 素材トークンを渡しているか(=consumedTokens が引数に入っているか)を見る。
+        // 改行位置に依存しないよう連続空白を1つに潰してから照合する。
+        String flattened = source.replaceAll("\\s+", " ");
+        assertTrue(flattened.contains("finalizeArsSmithingResult( result, player, consumedTokens)")
+                        || flattened.contains("finalizeArsSmithingResult(result, player, consumedTokens)"),
+                "Ars カスタム儀式が定額のまま(素材トークンを渡していない)");
     }
 }
