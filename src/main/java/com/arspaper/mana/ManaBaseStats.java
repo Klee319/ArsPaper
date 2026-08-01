@@ -57,7 +57,11 @@ public final class ManaBaseStats {
     }
 
     public static int defaultMax() {
-        return round(quantity("mana-max-base", FALLBACK_DEFAULT_MAX));
+        int v = round(quantity("mana-max-base", FALLBACK_DEFAULT_MAX));
+        // 0以下は「未記載＝バニラのまま」とみなす(base-stats.yml のヘッダ規約と一致させる)。
+        // 現状はTF側が0を捨てるためここへ0は届かないが、将来TFが0を保持するようになっても
+        // 「最大マナ0で魔法が一切使えない」状態へ黙って落ちないようにする保険。
+        return v > 0 ? v : FALLBACK_DEFAULT_MAX;
     }
 
     public static int defaultRegenRate() {
