@@ -34,7 +34,10 @@ public record SourceTransferConfig(
         int pathParticleIntervalTicks,
         double pathParticleSpacing,
         int pathParticleViewDistance,
-        int pathParticleMaxPaths) {
+        int pathParticleMaxPaths,
+        int infinityCoreRadius,
+        double infinityCoreTransferMultiplier,
+        double infinityCoreBufferMultiplier) {
 
     // --- 既定値 = 2026-08-01 以前のハードコード値(挙動不変) ---
     public static final int DEFAULT_SOURCELINK_INTERVAL_TICKS = 100;
@@ -62,12 +65,23 @@ public record SourceTransferConfig(
     public static final int DEFAULT_PATH_PARTICLE_VIEW_DISTANCE = 48;
     public static final int DEFAULT_PATH_PARTICLE_MAX_PATHS = 16;
 
+    // --- infinity_source_core を置いて機能させる(2026-08-02 新規。2026-08-01 確定仕様 柱6) ---
+    //
+    // 設置された infinity_source_core からこの半径内のソースリンクへ補正が乗る。
+    // マルチブロックのパターン判定はしない(半径判定だけで成立させる)。コアは消費されず、
+    // 設置したまま使い回せる(InfinityCoreTracker が設置位置を追跡する)。
+    public static final int DEFAULT_INFINITY_CORE_RADIUS = 5;
+    public static final double DEFAULT_INFINITY_CORE_TRANSFER_MULTIPLIER = 2.0;
+    public static final double DEFAULT_INFINITY_CORE_BUFFER_MULTIPLIER = 2.0;
+
     /** 検知半径の上限。これ以上はイベントごとの全リンク走査が実用にならない。 */
     private static final int MAX_DETECTION_RADIUS = 256;
     /** リンク距離の上限。ワールド跨ぎは元から不可、チャンクロード判定の現実的な上限に合わせる。 */
     private static final int MAX_LINK_RANGE = 256;
     /** パーティクル間隔の下限(m)。これ未満だと1経路あたりの粒子数が爆発する。 */
     private static final double MIN_PARTICLE_SPACING = 0.1;
+    /** infinity-core 倍率の上限。桁間違い(例: 2.0のつもりで20)を早期に警告するための保守的な上限。 */
+    private static final double MAX_INFINITY_CORE_MULTIPLIER = 1000.0;
 
     public static SourceTransferConfig defaults() {
         return new SourceTransferConfig(
@@ -83,7 +97,10 @@ public record SourceTransferConfig(
                 DEFAULT_PATH_PARTICLE_INTERVAL_TICKS,
                 DEFAULT_PATH_PARTICLE_SPACING,
                 DEFAULT_PATH_PARTICLE_VIEW_DISTANCE,
-                DEFAULT_PATH_PARTICLE_MAX_PATHS);
+                DEFAULT_PATH_PARTICLE_MAX_PATHS,
+                DEFAULT_INFINITY_CORE_RADIUS,
+                DEFAULT_INFINITY_CORE_TRANSFER_MULTIPLIER,
+                DEFAULT_INFINITY_CORE_BUFFER_MULTIPLIER);
     }
 
     /**
@@ -98,6 +115,7 @@ public record SourceTransferConfig(
         ConfigurationSection detect = link == null ? null : link.getConfigurationSection("detection-radius");
         ConfigurationSection net = root.getConfigurationSection("network");
         ConfigurationSection fx = net == null ? null : net.getConfigurationSection("path-particles");
+        ConfigurationSection infinityCore = root.getConfigurationSection("infinity-core");
 
         return new SourceTransferConfig(
                 clampInt(link, "interval-ticks", DEFAULT_SOURCELINK_INTERVAL_TICKS,
@@ -125,7 +143,13 @@ public record SourceTransferConfig(
                 clampInt(fx, "view-distance", DEFAULT_PATH_PARTICLE_VIEW_DISTANCE,
                         1, 256, "transfer.network.path-particles.view-distance", warn),
                 clampInt(fx, "max-paths", DEFAULT_PATH_PARTICLE_MAX_PATHS,
-                        1, 4096, "transfer.network.path-particles.max-paths", warn));
+                        1, 4096, "transfer.network.path-particles.max-paths", warn),
+                clampInt(infinityCore, "radius", DEFAULT_INFINITY_CORE_RADIUS,
+                        0, MAX_DETECTION_RADIUS, "transfer.infinity-core.radius", warn),
+                clampDouble(infinityCore, "transfer-multiplier", DEFAULT_INFINITY_CORE_TRANSFER_MULTIPLIER,
+                        0.0, MAX_INFINITY_CORE_MULTIPLIER, "transfer.infinity-core.transfer-multiplier", warn),
+                clampDouble(infinityCore, "buffer-multiplier", DEFAULT_INFINITY_CORE_BUFFER_MULTIPLIER,
+                        0.0, MAX_INFINITY_CORE_MULTIPLIER, "transfer.infinity-core.buffer-multiplier", warn));
     }
 
     private static int clampInt(ConfigurationSection sec, String key, int fallback,

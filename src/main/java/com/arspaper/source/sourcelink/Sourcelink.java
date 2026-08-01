@@ -114,7 +114,7 @@ public abstract class Sourcelink extends CustomBlock {
         if (!(block.getState() instanceof TileState tile)) return;
         if (amount <= 0) return;
         int current = getBuffer(tile);
-        int cap = transferConfig().sourcelinkBufferCap();
+        int cap = effectiveBufferCap(block);
         int next = com.arspaper.source.SourceTransferConfig.clampBuffer(current, amount, cap);
         long lost = (long) current + (long) amount - (long) next;
         Location key = block.getLocation();
@@ -153,7 +153,7 @@ public abstract class Sourcelink extends CustomBlock {
         if (!(block.getState() instanceof TileState tile)) return 0;
         int buffer = getBuffer(tile);
         if (buffer <= 0) return 0;
-        int drain = Math.min(buffer, transferConfig().sourcelinkMaxPerTransfer());
+        int drain = Math.min(buffer, effectiveMaxPerTransfer(block));
         setBuffer(tile, buffer - drain);
         return drain;
     }
@@ -167,6 +167,44 @@ public abstract class Sourcelink extends CustomBlock {
             return com.arspaper.source.SourceTransferConfig.defaults();
         }
         return ars.getSourcelinkConfig().transfer();
+    }
+
+    /**
+     * {@code block} の位置が設置済み {@code infinity_source_core} の半径内かどうか。
+     * 2026-08-01 確定仕様 柱6: マルチブロックのパターン判定はせず、半径判定だけで成立させる。
+     * トラッカー未初期化(テスト/早期呼び出し)では常に false(補正なし)。
+     */
+    private static boolean withinInfinityCoreRadius(Block block, int radius) {
+        ArsPaper ars = ArsPaper.getInstance();
+        if (ars == null) return false;
+        com.arspaper.source.InfinityCoreTracker tracker = ars.getInfinityCoreTracker();
+        if (tracker == null) return false;
+        return tracker.isWithinRadiusOfAny(block.getLocation(), radius);
+    }
+
+    /**
+     * {@code transfer.sourcelink.buffer-cap} に、半径内であれば
+     * {@code transfer.infinity-core.buffer-multiplier} を掛けた値。
+     *
+     * <p>⚠ 倍率適用後の値も {@link #addToBuffer} 内の {@code clampBuffer}(オーバーフロー安全)を
+     * 必ず通す ―― ここで返すのは「掛け算した cap」であって、加算結果そのものではない。
+     */
+    private static int effectiveBufferCap(Block block) {
+        com.arspaper.source.SourceTransferConfig cfg = transferConfig();
+        int base = cfg.sourcelinkBufferCap();
+        if (!withinInfinityCoreRadius(block, cfg.infinityCoreRadius())) return base;
+        return com.arspaper.source.InfinityCoreEffect.scaleCap(base, cfg.infinityCoreBufferMultiplier());
+    }
+
+    /**
+     * {@code transfer.sourcelink.max-per-transfer} に、半径内であれば
+     * {@code transfer.infinity-core.transfer-multiplier} を掛けた値。
+     */
+    private static int effectiveMaxPerTransfer(Block block) {
+        com.arspaper.source.SourceTransferConfig cfg = transferConfig();
+        int base = cfg.sourcelinkMaxPerTransfer();
+        if (!withinInfinityCoreRadius(block, cfg.infinityCoreRadius())) return base;
+        return com.arspaper.source.InfinityCoreEffect.scaleCap(base, cfg.infinityCoreTransferMultiplier());
     }
 
     /**

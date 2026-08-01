@@ -44,6 +44,9 @@ class SourceTransferConfigTest {
         assertEquals(100, cfg.networkMaxPerTransfer());
         assertEquals(30, cfg.networkMaxLinkRange());
         assertEquals(Integer.MAX_VALUE, cfg.sourcelinkBufferCap());
+        assertEquals(5, cfg.infinityCoreRadius());
+        assertEquals(2.0, cfg.infinityCoreTransferMultiplier(), 1e-9);
+        assertEquals(2.0, cfg.infinityCoreBufferMultiplier(), 1e-9);
         assertTrue(warnings.isEmpty(), "既定値の解決で警告が出てはいけない: " + warnings);
         assertEquals(SourceTransferConfig.defaults(), cfg);
     }
@@ -208,5 +211,53 @@ class SourceTransferConfigTest {
     void bufferAdditionIsTransparentBelowCap() {
         assertEquals(1500, SourceTransferConfig.clampBuffer(1000, 500, Integer.MAX_VALUE));
         assertEquals(30_000_000, SourceTransferConfig.clampBuffer(0, 30_000_000, Integer.MAX_VALUE));
+    }
+
+    // ---- infinity_source_core (柱6) ----
+
+    @Test
+    @DisplayName("infinity-core: 節を書けば半径・倍率を上書きできる")
+    void infinityCoreSectionIsConfigurable() {
+        SourceTransferConfig cfg = parse("""
+                transfer:
+                  infinity-core:
+                    radius: 8
+                    transfer-multiplier: 3.5
+                    buffer-multiplier: 1.5
+                """, new ArrayList<>());
+
+        assertEquals(8, cfg.infinityCoreRadius());
+        assertEquals(3.5, cfg.infinityCoreTransferMultiplier(), 1e-9);
+        assertEquals(1.5, cfg.infinityCoreBufferMultiplier(), 1e-9);
+    }
+
+    @Test
+    @DisplayName("infinity-core.radius=0は「補正を無効化する」として通す(警告なし)")
+    void infinityCoreRadiusZeroIsAllowed() {
+        List<String> warnings = new ArrayList<>();
+        SourceTransferConfig cfg = parse("""
+                transfer:
+                  infinity-core:
+                    radius: 0
+                """, warnings);
+
+        assertEquals(0, cfg.infinityCoreRadius());
+        assertTrue(warnings.isEmpty());
+    }
+
+    @Test
+    @DisplayName("infinity-core の倍率に極端な値を書くとクランプされ警告が出る")
+    void infinityCoreMultiplierOutOfRangeIsClamped() {
+        List<String> warnings = new ArrayList<>();
+        SourceTransferConfig cfg = parse("""
+                transfer:
+                  infinity-core:
+                    transfer-multiplier: -5.0
+                    buffer-multiplier: 999999.0
+                """, warnings);
+
+        assertEquals(0.0, cfg.infinityCoreTransferMultiplier(), 1e-9);
+        assertEquals(1000.0, cfg.infinityCoreBufferMultiplier(), 1e-9);
+        assertEquals(2, warnings.size(), "2件クランプしたはず: " + warnings);
     }
 }

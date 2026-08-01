@@ -5,6 +5,7 @@ import com.arspaper.block.CustomBlockListener;
 import com.arspaper.block.CustomBlockRegistry;
 import com.arspaper.block.SourceJarConfig;
 import com.arspaper.block.impl.CreativeSourceJar;
+import com.arspaper.block.impl.InfinitySourceCore;
 import com.arspaper.block.impl.Pedestal;
 import com.arspaper.block.impl.RitualCore;
 import com.arspaper.block.impl.ScribingTable;
@@ -28,6 +29,7 @@ import com.arspaper.ritual.RitualManager;
 import com.arspaper.ritual.RitualRecipeRegistry;
 import com.arspaper.ritual.effect.*;
 
+import com.arspaper.source.InfinityCoreTracker;
 import com.arspaper.source.SourceNetwork;
 import com.arspaper.source.SourcelinkTickTask;
 import com.arspaper.source.sourcelink.AlchemicalSourcelink;
@@ -66,6 +68,7 @@ public class ArsPaper extends JavaPlugin {
     private ManaManager manaManager;
     private SourceNetwork sourceNetwork;
     private SourcelinkTickTask sourcelinkTickTask;
+    private InfinityCoreTracker infinityCoreTracker;
     private com.arspaper.source.SourceNetworkParticleTask sourceNetworkParticleTask;
     private RecipeManager recipeManager;
     private com.arspaper.recipe.UnlockGate unlockGate;
@@ -323,6 +326,10 @@ public class ArsPaper extends JavaPlugin {
         sourcelinkTickTask = new SourcelinkTickTask(this, blockRegistry);
         sourcelinkTickTask.start();
 
+        // 設置された infinity_source_core の位置追跡(柱6: 半径内のソースリンクへ補正を乗せる)
+        infinityCoreTracker = new InfinityCoreTracker(this);
+        infinityCoreTracker.start();
+
         // ドミニオンワンドの経路可視化Task(ワンド保持者にだけ・一定間隔で描画。config でOFF可)
         sourceNetworkParticleTask = new com.arspaper.source.SourceNetworkParticleTask(this);
         sourceNetworkParticleTask.start();
@@ -518,7 +525,16 @@ public class ArsPaper extends JavaPlugin {
         itemRegistry.register(new SourceBerry(this));
 
         // 設定ベース素材（materials.ymlから動的登録）
+        // ⚠ id がカスタムブロック(例: infinity_source_core)と衝突する場合はスキップする。
+        //   registerDefaultBlocks() がこの前に実行済みで、ブロック側が既に見た目/設置挙動を
+        //   itemRegistry へ登録している ―― ここで無条件に上書きすると「置けるはずのブロックが
+        //   非設置のConfigurableMaterialに化ける」(このメソッドの呼び出し順に依存する無言の事故)。
+        //   materials.yml 側のレシピ(recipe:)はブロックのJavaクラスと独立に読まれるため、
+        //   スキップしてもクラフト自体は成立する。
         for (MaterialConfig mat : materialConfigManager.getAll()) {
+            if (blockRegistry.has(mat.id())) {
+                continue;
+            }
             itemRegistry.register(new com.arspaper.item.impl.ConfigurableMaterial(this, mat));
         }
 
@@ -563,6 +579,9 @@ public class ArsPaper extends JavaPlugin {
 
         CreativeSourceJar creativeSourceJar = new CreativeSourceJar(this);
         Waystone waystone = new Waystone(this);
+        // 到達証明「infinity_source_core」を設置可能にする(柱6)。既存の materials.yml の
+        // 儀式レシピ(result: custom:infinity_source_core)はそのまま流用し、こちらは見た目/設置挙動だけを持つ。
+        InfinitySourceCore infinitySourceCore = new InfinitySourceCore(this);
 
         blockRegistry.register(scribingTable);
         blockRegistry.register(sourceJar);
@@ -575,8 +594,11 @@ public class ArsPaper extends JavaPlugin {
         blockRegistry.register(ritualCore);
         blockRegistry.register(pedestal);
         blockRegistry.register(waystone);
+        blockRegistry.register(infinitySourceCore);
 
         // カスタムブロックもアイテムとして取得できるようにする
+        // (infinity_source_core は materials.yml にも同idの定義が残っているが、
+        //  registerDefaultItems() 側でブロック登録済みidをスキップするのでここが最終的に勝つ)
         itemRegistry.register(scribingTable);
         itemRegistry.register(sourceJar);
         itemRegistry.register(creativeSourceJar);
@@ -588,6 +610,7 @@ public class ArsPaper extends JavaPlugin {
         itemRegistry.register(ritualCore);
         itemRegistry.register(pedestal);
         itemRegistry.register(waystone);
+        itemRegistry.register(infinitySourceCore);
         getServer().getPluginManager().registerEvents(waystone, this);
 
         // テレポートコンパス
@@ -831,7 +854,11 @@ public class ArsPaper extends JavaPlugin {
     public void reloadMaterialConfig() {
         materialConfigManager.reload();
         // 素材アイテムを登録/更新（既存IDも最新設定で再登録）
+        // registerDefaultItems() と同じ理由でカスタムブロックidはスキップする。
         for (MaterialConfig mat : materialConfigManager.getAll()) {
+            if (blockRegistry.has(mat.id())) {
+                continue;
+            }
             itemRegistry.register(new com.arspaper.item.impl.ConfigurableMaterial(this, mat));
         }
     }
@@ -872,6 +899,11 @@ public class ArsPaper extends JavaPlugin {
 
     public SourceJarConfig getSourceJarConfig() {
         return sourceJarConfig;
+    }
+
+    /** 設置された infinity_source_core の位置追跡(柱6)。{@code onEnable} 完了前は null。 */
+    public InfinityCoreTracker getInfinityCoreTracker() {
+        return infinityCoreTracker;
     }
 
     public void reloadSourcelinkConfig() {

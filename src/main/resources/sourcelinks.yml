@@ -91,6 +91,21 @@ transfer:
       # 初版の 0.5 / 10tick / 64経路 は 63 × 64 × 2 = 約8,064粒子/秒だった。
       max-paths: 16
 
+  # --- infinity_source_core を「置いて機能させる」(2026-08-02 追加。柱6) ---
+  # 「1億ソース到達」の証明アイテムを設置すると、周囲のソースリンクに補正が乗る恒久設備になる。
+  # マルチブロックのパターン判定はしない(半径判定だけで成立させる)。設置しても消費されず、
+  # 右クリックで回収して別の場所へ置き直せる(使い回し可)。
+  infinity-core:
+    # 設置された infinity_source_core からこの半径内のソースリンクに補正が乗る(ブロック単位)。
+    # 0 にするとこの補正自体を無効化できる。
+    radius: 5
+    # 半径内のソースリンクの sourcelink.max-per-transfer に掛かる倍率(転送量が増える)。
+    transfer-multiplier: 2.0
+    # 半径内のソースリンクの sourcelink.buffer-cap に掛かる倍率(バッファ上限が増える)。
+    # ⚠ 倍率適用後の値も buffer-cap と同じオーバーフロー安全なクランプ(Sourcelink#addToBuffer)を
+    #   必ず通す。素通しにすると焼べた分が無言で全損する(K-16 の再発)。
+    buffer-multiplier: 2.0
+
 # --- Volcanic Sourcelink (FURNACE) ---
 # Fuel items consumed to generate Source.
 # Reference: coal (1600 burn ticks) = 5 source points
