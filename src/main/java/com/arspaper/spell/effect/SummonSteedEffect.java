@@ -81,7 +81,11 @@ public class SummonSteedEffect implements SpellEffect {
                 .color(net.kyori.adventure.text.format.NamedTextColor.GREEN));
             h.setCustomNameVisible(true);
 
-            // サドル装備
+            // サドル装備。
+            // 実物の鞍でないと騎乗しても操縦できず、降りた後の再騎乗（右クリック）も
+            // 装備枠を開く方に化けるので、ここはダミーに置き換えられない。
+            // 抜き取り（＝召喚のたびに鞍が増える複製）は SummonedMobListener が
+            // 召喚モブの装備枠を開かせないことで塞いでいる。
             h.getInventory().setSaddle(new ItemStack(Material.SADDLE));
 
             // Amplifyによるスピードブースト（最大設定可能）
