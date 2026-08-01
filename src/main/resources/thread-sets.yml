@@ -47,23 +47,28 @@ thread-sets:
   # ■ しきい値の到達可能性(これを外すと永久に発動しないティアになる)
   #   threads.yml の max は【装備1点あたり】の上限。スレッドを載せられる装備は
   #     着用防具4部位 + メインハンド + オフハンド(item-stats の offhand-stats-apply: true の品だけ。
-  #     出荷 item-stats.yml には該当品が無いので実質0)
+  #     出荷 item-stats.yml には該当品が 0 件なので実質0)
   #   なので、同種スレッドの到達可能な合計個数 = max x キャリア数(=5)、
-  #   かつ item-stats.yml の thread-slots 合計が実際の天井になる。
-  #     max 3 (mana_regen / mana_boost / health_boost)   -> 3 / 6 段
-  #     max 2 (hit_mana_recovery / damage_mana_recovery) -> 3 / 6 段
-  #     max 1・重複不可(speed 以下の常時効果系)          -> 2 / 4 段
+  #   かつ item-stats.yml の thread-slots 合計(最上位で 19)が実際の天井になる。
+  #     max 3 (mana_regen / mana_boost / health_boost)   -> 上限 15
+  #     max 2 (hit_mana_recovery / damage_mana_recovery) -> 上限 10
+  #     stackable 未指定 = 1点に1個まで(speed 以下の常時効果系 + spell_cost_down)
+  #                                                      -> 上限 5(キャリア数そのもの)
+  #   ※ セット効果の個数集計は ThreadApplicationPolicy#appliesNumericStats が
+  #     【全スロット】を true にしているので、常時効果が防具限定でも「個数」は武器の枠でも増える。
+  #     ThreadSetThresholdReachabilityTest がこの上限を機械で固定している。
   #
-  # ■ 2026-07-31 (F2) の再検算 —— しきい値は【変えない】。
-  #   武器・触媒でもスレッドが機能するようになったため、キャリアが 4 -> 5 に増えた
-  #   (枠合計の天井も 最上位防具1式 4x4=16 -> +最上位武器3 = 19)。それでも据え置いた理由:
-  #     1) しきい値が要求する【枠の投資量】は 1 枠も変わっていない。増えたのは総予算だけで、
-  #        「6段は1種に6枠を捧げる重い投資」という設計意図はそのまま成立する。
-  #     2) max 1 系の 4 段を 5 へ上げると「メインハンドに thread-slots を持つ武器」が必須になる。
-  #        thread-slots を持つのは item-stats.yml の一部の装備だけなので、枠なしの武器を使う
-  #        プレイヤーには【永久に発動しないティア】が生まれる ── 上の到達可能性の原則に反する。
-  #   結果として 4 段は「全部位」から「5キャリアのうち4つ」へ意味が変わり、
-  #   防具3部位+武器でも到達できる = 置き場所が柔軟になっただけ(コストは同じ)。
+  # ■ 2026-08-01 (A-5) しきい値の引き上げ —— 枠が 9 -> 19 に増えた時代へ合わせる。
+  #   旧値(3/6 段・2/4 段)は【枠合計9】の時代に置いた数字で、天井 19 枠の今は
+  #   6+6+4=16 枠で 3 系統をフル発動できてしまい、「1種に寄せるほどその系統のビルドになる」
+  #   という設計意図が機能していなかった。投資量を天井に比例させて引き上げる:
+  #     max 3 / max 2 の系統 -> 4 / 8 段  (上限 15・10 なので到達可能)
+  #     1点1個の系統         -> 3 / 5 段  (上限 5 ちょうど = 5キャリア全部に載せて初めて最終段)
+  #   1点1個の系統を 3/6 にしない理由は上限が 5 だから ── 6 段は【物理的に到達不能】で、
+  #   書いた瞬間に死にティアになる(設計書 §3-A-5 の「2/4 -> 3/6」はこの上限を見落としている)。
+  #   最終段 5 が「メインハンドに thread-slots を持つ武器」を要求する件は、item-stats.yml の
+  #   thread-slots 保有 128 件のうち剣/斧/槍/鎌/弓/クロスボウ/トライデント/メイス/触媒が
+  #   大半を占めるため、装備選択で到達できる = 永久に発動しないティアにはならない。
   #
   # ■ 方針: 1種に寄せるほど「その系統のビルド」になるよう、種ごとに伸びる軸を変えている。
   #   縦(単純な火力の総和)を伸ばすのではなく、横(会心型/回避型/受け型/出血型)を分ける。
@@ -77,104 +82,111 @@ thread-sets:
   # 詠唱を回し続ける型。継戦の見返りとして与ダメの割合追加。
   mana_regen:
     thresholds:
-      3:
+      4:
         percent-bonus-damage: 0.04
-      6:
+      8:
         percent-bonus-damage: 0.06
         magic-resistance: 0.05
   # マナ総量に寄せる型。一発を重くする(会心ダメージ)。
   mana_boost:
     thresholds:
-      3:
+      4:
         crit-damage: 0.10
-      6:
+      8:
         crit-damage: 0.15
         crit-chance: 0.03
 
   # 常時移動が速い型。避けて手数で押す。
   speed:
     thresholds:
-      2:
+      3:
         dodge-chance: 0.03
-      4:
+      5:
         dodge-chance: 0.04
         crit-chance: 0.03
   # 空中からの一撃を狙う型。
   jump_boost:
     thresholds:
-      2:
+      3:
         crit-damage: 0.06
-      4:
+      5:
         crit-damage: 0.09
   # 暗所での索敵型。固定値の追加ダメージなので低火力帯ほど効く。
+  # 2026-08-01: 2.0/3.0 は flat-bonus-damage の主ステ抽選(1.0〜3.0)1本分に届かない死に値だった。
   night_vision:
     thresholds:
-      2:
-        flat-bonus-damage: 2.0
-      4:
-        flat-bonus-damage: 3.0
+      3:
+        flat-bonus-damage: 8.0
+      5:
+        flat-bonus-damage: 18.0
   # ネザー適性型。魔法耐性へ寄せる。
   fire_resistance:
     thresholds:
-      2:
+      3:
         magic-resistance: 0.04
-      4:
+      5:
         magic-resistance: 0.06
   # 水中適性型。物理耐性へ寄せる。
   dolphins_grace:
     thresholds:
-      2:
+      3:
         phys-resistance: 0.04
-      4:
+      5:
         phys-resistance: 0.06
   # 海底神殿型。魔法守備力を積む。
+  # 2026-08-01: 2.0/3.0 は magic-flat-defense の主ステ抽選(1.5〜5.0)1本分にも満たず、
+  # 「5キャリア全部を捧げる対価」になっていなかったため 12/26 へ引き上げ。
   conduit_power:
     thresholds:
-      2:
-        magic-flat-defense: 2.0
-      4:
-        magic-flat-defense: 3.0
+      3:
+        magic-flat-defense: 12.0
+      5:
+        magic-flat-defense: 26.0
         damage-reduction: 0.02
   # 支援型。attack-power は近接ベースへ加算されるので、素の武器が弱いうちほど効く。
+  # 2026-08-01: 1.0/2.0 は attack-power の主ステ抽選最小値 200 の 1/100 以下で完全な死に値だった。
+  # 累計 1300 は主ステ抽選(200〜600) 2〜3 本分に相当し、5枠を捧げる対価として釣り合う。
   hero_of_the_village:
     thresholds:
-      2:
-        attack-power: 1.0
-      4:
-        attack-power: 2.0
+      3:
+        attack-power: 400.0
+      5:
+        attack-power: 900.0
   # 純粋な受け型。物理と魔法の守備力を両方積む。
+  # 2026-08-01: flat-defense 2.0 は conduit_power と同じ理由の死に値(しかも 8 枠要求)なので 12 へ。
   health_boost:
     thresholds:
-      3:
+      4:
         damage-reduction: 0.03
-        phys-flat-defense: 2.0
-      6:
+        phys-flat-defense: 12.0
+      8:
         damage-reduction: 0.04
-        magic-flat-defense: 2.0
+        magic-flat-defense: 12.0
 
   # 被弾を前提に立つ型。会心軽減(防具強度)と回避で「大きい一発」を潰す。
   hit_mana_recovery:
     thresholds:
-      3:
+      4:
         armor-strength: 0.06
-      6:
+      8:
         armor-strength: 0.08
         dodge-chance: 0.03
   # 殴り続ける型。会心から出血へ繋ぐ。
+  # 2026-08-01: bleed-damage 2.0 は主ステ抽選(20〜80)の 1/10 未満で死に値だったため 80 へ。
   damage_mana_recovery:
     thresholds:
-      3:
+      4:
         crit-chance: 0.04
-      6:
+      8:
         bleed-chance: 0.06
-        bleed-damage: 2.0
+        bleed-damage: 80.0
 
-  # 詠唱コスト型。max 1 なので到達上限は4個。貫通で硬い相手を通す。
+  # 詠唱コスト型。1点1個なので到達上限は5個。貫通で硬い相手を通す。
   spell_cost_down:
     thresholds:
-      2:
+      3:
         penetration: 0.04
-      4:
+      5:
         penetration: 0.06
   # flight / backpack は単体の利便性が既に最大級なので、
   # セット効果は意図的に与えない(戦闘ステまで付くと他のスレッドを選ぶ理由が消える)。

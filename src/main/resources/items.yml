@@ -296,11 +296,53 @@ ritual_effects:
   # レシピ側で固定できないため。RitualRecipe は core-item が null なら任意のコアを許す。
   # 費用はペデスタルの素材とソースだけ。厳選は「沼」なので回数を回せる価格に置いてある
   # (ソースを消費先として使うことで、1億ソースの強化ループにもシンクを作っている)。
+  #
+  # 2026-08-01 (A-2 / K-20): 触媒に custom:reality_thread_core(現実の芯) を1個要求するよう変更。
+  # それまでこの儀式は汎用の source_gem / AMETHYST_SHARD しか要求しておらず、
+  # 「現実の芯」の説明文(&3スレッド再抽選の触媒)・ドロップ配線(要塞/洋館 2%・バスティオン/
+  # 古代都市/エンドシティ 6%・デタパ 3%・束縛者ミニボス 25%)・専用テクスチャのすべてが
+  # 【どこにも繋がっていない嘘】になっていた。1個だけ要求することで、深部ダンジョン周回が
+  # そのまま厳選の回転数になる(汎用素材だけで無限に回せる状態も同時に塞ぐ)。
   thread_reroll:
     name: スレッド厳選の振り直し
     effect-type: thread_reroll
     effect-params: {}
     pedestal-items:
+      - custom:reality_thread_core x1
       - custom:source_gem x4
       - AMETHYST_SHARD x4
     source: 2000
+
+  # 2026-08-01 追加 (A-1): スレッド枠の拡張。
+  # コアに拡張したい装備を置いて回すと、その装備の TrinityForge thread-slots が +1 される。
+  # ThreadSlotExpandRitualEffect / ArsPaper.java の登録 / TF 側 API(expandRitualThreadSlot) /
+  # RitualManager のコア非消費登録は【すべて実装済み】で、items.yml に
+  # effect-type: thread_slot_expand のエントリが 0 件だったため、
+  # 「装備を育てる」軸だけがフルスタック実装済みのまま到達不能だった(0-2 / K-18)。
+  #
+  # core-item を書いていないのは意図的 ── 拡張対象は「プレイヤーが持ってきた装備」で
+  # レシピ側で固定できない。RitualRecipe は core-item が null なら任意のコアを許し、
+  # 効果側の validate() が「枠を増やせない装備」を素材消費前に弾く。
+  # コアの装備は消費されず、その場で書き換えて同じコアへ戻る
+  # (RitualManager の CORE_PRESERVING_EFFECT_TYPES に thread_slot_expand が入っている)。
+  #
+  # max-slots: 2 = この儀式で【1つの装備に累計で付与できる】枠数の上限。
+  #   スレッド枠の天井は最上位防具1式(4x4=16) + 最上位武器(3) = 19 枠。
+  #   1点あたり +2 までなら、キャリア5点フル拡張でも 19 -> 29 枠に留まり、
+  #   thread-sets.yml のしきい値(4/8 段・3/5 段)の投資量の意味が壊れない。
+  #
+  # 素材: ソース設備側(ソース機関)と深部ダンジョン周回側(現実の芯・深淵の合金)の両方を要求する。
+  #   どちらか片方だけを回しても枠は伸びない = 「育てる」軸が両方の周回に依存する。
+  #   入手経路: source_engine = materials.yml のソース階梯レシピ(source_condenser x8 + 1,000,000 ソース)、
+  #             reality_thread_core = 構造物ルート + 束縛者ミニボス、
+  #             abyssal_ingot = 束縛者最終フェーズ 1.0(2-4個) + 各ダンジョン最終ボス 10%。
+  thread_slot_expand_ritual:
+    name: スレッド枠拡張の儀式
+    effect-type: thread_slot_expand
+    effect-params:
+      max-slots: 2
+    pedestal-items:
+      - custom:source_engine x1
+      - custom:reality_thread_core x2
+      - custom:abyssal_ingot x1
+    source: 25000
