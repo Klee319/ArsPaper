@@ -48,11 +48,19 @@ public record SourceTransferConfig(
     public static final int DEFAULT_NETWORK_MAX_LINK_RANGE = 30;
 
     // --- 経路パーティクル(2026-08-01 新規。既定ON) ---
+    //
+    // ⚠ 2026-08-01(同日 round2): 初版の既定値(10tick / 0.5m / 64経路)はワンド保持者1人あたり
+    //    毎秒約8,000粒子パケットを送っていた(1経路30m ÷ 0.5m = 61粒子 + 終端2 → 63、
+    //    × 64経路 = 4,032、× 毎秒2回 = 約8,064)。ワンドは設置作業中ずっと持つ道具なので
+    //    「一瞬だけ重い」ではなく定常負荷になる。下記の保守的な既定へ引き下げた:
+    //      1経路30m ÷ 1.0m = 31粒子 + 終端2 → 33、× 16経路 = 528、× 毎秒1回 = 約528粒子/秒。
+    //    ≒ 1/15。可視性は「1ブロックに1粒子」で十分保てる。
+    //    濃く出したい鯖は sourcelinks.yml で従来値(10 / 0.5 / 64)へ戻せる。
     public static final boolean DEFAULT_PATH_PARTICLES_ENABLED = true;
-    public static final int DEFAULT_PATH_PARTICLE_INTERVAL_TICKS = 10;
-    public static final double DEFAULT_PATH_PARTICLE_SPACING = 0.5;
+    public static final int DEFAULT_PATH_PARTICLE_INTERVAL_TICKS = 20;
+    public static final double DEFAULT_PATH_PARTICLE_SPACING = 1.0;
     public static final int DEFAULT_PATH_PARTICLE_VIEW_DISTANCE = 48;
-    public static final int DEFAULT_PATH_PARTICLE_MAX_PATHS = 64;
+    public static final int DEFAULT_PATH_PARTICLE_MAX_PATHS = 16;
 
     /** 検知半径の上限。これ以上はイベントごとの全リンク走査が実用にならない。 */
     private static final int MAX_DETECTION_RADIUS = 256;

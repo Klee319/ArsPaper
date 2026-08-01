@@ -131,8 +131,10 @@ public class VolcanicSourcelink extends Sourcelink {
     }
 
     @Override
-    public int generateSource(Block block) {
-        return drainBuffer(block);
+    public SourceYield generateSource(Block block) {
+        // 受動生成は無し — この実装は焼べた分(バッファ)しか吐かない。
+        // 注ぎ切れなかった分は全額バッファへ戻る(SourceYield.refundToBuffer)。
+        return SourceYield.ofBuffer(drainBuffer(block));
     }
 
     @Override

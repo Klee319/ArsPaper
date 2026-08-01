@@ -54,11 +54,18 @@ public abstract class Sourcelink extends CustomBlock {
     }
 
     /**
-     * 1回のティックで生成するSource量。
+     * 1回のティックで供給へ回すSource量を、<b>バッファ由来</b>と<b>受動生成</b>に分けて返す。
      * ブロックのTileStateを参照してバッファから排出等の判断が可能。
-     * 0を返すと生成しない。
+     * {@link SourceYield#NONE}(総量0)を返すと生成しない。
+     *
+     * <p>⚠ <b>5実装で規約は1つ</b>: {@link #drainBuffer} で引いた分は
+     * {@link SourceYield#fromBuffer()} に、それ以外(バイタリックの常時生成のような
+     * 無から湧く分)は {@link SourceYield#passive()} に入れること。
+     * 注ぎ切れなかった残量のうちバッファへ戻せるのは前者だけで、後者は捨てられる
+     * ({@link SourceYield#refundToBuffer} 参照)。ここを取り違えると
+     * 「ジャーを外して放置するだけでバッファが無限に増える」抜け穴になる。
      */
-    public abstract int generateSource(Block block);
+    public abstract SourceYield generateSource(Block block);
 
     /**
      * 指定アイテムのソースポイント値を返す。対応しないアイテムは0。
@@ -97,6 +104,11 @@ public abstract class Sourcelink extends CustomBlock {
      * <b>オーバーフローして負値になり、蓄積が無言で全損</b>していた。
      * long で計算して {@code transfer.sourcelink.buffer-cap}(既定 = int上限)へクランプする。
      * クランプで捨てた分はログに残す(素材は既に消費されているため、黙って消さない)。
+     *
+     * <p>⚠ 2026-08-01 追加: 警告は<b>同じブロックにつき1回だけ</b>出す({@link #BUFFER_CAP_WARNED} のラッチ)。
+     * {@code buffer-cap} を有限にすると「上限に張り付いたまま毎周期クランプする」のが定常状態になり、
+     * ラッチ無しだと既定100tick周期で1台あたり日864行の同一警告がログを埋める。
+     * 一度上限を下回れば解除され、次に上限へ達したときにまた1回だけ出る。
      */
     public void addToBuffer(Block block, int amount) {
         if (!(block.getState() instanceof TileState tile)) return;
@@ -105,12 +117,32 @@ public abstract class Sourcelink extends CustomBlock {
         int cap = transferConfig().sourcelinkBufferCap();
         int next = com.arspaper.source.SourceTransferConfig.clampBuffer(current, amount, cap);
         long lost = (long) current + (long) amount - (long) next;
+        Location key = block.getLocation();
         if (lost > 0L) {
-            plugin.getLogger().warning("Sourcelink buffer capped at " + cap + " ("
-                    + getItemId() + " @ " + block.getX() + "," + block.getY() + "," + block.getZ()
-                    + "): discarded " + lost + " source points");
+            if (BUFFER_CAP_WARNED.add(key)) {
+                plugin.getLogger().warning("Sourcelink buffer capped at " + cap + " ("
+                        + getItemId() + " @ " + block.getX() + "," + block.getY() + "," + block.getZ()
+                        + "): discarded " + lost + " source points"
+                        + " (this warning is latched per block until it drops below the cap)");
+            }
+        } else {
+            BUFFER_CAP_WARNED.remove(key);
         }
         setBuffer(tile, next);
+    }
+
+    /**
+     * buffer-cap 到達の警告を既に出したブロック。設置座標そのものをキーにするので、
+     * ソースリンクの種別を跨いで衝突しない。
+     */
+    private static final java.util.Set<Location> BUFFER_CAP_WARNED =
+            java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /** ソースリンクが撤去された/失われたときにラッチを解放する({@code SourcelinkTickTask} から呼ぶ)。 */
+    public static void forgetBufferCapWarning(Location location) {
+        if (location != null) {
+            BUFFER_CAP_WARNED.remove(location.getBlock().getLocation());
+        }
     }
 
     /**
@@ -141,12 +173,12 @@ public abstract class Sourcelink extends CustomBlock {
      * 隣接するSource JarにSourceを供給する。
      * 供給成功時にパーティクルとサウンドを再生。
      *
-     * <p>⚠ 戻り値は<b>注ぎ切れなかった残量</b>。隣接ジャーが満杯/不在だと注げないが、
-     * 呼び出し元は既に {@link #drainBuffer} でバッファから引いた後なので、
-     * <b>残量を戻さないとその分が消滅する</b>({@link com.arspaper.source.SourcelinkTickTask#tick}
-     * が戻り値をバッファへ返却している)。
-     * 転送速度({@code transfer.sourcelink.max-per-transfer})を上げるほど
-     * 「ジャーの空きより多く排出する」状況が普通になるため、この返却は必須。
+     * <p>⚠ 戻り値は<b>注ぎ切れなかった残量</b>。隣接ジャーが満杯/不在だと注げない。
+     * このうち<b>バッファから引いた分だけ</b>を呼び出し元がバッファへ戻す
+     * ({@link SourceYield#refundToBuffer} — 転送速度
+     * {@code transfer.sourcelink.max-per-transfer} を上げるほど
+     * 「ジャーの空きより多く排出する」状況が普通になるため、この返却は必須)。
+     * <b>受動生成分は戻さず捨てる</b>(ジャーの容量を実質的な上限として働かせる元設計の復元)。
      */
     public int supplyAdjacent(Block block, int amount) {
         Location loc = block.getLocation();

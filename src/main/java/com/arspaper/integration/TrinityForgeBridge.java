@@ -1666,8 +1666,10 @@ public final class TrinityForgeBridge {
      * TrinityForge 本体がロードされ、プレイヤー基礎ステータスを読める状態か。
      *
      * <p>{@link #isAvailable()}(戦闘サービスの可用性)とは別物で、ここでは
-     * {@code combat/base-stats.yml} が読めることだけを見る。TFがロードされていれば
-     * 「設定に書かれていないマナ回復系キー = 0」と断定してよい根拠になる。
+     * {@code combat/base-stats.yml} が読めることだけを見る。
+     *
+     * <p>⚠ これだけでは「0と書いた」と「行が無い/パース失敗」を区別できない。
+     * マナ初期値の解決には {@link #manaBaseStatSource(String)} を使うこと。
      */
     public static boolean trinityForgeLoaded() {
         try {
@@ -1676,6 +1678,93 @@ public final class TrinityForgeBridge {
         } catch (Throwable t) {
             return false;
         }
+    }
+
+    // --- base-stats.yml の「行が書かれているか」判定(2026-08-01 round2) ---------------------
+    //
+    // BaseStatsConfig#stats() は 0 のキーをロード時に捨てるので、値が届かない理由が
+    //   (a) 0 と書いた / (b) 行が1つも無い / (c) yml のパースに失敗した
+    // のどれなのか API からは分からない。(a) だけを 0 として扱い、(b)(c) はフォールバックへ
+    // 落とす必要があるため、TF のデータフォルダにある実ファイルのキー集合を直接読む。
+    // 読み直しはファイルの更新時刻+サイズが変わったときだけ(マナ回復は毎秒引かれるため)。
+
+    /** base-stats.yml を再確認する最短間隔(ナノ秒)。/trinityforge reload への追随は数秒遅れて構わない。 */
+    private static final long BASE_STATS_RECHECK_NANOS = 5_000_000_000L;
+
+    /** 読めたときは canonical 化済みキー集合、読めなかったときは null。 */
+    private static volatile java.util.Set<String> baseStatsDeclaredKeys = null;
+    /** キャッシュした時点のファイル識別(更新時刻とサイズ)。 */
+    private static volatile long baseStatsFileStamp = Long.MIN_VALUE;
+    private static volatile long baseStatsCheckedAtNanos = 0L;
+    private static volatile boolean baseStatsCacheInitialised = false;
+
+    /**
+     * マナ初期値キーが TF の {@code combat/base-stats.yml} でどう見えているかを返す。
+     *
+     * <p>{@link #manaBaseStatRaw(String)} が empty を返す理由を4通りに分ける。
+     * 詳細な規約は {@link com.arspaper.mana.ManaBaseStats} の javadoc を参照。
+     */
+    public static com.arspaper.mana.ManaBaseStats.Source manaBaseStatSource(String canonicalKey) {
+        try {
+            TrinityForge tf = TrinityForge.getInstance();
+            if (tf == null || tf.config() == null || tf.config().baseStats() == null) {
+                return com.arspaper.mana.ManaBaseStats.Source.TRINITYFORGE_ABSENT;
+            }
+            java.util.Set<String> declared = declaredBaseStatKeys(tf);
+            if (declared == null) {
+                return com.arspaper.mana.ManaBaseStats.Source.UNREADABLE;
+            }
+            if (canonicalKey == null) {
+                return com.arspaper.mana.ManaBaseStats.Source.KEY_ABSENT;
+            }
+            return declared.contains(StatKeys.canonical(canonicalKey))
+                    ? com.arspaper.mana.ManaBaseStats.Source.KEY_DECLARED
+                    : com.arspaper.mana.ManaBaseStats.Source.KEY_ABSENT;
+        } catch (Throwable t) {
+            // TF のクラスが解決できない等。ArsPaper 単体運用と同じ扱い(fail-open)。
+            return com.arspaper.mana.ManaBaseStats.Source.TRINITYFORGE_ABSENT;
+        }
+    }
+
+    /** base-stats.yml に実際に書かれているキー集合(canonical)。読めなければ null。 */
+    private static java.util.Set<String> declaredBaseStatKeys(TrinityForge tf) {
+        java.io.File file = new java.io.File(tf.getDataFolder(),
+                com.trinityforge.config.domains.BaseStatsConfig.PATH);
+        long stamp = file.exists() ? (file.lastModified() * 31L) ^ file.length() : Long.MIN_VALUE + 1L;
+        long now = System.nanoTime();
+        if (baseStatsCacheInitialised
+                && stamp == baseStatsFileStamp
+                && now - baseStatsCheckedAtNanos < BASE_STATS_RECHECK_NANOS) {
+            return baseStatsDeclaredKeys;
+        }
+        java.util.Set<String> parsed = parseDeclaredBaseStatKeys(file);
+        baseStatsDeclaredKeys = parsed;
+        baseStatsFileStamp = stamp;
+        baseStatsCheckedAtNanos = now;
+        baseStatsCacheInitialised = true;
+        return parsed;
+    }
+
+    private static java.util.Set<String> parseDeclaredBaseStatKeys(java.io.File file) {
+        if (!file.isFile()) {
+            return null;
+        }
+        org.bukkit.configuration.file.YamlConfiguration yaml =
+                new org.bukkit.configuration.file.YamlConfiguration();
+        try {
+            yaml.load(file);
+        } catch (java.io.IOException | org.bukkit.configuration.InvalidConfigurationException broken) {
+            return null;
+        }
+        org.bukkit.configuration.ConfigurationSection sec = yaml.getConfigurationSection("base-stats");
+        if (sec == null) {
+            return null;
+        }
+        java.util.Set<String> keys = new java.util.LinkedHashSet<>();
+        for (String key : sec.getKeys(false)) {
+            keys.add(StatKeys.canonical(key));
+        }
+        return keys;
     }
 
     /** グリフ配置枠加算(int, +N, floor/0クランプ済み)。dedicated + native arsmagic_glyphslots_add。 */

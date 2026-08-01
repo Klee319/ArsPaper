@@ -49,6 +49,43 @@ class SourceTransferConfigTest {
     }
 
     @Test
+    @DisplayName("経路パーティクルの既定値は保守的な値で固定する(毎秒の粒子数の見積り付き)")
+    void particleDefaultsStayConservative() {
+        SourceTransferConfig cfg = SourceTransferConfig.defaults();
+
+        assertTrue(cfg.pathParticlesEnabled(), "既定はON(可視化しないと経路が追えない)");
+        assertEquals(20, cfg.pathParticleIntervalTicks());
+        assertEquals(1.0, cfg.pathParticleSpacing(), 1e-9);
+        assertEquals(48, cfg.pathParticleViewDistance());
+        assertEquals(16, cfg.pathParticleMaxPaths());
+
+        // 1経路30mでの毎秒粒子数 = (30 ÷ spacing + 1 端点 + 2 終端マーカー) × max-paths × (20 ÷ interval)
+        int dots = SourcePathVisualPolicy.dotCount(30.0, cfg.pathParticleSpacing());
+        int perSecond = (dots + 2) * cfg.pathParticleMaxPaths() * (20 / cfg.pathParticleIntervalTicks());
+        assertEquals(528, perSecond, "ワンド保持者1人あたりの定常負荷");
+        assertTrue(perSecond <= 1000,
+                "初版の既定(10tick / 0.5m / 64経路)は毎秒約8,064粒子だった。"
+                        + "ワンドは設置作業中ずっと持つ道具なので、ここは1,000粒子/秒を超えさせない: " + perSecond);
+    }
+
+    @Test
+    @DisplayName("出荷 sourcelinks.yml の値は既定値と厳密に一致する")
+    void shippedYamlMatchesDefaults() throws Exception {
+        // 既定値だけ下げても、出荷ymlが古い値を明示していれば新規サーバには効かない。
+        // 「Java の既定」と「出荷 yml」の2本を必ず同時に動かすためのガード。
+        YamlConfiguration yaml = new YamlConfiguration();
+        yaml.load(new java.io.File("src/main/resources/sourcelinks.yml"));
+
+        List<String> warnings = new ArrayList<>();
+        SourceTransferConfig cfg =
+                SourceTransferConfig.parse(yaml.getConfigurationSection("transfer"), warnings::add);
+
+        assertEquals(SourceTransferConfig.defaults(), cfg,
+                "出荷 sourcelinks.yml の transfer: が SourceTransferConfig の既定値とズレている");
+        assertTrue(warnings.isEmpty(), "出荷ymlがクランプ対象の値を書いている: " + warnings);
+    }
+
+    @Test
     @DisplayName("部分的に書いても、書かなかったキーは既定値のまま")
     void partialSectionKeepsOtherDefaults() {
         SourceTransferConfig cfg = parse("""

@@ -155,8 +155,9 @@ public class SourceNetworkParticleTask {
         double dy = end.getY() - start.getY();
         double dz = end.getZ() - start.getZ();
 
-        for (int i = 0; i <= dots; i++) {
-            double t = (double) i / dots;
+        // ⚠ dots は「実個数」。以前は i <= dots で回していたため上限128のはずが129個出ていた。
+        for (int i = 0; i < dots; i++) {
+            double t = SourcePathVisualPolicy.dotRatio(i, dots);
             Location point = new Location(start.getWorld(),
                     start.getX() + dx * t, start.getY() + dy * t, start.getZ() + dz * t);
             Particle.DustOptions color =

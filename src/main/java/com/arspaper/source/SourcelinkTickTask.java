@@ -4,6 +4,7 @@ import com.arspaper.block.BlockKeys;
 import com.arspaper.block.CustomBlockRegistry;
 import com.arspaper.source.sourcelink.BotanicalSourcelink;
 import com.arspaper.source.sourcelink.Sourcelink;
+import com.arspaper.source.sourcelink.SourceYield;
 import com.arspaper.source.sourcelink.VitalicSourcelink;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
@@ -155,6 +156,8 @@ public class SourcelinkTickTask implements Listener {
     public void removeSourcelink(Location location) {
         Location blockLoc = location.getBlock().getLocation();
         sourcelinkLocations.values().forEach(locs -> locs.remove(blockLoc));
+        // buffer-cap 警告のラッチも解放する(撤去済みブロックの座標を溜め続けないため)
+        Sourcelink.forgetBufferCapWarning(blockLoc);
     }
 
     /**
@@ -247,19 +250,26 @@ public class SourcelinkTickTask implements Listener {
                         continue;
                     }
 
-                    int generated = sourcelink.generateSource(block);
+                    SourceYield yield = sourcelink.generateSource(block);
+                    int generated = yield.total();
                     if (generated > 0) {
-                        // 注ぎ切れなかった残量はバッファへ戻す。generateSource が既に
-                        // バッファから引いているので、戻さないと「隣接ジャーが満杯の間だけ
-                        // 生成分が無言で消える」ことになる(転送速度を上げるほど常態化する)。
+                        // 注ぎ切れなかった残量のうち「バッファから引いた分」だけを戻す。
+                        // 全額戻すと、バイタリックの受動生成(バッファ由来ではない)が
+                        // 隣接ジャー不在/満杯のあいだ毎周期バッファへ積み上がり、
+                        // 保管容量の上限が消える(2026-08-01 の実バグ)。逆に一切戻さないと
+                        // 焼べた分が「ジャーが満杯の間だけ無言で消える」。
                         int leftover = sourcelink.supplyAdjacent(block, generated);
-                        if (leftover > 0) {
-                            sourcelink.addToBuffer(block, leftover);
+                        int refund = SourceYield.refundToBuffer(yield, leftover);
+                        if (refund > 0) {
+                            sourcelink.addToBuffer(block, refund);
                         }
                         sourcelink.onGenerate(block);
                     }
                 }
-                staleLocations.forEach(locations::remove);
+                staleLocations.forEach(stale -> {
+                    locations.remove(stale);
+                    Sourcelink.forgetBufferCapWarning(stale);
+                });
             });
         }
     }

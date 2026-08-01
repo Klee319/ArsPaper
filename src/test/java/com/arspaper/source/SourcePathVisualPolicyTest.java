@@ -25,13 +25,35 @@ class SourcePathVisualPolicyTest {
     }
 
     @Test
-    @DisplayName("粒子数は距離÷間隔で、上限でハードキャップされる")
+    @DisplayName("粒子数は「距離÷間隔 + 1」(端点を両方描く)で、上限でハードキャップされる")
     void dotCountFollowsSpacingUntilCapped() {
-        assertEquals(60, SourcePathVisualPolicy.dotCount(30.0, 0.5));
-        assertEquals(20, SourcePathVisualPolicy.dotCount(10.0, 0.5));
-        // 距離256 ÷ 間隔0.1 = 2560 だが、メインスレッドを守るため上限で止める
+        // 2026-08-01: 戻り値は「実際に回す個数」。呼び出し側が i <= dots で回していたため
+        // 「上限128」と書いてあるのに129個出ていた(オフバイワン)。個数側に上限を掛ける。
+        assertEquals(61, SourcePathVisualPolicy.dotCount(30.0, 0.5));
+        assertEquals(21, SourcePathVisualPolicy.dotCount(10.0, 0.5));
+        assertEquals(31, SourcePathVisualPolicy.dotCount(30.0, 1.0));
+        // 距離256 ÷ 間隔0.1 + 1 = 2561 だが、メインスレッドを守るため上限で止める
         assertEquals(SourcePathVisualPolicy.MAX_DOTS_PER_PATH,
                 SourcePathVisualPolicy.dotCount(256.0, 0.1));
+        // 上限ちょうどを跨いでも128を超えない(129個出ていたのが実バグ)
+        assertEquals(SourcePathVisualPolicy.MAX_DOTS_PER_PATH,
+                SourcePathVisualPolicy.dotCount(127.0, 1.0));
+        assertEquals(SourcePathVisualPolicy.MAX_DOTS_PER_PATH,
+                SourcePathVisualPolicy.dotCount(1000.0, 1.0));
+    }
+
+    @Test
+    @DisplayName("粒子の位置は始点0.0〜終点1.0を dotCount 個で割る(0除算しない)")
+    void dotRatioSpansBothEndpoints() {
+        assertEquals(0.0, SourcePathVisualPolicy.dotRatio(0, 5), 1e-9);
+        assertEquals(0.25, SourcePathVisualPolicy.dotRatio(1, 5), 1e-9);
+        assertEquals(1.0, SourcePathVisualPolicy.dotRatio(4, 5), 1e-9);
+        // 1個しか出ない経路(距離0など)は始点へ置く。dots-1 = 0 で割らないこと。
+        assertEquals(0.0, SourcePathVisualPolicy.dotRatio(0, 1), 1e-9);
+        assertEquals(0.0, SourcePathVisualPolicy.dotRatio(3, 1), 1e-9);
+        // 範囲外の index でも [0,1] を出ない
+        assertEquals(1.0, SourcePathVisualPolicy.dotRatio(99, 5), 1e-9);
+        assertEquals(0.0, SourcePathVisualPolicy.dotRatio(-3, 5), 1e-9);
     }
 
     @Test
