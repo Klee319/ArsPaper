@@ -372,13 +372,16 @@ public class RitualManager {
                     // Arsカスタムは isQualityStamped のもののみ品質刻印。
                     if (recipe.isCustomResult()) {
                         String rid = recipe.resultId();
+                        // U1/N6: 儀式EXPを素材ごとに決めるため、消費素材のトークンを渡す。
+                        List<String> consumedTokens = consumedMaterialTokens(recipe);
                         if (rid != null && rid.startsWith(CatalogRitualRegistrar.RESULT_PREFIX)) {
-                            TrinityForgeBridge.finalizeCatalogRitualResult(result, player);
+                            TrinityForgeBridge.finalizeCatalogRitualResult(result, player, consumedTokens);
                         } else {
                             ArsPaper.getInstance().getItemRegistry()
                                 .get(recipe.resultId())
                                 .filter(BaseCustomItem::isQualityStamped)
-                                .ifPresent(bci -> TrinityForgeBridge.finalizeArsSmithingResult(result, player));
+                                .ifPresent(bci -> TrinityForgeBridge.finalizeArsSmithingResult(
+                                    result, player, consumedTokens));
                         }
                     }
 
@@ -527,6 +530,41 @@ public class RitualManager {
                 }
             }
         }
+    }
+
+    /**
+     * この儀式が消費する素材のトークン列 (U1/N6)。TrinityForge の
+     * {@code smithing.exp-per-material} と同じ語彙で、素材1個につき1要素
+     * (台座は1台につき1個なので {@code pedestalItems()} の要素数がそのまま個数になる)。
+     *
+     * <p><b>実際に台座から取り出した ItemStack ではなくレシピ定義を使う理由</b>:
+     * レシピ側は最初から {@code custom:<id>} / Material 名という config と同じ語彙で持っており、
+     * PDC を読み直す必要がない。台座の実物から起こすと、Ars と TF の刻印の読み分けを
+     * ここでもう一度実装することになり、TF 側の表と食い違う余地が増える。
+     *
+     * <p>コアアイテムも craft 儀式では消費されるので含める。
+     */
+    private List<String> consumedMaterialTokens(RitualRecipe recipe) {
+        List<String> tokens = new ArrayList<>();
+        if (recipe == null) {
+            return tokens;
+        }
+        addMaterialToken(tokens, recipe.coreItem());
+        for (RitualIngredient ingredient : recipe.pedestalItems()) {
+            addMaterialToken(tokens, ingredient);
+        }
+        return tokens;
+    }
+
+    /** package-private: 1素材ぶんのトークンを積む(ユニットテストから直接叩けるように)。 */
+    static void addMaterialToken(List<String> tokens, RitualIngredient ingredient) {
+        if (ingredient == null || ingredient.materialOrCustomId() == null
+                || ingredient.materialOrCustomId().isBlank()) {
+            return;
+        }
+        tokens.add(ingredient.isCustom()
+            ? "custom:" + ingredient.materialOrCustomId()
+            : ingredient.materialOrCustomId());
     }
 
     private void consumePedestalItems(Player player, List<PedestalInfo> pedestals,

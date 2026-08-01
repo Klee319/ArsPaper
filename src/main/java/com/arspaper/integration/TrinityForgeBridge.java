@@ -785,12 +785,22 @@ public final class TrinityForgeBridge {
      * to the crafter when applicable.
      */
     public static void finalizeCatalogRitualResult(ItemStack item, Player crafter) {
+        finalizeCatalogRitualResult(item, crafter, java.util.List.of());
+    }
+
+    /**
+     * {@link #finalizeCatalogRitualResult(ItemStack, Player)} に消費素材を伝える版 (U1/N6)。
+     * {@code materialTokens} は TrinityForge の {@code smithing.exp-per-material} と同じ語彙
+     * ({@code IRON_INGOT} / {@code custom:<id>})で、素材1個につき1要素。
+     */
+    public static void finalizeCatalogRitualResult(ItemStack item, Player crafter,
+                                                   Collection<String> materialTokens) {
         if (item == null || crafter == null || item.getType().isAir()) {
             return;
         }
         try {
             if (MaterialTier.of(item.getType()).isEquipment() || isArsQualityStamped(item)) {
-                finalizeArsSmithingResult(item, crafter);
+                finalizeArsSmithingResult(item, crafter, materialTokens);
             }
             if (!item.hasItemMeta()) {
                 return;
@@ -815,12 +825,26 @@ public final class TrinityForgeBridge {
      * finished-item use-level scaling configured by TrinityForge.
      */
     public static void finalizeArsSmithingResult(ItemStack item, Player crafter) {
+        finalizeArsSmithingResult(item, crafter, java.util.List.of());
+    }
+
+    /**
+     * {@link #finalizeArsSmithingResult(ItemStack, Player)} に消費素材を伝える版 (U1/N6)。
+     *
+     * <p>儀式EXPはこれまで定額({@code ars-smithing.exp-per-craft})で、素材の重さを一切見ていなかった。
+     * 消費素材のトークンを渡すと TrinityForge 側が作業台と<b>同じ</b>
+     * {@code smithing.exp-per-material} 表で合計する。表から1つも引けなければ従来どおり定額に戻るので、
+     * 表が未整備のサーバで儀式EXPが消える回帰にはならない。
+     */
+    public static void finalizeArsSmithingResult(ItemStack item, Player crafter,
+                                                 Collection<String> materialTokens) {
         if (item == null || crafter == null || item.getType().isAir()) {
             return;
         }
         stampCraftedQuality(item, crafter);
         try {
-            ArsProgressionBridge.grantSmithingCraftExp(ArsPaper.getInstance(), crafter, item);
+            ArsProgressionBridge.grantSmithingCraftExp(ArsPaper.getInstance(), crafter, item,
+                    materialTokens == null ? java.util.List.of() : materialTokens);
         } catch (Throwable t) {
             // TF absent / older API: keep the successfully crafted and quality-stamped result.
         }
