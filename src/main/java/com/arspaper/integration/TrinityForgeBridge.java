@@ -1726,21 +1726,29 @@ public final class TrinityForgeBridge {
         }
     }
 
-    /** base-stats.yml に実際に書かれているキー集合(canonical)。読めなければ null。 */
+    /**
+     * base-stats.yml に実際に書かれているキー集合(canonical)。読めなければ null。
+     *
+     * <p>⚠ この判定はマナ回復のたび(＝毎秒×人数)に引かれるので、
+     * <b>時間窓の中ではファイルシステムに一切触れない</b>。窓を過ぎたときだけ
+     * 更新時刻+サイズを見て、変わっていれば読み直す({@code /trinityforge reload} への
+     * 追随が数秒遅れるのは許容範囲)。
+     */
     private static java.util.Set<String> declaredBaseStatKeys(TrinityForge tf) {
+        long now = System.nanoTime();
+        if (baseStatsCacheInitialised && now - baseStatsCheckedAtNanos < BASE_STATS_RECHECK_NANOS) {
+            return baseStatsDeclaredKeys;
+        }
         java.io.File file = new java.io.File(tf.getDataFolder(),
                 com.trinityforge.config.domains.BaseStatsConfig.PATH);
         long stamp = file.exists() ? (file.lastModified() * 31L) ^ file.length() : Long.MIN_VALUE + 1L;
-        long now = System.nanoTime();
-        if (baseStatsCacheInitialised
-                && stamp == baseStatsFileStamp
-                && now - baseStatsCheckedAtNanos < BASE_STATS_RECHECK_NANOS) {
+        baseStatsCheckedAtNanos = now;
+        if (baseStatsCacheInitialised && stamp == baseStatsFileStamp) {
             return baseStatsDeclaredKeys;
         }
         java.util.Set<String> parsed = parseDeclaredBaseStatKeys(file);
         baseStatsDeclaredKeys = parsed;
         baseStatsFileStamp = stamp;
-        baseStatsCheckedAtNanos = now;
         baseStatsCacheInitialised = true;
         return parsed;
     }
