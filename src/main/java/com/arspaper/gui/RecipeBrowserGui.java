@@ -1082,7 +1082,32 @@ public class RecipeBrowserGui extends BaseGui {
         for (RecipeEntry entry : entries) {
             applySortKeys(entry);
         }
+        applyCategories(entries);
         return entries;
+    }
+
+    /**
+     * 5分類(防具/素材/武器/ツール/その他)を全レシピへ焼き付ける(N4)。
+     *
+     * <p><b>全件そろってからでないと決められない</b>: 「素材」の判定に
+     * 「この結果が他のレシピの素材として使われているか」を使うため、
+     * 先に全レシピの素材トークンを1つの集合へ集めてから分類する。
+     */
+    private void applyCategories(List<RecipeEntry> entries) {
+        java.util.Set<String> usedAsIngredient = new java.util.HashSet<>();
+        for (RecipeEntry entry : entries) {
+            usedAsIngredient.addAll(entry.ingredientTokens());
+        }
+        for (RecipeEntry entry : entries) {
+            ItemStack probe = entry.iconItem;
+            if (probe == null && entry.icon != null && entry.icon.isItem()) {
+                probe = new ItemStack(entry.icon);
+            }
+            String tfCategory =
+                    com.arspaper.integration.TrinityForgeStatPreview.topLevelCategory(probe);
+            entry.sortCategory = RecipeCategory.classify(tfCategory, entry.sortSkill, entry.icon,
+                    entry.resultToken != null && usedAsIngredient.contains(entry.resultToken));
+        }
     }
 
     /**
@@ -1268,6 +1293,27 @@ public class RecipeBrowserGui extends BaseGui {
                 lore.add(detailText(desc, NamedTextColor.LIGHT_PURPLE));
             }
         }
+
+        // === 最低品質でのステータス下限(N4) ===
+        // 品質と厳選ロールでどれだけ振れても「最低これだけは出る」を先に見せる。
+        // TF未ロード / item-stats 未登録 / lore.yml に表示定義が無い場合は1行も出ない。
+        List<Component> floorLines = minimumStatLines(entry);
+        if (!floorLines.isEmpty()) {
+            lore.add(Component.empty());
+            lore.addAll(floorLines);
+        }
+    }
+
+    /**
+     * このレシピの完成品が最低品質(既定では【劣悪】)で保証するステータスの lore 行。
+     * 実際の計算は {@link com.arspaper.integration.TrinityForgeStatPreview} 側。
+     */
+    private List<Component> minimumStatLines(RecipeEntry entry) {
+        ItemStack probe = entry.iconItem;
+        if (probe == null && entry.icon != null && entry.icon.isItem()) {
+            probe = new ItemStack(entry.icon);
+        }
+        return com.arspaper.integration.TrinityForgeStatPreview.minimumStatLines(probe);
     }
 
     /**
@@ -1393,6 +1439,7 @@ public class RecipeBrowserGui extends BaseGui {
                 mode == current ? NamedTextColor.GREEN : NamedTextColor.DARK_GRAY));
         }
         lore.add(detailText("種別=item-stats の使用スキル(無ければ素材)", NamedTextColor.DARK_GRAY));
+        lore.add(detailText("分類=防具/素材/武器/ツール/その他", NamedTextColor.DARK_GRAY));
         return lore;
     }
 

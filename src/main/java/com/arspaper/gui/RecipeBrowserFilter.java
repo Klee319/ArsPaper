@@ -45,6 +45,9 @@ final class RecipeBrowserFilter {
     enum SortMode {
         NAME("名前順"),
         KIND("種別順(スキル→素材)"),
+        // N4: 「防具/素材/武器/ツール/その他」の5分類。KIND は使用スキル文字列を並べるだけで
+        // 未設定分が Material 名で散らばるため、「防具だけ見たい」には使えなかった。
+        CATEGORY("分類順(防具/素材/武器/ツール/その他)"),
         LEVEL("使用可能レベル順"),
         DEFAULT("登録順");
 
@@ -133,6 +136,10 @@ final class RecipeBrowserFilter {
             // 同じ種別/レベル内は名前順で安定させる(ページをめくるたび順序が変わらないように)
             case KIND -> Comparator.<RecipeEntry, String>comparing(
                     e -> e.sortKind().toLowerCase(Locale.ROOT)).thenComparing(byName);
+            // 分類は enum の宣言順(防具→素材→武器→ツール→その他)で並べる
+            case CATEGORY -> Comparator.<RecipeEntry, Integer>comparing(
+                    e -> e.sortCategory == null ? RecipeCategory.OTHER.ordinal()
+                            : e.sortCategory.ordinal()).thenComparing(byName);
             case LEVEL -> Comparator.<RecipeEntry, Integer>comparing(e -> e.sortLevel)
                     .thenComparing(byName);
         };

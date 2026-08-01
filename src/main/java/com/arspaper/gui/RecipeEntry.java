@@ -50,6 +50,12 @@ final class RecipeEntry {
     String sortSkill = "";
     /** 並べ替え用にキャッシュした使用可能レベル(未設定なら0)。 */
     int sortLevel = 0;
+    /**
+     * 並べ替え用にキャッシュした5分類(防具/素材/武器/ツール/その他)。
+     * 「他のレシピの素材か」を見る必要があるので、全レシピを集め終わってからまとめて決まる
+     * ({@code RecipeBrowserGui#applyCategories})。未確定の間は「その他」。
+     */
+    RecipeCategory sortCategory = RecipeCategory.OTHER;
 
     /**
      * このレシピが消費する素材トークンを重複なしで返す。

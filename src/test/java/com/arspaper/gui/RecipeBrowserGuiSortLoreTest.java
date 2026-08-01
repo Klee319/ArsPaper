@@ -60,6 +60,8 @@ class RecipeBrowserGuiSortLoreTest {
     void keepsGuidanceLines() {
         List<Component> lore = RecipeBrowserGui.sortLore(RecipeBrowserFilter.SortMode.DEFAULT);
         assertEquals("クリックで次の並び順へ", plain(lore.get(0)));
-        assertEquals("種別=item-stats の使用スキル(無ければ素材)", plain(lore.get(lore.size() - 1)));
+        // 末尾の補足行は「種別」「分類」の2本（分類順の追加で1本増えた）。
+        assertEquals("種別=item-stats の使用スキル(無ければ素材)", plain(lore.get(lore.size() - 2)));
+        assertEquals("分類=防具/素材/武器/ツール/その他", plain(lore.get(lore.size() - 1)));
     }
 }
