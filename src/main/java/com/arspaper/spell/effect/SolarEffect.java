@@ -4,6 +4,8 @@ import com.arspaper.spell.DefenseIgnoringDamagePolicy;
 import com.arspaper.spell.GlyphConfig;
 import com.arspaper.spell.SpellContext;
 import com.arspaper.spell.SpellEffect;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
@@ -123,21 +125,56 @@ public class SolarEffect implements SpellEffect {
 
                 // 炎弾発射
                 if (ticks % fireInterval == 0) {
-                    List<LivingEntity> targets = center.getNearbyLivingEntities(radius).stream()
+                    List<LivingEntity> candidates = center.getNearbyLivingEntities(radius).stream()
                         .filter(e -> !e.equals(onlineCaster))
                         .filter(e -> context.isValidAoeTarget(e, onlineCaster))
                         .sorted(Comparator.comparingDouble(e -> e.getLocation().distanceSquared(center)))
+                        .toList();
+                    // F5 指摘3: 累計上限を使い切った対象は「発射スロットを占有しない」= limit より前に外す。
+                    // 旧実装は limit(発射数) で切ってから撃っていたため、最近接の1体が上限に達すると
+                    // 他に有効な敵がいても召喚が残り時間ぜんぶ不発だった。
+                    List<LivingEntity> shootable = candidates.stream()
+                        .filter(e -> remainingBudget(damage, e, dealtPerTarget,
+                            maxPercentPerHit, maxPercentPerCast) > 0)
                         .limit(shotsPerVolley)
                         .toList();
 
-                    for (LivingEntity target : targets) {
-                        fireFlameProjectile(center, target, damage, onlineCaster,
-                            dealtPerTarget, maxPercentPerHit, maxPercentPerCast);
+                    switch (DefenseIgnoringDamagePolicy.volleyOutcome(candidates.size(), shootable.size())) {
+                        case END_SUMMON -> {
+                            // 範囲内の対象が全員この詠唱の累計上限に到達。残り時間を無言で消費せず終了する
+                            // (詠唱し直せば累計はリセットされるので、回復する対象が恒久的に無敵にはならない)。
+                            onlineCaster.sendActionBar(Component.text(
+                                "日輪: 対象の累計ダメージ上限に達したため召喚を終了しました",
+                                NamedTextColor.GOLD));
+                            cancel();
+                            return;
+                        }
+                        case IDLE -> {
+                            // 範囲に対象がいないだけ。設置技として敵が入ってくるのを待つ。
+                        }
+                        case FIRE -> {
+                            for (LivingEntity target : shootable) {
+                                fireFlameProjectile(center, target, damage, onlineCaster,
+                                    dealtPerTarget, maxPercentPerHit, maxPercentPerCast);
+                            }
+                        }
                     }
                 }
             }
         }.runTaskTimer(plugin, 0L, 1L);
         SpellTaskLimiter.registerPerCaster("solar", casterUUID, task, maxSummons);
+    }
+
+    /**
+     * この詠唱でこの対象へまだ適用できる防御無視ダメージ量（0 なら累計上限に到達済み）。
+     * 発射スロットの選定と実際の適用で<b>同じ式</b>を使うために切り出してある
+     * （片方だけ更新すると「選ばれたのに何も起きない弾」が復活する）。
+     */
+    private static double remainingBudget(double damage, LivingEntity target,
+                                          Map<UUID, Double> dealtPerTarget,
+                                          double maxPercentPerHit, double maxPercentPerCast) {
+        return DefenseIgnoringDamagePolicy.cappedDamage(damage, SpellContext.maxHealthOf(target),
+            dealtPerTarget.getOrDefault(target.getUniqueId(), 0.0), maxPercentPerHit, maxPercentPerCast);
     }
 
     private void fireFlameProjectile(Location from, LivingEntity target, double damage, Player caster,
