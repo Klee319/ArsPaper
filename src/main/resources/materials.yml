@@ -2169,7 +2169,8 @@ _editor:
           - husk_cloth
           - bogged_mossy_bone
           - parched_sandy_bone
-      - label: ダンジョンの印
+      - id: cat_20260731_dungeon_seal
+        label: ダンジョンの印
         itemIds:
           - dungeon_seal_mines
           - dungeon_seal_deep_mines
@@ -2190,12 +2191,14 @@ _editor:
           - dungeon_seal_hallosseum
           - dungeon_seal_north_pole
           - dungeon_seal_binder
-      - label: EM限定素材
+      - id: cat_20260731_em_exclusive
+        label: EM限定素材
         itemIds:
           - binder_fragment
           - reality_thread_core
           - abyssal_ingot
-      - label: ソース階梯
+      - id: cat_20260731_source_ladder
+        label: ソース階梯
         itemIds:
           - source_shard
           - source_crystal
