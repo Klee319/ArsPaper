@@ -140,8 +140,15 @@ public abstract class Sourcelink extends CustomBlock {
     /**
      * 隣接するSource JarにSourceを供給する。
      * 供給成功時にパーティクルとサウンドを再生。
+     *
+     * <p>⚠ 戻り値は<b>注ぎ切れなかった残量</b>。隣接ジャーが満杯/不在だと注げないが、
+     * 呼び出し元は既に {@link #drainBuffer} でバッファから引いた後なので、
+     * <b>残量を戻さないとその分が消滅する</b>({@link com.arspaper.source.SourcelinkTickTask#tick}
+     * が戻り値をバッファへ返却している)。
+     * 転送速度({@code transfer.sourcelink.max-per-transfer})を上げるほど
+     * 「ジャーの空きより多く排出する」状況が普通になるため、この返却は必須。
      */
-    public void supplyAdjacent(Block block, int amount) {
+    public int supplyAdjacent(Block block, int amount) {
         Location loc = block.getLocation();
         int[][] offsets = {{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
 
@@ -172,6 +179,7 @@ public abstract class Sourcelink extends CustomBlock {
                 spawnJarFillFx(adjacent.getLocation());
             }
         }
+        return remaining;
     }
 
     /**

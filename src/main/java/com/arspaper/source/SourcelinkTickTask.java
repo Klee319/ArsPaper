@@ -249,7 +249,13 @@ public class SourcelinkTickTask implements Listener {
 
                     int generated = sourcelink.generateSource(block);
                     if (generated > 0) {
-                        sourcelink.supplyAdjacent(block, generated);
+                        // 注ぎ切れなかった残量はバッファへ戻す。generateSource が既に
+                        // バッファから引いているので、戻さないと「隣接ジャーが満杯の間だけ
+                        // 生成分が無言で消える」ことになる(転送速度を上げるほど常態化する)。
+                        int leftover = sourcelink.supplyAdjacent(block, generated);
+                        if (leftover > 0) {
+                            sourcelink.addToBuffer(block, leftover);
+                        }
                         sourcelink.onGenerate(block);
                     }
                 }
