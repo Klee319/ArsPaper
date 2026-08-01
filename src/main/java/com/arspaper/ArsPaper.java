@@ -66,6 +66,7 @@ public class ArsPaper extends JavaPlugin {
     private ManaManager manaManager;
     private SourceNetwork sourceNetwork;
     private SourcelinkTickTask sourcelinkTickTask;
+    private com.arspaper.source.SourceNetworkParticleTask sourceNetworkParticleTask;
     private RecipeManager recipeManager;
     private com.arspaper.recipe.UnlockGate unlockGate;
     private RitualRecipeRegistry ritualRecipeRegistry;
@@ -161,6 +162,9 @@ public class ArsPaper extends JavaPlugin {
         }
         if (sourcelinkTickTask != null) {
             sourcelinkTickTask.stop();
+        }
+        if (sourceNetworkParticleTask != null) {
+            sourceNetworkParticleTask.stop();
         }
         if (blockParticleTask != null) {
             blockParticleTask.cancel();
@@ -318,6 +322,10 @@ public class ArsPaper extends JavaPlugin {
         // SourcelinkティックTask
         sourcelinkTickTask = new SourcelinkTickTask(this, blockRegistry);
         sourcelinkTickTask.start();
+
+        // ドミニオンワンドの経路可視化Task(ワンド保持者にだけ・一定間隔で描画。config でOFF可)
+        sourceNetworkParticleTask = new com.arspaper.source.SourceNetworkParticleTask(this);
+        sourceNetworkParticleTask.start();
 
         // ブロックパーティクルTask
         blockParticleTask = new BlockParticleTask(this);
@@ -880,6 +888,16 @@ public class ArsPaper extends JavaPlugin {
         }
         // reloadで新しく追加されたカスタムソースリンクを登録 (既存idはスキップされる)
         registerCustomSourcelinks();
+        // 転送周期/経路パーティクル間隔は Bukkit のタイマー周期なので、張り直さないと反映されない。
+        if (sourcelinkTickTask != null) {
+            sourcelinkTickTask.restart();
+        }
+        if (sourceNetwork != null) {
+            sourceNetwork.restartTransferTask();
+        }
+        if (sourceNetworkParticleTask != null) {
+            sourceNetworkParticleTask.restart();
+        }
     }
 
     public void reloadSourceJarConfig() {

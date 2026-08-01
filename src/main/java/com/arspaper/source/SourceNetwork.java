@@ -26,9 +26,9 @@ import java.util.*;
  */
 public class SourceNetwork {
 
-    private static final int TRANSFER_AMOUNT = 100;
-    private static final int MAX_RELAY_RANGE = 30;
-    private static final int TRANSFER_INTERVAL_TICKS = 40; // 2秒
+    // 転送量(旧 TRANSFER_AMOUNT=100) / 転送範囲(旧 MAX_RELAY_RANGE=30) /
+    // 転送周期(旧 TRANSFER_INTERVAL_TICKS=40) は 2026-08-01 に sourcelinks.yml の
+    // transfer.network.* へ移設した。既定値は移設前と同値(挙動不変)。
 
     private final JavaPlugin plugin;
     private final Map<LocationKey, Set<LocationKey>> connections = new HashMap<>();
@@ -41,6 +41,19 @@ public class SourceNetwork {
         startTransferTask();
     }
 
+    private static SourceTransferConfig transferConfig() {
+        com.arspaper.ArsPaper ars = com.arspaper.ArsPaper.getInstance();
+        if (ars == null || ars.getSourcelinkConfig() == null) {
+            return SourceTransferConfig.defaults();
+        }
+        return ars.getSourcelinkConfig().transfer();
+    }
+
+    /** リンクを張れる最大距離（{@code transfer.network.max-link-range}）。 */
+    public static int maxLinkRange() {
+        return transferConfig().networkMaxLinkRange();
+    }
+
     /**
      * 送信元→送信先の接続を追加する。
      * 逆方向の接続が既にある場合は自動削除する（相殺防止）。
@@ -49,7 +62,7 @@ public class SourceNetwork {
      */
     public boolean connect(Location from, Location to) {
         if (!from.getWorld().equals(to.getWorld())) return false;
-        if (from.distance(to) > MAX_RELAY_RANGE) return false;
+        if (from.distance(to) > maxLinkRange()) return false;
 
         LocationKey fromKey = LocationKey.of(from);
         LocationKey toKey = LocationKey.of(to);
@@ -147,12 +160,43 @@ public class SourceNetwork {
     }
 
     private void startTransferTask() {
+        if (transferTask != null) {
+            transferTask.cancel();
+        }
+        long interval = transferConfig().networkIntervalTicks();
         transferTask = plugin.getServer().getScheduler().runTaskTimer(
-            plugin, this::tickTransfer, TRANSFER_INTERVAL_TICKS, TRANSFER_INTERVAL_TICKS
+            plugin, this::tickTransfer, interval, interval
         );
     }
 
+    /**
+     * {@code transfer.network.interval-ticks} を読み直してタイマーを張り直す。
+     * {@code /ars reload} から呼ぶ（Bukkitのタイマー周期は後から変更できないため）。
+     */
+    public void restartTransferTask() {
+        startTransferTask();
+    }
+
+    /**
+     * 経路(送信元→送信先)のスナップショットを返す。パーティクル描画など読み取り専用の用途向け。
+     * ワールドが未ロードの端点は除外する。
+     */
+    public List<Location[]> snapshotPaths() {
+        List<Location[]> paths = new ArrayList<>();
+        for (var entry : connections.entrySet()) {
+            Location from = entry.getKey().toLocation();
+            if (from == null) continue;
+            for (LocationKey toKey : entry.getValue()) {
+                Location to = toKey.toLocation();
+                if (to == null) continue;
+                paths.add(new Location[]{from, to});
+            }
+        }
+        return paths;
+    }
+
     private void tickTransfer() {
+        final int transferAmount = transferConfig().networkMaxPerTransfer();
         // フェーズ1: 全転送を計算（net flowで相殺を回避）
         // ペアごとの正味転送量を計算
         Map<LocationKey, Map<LocationKey, Integer>> pendingTransfers = new LinkedHashMap<>();
@@ -190,7 +234,7 @@ public class SourceNetwork {
                 int space = toMax - toAmount;
                 if (space <= 0) continue;
 
-                int transfer = Math.min(TRANSFER_AMOUNT, Math.min(available, space));
+                int transfer = Math.min(transferAmount, Math.min(available, space));
                 if (transfer <= 0) continue;
 
                 pendingTransfers.computeIfAbsent(fromKey, k -> new LinkedHashMap<>())

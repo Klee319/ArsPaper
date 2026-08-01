@@ -62,6 +62,9 @@ public class SourcelinkConfig {
     private ItemCostTable mycelialMaterials = ItemCostTable.empty();
     private ItemCostTable alchemicalMaterials = ItemCostTable.empty();
     private Map<String, ItemDef> items = Map.of();
+    // 転送速度/転送範囲/経路パーティクル(2026-08-01 config化)。未設定なら従来のハードコード値。
+    private volatile com.arspaper.source.SourceTransferConfig transfer =
+            com.arspaper.source.SourceTransferConfig.defaults();
 
     public SourcelinkConfig(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -76,6 +79,7 @@ public class SourcelinkConfig {
             mycelialMaterials = ItemCostTable.fromMaterials(MycelialSourcelink.getDefaultFoodValues());
             alchemicalMaterials = ItemCostTable.fromMaterials(AlchemicalSourcelink.getDefaultAlchemyValues());
             items = Map.of();
+            transfer = com.arspaper.source.SourceTransferConfig.defaults();
             return;
         }
 
@@ -89,11 +93,22 @@ public class SourcelinkConfig {
         alchemicalMaterials = loadSection(config, "alchemical.materials",
                 ItemCostTable.fromMaterials(AlchemicalSourcelink.getDefaultAlchemyValues()), logger);
         items = loadItems(config, logger);
+        transfer = com.arspaper.source.SourceTransferConfig.parse(
+                config.getConfigurationSection("transfer"), logger::warning);
 
         logger.info("Sourcelink config loaded: volcanic=" + volcanicMaterials.size()
                 + ", mycelial=" + mycelialMaterials.size()
                 + ", alchemical=" + alchemicalMaterials.size()
-                + ", items=" + items.size());
+                + ", items=" + items.size()
+                + ", transfer=" + transfer.sourcelinkMaxPerTransfer() + "/"
+                + transfer.sourcelinkIntervalTicks() + "t"
+                + ", network=" + transfer.networkMaxPerTransfer() + "/"
+                + transfer.networkIntervalTicks() + "t range=" + transfer.networkMaxLinkRange());
+    }
+
+    /** 転送速度/転送範囲/経路パーティクルの設定。null にはならない。 */
+    public com.arspaper.source.SourceTransferConfig transfer() {
+        return transfer;
     }
 
     private Map<String, ItemDef> loadItems(YamlConfiguration config, Logger logger) {

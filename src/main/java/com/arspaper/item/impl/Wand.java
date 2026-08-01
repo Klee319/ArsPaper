@@ -32,6 +32,9 @@ import java.util.*;
  */
 public class Wand extends BaseCustomItem {
 
+    /** カスタムアイテムid。PDC照合(経路パーティクルの保持判定など)から参照する。 */
+    public static final String ITEM_ID = "dominion_wand";
+
     private final Map<UUID, Location> selectedSource = new HashMap<>();
 
     /**
@@ -41,8 +44,16 @@ public class Wand extends BaseCustomItem {
         selectedSource.remove(playerId);
     }
 
+    /**
+     * 送信元として選択中の座標（未選択なら empty）。
+     * 経路パーティクル({@code SourceNetworkParticleTask})が選択中ブロックを強調するために読む。
+     */
+    public java.util.Optional<Location> selectedSource(UUID playerId) {
+        return java.util.Optional.ofNullable(selectedSource.get(playerId));
+    }
+
     public Wand(JavaPlugin plugin) {
-        super(plugin, "dominion_wand");
+        super(plugin, ITEM_ID);
     }
 
     @Override
@@ -131,8 +142,9 @@ public class Wand extends BaseCustomItem {
                 // 接続パーティクル
                 spawnConnectionParticle(selected, clickedLoc);
             } else {
+                // 最大距離は sourcelinks.yml の transfer.network.max-link-range なのでメッセージも追随させる
                 player.sendMessage(Component.text(
-                    "接続失敗！（最大距離: 30ブロック、同一ワールドのみ）",
+                    "接続失敗！（最大距離: " + SourceNetwork.maxLinkRange() + "ブロック、同一ワールドのみ）",
                     NamedTextColor.RED
                 ));
             }

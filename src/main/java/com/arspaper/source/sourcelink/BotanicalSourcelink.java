@@ -26,8 +26,15 @@ public class BotanicalSourcelink extends Sourcelink {
 
     /** 植物成長1回あたりのソースポイント */
     public static final int SOURCE_PER_GROWTH = 5;
-    /** 成長検知範囲（ブロック） */
-    public static final int DETECTION_RADIUS = 10;
+    /**
+     * 成長検知範囲（ブロック）の既定値。
+     *
+     * <p>2026-08-01: 実際に使う値は {@code sourcelinks.yml} の
+     * {@code transfer.sourcelink.detection-radius.botanical}（既定10 = 移設前と同値）。
+     * 参照元は {@link com.arspaper.source.SourcelinkTickTask#onBlockGrow}。
+     */
+    public static final int DETECTION_RADIUS =
+            com.arspaper.source.SourceTransferConfig.DEFAULT_BOTANICAL_DETECTION_RADIUS;
 
     public BotanicalSourcelink(JavaPlugin plugin) {
         super(plugin, "botanical_sourcelink");
@@ -59,7 +66,9 @@ public class BotanicalSourcelink extends Sourcelink {
         return withConfiguredOrDefaultLore(super.createItemStack(), List.of(
                 Component.text("植物の成長からソースを生成", NamedTextColor.GRAY)
                     .decoration(TextDecoration.ITALIC, false),
-                Component.text("半径10ブロック以内の作物成長で蓄積", NamedTextColor.DARK_GRAY)
+                // 検知半径は設定(transfer.sourcelink.detection-radius.botanical)なので lore も追随させる
+                Component.text("半径" + transferConfig().botanicalDetectionRadius()
+                        + "ブロック以内の作物成長で蓄積", NamedTextColor.DARK_GRAY)
                     .decoration(TextDecoration.ITALIC, false)
         ));
     }

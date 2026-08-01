@@ -35,10 +35,12 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class SourcelinkTickTask implements Listener {
 
-    private static final int TICK_INTERVAL = 100; // 5秒
+    // 周期(旧 TICK_INTERVAL = 100tick = 5秒)は 2026-08-01 に sourcelinks.yml の
+    // transfer.sourcelink.interval-ticks へ移設した。既定値は同じ100tick(挙動不変)。
     private final JavaPlugin plugin;
     private final CustomBlockRegistry blockRegistry;
     private BukkitTask task;
+    private boolean listenerRegistered = false;
 
     /** 設置済みSourcelinkの位置キャッシュ (blockId → locations) */
     private final Map<String, Set<Location>> sourcelinkLocations = new ConcurrentHashMap<>();
@@ -51,11 +53,36 @@ public class SourcelinkTickTask implements Listener {
     public void start() {
         // 起動時にロード済みチャンクをスキャンしてキャッシュ再構築
         rebuildCache();
-        task = plugin.getServer().getScheduler().runTaskTimer(
-            plugin, this::tick, TICK_INTERVAL, TICK_INTERVAL
-        );
-        // ChunkLoadイベントでキャッシュに追加
-        plugin.getServer().getPluginManager().registerEvents(this, plugin);
+        scheduleTick();
+        // ChunkLoadイベントでキャッシュに追加(reload で二重登録しないよう1回だけ)
+        if (!listenerRegistered) {
+            plugin.getServer().getPluginManager().registerEvents(this, plugin);
+            listenerRegistered = true;
+        }
+    }
+
+    /**
+     * {@code transfer.sourcelink.interval-ticks} を読み直してタイマーを張り直す。
+     * {@code /ars reload} から呼ぶ(Bukkitのタイマー周期は後から変更できないため再スケジュールが必要)。
+     */
+    public void restart() {
+        scheduleTick();
+    }
+
+    private void scheduleTick() {
+        if (task != null) {
+            task.cancel();
+        }
+        long interval = transferConfig().sourcelinkIntervalTicks();
+        task = plugin.getServer().getScheduler().runTaskTimer(plugin, this::tick, interval, interval);
+    }
+
+    private static com.arspaper.source.SourceTransferConfig transferConfig() {
+        com.arspaper.ArsPaper ars = com.arspaper.ArsPaper.getInstance();
+        if (ars == null || ars.getSourcelinkConfig() == null) {
+            return com.arspaper.source.SourceTransferConfig.defaults();
+        }
+        return ars.getSourcelinkConfig().transfer();
     }
 
     /**
@@ -142,8 +169,9 @@ public class SourcelinkTickTask implements Listener {
         World deathWorld = deathLoc.getWorld();
         if (deathWorld == null) return;
 
-        int radiusSq = VitalicSourcelink.DETECTION_RADIUS * VitalicSourcelink.DETECTION_RADIUS;
-        accumulateNear(VitalicSourcelink.class, deathWorld, deathLoc, radiusSq,
+        int radius = transferConfig().vitalicDetectionRadius();
+        if (radius <= 0) return;
+        accumulateNear(VitalicSourcelink.class, deathWorld, deathLoc, radius * radius,
             VitalicSourcelink.SOURCE_PER_KILL);
     }
 
@@ -167,8 +195,9 @@ public class SourcelinkTickTask implements Listener {
         World growthWorld = growthLoc.getWorld();
         if (growthWorld == null) return;
 
-        int radiusSq = BotanicalSourcelink.DETECTION_RADIUS * BotanicalSourcelink.DETECTION_RADIUS;
-        accumulateNear(BotanicalSourcelink.class, growthWorld, growthLoc, radiusSq,
+        int radius = transferConfig().botanicalDetectionRadius();
+        if (radius <= 0) return;
+        accumulateNear(BotanicalSourcelink.class, growthWorld, growthLoc, radius * radius,
             BotanicalSourcelink.SOURCE_PER_GROWTH);
     }
 

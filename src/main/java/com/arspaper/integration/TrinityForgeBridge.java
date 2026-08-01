@@ -1628,18 +1628,53 @@ public final class TrinityForgeBridge {
      * {@code stats()} だけで完結させる。
      */
     public static double manaBaseStat(String canonicalKey, double fallback) {
+        java.util.OptionalDouble value = manaBaseStatRaw(canonicalKey);
+        return value.isPresent() ? value.getAsDouble() : fallback;
+    }
+
+    /**
+     * マナ初期値を「値が実際に届いたかどうか」まで含めて読む。
+     *
+     * <p>⚠ {@code BaseStatsConfig#load} は <b>0 を書いたキーをロード時に捨てる</b>
+     * (「0 = 加算なし = 未記載」というTF側の規約。base-stats.yml のヘッダコメント参照)。
+     * そのため「TFで 0 に設定した」と「TFがロードされていない/キーが無い」を
+     * {@code stats()} だけでは区別できず、両方 empty で返る。
+     * 0 を 0 として扱いたい呼び出し側は {@link #trinityForgeLoaded()} と組み合わせること
+     * ({@link com.arspaper.mana.ManaBaseStats} が実例)。
+     *
+     * <p>{@link com.trinityforge.config.domains.BaseStatsConfig#stats()} を直接読む(新設の
+     * {@code statOrDefault} ではなく)。fork は {@code libs/TrinityForge.jar} をコンパイル時依存として
+     * 固定しているため、既存jarに含まれる {@code stats()} だけで完結させる。
+     */
+    public static java.util.OptionalDouble manaBaseStatRaw(String canonicalKey) {
         if (canonicalKey == null) {
-            return fallback;
+            return java.util.OptionalDouble.empty();
         }
         try {
             TrinityForge tf = TrinityForge.getInstance();
             if (tf == null) {
-                return fallback;
+                return java.util.OptionalDouble.empty();
             }
             Double value = tf.config().baseStats().stats().get(StatKeys.canonical(canonicalKey));
-            return value != null ? value : fallback;
+            return value != null ? java.util.OptionalDouble.of(value) : java.util.OptionalDouble.empty();
         } catch (Throwable t) {
-            return fallback;
+            return java.util.OptionalDouble.empty();
+        }
+    }
+
+    /**
+     * TrinityForge 本体がロードされ、プレイヤー基礎ステータスを読める状態か。
+     *
+     * <p>{@link #isAvailable()}(戦闘サービスの可用性)とは別物で、ここでは
+     * {@code combat/base-stats.yml} が読めることだけを見る。TFがロードされていれば
+     * 「設定に書かれていないマナ回復系キー = 0」と断定してよい根拠になる。
+     */
+    public static boolean trinityForgeLoaded() {
+        try {
+            TrinityForge tf = TrinityForge.getInstance();
+            return tf != null && tf.config() != null && tf.config().baseStats() != null;
+        } catch (Throwable t) {
+            return false;
         }
     }
 

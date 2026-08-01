@@ -14,8 +14,9 @@ import java.util.Set;
  * 本サーバ仕様の戦闘時マナ回復（COMBAT §3.4）を担うリスナー。
  * 設定駆動（ManaConfig.recovery.*）で、被弾時/攻撃時に最大マナに対する%＋固定値を回復する。
  *
- * 注意: 装備（防具/スレッド）由来の ARMOR_HIT_MANA_RECOVERY / ARMOR_DAMAGE_MANA_RECOVERY は
- * ArmorManaListener が別途処理する。本リスナーはサーバ全体の設定値を加算するもので、両者は独立・加算的。
+ * 注意: 固定量の回復(hit_mana_recovery / damage_mana_recovery)は ArmorManaListener が一本化して
+ * 処理する(装備分＋パーク/役職/永続バフ/base-stats の非装備分)。本リスナーは
+ * 「最大マナの何%」という別意味の回復だけを担当する。両者は独立・加算的。
  * 非発動（idle）回復は周期処理のため ManaManager.tickRegeneration 側で扱う。
  */
 public class ManaRecoveryListener implements Listener {
@@ -52,7 +53,7 @@ public class ManaRecoveryListener implements Listener {
         if (event.isCancelled()) return;
         if (!(event.getEntity() instanceof Player player)) return;
         if (event.getFinalDamage() <= 0) return;
-        recover(player, ManaBaseStats.onHitPercent(), ManaBaseStats.onHitFlat());
+        recover(player, ManaBaseStats.onHitPercent());
     }
 
     /**
@@ -68,20 +69,22 @@ public class ManaRecoveryListener implements Listener {
         if (!(event.getDamager() instanceof Player player)) return;
         if (!MELEE_ATTACK_CAUSES.contains(event.getCause())) return;
         if (event.getFinalDamage() <= 0) return;
-        recover(player, ManaBaseStats.onAttackPercent(), ManaBaseStats.onAttackFlat());
+        recover(player, ManaBaseStats.onAttackPercent());
     }
 
     /**
-     * 最大マナに対する%＋固定値を回復する。回復量が0以下なら何もしない。
+     * 最大マナに対する%分を回復する。回復量が0以下なら何もしない。
+     *
+     * <p>2026-07-29(重複ステ間引き): 固定値(旧 mana-onhit-flat / mana-onattack-flat)は
+     * {@link com.arspaper.item.ArmorManaListener} の hit_mana_recovery / damage_mana_recovery と
+     * 完全に重複していたため廃止し、ここは%分専用になった。
      *
      * @param percent 分数[0,1](例 0.03 = 3%)。{@link ManaBaseStats} が既に正規化済みの値を返す。
      */
-    private void recover(Player player, double percent, int flat) {
-        int amount = flat;
-        if (percent > 0) {
-            int max = manaManager.getMaxMana(player);
-            amount += (int) Math.round(max * percent);
-        }
+    private void recover(Player player, double percent) {
+        if (percent <= 0) return;
+        int max = manaManager.getMaxMana(player);
+        int amount = (int) Math.round(max * percent);
         if (amount > 0) {
             manaManager.addMana(player, amount);
         }

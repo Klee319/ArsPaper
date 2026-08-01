@@ -34,8 +34,9 @@ public abstract class Sourcelink extends CustomBlock {
     /** 蓄積されたソースポイントを保持するPDCキー */
     public static final NamespacedKey SOURCE_BUFFER = new NamespacedKey("arspaper", "sourcelink_buffer");
 
-    /** 1tickあたりの最大排出量 */
-    private static final int MAX_DRAIN_PER_TICK = 50;
+    // 1周期あたりの最大排出量(旧 MAX_DRAIN_PER_TICK = 50)は 2026-08-01 に
+    // sourcelinks.yml の transfer.sourcelink.max-per-transfer へ移設した。
+    // 既定値は SourceTransferConfig.DEFAULT_SOURCELINK_MAX_PER_TRANSFER(=50、挙動不変)。
 
     protected Sourcelink(JavaPlugin plugin, String blockId) {
         super(plugin, blockId);
@@ -90,22 +91,50 @@ public abstract class Sourcelink extends CustomBlock {
 
     /**
      * バッファにソースポイントを追加する。
+     *
+     * <p>⚠ 2026-08-01 修正: 以前は {@code getBuffer(tile) + amount} を int で行っており、
+     * 高価値燃料({@code custom:source_engine} = 3000万)を焼べ続けると約2.1億で
+     * <b>オーバーフローして負値になり、蓄積が無言で全損</b>していた。
+     * long で計算して {@code transfer.sourcelink.buffer-cap}(既定 = int上限)へクランプする。
+     * クランプで捨てた分はログに残す(素材は既に消費されているため、黙って消さない)。
      */
     public void addToBuffer(Block block, int amount) {
         if (!(block.getState() instanceof TileState tile)) return;
-        setBuffer(tile, getBuffer(tile) + amount);
+        if (amount <= 0) return;
+        int current = getBuffer(tile);
+        int cap = transferConfig().sourcelinkBufferCap();
+        int next = com.arspaper.source.SourceTransferConfig.clampBuffer(current, amount, cap);
+        long lost = (long) current + (long) amount - (long) next;
+        if (lost > 0L) {
+            plugin.getLogger().warning("Sourcelink buffer capped at " + cap + " ("
+                    + getItemId() + " @ " + block.getX() + "," + block.getY() + "," + block.getZ()
+                    + "): discarded " + lost + " source points");
+        }
+        setBuffer(tile, next);
     }
 
     /**
-     * バッファから最大MAX_DRAIN_PER_TICKを排出する。排出量を返す。
+     * バッファから1周期あたりの上限({@code transfer.sourcelink.max-per-transfer})まで排出する。
+     * 排出量を返す。
      */
     protected int drainBuffer(Block block) {
         if (!(block.getState() instanceof TileState tile)) return 0;
         int buffer = getBuffer(tile);
         if (buffer <= 0) return 0;
-        int drain = Math.min(buffer, MAX_DRAIN_PER_TICK);
+        int drain = Math.min(buffer, transferConfig().sourcelinkMaxPerTransfer());
         setBuffer(tile, buffer - drain);
         return drain;
+    }
+
+    /**
+     * 転送設定。ArsPaper 未初期化(テスト/早期呼び出し)でも落ちないよう既定値へフォールバックする。
+     */
+    protected static com.arspaper.source.SourceTransferConfig transferConfig() {
+        ArsPaper ars = ArsPaper.getInstance();
+        if (ars == null || ars.getSourcelinkConfig() == null) {
+            return com.arspaper.source.SourceTransferConfig.defaults();
+        }
+        return ars.getSourcelinkConfig().transfer();
     }
 
     /**

@@ -26,8 +26,15 @@ public class VitalicSourcelink extends Sourcelink {
     private static final int SOURCE_PER_TICK = 5;
     /** mob死亡時のボーナスSource */
     public static final int SOURCE_PER_KILL = 15;
-    /** mob死亡検知範囲（ブロック） */
-    public static final int DETECTION_RADIUS = 10;
+    /**
+     * mob死亡検知範囲（ブロック）の既定値。
+     *
+     * <p>2026-08-01: 実際に使う値は {@code sourcelinks.yml} の
+     * {@code transfer.sourcelink.detection-radius.vitalic}（既定10 = 移設前と同値）。
+     * 参照元は {@link com.arspaper.source.SourcelinkTickTask#onEntityDeath}。
+     */
+    public static final int DETECTION_RADIUS =
+            com.arspaper.source.SourceTransferConfig.DEFAULT_VITALIC_DETECTION_RADIUS;
 
     public VitalicSourcelink(JavaPlugin plugin) {
         super(plugin, "vitalic_sourcelink");
