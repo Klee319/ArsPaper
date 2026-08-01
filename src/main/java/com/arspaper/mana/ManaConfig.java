@@ -17,12 +17,6 @@ import java.util.Map;
  * ({@code combat/base-stats.yml})へ移設した。読み出しは {@link ManaManager}/
  * {@link ManaRecoveryListener} が {@link ManaBaseStats} 経由で都度取得する
  * (TF側の {@code /trinityforge reload} に即追随させるため、この record には焼き込まない)。
- *
- * <p>2026-07-25 (config editor T3): {@code ars-magic.exp-per-cast} / {@code ars-magic.exp-per-mana} も
- * {@code config.yml} から削除し、{@code stats/skill-exp.yml} の {@code ars-magic:} セクションへ統合した
- * (元々 {@link com.arspaper.integration.TrinityForgeBridge#arsMagicExpPerCast} はTFロード時に
- * skill-exp.yml側を優先していたため、こちらのフィールドは実質TF未ロード時のみのフォールバックだった。
- * 重複解消のため定数化し、フォールバック専用としてこの record からは削除した)。
  */
 public record ManaConfig(
     int manaPerGlyphUnlock,
@@ -72,10 +66,5 @@ public record ManaConfig(
     /** %系設定を 0..1000 にクランプする。 */
     private static int clampPercent(int value) {
         return Math.max(0, Math.min(1000, value));
-    }
-
-    /** double設定を 0以上にクランプする。 */
-    private static double clampNonNegative(double value) {
-        return Math.max(0.0, value);
     }
 }

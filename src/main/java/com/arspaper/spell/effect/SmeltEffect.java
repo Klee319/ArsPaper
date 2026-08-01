@@ -118,8 +118,7 @@ public class SmeltEffect implements SpellEffect {
         if (!result.isBlock()) {
             // BlockBreakEventで保護確認してからブロックを空気に置換
             org.bukkit.event.block.BlockBreakEvent breakEvent =
-                new org.bukkit.event.block.BlockBreakEvent(block, caster);
-            Bukkit.getPluginManager().callEvent(breakEvent);
+                    SpellBreakMarker.callMarkedBreakEvent(block, caster);
             if (breakEvent.isCancelled()) return;
 
             block.setType(Material.AIR);

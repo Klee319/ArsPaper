@@ -9,6 +9,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
+import org.bukkit.event.player.PlayerDropItemEvent;
+import org.bukkit.event.player.PlayerItemBreakEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
@@ -245,8 +247,30 @@ public class ManaManager implements Listener {
         player.getPersistentDataContainer().set(
             ManaKeys.CURRENT_MANA, PersistentDataType.INTEGER, clamped
         );
-        BossBar bar = barDisplay.update(player.getUniqueId(), clamped, max);
-        player.showBossBar(bar);
+        applyBar(player, clamped, max);
+    }
+
+    /**
+     * マナバーの内容を更新し、表示/非表示を切り替える(2026-07-28 ユーザー要望:
+     * 魔導書か魔法バインド済みアイテムを<strong>手に持っている間だけ</strong>出す)。
+     *
+     * <p>従来は各所で無条件に {@code player.showBossBar(bar)} していたため、魔法を使わない
+     * プレイヤーの画面上部も常にボスバーで埋まっていた。表示条件は
+     * {@link ManaBarVisibility#holdsMagicItem} 1か所に集約し、show/hide の対を必ずここで作る
+     * (片方だけ書き換えると「一度出たら消えないバー」が生まれる)。
+     */
+    private void applyBar(Player player, int current, int max) {
+        BossBar bar = barDisplay.update(player.getUniqueId(), current, max);
+        if (ManaBarVisibility.holdsMagicItem(player)) {
+            player.showBossBar(bar);
+        } else {
+            player.hideBossBar(bar);
+        }
+    }
+
+    /** 手持ちが変わった等で表示条件だけ再評価する(マナ値は変えない)。 */
+    private void refreshBar(Player player) {
+        applyBar(player, getCurrentMana(player), getMaxMana(player));
     }
 
     private int getRegenRate(Player player) {
@@ -304,7 +328,12 @@ public class ManaManager implements Listener {
         for (Player player : plugin.getServer().getOnlinePlayers()) {
             int current = getCurrentMana(player);
             int max = getMaxMana(player);
-            if (current >= max) continue;
+            if (current >= max) {
+                // 満タンでも表示条件だけは取り直す — ここで continue すると、
+                // 満タンのまま魔導書を持った/しまったプレイヤーのバーが切り替わらない。
+                applyBar(player, current, max);
+                continue;
+            }
 
             int regenRate = getRegenRate(player) + getIdleRecoveryBonus(player, max);
             int newMana = Math.min(current + regenRate, max);
@@ -318,10 +347,91 @@ public class ManaManager implements Listener {
         migrateLegacyManaBonus(player);
         // 旅路デバフのAttributeModifier残留をクリーンアップ
         cleanupJourneyDebuff(player);
-        int current = getCurrentMana(player);
-        int max = getMaxMana(player);
-        BossBar bar = barDisplay.update(player.getUniqueId(), current, max);
-        player.showBossBar(bar);
+        refreshBar(player);
+    }
+
+    /**
+     * 2026-07-28: 持ち替えた瞬間にマナバーの出し入れを反映する。回復タスク任せだと
+     * 満タン時は {@code tickRegeneration} が早期returnするため、持ち替えても切り替わらない。
+     */
+    @EventHandler
+    public void onItemHeld(org.bukkit.event.player.PlayerItemHeldEvent event) {
+        Player player = event.getPlayer();
+        // このイベント時点ではまだ選択スロットが切り替わっていないので、新スロットを直接見る。
+        boolean magic = ManaBarVisibilityPolicy.shouldShow(
+                ManaBarVisibility.isMagicItem(player.getInventory().getItem(event.getNewSlot())),
+                ManaBarVisibility.isMagicItem(player.getInventory().getItemInOffHand())
+        );
+        BossBar bar = barDisplay.update(player.getUniqueId(), getCurrentMana(player), getMaxMana(player));
+        if (magic) {
+            player.showBossBar(bar);
+        } else {
+            player.hideBossBar(bar);
+        }
+    }
+
+    /** オフハンド入れ替え(F)でも即座に反映する。 */
+    @EventHandler
+    public void onSwapHands(org.bukkit.event.player.PlayerSwapHandItemsEvent event) {
+        Player player = event.getPlayer();
+        boolean magic = ManaBarVisibilityPolicy.shouldShow(
+                ManaBarVisibility.isMagicItem(event.getMainHandItem()),
+                ManaBarVisibility.isMagicItem(event.getOffHandItem())
+        );
+        BossBar bar = barDisplay.update(player.getUniqueId(), getCurrentMana(player), getMaxMana(player));
+        if (magic) {
+            player.showBossBar(bar);
+        } else {
+            player.hideBossBar(bar);
+        }
+    }
+
+    /** インベントリを閉じた時(装備変更後)にも表示条件を取り直す。 */
+    @EventHandler
+    public void onInventoryClose(org.bukkit.event.inventory.InventoryCloseEvent event) {
+        if (event.getPlayer() instanceof Player player) {
+            refreshBar(player);
+        }
+    }
+
+    /**
+     * インベントリ操作の適用後に手持ちを再評価する。
+     *
+     * <p>InventoryClickEvent/InventoryDragEvent の発火中はまだインベントリの最終状態ではないため、
+     * Paper APIの推奨どおり次tickへ送る。クリック、数字キー、オフハンドキー、ドラッグのいずれで
+     * 手持ちが変わっても同じ経路で表示を同期できる。
+     */
+    @EventHandler
+    public void onInventoryClick(org.bukkit.event.inventory.InventoryClickEvent event) {
+        if (event.getWhoClicked() instanceof Player player) {
+            refreshBarNextTick(player);
+        }
+    }
+
+    @EventHandler
+    public void onInventoryDrag(org.bukkit.event.inventory.InventoryDragEvent event) {
+        if (event.getWhoClicked() instanceof Player player) {
+            refreshBarNextTick(player);
+        }
+    }
+
+    /** 手に持ったバインド品を捨てた、または破損した場合も次tickで隠す。 */
+    @EventHandler
+    public void onPlayerDropItem(PlayerDropItemEvent event) {
+        refreshBarNextTick(event.getPlayer());
+    }
+
+    @EventHandler
+    public void onPlayerItemBreak(PlayerItemBreakEvent event) {
+        refreshBarNextTick(event.getPlayer());
+    }
+
+    private void refreshBarNextTick(Player player) {
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            if (player.isOnline()) {
+                refreshBar(player);
+            }
+        });
     }
 
     /** ログイン時に旅路デバフの残留AttributeModifierを除去する */
@@ -342,10 +452,7 @@ public class ManaManager implements Listener {
         org.bukkit.Bukkit.getScheduler().runTaskLater(ArsPaper.getInstance(), () -> {
             Player player = event.getPlayer();
             if (player.isOnline()) {
-                int current = getCurrentMana(player);
-                int max = getMaxMana(player);
-                BossBar bar = barDisplay.update(player.getUniqueId(), current, max);
-                player.showBossBar(bar);
+                refreshBar(player);
             }
         }, 1L);
     }
@@ -359,8 +466,7 @@ public class ManaManager implements Listener {
         if (current > max) {
             setCurrentMana(player, max);
         } else {
-            BossBar bar = barDisplay.update(player.getUniqueId(), current, max);
-            player.showBossBar(bar);
+            applyBar(player, current, max);
         }
     }
 

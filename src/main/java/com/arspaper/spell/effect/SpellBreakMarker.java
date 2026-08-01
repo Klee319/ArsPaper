@@ -20,4 +20,27 @@ public final class SpellBreakMarker {
 
     private SpellBreakMarker() {
     }
+
+    /**
+     * Fires a synthetic break event while the exact block is marked for TrinityForge.
+     * The marker always disappears, including when another listener throws.
+     */
+    public static org.bukkit.event.block.BlockBreakEvent callMarkedBreakEvent(
+            org.bukkit.plugin.Plugin plugin, org.bukkit.block.Block block,
+            org.bukkit.entity.Player caster) {
+        org.bukkit.event.block.BlockBreakEvent event;
+        block.setMetadata(METADATA_KEY, new org.bukkit.metadata.FixedMetadataValue(plugin, true));
+        try {
+            event = new org.bukkit.event.block.BlockBreakEvent(block, caster);
+            org.bukkit.Bukkit.getPluginManager().callEvent(event);
+        } finally {
+            block.removeMetadata(METADATA_KEY, plugin);
+        }
+        return event;
+    }
+
+    public static org.bukkit.event.block.BlockBreakEvent callMarkedBreakEvent(
+            org.bukkit.block.Block block, org.bukkit.entity.Player caster) {
+        return callMarkedBreakEvent(com.arspaper.ArsPaper.getInstance(), block, caster);
+    }
 }

@@ -76,8 +76,7 @@ public class CrushEffect implements SpellEffect {
         // 花 → 染料の場合: ブロックを空気にしてアイテムをドロップ
         if (!result.isBlock()) {
             org.bukkit.event.block.BlockBreakEvent breakEvent =
-                new org.bukkit.event.block.BlockBreakEvent(block, caster);
-            Bukkit.getPluginManager().callEvent(breakEvent);
+                    SpellBreakMarker.callMarkedBreakEvent(block, caster);
             if (breakEvent.isCancelled()) return;
 
             block.setType(Material.AIR);

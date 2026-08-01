@@ -73,8 +73,8 @@ public class ExplosionEffect implements SpellEffect {
                         Block block = loc.getBlock();
                         if (!block.getType().isAir() && block.getType() != Material.BEDROCK) {
                             if (caster != null) {
-                                BlockBreakEvent evt = new BlockBreakEvent(block, caster);
-                                Bukkit.getPluginManager().callEvent(evt);
+                                BlockBreakEvent evt =
+                                        SpellBreakMarker.callMarkedBreakEvent(block, caster);
                                 if (evt.isCancelled()) continue;
                             }
                             block.breakNaturally();

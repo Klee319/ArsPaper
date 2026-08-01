@@ -245,14 +245,8 @@ public class BreakEffect implements SpellEffect {
         // 保護プラグイン互換 + TF連携: 合成イベントであることをmetadataでマークし、TF側の採取ギミック
         // (VeinMining/TreeFelling/FarmingHarvest等)が誤発動しないようにする(callEvent直前にセットし、
         // finallyで必ず除去する — SpellBreakMarker参照)。
-        BlockBreakEvent breakEvent;
-        block.setMetadata(SpellBreakMarker.METADATA_KEY, new FixedMetadataValue(plugin, true));
-        try {
-            breakEvent = new BlockBreakEvent(block, caster);
-            Bukkit.getPluginManager().callEvent(breakEvent);
-        } finally {
-            block.removeMetadata(SpellBreakMarker.METADATA_KEY, plugin);
-        }
+        BlockBreakEvent breakEvent =
+                SpellBreakMarker.callMarkedBreakEvent(plugin, block, caster);
         if (breakEvent.isCancelled()) return;
 
         // 掘削モードはシャベル、通常モードはピッケル

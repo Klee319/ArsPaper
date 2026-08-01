@@ -91,8 +91,8 @@ public class CutEffect implements SpellEffect {
 
         // カボチャ → くり抜きカボチャ（種ドロップ）
         if (block.getType() == Material.PUMPKIN) {
-            BlockBreakEvent event = new BlockBreakEvent(block, caster);
-            Bukkit.getPluginManager().callEvent(event);
+            BlockBreakEvent event =
+                    SpellBreakMarker.callMarkedBreakEvent(block, caster);
             if (!event.isCancelled()) {
                 block.setType(Material.CARVED_PUMPKIN);
                 block.getWorld().dropItemNaturally(
@@ -105,8 +105,8 @@ public class CutEffect implements SpellEffect {
 
         // ハサミ採取可能ブロックを破壊してドロップ
         if (SHEAR_BLOCKS.contains(block.getType())) {
-            BlockBreakEvent event = new BlockBreakEvent(block, caster);
-            Bukkit.getPluginManager().callEvent(event);
+            BlockBreakEvent event =
+                    SpellBreakMarker.callMarkedBreakEvent(block, caster);
             if (!event.isCancelled()) {
                 block.breakNaturally(new org.bukkit.inventory.ItemStack(Material.SHEARS));
             }

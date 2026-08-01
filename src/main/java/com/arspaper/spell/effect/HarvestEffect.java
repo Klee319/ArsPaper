@@ -83,8 +83,8 @@ public class HarvestEffect implements SpellEffect {
         if (block.getBlockData() instanceof Ageable ageable) {
             if (ageable.getAge() < ageable.getMaximumAge()) return;
 
-            BlockBreakEvent breakEvent = new BlockBreakEvent(block, caster);
-            Bukkit.getPluginManager().callEvent(breakEvent);
+            BlockBreakEvent breakEvent =
+                    SpellBreakMarker.callMarkedBreakEvent(block, caster);
             if (breakEvent.isCancelled()) return;
 
             boolean shouldReplant = shouldReplant(amplify);

@@ -107,8 +107,8 @@ public class FellEffect implements SpellEffect {
 
         // 収集したブロックを破壊（イベント確認後）
         for (Block block : toBreak) {
-            BlockBreakEvent breakEvent = new BlockBreakEvent(block, caster);
-            Bukkit.getPluginManager().callEvent(breakEvent);
+            BlockBreakEvent breakEvent =
+                    SpellBreakMarker.callMarkedBreakEvent(block, caster);
             if (!breakEvent.isCancelled()) {
                 block.breakNaturally();
             }
