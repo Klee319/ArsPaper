@@ -88,9 +88,9 @@ public final class AdminCommands {
         plugin.getThreadConfig().reload(plugin.getConfig());
 
         // スレッド・セット効果設定リロード(thread-sets.yml)
-        if (plugin.getThreadRollConfig() != null) {
-            plugin.getThreadRollConfig().reload();
-        }
+        // スレッド個体差(rollSeed/quality)と厳選ステの中身は TrinityForge の
+        // stats/item-stats.yml(スレッド40件それぞれの個別 fixed/per-quality/random 定義)側にあるので、
+        // TF自身の /trinityforge reload でリロードされる(こちら側での個別reloadは不要)。
         if (plugin.getThreadSetConfig() != null) {
             plugin.getThreadSetConfig().reload();
         }

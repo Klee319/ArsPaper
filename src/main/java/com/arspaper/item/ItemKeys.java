@@ -48,8 +48,11 @@ public final class ItemKeys {
     public static final NamespacedKey THREAD_ITEM_TYPE = new NamespacedKey(NAMESPACE, "thread_item_type");
 
     /**
-     * スレッドアイテム個体の厳選結果（{@link ThreadRoll#encode()} の文字列）。
-     * 生成時に焼き込むので、thread-rolls.yml を後から変えても既存個体は変わらない。
+     * スレッドアイテム個体の厳選値（rollSeed + quality）は 2026-08-03 以降、Ars独自PDCではなく
+     * TrinityForge の {@code ItemData}(=通常アイテムと同じ {@code trinityforge:item_roll_seed}/
+     * {@code trinityforge:item_quality})に統一された（{@code com.arspaper.integration.
+     * TrinityForgeBridge#stampThreadIdentity}/{@code #readThreadIdentity} 参照）。
+     * このキー自体はもう使われていない（過去に書かれた個体の残骸が読めても無視される）。
      */
     public static final NamespacedKey THREAD_ROLL = new NamespacedKey(NAMESPACE, "thread_roll");
 
@@ -58,6 +61,12 @@ public final class ItemKeys {
      * <p>キーを分けているのは後方互換のため: 既存の防具はこのキーを持たないので「厳選なし」＝
      * 現行とまったく同じ挙動になり、移行処理が一切要らない。{@link #THREAD_SLOTS} の形式を
      * 変えるとロード時の分岐が必要になり、失敗すると装着済みスレッドが消える。
+     *
+     * <p><b>格納値の形式(2026-08-03移行)</b>: 各要素は {@code "<rollSeed>:<quality>"}
+     * （{@code com.arspaper.item.ThreadSlotIdentity} が符号化/復号を担う）。旧形式
+     * （{@code "<rarityId>|main=値|sub=値;..."}）が残る既存装備は、{@code ":"} 区切りで
+     * long/int としてパースできないため {@code ThreadSlotIdentity#decode} が rollSeed=0/
+     * quality=0（＝個体差なしの従来どおりの幅）へfail-openする。空スロットは空文字のまま。
      */
     public static final NamespacedKey THREAD_SLOT_ROLLS = new NamespacedKey(NAMESPACE, "thread_slot_rolls");
 

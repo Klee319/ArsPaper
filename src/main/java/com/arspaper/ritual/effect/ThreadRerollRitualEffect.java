@@ -1,10 +1,9 @@
 package com.arspaper.ritual.effect;
 
-import com.arspaper.ArsPaper;
 import com.arspaper.block.impl.RitualCore;
+import com.arspaper.integration.TrinityForgeBridge;
+import com.arspaper.integration.TrinityForgeBridge.ThreadIdentity;
 import com.arspaper.item.ItemKeys;
-import com.arspaper.item.ThreadRoll;
-import com.arspaper.item.ThreadRollConfig;
 import com.arspaper.item.ThreadType;
 import com.arspaper.item.impl.ThreadItem;
 import com.arspaper.ritual.RitualEffect;
@@ -21,12 +20,14 @@ import org.bukkit.persistence.PersistentDataType;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
+import java.util.Optional;
 
 /**
- * スレッド厳選の振り直し儀式 ── コアに置いたスレッド1個の主ステ/サブステを再抽選する。
+ * スレッド厳選の振り直し儀式 ── コアに置いたスレッド1個の rollSeed を新規発番して再抽選する
+ * （quality は据え置き）。実際のステ値は TF の item-stats.yml から都度導出されるため、
+ * この儀式は「rollSeed という乱数の種」を引き直すだけで済む。
  *
- * <p>厳選値は生成時にアイテムへ焼き込むので、他に振り直す手段が無い（外して付け直しても
+ * <p>厳選値(rollSeed)は生成時にアイテムへ焼き込むので、他に振り直す手段が無い（外して付け直しても
  * {@code ThreadGui} が装着時の値を復元するため変わらない）。「沼」を回すための唯一の入口がここ。
  *
  * <p>コアのアイテムは<b>消費せず</b>その場で書き換える（{@code RitualManager} の
@@ -37,8 +38,6 @@ import java.util.Random;
  * 直感に反し、まとめて同じ値にするのは厳選の意味を壊すため。
  */
 public class ThreadRerollRitualEffect implements RitualEffect {
-
-    private static final Random RANDOM = new Random();
 
     @Override
     public boolean validate(Location coreLocation, Player player, RitualRecipe recipe) {
@@ -52,12 +51,23 @@ public class ThreadRerollRitualEffect implements RitualEffect {
                     NamedTextColor.RED));
             return false;
         }
-        ThreadRollConfig config = rollConfig();
-        if (config == null || !config.isEnabled()) {
+        ThreadType type = threadTypeOf(core);
+        if (type == null || !hasResolvableThreadStats(core, type)) {
             player.sendMessage(Component.text("厳選が無効化されているため振り直せません！", NamedTextColor.RED));
             return false;
         }
         return true;
+    }
+
+    /**
+     * 「厳選が無効化されているか」の判定手段。TF側に「random 定義の有無」を直接問う入口が無いため、
+     * <b>現在の (rollSeed, quality) で resolveThreadStats が空マップを返すか</b>で代用する
+     * （item-stats.yml にそのスレッドの定義自体が無い/TF未ロードなら空になる）。
+     */
+    private static boolean hasResolvableThreadStats(ItemStack core, ThreadType type) {
+        ThreadIdentity identity = TrinityForgeBridge.readThreadIdentity(core);
+        return !TrinityForgeBridge.resolveThreadStats(type.getBaseMaterial(), type.getCustomModelData(),
+                identity.quality(), identity.rollSeed()).isEmpty();
     }
 
     @Override
@@ -70,22 +80,25 @@ public class ThreadRerollRitualEffect implements RitualEffect {
             player.sendMessage(Component.text("コアに効果付きスレッドを1個だけ置いてください！", NamedTextColor.RED));
             return;
         }
-        ThreadRollConfig config = rollConfig();
-        if (config == null) {
-            return;
-        }
-        ThreadRoll rerolled = config.roll(RANDOM).orElse(null);
-        if (rerolled == null) {
-            player.sendMessage(Component.text("厳選の抽選に失敗しました（thread-rolls.yml を確認してください）",
-                    NamedTextColor.RED));
+        ThreadType type = threadTypeOf(core);
+        if (type == null) {
             return;
         }
 
         // 旧厳選の lore 行だけを取り除いてから新しい行を入れる（種類ごとの効果説明は残す）。
-        List<Component> previousRollLore = ThreadRoll.decode(ThreadRoll.rawOf(core))
-                .map(ThreadItem::rollLore).orElse(List.of());
+        // rollSeed を上書きする前に、上書き前の識別子で旧lore行を確定させておく必要がある。
+        List<Component> previousRollLore = ThreadItem.rollLore(type, TrinityForgeBridge.readThreadIdentity(core));
+
+        // quality は据え置き、rollSeed だけを新規発番して刻み直す。
+        Optional<ThreadIdentity> rerolledOpt = TrinityForgeBridge.rerollThreadIdentity(core);
+        if (rerolledOpt.isEmpty()) {
+            player.sendMessage(Component.text("厳選の振り直しに失敗しました（TrinityForge未ロード等）",
+                    NamedTextColor.RED));
+            return;
+        }
+        ThreadIdentity rerolled = rerolledOpt.get();
+
         core.editMeta(meta -> {
-            ThreadRoll.write(meta.getPersistentDataContainer(), rerolled);
             List<Component> current = meta.lore() == null ? List.<Component>of() : meta.lore();
             List<Component> rebuilt = new ArrayList<>();
             for (Component line : current) {
@@ -93,7 +106,7 @@ public class ThreadRerollRitualEffect implements RitualEffect {
                     rebuilt.add(line);
                 }
             }
-            rebuilt.addAll(ThreadItem.rollLore(rerolled));
+            rebuilt.addAll(ThreadItem.rollLore(type, rerolled));
             meta.lore(rebuilt);
         });
         RitualCore.setStoredItem(tileState, core);
@@ -102,21 +115,21 @@ public class ThreadRerollRitualEffect implements RitualEffect {
         coreLocation.getWorld().spawnParticle(Particle.WITCH, effectLoc, 90, 0.5, 0.6, 0.5, 0.6);
         coreLocation.getWorld().playSound(effectLoc, Sound.BLOCK_ENCHANTMENT_TABLE_USE, 1.0f, 0.8f);
         player.sendMessage(Component.text("スレッドを振り直しました！", NamedTextColor.LIGHT_PURPLE));
-        ThreadItem.rollLore(rerolled).forEach(player::sendMessage);
+        ThreadItem.rollLore(type, rerolled).forEach(player::sendMessage);
     }
 
-    private static ThreadRollConfig rollConfig() {
-        ArsPaper ars = ArsPaper.getInstance();
-        return ars == null ? null : ars.getThreadRollConfig();
-    }
-
-    private static boolean isEffectThread(ItemStack item) {
+    /** {@code item} のPDC({@code ItemKeys.THREAD_ITEM_TYPE})からスレッド種別を復元する。未設定/不明なら null。 */
+    private static ThreadType threadTypeOf(ItemStack item) {
         if (item == null || !item.hasItemMeta()) {
-            return false;
+            return null;
         }
         String typeId = item.getItemMeta().getPersistentDataContainer()
                 .get(ItemKeys.THREAD_ITEM_TYPE, PersistentDataType.STRING);
-        ThreadType type = ThreadType.fromId(typeId);
+        return ThreadType.fromId(typeId);
+    }
+
+    private static boolean isEffectThread(ItemStack item) {
+        ThreadType type = threadTypeOf(item);
         return type != null && type.hasEffect();
     }
 

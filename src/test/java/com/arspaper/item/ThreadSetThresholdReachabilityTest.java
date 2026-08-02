@@ -28,8 +28,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *       上限を超えるしきい値を書くと、そのティアは物理的に発動しない。
  *       (設計書 §3-A-5 の「2/4 段 → 3/6 段」はこの上限 5 を見落としていた。)</li>
  *   <li><b>死に値</b>。セット効果は「同種を N 枠捧げる」対価なので、最終ティアまでの累計が
- *       そのキーの<b>主ステ抽選1本の最小値</b>({@code thread-rolls.yml} の {@code main-stats.min})に
- *       すら届かないなら、枠を1つ厳選スレッドに使ったほうが強い = セット効果を狙う理由が消える。
+ *       そのキーの<b>スレッド1本の抽選最小値</b>(TrinityForge {@code item-stats.yml} のスレッド項目
+ *       (CMD帯 300000-300099、items.<MATERIAL#CMD>.random.<key>.min)が持つ値のうち、全スレッド中の
+ *       最小値。2026-08-03 に、共有プール {@code random-roll-pools.thread} 方式からスレッド40件の
+ *       個別定義方式へ移行した際、比較対象も「全スレッド中の最小値」へ読み替えた)にすら届かないなら、
+ *       枠を1つ厳選スレッドに使ったほうが強い = セット効果を狙う理由が消える。
  *       {@code hero_of_the_village} の {@code attack-power +1.0/+2.0}(主ステ最小 200 の 1/100)が
  *       この状態だった。</li>
  * </ol>
@@ -44,6 +47,11 @@ class ThreadSetThresholdReachabilityTest {
      * 出荷 item-stats.yml に0件なので数えない。
      */
     private static final int CARRIER_SLOTS = 5;
+
+    /** スレッド用に予約された CustomModelData 帯の下限(含む)。 */
+    private static final int THREAD_CMD_MIN = 300000;
+    /** スレッド用に予約された CustomModelData 帯の上限(含まない)。 */
+    private static final int THREAD_CMD_MAX = 300100;
 
     private static YamlConfiguration load(String relative) {
         File file = Path.of("src/main/resources/" + relative).toFile();
@@ -76,18 +84,59 @@ class ThreadSetThresholdReachabilityTest {
         return limits;
     }
 
-    /** ステキー → 主ステ抽選の最小値({@code thread-rolls.yml})。 */
+    /**
+     * ステキー → 全スレッド中の抽選最小値(そのキーを {@code random:} に持つスレッド全体での最小)。
+     *
+     * <p>2026-08-03: スレッド厳選は「共有プール1本({@code random-roll-pools.thread.main-stats})」
+     * 方式から「スレッド40件それぞれが {@code item-stats.yml} に個別の {@code per-quality}/
+     * {@code random} を持つ」方式へ移行した(依頼:「専用GUI/専用configを作るな、武器と同じ
+     * item-stats仕様でスレッドも個別にステータス定義しろ」)。共有の「主ステ抽選テーブル」という
+     * 概念が無くなったため、この比較は「そのステキーを持つ全スレッド項目の {@code random.min} の
+     * うち最小値」で代用する(死に値判定を安全側=厳しめに倒す: 最も緩いスレッドの最小値と比べる)。
+     * このフォークのリソースには厳選定義がもう存在しないため、TF 本体の出荷 yml を
+     * リポジトリ相対パスで直接読む。
+     */
     private static Map<String, Double> mainStatMinimums() {
-        ConfigurationSection mains = section(load("thread-rolls.yml"), "main-stats",
-                "thread-rolls.yml の main-stats:");
+        File file = Path.of("../../../TrinityForge/src/main/resources/stats/item-stats.yml").toFile();
+        assertTrue(file.isFile(), "TrinityForge 本体の item-stats.yml が見つからない: " + file.getAbsolutePath());
+        YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
+        ConfigurationSection items = config.getConfigurationSection("items");
+        assertNotNull(items, "item-stats.yml の items: が見つからない");
         Map<String, Double> minimums = new LinkedHashMap<>();
-        for (String key : mains.getKeys(false)) {
-            ConfigurationSection entry = mains.getConfigurationSection(key);
-            if (entry != null) {
-                minimums.put(key, entry.getDouble("min"));
+        for (String key : items.getKeys(false)) {
+            if (!isThreadItemKey(key)) {
+                continue;
+            }
+            ConfigurationSection random = items.getConfigurationSection(key + ".random");
+            if (random == null) {
+                continue;
+            }
+            for (String stat : random.getKeys(false)) {
+                if (!random.contains(stat + ".min")) {
+                    continue;
+                }
+                double min = random.getDouble(stat + ".min");
+                minimums.merge(stat, min, Math::min);
             }
         }
+        assertFalse(minimums.isEmpty(),
+                "item-stats.yml にスレッド項目(CMD " + THREAD_CMD_MIN + "-" + (THREAD_CMD_MAX - 1)
+                        + ")の random: 定義が1件も見つからない");
         return minimums;
+    }
+
+    /** {@code MATERIAL#CMD} キーがスレッド用 CustomModelData 帯かどうか。 */
+    private static boolean isThreadItemKey(String key) {
+        int hash = key.lastIndexOf('#');
+        if (hash < 0) {
+            return false;
+        }
+        try {
+            int cmd = Integer.parseInt(key.substring(hash + 1).trim());
+            return cmd >= THREAD_CMD_MIN && cmd < THREAD_CMD_MAX;
+        } catch (NumberFormatException notNumeric) {
+            return false;
+        }
     }
 
     private static ConfigurationSection threadSets() {
@@ -121,7 +170,7 @@ class ThreadSetThresholdReachabilityTest {
     }
 
     @Test
-    @DisplayName("最終ティアまでの累計は、そのキーの主ステ抽選1本分(最小値)以上ある(死に値の禁止)")
+    @DisplayName("最終ティアまでの累計は、そのキーの抽選最小値(全スレッド中の最小)以上ある(死に値の禁止)")
     void topTierIsWorthMoreThanOneRoll() {
         Map<String, Double> mainMinimums = mainStatMinimums();
         ConfigurationSection sets = threadSets();
@@ -147,7 +196,7 @@ class ThreadSetThresholdReachabilityTest {
                     return; // 厳選の抽選候補に無いキー(比較対象が無い)は対象外。
                 }
                 assertTrue(total >= rollMin,
-                        threadId + " の " + stat + " 累計 " + total + " は主ステ抽選1本の最小値 "
+                        threadId + " の " + stat + " 累計 " + total + " は抽選1本の最小値(全スレッド中最小) "
                                 + rollMin + " 未満 = 死に値(枠を厳選スレッドに使ったほうが強い)");
             });
         }

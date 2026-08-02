@@ -2,6 +2,7 @@ package com.arspaper.gui;
 
 import com.arspaper.ArsPaper;
 import com.arspaper.integration.TrinityForgeBridge;
+import com.arspaper.integration.TrinityForgeBridge.ThreadIdentity;
 import com.arspaper.item.*;
 import com.arspaper.item.impl.ThreadItem;
 import com.google.gson.Gson;
@@ -336,7 +337,7 @@ public class ThreadGui extends BaseGui {
             }
 
             // 厳選値は【消費前の】スタックから読む(消費でスタックが空になると読めなくなる)。
-            String socketedRoll = ThreadRoll.rawOf(threadStack);
+            String socketedRoll = ThreadSlotIdentity.of(TrinityForgeBridge.readThreadIdentity(threadStack)).encode();
 
             // アイテム消費
             if (fromCursor) {
@@ -424,7 +425,8 @@ public class ThreadGui extends BaseGui {
             lore.add(Component.text("※この装備では常時効果は発動しません", NamedTextColor.RED)
                 .decoration(TextDecoration.ITALIC, false));
         }
-        ThreadRoll.decode(encodedRoll).ifPresent(roll -> lore.addAll(ThreadItem.rollLore(roll)));
+        ThreadSlotIdentity slotIdentity = ThreadSlotIdentity.decode(encodedRoll);
+        lore.addAll(ThreadItem.rollLore(type, new ThreadIdentity(slotIdentity.rollSeed(), slotIdentity.quality())));
         lore.add(Component.text("クリックで取り外し", NamedTextColor.DARK_GRAY)
             .decoration(TextDecoration.ITALIC, false));
 
@@ -487,18 +489,22 @@ public class ThreadGui extends BaseGui {
 
     /**
      * 返却するスレッドへ、装着時の厳選値と lore を書き戻す。
-     * {@code createThreadItemStack} が新品として付けた厳選行を先に取り除いてから入れ直す
-     * （そうしないと lore に2個体ぶんの数値が並ぶ）。
+     * {@code createThreadItemStack} は新品として新規 rollSeed(quality=0)を刻んでしまうので、
+     * 装着時に保存していた識別子(rollSeed/quality)で上書きする ── そうしないと「外して付け直す
+     * だけで厳選し直せる」無限リロールになる。
+     *
+     * <p>PDC上書きは {@link TrinityForgeBridge#writeItemRoll}(rollSeed/qualityのみ書く軽量経路)を
+     * 使う ── {@code createThreadItemStack} 経由で既に一度フル組み立て済みなので、ここでは
+     * 識別子とloreだけを差し替えれば十分。
      */
     private static void restoreRoll(ItemStack threadItem, String encodedRoll) {
-        ThreadRoll saved = ThreadRoll.decode(encodedRoll).orElse(null);
-        if (saved == null) {
-            return;
-        }
-        List<Component> freshLore = ThreadRoll.decode(ThreadRoll.rawOf(threadItem))
-                .map(ThreadItem::rollLore).orElse(List.of());
+        ThreadSlotIdentity slotIdentity = ThreadSlotIdentity.decode(encodedRoll);
+        ThreadType type = threadTypeOf(threadItem);
+        ThreadIdentity fresh = TrinityForgeBridge.readThreadIdentity(threadItem);
+        List<Component> freshLore = ThreadItem.rollLore(type, fresh);
+        ThreadIdentity saved = new ThreadIdentity(slotIdentity.rollSeed(), slotIdentity.quality());
         threadItem.editMeta(meta -> {
-            ThreadRoll.write(meta.getPersistentDataContainer(), saved);
+            TrinityForgeBridge.writeItemRoll(meta, saved.rollSeed(), saved.quality());
             List<Component> current = meta.lore() == null ? List.<Component>of() : meta.lore();
             List<Component> rebuilt = new ArrayList<>();
             for (Component line : current) {
@@ -506,9 +512,19 @@ public class ThreadGui extends BaseGui {
                     rebuilt.add(line);
                 }
             }
-            rebuilt.addAll(ThreadItem.rollLore(saved));
+            rebuilt.addAll(ThreadItem.rollLore(type, saved));
             meta.lore(rebuilt);
         });
+    }
+
+    /** {@code item} のPDC({@code ItemKeys.THREAD_ITEM_TYPE})からスレッド種別を復元する。未設定/不明なら null。 */
+    private static ThreadType threadTypeOf(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) {
+            return null;
+        }
+        String typeId = item.getItemMeta().getPersistentDataContainer()
+                .get(ItemKeys.THREAD_ITEM_TYPE, PersistentDataType.STRING);
+        return ThreadType.fromId(typeId);
     }
 
     private static List<String> loadThreadSlotRolls(ItemStack armor, int slotCount) {
@@ -568,9 +584,9 @@ public class ThreadGui extends BaseGui {
                 if (type != null) {
                     lore.add(Component.text("  " + (i + 1) + ": " + type.getDisplayName(), type.getColor())
                         .decoration(TextDecoration.ITALIC, false));
-                    int slotIndex = i;
-                    ThreadRoll.decode(rollAt(slotIndex))
-                        .ifPresent(roll -> lore.addAll(ThreadItem.rollLore(roll)));
+                    ThreadSlotIdentity slotIdentity = ThreadSlotIdentity.decode(rollAt(i));
+                    lore.addAll(ThreadItem.rollLore(type,
+                            new ThreadIdentity(slotIdentity.rollSeed(), slotIdentity.quality())));
                 }
             }
         }

@@ -39,6 +39,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Logger;
@@ -158,12 +159,23 @@ public final class TrinityForgeBridge {
     }
 
     /**
+     * グリフID付きの6引数版。増幅(Amplify)の乗算ボーナスは掛からない
+     * （{@code amplifyLevel=0} で {@link #magicalFinalDamage(UUID, LivingEntity, double, ItemStack,
+     * ItemStack, String, int)} へ委譲）。現状の呼び出し元は
+     * {@code SpellContext#dealSpellDamage} 経由の7引数版のみで、本メソッドは旧シグネチャの
+     * 呼び出し元向けに温存している。
+     */
+    public static double magicalFinalDamage(UUID casterUuid, LivingEntity victim, double spellBase,
+                                            ItemStack catalyst, ItemStack castItem, String glyphId) {
+        return magicalFinalDamage(casterUuid, victim, spellBase, catalyst, castItem, glyphId, 0);
+    }
+
+    /**
      * スペル基礎ダメージを対称パイプラインへ供給し、杖/触媒の攻撃ステを乗せた最終魔法ダメージを返す。
      *
      * <p>ステ供給元（杖 or 登録済み触媒）の選択は {@link #resolveMagicStatSource} が担う。
      * その会心・貫通等は {@link WeaponAttackStatResolver#forItem} 系で {@link AttackStats} に導出し、
-     * 対称パイプラインへ供給する。増減グリフ(Amplify/Dampen)は呼び出し側で {@code spellBase} に
-     * 内包済み・会心/貫通はTF側という層分離を維持するため、{@code spellBase} には
+     * 対称パイプラインへ供給する。会心/貫通はTF側という層分離を維持するため、{@code spellBase} には
      * 攻撃力(attack-power)以外のステを二重計上しない（TF側 AttackStats が別レイヤーで加味する）。
      *
      * <p>フォールバック（挙動不変の安全策）:
@@ -172,19 +184,25 @@ public final class TrinityForgeBridge {
      *   <li>ステ供給元が無い / 取得失敗 / resolver未初期化 → {@link AttackStats#plain(0)} 相当で計算。</li>
      * </ul>
      *
-     * @param casterUuid 詠唱者UUID
-     * @param victim     被弾エンティティ（{@code PersistentDataHolder}）
-     * @param spellBase  スペル基礎ダメージ（Ars攻撃力 + 増減グリフを内包済み）
-     * @param catalyst   詠唱に使った触媒 ItemStack（{@code catalysts.yml} 登録品、または非触媒バインド
-     *                   詠唱では魔導書本体）。特定不能なら {@code null}
-     * @param castItem   実際に右クリックして詠唱したアイテム（杖など）。{@code use-skill: ARS_MAGIC}
-     *                   を持つ場合だけステ供給元として採用する。特定不能なら {@code null}
-     * @param glyphId    ダメージを出したグリフのID（{@code "harm"} 等）。TF の
-     *                   {@code glyph_damage_multiplier_bonus} の適用対象判定に使う。不明なら {@code null}
+     * @param casterUuid   詠唱者UUID
+     * @param victim       被弾エンティティ（{@code PersistentDataHolder}）
+     * @param spellBase    スペル基礎ダメージ（Ars攻撃力を内包済み。2026-08-02以降、増減グリフは
+     *                     {@code amplifyLevel} 側に分離した——{@code applyAmplifyDamageMultiplier=false}
+     *                     で呼ばれた経路(例: {@code HealEffect})だけは従来どおり内包済み）
+     * @param catalyst     詠唱に使った触媒 ItemStack（{@code catalysts.yml} 登録品、または非触媒バインド
+     *                     詠唱では魔導書本体）。特定不能なら {@code null}
+     * @param castItem     実際に右クリックして詠唱したアイテム（杖など）。{@code use-skill: ARS_MAGIC}
+     *                     を持つ場合だけステ供給元として採用する。特定不能なら {@code null}
+     * @param glyphId      ダメージを出したグリフのID（{@code "harm"} 等）。TF の
+     *                     {@code glyph_damage_multiplier_bonus} の適用対象判定に使う。不明なら {@code null}
+     * @param amplifyLevel 増幅段数（{@code SpellContext#getAmplifyLevel()}。Dampenで負にもなり得る）。
+     *                     {@code 0} なら乗算ボーナスなし（{@code applyAmplifyDamageMultiplier=false} の
+     *                     呼び出し元、または増幅グリフが1個も積まれていない詠唱）
      * @return 8stepパイプライン後の最終ダメージ。サービス未ロード時は {@code spellBase} をそのまま返す
      */
     public static double magicalFinalDamage(UUID casterUuid, LivingEntity victim, double spellBase,
-                                            ItemStack catalyst, ItemStack castItem, String glyphId) {
+                                            ItemStack catalyst, ItemStack castItem, String glyphId,
+                                            int amplifyLevel) {
         SymmetricCombatService service = combatService();
         if (service == null) {
             warnUnavailableOnce();
@@ -202,6 +220,11 @@ public final class TrinityForgeBridge {
         ItemStack statSource = resolveMagicStatSource(catalyst, castItem);
         double effectiveBase = MagicStatSourcePolicy.effectiveBase(
                 spellBase, itemAttackPower(statSource), magicalAttackPowerScale());
+        // 2026-08-02: 増幅(Amplify)の乗算ボーナス。「グリフ基礎＋杖の攻撃力」の合計へ掛ける
+        // (理由は MagicStatSourcePolicy#applyAmplifyMultiplier の javadoc — グリフ基礎だけに
+        // 掛けると触媒ビルドで実質無効になるのが変更の動機そのものなので、glyph倍率と同じ層で掛ける)。
+        effectiveBase = MagicStatSourcePolicy.applyAmplifyMultiplier(
+                effectiveBase, amplifyLevel, amplifyDamageRatePerStack(), maxAmplifyDamageLevel());
         // 課題G5: glyph_damage_multiplier_bonus(TF公開API TrinityForge#glyphDamageMultiplier)は
         // lore に出るのにフォーク側の呼び出し元が1つも無く効いていなかった。基礎ダメージ層で掛ける
         // (理由は MagicStatSourcePolicy#applyGlyphMultiplier の javadoc)。
@@ -398,6 +421,35 @@ public final class TrinityForgeBridge {
             return tf.config().combatDamage().magicalAttackPowerScale();
         } catch (Throwable t) {
             return MagicStatSourcePolicy.DEFAULT_ATTACK_POWER_SCALE;
+        }
+    }
+
+    /**
+     * {@code glyphs.yml} の {@code amplify.params.damage-rate-per-stack}（増幅1段あたりのダメージ乗率、
+     * 既定10%）。ArsPaper未初期化/例外時は {@link MagicStatSourcePolicy#DEFAULT_AMPLIFY_DAMAGE_RATE}。
+     */
+    private static double amplifyDamageRatePerStack() {
+        try {
+            return ArsPaper.getInstance().getGlyphConfig()
+                    .getParam("amplify", "damage-rate-per-stack", MagicStatSourcePolicy.DEFAULT_AMPLIFY_DAMAGE_RATE);
+        } catch (Throwable t) {
+            return MagicStatSourcePolicy.DEFAULT_AMPLIFY_DAMAGE_RATE;
+        }
+    }
+
+    /**
+     * {@code glyphs.yml} の {@code amplify.params.max-damage-level}（増幅ダメージ乗率の計算に使う
+     * 段数の絶対値上限、既定20）。ArsPaper未初期化/例外時は
+     * {@link MagicStatSourcePolicy#DEFAULT_MAX_AMPLIFY_DAMAGE_LEVEL}。
+     */
+    private static int maxAmplifyDamageLevel() {
+        try {
+            double value = ArsPaper.getInstance().getGlyphConfig().getParam(
+                    "amplify", "max-damage-level",
+                    (double) MagicStatSourcePolicy.DEFAULT_MAX_AMPLIFY_DAMAGE_LEVEL);
+            return (int) value;
+        } catch (Throwable t) {
+            return MagicStatSourcePolicy.DEFAULT_MAX_AMPLIFY_DAMAGE_LEVEL;
         }
     }
 
@@ -1094,6 +1146,207 @@ public final class TrinityForgeBridge {
             return svc.rollArsSmithingQuality(crafter, item);
         } catch (NoSuchMethodError legacyTf) {
             return svc.rollArsSmithingQuality(crafter);
+        }
+    }
+
+    /**
+     * スレッド厳選（TF {@code stats/item-stats.yml} の {@code items.<MATERIAL#CMD>.per-quality}/
+     * {@code random}）向け: TF のクラフト品質(0-100目安)を、既存の Ars鍛冶品質ロール
+     * ({@link CraftQualityService#rollArsSmithingQuality})でそのまま解決する。
+     *
+     * <p>スレッドは {@code isQualityStamped()==false}（装備ではなく素材扱い）なので
+     * {@link #finalizeCatalogRitualResult} の通常経路では TF の ItemData 品質 PDC は刻印されない
+     * （儀式クラフトの通常成果物と混ざらない）。この値は
+     * {@link #stampThreadIdentity(ItemStack, Player)} が TF の ItemData 品質 PDC へ
+     * 直接書き込む（2026-08-03、旧: Ars 独自 PDC で厳選結果そのものを焼き込んでいた設計から、
+     * 武器と同じ TF ItemData(rollSeed+quality)駆動へ統合済み）。
+     *
+     * <p>TF未ロード / サービス未初期化 / {@code crafter == null}（品質情報が取れない経路 ──
+     * ルートチェスト/ダンジョンドロップ/管理コマンド付与等） / 例外時は必ず {@code 0} を返す
+     * （＝幅を広げない、従来どおりの抽選）。この経路が失敗しても厳選そのものは止めない(fail-open)。
+     */
+    public static int currentArsSmithingQuality(Player crafter, ItemStack itemContext) {
+        if (crafter == null) {
+            return 0;
+        }
+        try {
+            TrinityForge tf = TrinityForge.getInstance();
+            if (tf == null) {
+                return 0;
+            }
+            CraftQualityService svc = tf.craftQualityService();
+            if (svc == null) {
+                return 0;
+            }
+            return rollQualityWithOffset(svc, crafter, itemContext);
+        } catch (Throwable t) {
+            return 0;
+        }
+    }
+
+    // ============================================================
+    // スレッド個体差(rollSeed + quality)の TrinityForge 標準経路への統合 (2026-08-03)
+    //
+    // 旧実装は Ars 独自の共有抽選プール(item-stats.yml の random-roll-pools:、さらにその前は
+    // thread-rolls.yml)へ委譲していたが、TF側はその専用の抽選プール機構自体を削除し「武器と全く同じ
+    // fixed/per-quality/random/確率付与の導出(WeaponAttackStatResolver#resolveItemStats(material,
+    // cmd, quality, rollSeed))」へ一本化した。stats/item-stats.yml の items: に thread_* が
+    // 1件ずつ個別定義されているのはこのため。ArsPaper 側はもう「厳選テーブルを引く」役ではなく、
+    // 「TFのrollSeed/qualityをアイテムへ刻む・読む・その値でTFの通常導出を呼ぶ」だけの薄い
+    // 呼び出し元になる。ステ値そのものはアイテムへベイクしない(rollSeed+qualityのみPDC保存、TF
+    // ItemData と同じ設計 ── item-stats.yml を変えれば既存スレッドの数値も追随する)。
+    // ============================================================
+
+    /**
+     * {@link #stampThreadIdentity(ItemStack, Player)}/{@link #rerollThreadIdentity(ItemStack)}/
+     * {@link #readThreadIdentity(ItemStack)} の戻り値。TF {@code ItemData} が持つ
+     * rollSeed(乱数)とquality(0-100目安)の組。
+     */
+    public record ThreadIdentity(long rollSeed, int quality) {
+        /** 未刻印/TF未ロード時のfail-open値(=従来どおりの幅、個体差なし)。 */
+        public static final ThreadIdentity NONE = new ThreadIdentity(0L, 0);
+    }
+
+    /**
+     * 効果付きスレッドを1個新規生成した瞬間に、TFのrollSeed(新規発番)とクラフト品質
+     * ({@link #currentArsSmithingQuality})を刻む。{@link com.trinityforge.stats.ItemFactory#stamp}
+     * ── 武器/触媒が品質を刻まれるのと同じ入口 ── へ委譲する。
+     *
+     * <p>{@code stamp} は本来 lore/vanilla属性も再組み立てするが、スレッドのステキー
+     * (bleed-damage 等)は {@code AttributeProjection} に一切マップされていない
+     * (2026-08-03 確認: stat mapped キーは knockback_resistance/armor_defense_rate/max_health/
+     * move_speed/attack_speed/attack_speed_bonus/attack_reach の7種のみで、スレッド40件は
+     * どれも使わない)ため、実害は無い。lore は呼び出し側({@code ThreadItem})がこの直後に
+     * 独自の lore で必ず上書きする前提。
+     *
+     * @param crafter 生成者。{@code null}(生成者不明経路: ルートチェスト/ダンジョンドロップ/管理
+     *                コマンド付与等)なら品質は0(=従来どおりの幅)だが rollSeed は発番する。
+     * @return 刻んだ (rollSeed, quality)。TF未ロード/ItemFactory未初期化/例外時は
+     *         {@link Optional#empty()}(=何も刻まない、fail-open)。
+     */
+    public static Optional<ThreadIdentity> stampThreadIdentity(ItemStack item, Player crafter) {
+        if (item == null || item.getType().isAir()) {
+            return Optional.empty();
+        }
+        try {
+            TrinityForge tf = TrinityForge.getInstance();
+            if (tf == null || tf.itemFactory() == null) {
+                return Optional.empty();
+            }
+            int quality = currentArsSmithingQuality(crafter, item);
+            long rollSeed = UUID.randomUUID().getMostSignificantBits();
+            tf.itemFactory().stamp(item, rollSeed, quality);
+            return Optional.of(new ThreadIdentity(rollSeed, quality));
+        } catch (Throwable t) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * 振り直し儀式向け: 既存スレッドの quality を据え置いたまま rollSeed だけを新規発番して書き直す。
+     * {@link #writeItemRoll(ItemMeta, long, int)}(PDCのみ書く軽量経路)を使う ──
+     * 呼び出し元({@code ThreadRerollRitualEffect})が直後に自前で lore を作り直すため、
+     * {@link #stampThreadIdentity} のようなフル再組み立ては不要かつ無駄働きになる。
+     *
+     * @return 書き直した (rollSeed, quality)。対象が空/PDC無し/TF未ロード/例外時は
+     *         {@link Optional#empty()}(=書き込まない、fail-open)。
+     */
+    public static Optional<ThreadIdentity> rerollThreadIdentity(ItemStack item) {
+        if (item == null || item.getType().isAir() || !item.hasItemMeta()) {
+            return Optional.empty();
+        }
+        try {
+            int quality = readThreadIdentity(item).quality();
+            long rollSeed = UUID.randomUUID().getMostSignificantBits();
+            item.editMeta(meta -> writeItemRoll(meta, rollSeed, quality));
+            return Optional.of(new ThreadIdentity(rollSeed, quality));
+        } catch (Throwable t) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * アイテムに刻まれた (rollSeed, quality) を読む。未刻印/PDC無し/TF未ロード/例外時は
+     * {@link ThreadIdentity#NONE}(rollSeed=0, quality=0)。
+     *
+     * <p><b>旧形式(装備側 {@code THREAD_SLOT_ROLLS} に入っていた
+     * {@code "<rarityId>|main=値|sub=値;..."})はこのメソッドの対象外</b> ──
+     * このメソッドはあくまで「スレッド単体アイテム」の TF {@code ItemData} PDC を読む。
+     * 装備の装着済みスレッド枠(旧形式が残り得る場所)は {@code ArmorManaListener} 側の
+     * 専用デコーダが担当し、パース失敗時は rollSeed=0/quality=0 にフォールバックする
+     * (フェイルオープン: 個体差が消えるだけで、ステ自体が消えたり例外で止まったりはしない)。
+     */
+    public static ThreadIdentity readThreadIdentity(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) {
+            return ThreadIdentity.NONE;
+        }
+        try {
+            ItemData data = ItemData.of(item.getItemMeta());
+            return new ThreadIdentity(data.rollSeed().orElse(0L), data.quality());
+        } catch (Throwable t) {
+            return ThreadIdentity.NONE;
+        }
+    }
+
+    /**
+     * 装着スレッド1個ぶんの導出済みステ(fixed + per-quality + random + 確率付与)を、
+     * 指定の quality/rollSeed で解決する。
+     * {@link WeaponAttackStatResolver#resolveItemStats(Material, Integer, int, long)}
+     * (武器がステを得るのとまったく同じ導出経路)への薄い委譲。
+     *
+     * <p>TF未ロード / resolver未初期化 / 例外時は空の可変Mapを返す(fail-open)。
+     */
+    public static Map<String, Double> resolveThreadStats(Material material, Integer cmd,
+                                                          int quality, long rollSeed) {
+        if (material == null) {
+            return new LinkedHashMap<>();
+        }
+        try {
+            TrinityForge tf = TrinityForge.getInstance();
+            if (tf == null) {
+                return new LinkedHashMap<>();
+            }
+            WeaponAttackStatResolver resolver = tf.weaponAttackStats();
+            if (resolver == null) {
+                return new LinkedHashMap<>();
+            }
+            return resolver.resolveItemStats(material, cmd, quality, rollSeed);
+        } catch (Throwable t) {
+            return new LinkedHashMap<>();
+        }
+    }
+
+    /** {@link #threadStatDisplay(String, double)} の戻り値: TF由来の表示名+整形済み値文字列。 */
+    public record ThreadStatDisplay(String label, String formattedValue) {
+    }
+
+    /**
+     * canonical stat key(例 {@code bleed-damage})の TF表示名 + 整形済み値
+     * ({@code stats/lore.yml} の {@code format}/{@code decimals}/{@code unit} を通した文字列、
+     * {@link com.trinityforge.stats.StatDisplaySpec#renderValue}) を返す。
+     * lore/チャット/GUI と桁数・％表記を必ず一致させるため、フォーク側で独自に数値を
+     * 整形し直さないこと(過去に lore とチャットで桁が食い違った事故がある)。
+     *
+     * <p>{@code stats/lore.yml} にそのキーの定義が無い / TF未ロード / 例外時は
+     * {@link Optional#empty()}(呼び出し側はキー名をそのまま出す等のフォールバックを持つこと)。
+     */
+    public static Optional<ThreadStatDisplay> threadStatDisplay(String canonicalKey, double value) {
+        if (canonicalKey == null || canonicalKey.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            TrinityForge tf = TrinityForge.getInstance();
+            if (tf == null || tf.config() == null || tf.config().lore() == null) {
+                return Optional.empty();
+            }
+            com.trinityforge.stats.StatDisplaySpec spec = tf.config().lore().displayTable()
+                    .get(StatKeys.canonical(canonicalKey));
+            if (spec == null) {
+                return Optional.empty();
+            }
+            return Optional.of(new ThreadStatDisplay(spec.displayName(), spec.renderValue(value)));
+        } catch (Throwable t) {
+            return Optional.empty();
         }
     }
 
@@ -1948,10 +2201,13 @@ public final class TrinityForgeBridge {
     }
 
     // ============================================================
-    // P9: 触媒詠唱成功時のアイテムクールダウンゲージ(武器CT相当)
+    // P9: 詠唱成功時のアイテムクールダウンゲージ(武器CT相当)
     //
     // 近接主命中(CombatListener)は既存の武器CTゲージを表示するが、触媒スペルの詠唱には何の
     // アイテムクールダウンゲージも出ない。詠唱成功時に触媒自身のクールダウン(秒)でゲージを表示する。
+    // 2026-08-02: 呼び出し元は触媒(catalysts.yml登録品)経由に限らない。SpellCaster の
+    // item-cooldown 汎用パス(触媒/魔導書のどちらもCTを持たない詠唱で、実際に右クリックした
+    // アイテム自身の item-cooldown ステを使う経路)からも呼ばれる。
     // ============================================================
 
     /**
@@ -2008,6 +2264,16 @@ public final class TrinityForgeBridge {
             }
             if (seconds <= 0.0) {
                 return;
+            }
+            // cooldown_reduction (アイテムCT短縮ステ)を近接側(CombatListener#startItemCooldown)と
+            // 同じ規則で適用する(2026-08-02)。従来はここが未適用で、杖/触媒詠唱のCTだけ短縮ステの
+            // 対象外という食い違いがあった。近接と全く同じ下限クランプ(最大90%短縮、下限5%は必ず残す)
+            // を踏襲し、CTが0まで削れて無限連射になる穴を作らない。tfStatTotal は装備+skilltree perk
+            // 合算(全ソース)を返すため、CombatListener側の aggregator.aggregate(...).totalOf(...) と
+            // 同じ値になる。
+            double reduction = tfStatTotal(player, "cooldown_reduction");
+            if (Double.isFinite(reduction) && reduction > 0.0) {
+                seconds = seconds * Math.max(0.05, 1.0 - Math.min(0.9, reduction));
             }
             long ticks = WeaponAttackStatResolver.cooldownTicksFor(seconds);
             if (ticks > 0) {

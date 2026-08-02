@@ -1,29 +1,28 @@
 package com.arspaper.item.impl;
 
+import com.arspaper.integration.TrinityForgeBridge;
+import com.arspaper.integration.TrinityForgeBridge.ThreadIdentity;
 import com.arspaper.item.BaseCustomItem;
 import com.arspaper.item.ItemKeys;
-import com.arspaper.item.ThreadRoll;
-import com.arspaper.item.ThreadRollConfig;
 import com.arspaper.item.ThreadType;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * スレッドアイテム。防具のスレッドスロットにセットして使う。
  * 空スレッド（EMPTY）は儀式で型付きスレッドに変換する中間素材。
  */
 public class ThreadItem extends BaseCustomItem {
-
-    /** 厳選用の乱数。個体差だけに使うのでセキュアである必要はない。 */
-    private static final java.util.Random RANDOM = new java.util.Random();
 
     private final ThreadType threadType;
 
@@ -50,15 +49,33 @@ public class ThreadItem extends BaseCustomItem {
 
     @Override
     public ItemStack createItemStack() {
+        // 生成者（誰が作ったか）が分からない経路（ルートチェスト/ダンジョンドロップ/管理コマンド
+        // 付与等）のフォールバック。品質は0扱いになり、従来どおりの幅でロールする
+        // （TrinityForgeBridge#stampThreadIdentity 参照）。
+        return createItemStack(null);
+    }
+
+    /**
+     * 生成者（儀式クラフトの実行者）が分かる版。TF のクラフト品質を厳選のロール幅へ反映する
+     * （{@link TrinityForgeBridge#stampThreadIdentity(ItemStack, Player)} 参照）。{@code crafter} が
+     * {@code null} のときは {@link #createItemStack()} と同じ（quality=0 扱い）。
+     */
+    public ItemStack createItemStack(Player crafter) {
         ItemStack item = super.createItemStack();
         // 厳選(個体差)は「効果付きスレッドを1個作った瞬間」に決まる。EMPTY は儀式で型付きへ変換する
         // 中間素材なので厳選しない(変換後の ThreadItem 生成時に改めて抽選される)。
-        ThreadRoll roll = threadType.hasEffect() ? rollForNewItem() : null;
+        // stampThreadIdentity は TF の ItemFactory#stamp(=武器/触媒と同じ入口)へ委譲し、
+        // item(=このメソッド内で参照を保持している同一インスタンス)へ rollSeed/quality を刻む。
+        // stamp は lore/属性も再組み立てするが、スレッドのステキーは AttributeProjection に
+        // 一切マップされていない(TrinityForgeBridge#stampThreadIdentity のjavadoc参照)ので実害は無く、
+        // lore はこの直後の editMeta で必ず上書きする。
+        ThreadIdentity identity = threadType.hasEffect()
+                ? TrinityForgeBridge.stampThreadIdentity(item, crafter).orElse(ThreadIdentity.NONE)
+                : ThreadIdentity.NONE;
         item.editMeta(meta -> {
             meta.getPersistentDataContainer().set(
                 ItemKeys.THREAD_ITEM_TYPE, PersistentDataType.STRING, threadType.getId()
             );
-            ThreadRoll.write(meta.getPersistentDataContainer(), roll);
 
             List<Component> lore = new ArrayList<>();
             if (threadType.hasEffect()) {
@@ -67,7 +84,7 @@ public class ThreadItem extends BaseCustomItem {
                 lore.add(Component.text("儀式で効果付きスレッドに変換できます", NamedTextColor.GRAY)
                     .decoration(TextDecoration.ITALIC, false));
             }
-            lore.addAll(rollLore(roll));
+            lore.addAll(rollLore(threadType, identity));
             lore.add(Component.text("防具のスレッドスロットにセット可能", NamedTextColor.DARK_GRAY)
                 .decoration(TextDecoration.ITALIC, false));
             meta.lore(lore);
@@ -75,31 +92,36 @@ public class ThreadItem extends BaseCustomItem {
         return item;
     }
 
-    /** 厳選を1回引く。設定が無効/未ロードなら null（＝個体差なしの従来挙動）。 */
-    private static ThreadRoll rollForNewItem() {
-        com.arspaper.ArsPaper ars = com.arspaper.ArsPaper.getInstance();
-        if (ars == null || ars.getThreadRollConfig() == null) {
-            return null;
-        }
-        return ars.getThreadRollConfig().roll(RANDOM).orElse(null);
-    }
-
     /**
-     * 厳選結果の lore 行。レア度のラベル/色は thread-rolls.yml 側が正なので毎回引き直す
-     * （アイテムに焼き込むのは ID と数値だけ ── 表示だけは後から設定で変えられるようにしている）。
+     * 厳選結果の lore 行。ステの表示名/単位/丸めは TF 側({@code stats/lore.yml})が正なので、
+     * フォークで独自に整形し直さない（{@link TrinityForgeBridge#threadStatDisplay}）。
+     * {@code identity} が {@link ThreadIdentity#NONE} でも(rollSeed=0, quality=0の)ステは
+     * 決定的に解決されるので、必ず fixed 分だけは表示される。
+     *
+     * @param type     ステを解決するための material/CMD 供給元（スレッドの種類）
+     * @param identity そのスレッド個体の rollSeed + quality
      */
-    public static List<Component> rollLore(ThreadRoll roll) {
-        if (roll == null) {
+    public static List<Component> rollLore(ThreadType type, ThreadIdentity identity) {
+        if (type == null || identity == null || !type.hasEffect()) {
             return List.of();
         }
-        com.arspaper.ArsPaper ars = com.arspaper.ArsPaper.getInstance();
-        ThreadRollConfig config = ars == null ? null : ars.getThreadRollConfig();
-        if (config == null) {
-            return roll.lore(NamedTextColor.GRAY, roll.rarityId(), java.util.Set.of());
+        Map<String, Double> stats = TrinityForgeBridge.resolveThreadStats(
+                type.getBaseMaterial(), type.getCustomModelData(), identity.quality(), identity.rollSeed());
+        if (stats.isEmpty()) {
+            return List.of();
         }
-        return config.rarity(roll.rarityId())
-                .map(rarity -> roll.lore(rarity.color(), rarity.label(), config.percentKeys()))
-                .orElseGet(() -> roll.lore(NamedTextColor.GRAY, roll.rarityId(), config.percentKeys()));
+        List<Component> lore = new ArrayList<>();
+        stats.forEach((key, value) -> {
+            if (value == null || !Double.isFinite(value) || value == 0.0) {
+                return;
+            }
+            String line = TrinityForgeBridge.threadStatDisplay(key, value)
+                    .map(display -> display.label() + " " + display.formattedValue())
+                    .orElseGet(() -> key + " +" + value);
+            lore.add(Component.text("  ・ " + line, NamedTextColor.YELLOW)
+                    .decoration(TextDecoration.ITALIC, false));
+        });
+        return lore;
     }
 
     public ThreadType getThreadType() {

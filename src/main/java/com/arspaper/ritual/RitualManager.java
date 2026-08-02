@@ -8,6 +8,7 @@ import com.arspaper.block.impl.SourceJar;
 import com.arspaper.integration.TrinityForgeBridge;
 import com.arspaper.item.BaseCustomItem;
 import com.arspaper.item.ItemKeys;
+import com.arspaper.item.impl.ThreadItem;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -249,7 +250,7 @@ public class RitualManager {
                         return;
                     }
                 } else {
-                    craftResult = resolveResult(recipe);
+                    craftResult = resolveResult(recipe, player);
                     if (craftResult == null) {
                         player.sendMessage(Component.text("儀式の結果が無効です！", NamedTextColor.RED));
                         refundSource(coreLocation, reservedSource);
@@ -617,7 +618,7 @@ public class RitualManager {
         return mat != null ? new ItemStack(mat, 1) : null;
     }
 
-    private ItemStack resolveResult(RitualRecipe recipe) {
+    private ItemStack resolveResult(RitualRecipe recipe, Player player) {
         if (recipe.isCustomResult()) {
             String rid = recipe.resultId();
             if (rid != null && rid.startsWith(CatalogRitualRegistrar.RESULT_PREFIX)) {
@@ -625,7 +626,7 @@ public class RitualManager {
                 // Ars登録済みアイテム(魔導書/素材等)はArs実体を優先: 機能PDC(book tier等)を持たせる。
                 ItemStack ars = ArsPaper.getInstance().getItemRegistry()
                     .get(catalogId)
-                    .map(item -> item.createItemStack())
+                    .map(item -> createResultItem(item, player))
                     .orElse(null);
                 if (ars != null) {
                     return ars;
@@ -637,13 +638,26 @@ public class RitualManager {
             }
             return ArsPaper.getInstance().getItemRegistry()
                 .get(recipe.resultId())
-                .map(item -> item.createItemStack())
+                .map(item -> createResultItem(item, player))
                 .orElse(null);
         }
         if (recipe.resultMaterial() != null) {
             return new ItemStack(recipe.resultMaterial());
         }
         return null;
+    }
+
+    /**
+     * 儀式クラフトの結果 ItemStack を生成する。{@link ThreadItem} だけは生成者(player)を渡し、
+     * TF のクラフト品質をスレッド個体の quality として刻ませる(TF {@code stats/item-stats.yml} の
+     * {@code items.<MATERIAL#CMD>.per-quality}/{@code random})。他のカスタムアイテムは従来どおり
+     * player 情報を使わない。
+     */
+    private static ItemStack createResultItem(BaseCustomItem item, Player player) {
+        if (item instanceof ThreadItem threadItem) {
+            return threadItem.createItemStack(player);
+        }
+        return item.createItemStack();
     }
 
     private void playRitualCompleteEffects(Location location) {
