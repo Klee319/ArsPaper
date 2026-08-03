@@ -392,9 +392,21 @@ public class ArmorManaListener implements Listener {
             // ポーション処理を止めない。
             totals.counts.merge(thread, 1, Integer::sum);
             try {
-                TrinityForgeBridge.resolveThreadStats(thread.getBaseMaterial(), thread.getCustomModelData(),
-                                equipped.quality(), equipped.rollSeed())
-                        .forEach((key, value) -> totals.combatStats.merge(key, value, Double::sum));
+                // 呼び出し元が返すMapの可変性を仮定しない(TF側の実装差で
+                // UnmodifiableMap が返ればremoveで落ちる)ため、必ず自前のMapへ写してから仕分ける。
+                Map<String, Double> threadStats = new LinkedHashMap<>(
+                        TrinityForgeBridge.resolveThreadStats(thread.getBaseMaterial(),
+                                thread.getCustomModelData(), equipped.quality(), equipped.rollSeed()));
+                // 2026-08-03: マナ系5キーだけは combatStats(=addon戦闘チャネル)へ流しても
+                // 誰も読まず無言で死ぬ。threads.yml と同じ整数カウンタへ移す
+                // (経路の詳細と単位変換の理由は ThreadManaStatRouting の javadoc)。
+                ThreadManaStatRouting.Deltas mana = ThreadManaStatRouting.extract(threadStats);
+                totals.threadMana += mana.manaBonus();
+                totals.threadRegen += mana.manaRegen();
+                totals.hitRecovery += mana.hitManaRecovery();
+                totals.damageRecovery += mana.damageManaRecovery();
+                totals.costReduction += mana.costReductionPercent();
+                threadStats.forEach((key, value) -> totals.combatStats.merge(key, value, Double::sum));
             } catch (Throwable tfUnavailable) {
                 // TF未ロード等: このスレの戦闘ステはスキップ(マナ機能は無影響)。
             }

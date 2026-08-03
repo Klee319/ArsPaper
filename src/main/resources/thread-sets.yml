@@ -485,3 +485,63 @@ thread-sets:
         mob-drop-bonus: 0.03
       5:
         mob-drop-bonus: 0.045
+
+  # ==================================================================
+  # 2026-08-03 追加5種(CMD 300041-300045)。
+  #
+  # ■ 儀式レシピを持たない(TF gacha.yml の景品専用)ぶんを、効果の強さではなく
+  #   「触っている軸が他と被らない」ことで価値にしている。5種とも既存40種が
+  #   誰も触っていないステを1段目に置いてある。
+  # ■ しきい値は追加24種と同じ 1/3/5。1段目が 1 なのは、スレッド単体の効果を
+  #   item-stats.yml だけで出すと「手に持つだけで乗る」穴が開くため
+  #   (ファイル冒頭の ⚠⚠ 参照)。個数集計はソケット済みしか数えない。
+  # ■ 5 が上限なのはキャリア数(防具4部位 + メインハンド + オフハンド枠)が今 5 だから。
+  #   6段以上は到達不能な死にティアになる(ThreadSetThresholdReachabilityTest が落とす)。
+  # ==================================================================
+  # 醸造の品質。potion-quality-bonus は「品質modeへの加点」なので整数刻みで意味が出る。
+  perfumer:
+    thresholds:
+      1:
+        potion-quality-bonus: 1.0
+      3:
+        brew-speed-bonus: 0.06
+      5:
+        potion-quality-bonus: 1.0
+  # 蜂の巣の採取量。hive-harvest-fortune は BeekeepingListener 専用で他と重ならない。
+  apiarist:
+    thresholds:
+      1:
+        hive-harvest-fortune: 0.024
+      3:
+        hive-harvest-fortune: 0.012
+      5:
+        hive-harvest-fortune: 0.012
+  # 繁殖。追加産仔と成長速度で分けているのは、同じキーを3段重ねると
+  # 「増えるだけで育たない」偏りが出るため。
+  herder:
+    thresholds:
+      1:
+        breeding-extra-child-chance: 0.024
+      3:
+        bred-animal-growth-bonus: 0.06
+      5:
+        breeding-extra-child-chance: 0.024
+  # モブから得る品の品質。spoils(量)とは別軸なので、両方挿す価値がある。
+  appraiser:
+    thresholds:
+      1:
+        mob-drop-quality: 1.0
+      3:
+        mob-drop-bonus: 0.03
+      5:
+        mob-drop-quality: 1.0
+  # 採取速度。gathering-efficiency は「効率強化エンチャントのレベル」として反映されるため
+  # 整数刻み。バニラの採掘速度は level^2+1 で伸びるので、累計3までに抑えている。
+  excavation:
+    thresholds:
+      1:
+        gathering-efficiency: 1.0
+      3:
+        gathering-efficiency: 1.0
+      5:
+        gathering-efficiency: 1.0

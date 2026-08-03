@@ -132,7 +132,38 @@ public enum ThreadType {
     MARKSMAN("marksman", "射手のスレッド", 300038, NamedTextColor.DARK_GREEN,
         0, 0, null, 0, 0, 0, 0, Material.ARCHER_POTTERY_SHERD),
     LUCK("luck", "幸運のスレッド", 300040, NamedTextColor.GOLD,
-        0, 0, PotionEffectType.LUCK, 0, 0, 0, 0, Material.EXPLORER_POTTERY_SHERD);
+        0, 0, PotionEffectType.LUCK, 0, 0, 0, 0, Material.EXPLORER_POTTERY_SHERD),
+
+    // ================================================================
+    // 2026-08-03 追加5種 (CMD 300041-300045)。
+    //
+    // ■ 上の40種と違う点は「儀式レシピを持たない」ことだけ
+    //   items/catalog.yml のエントリに recipe: を書かず、TF の gacha.yml の景品としてしか出ない。
+    //   そのぶん厳選(item-stats.yml の per-quality + random + grant-chances)の主ステを
+    //   生活・採取・戦利品の軸に寄せ、「引き当てた甲斐がある」性格にしてある。
+    //
+    // ■ baseMaterial に旗の模様(BANNER_PATTERN)と鍛冶型を使った理由
+    //   既存40種で防具トリム18種と陶器の欠片22種を使い切っており、空きは
+    //   PRIZE の欠片1種だけだった(HOST は防具トリムにしか無く、HOST_POTTERY_SHERD は
+    //   Paper の Material に存在しない)。同じ材質を使い回しても機能上は安全
+    //   (スレッドの同一性は PDC の thread_type で、材質+CMD では判定していない)が、
+    //   見た目が既存スレッドと完全に同じになるので避けた。旗の模様は「紋様」で
+    //   スレッドの語感にも合う。
+    //
+    // ■ id の禁止事項は上の40種と同じ
+    //   "hit" を含む id を作らない(ThreadConfig の recovery 振り分けが文字列判定)。
+    //   perfumer / apiarist / herder / appraiser / excavation はいずれも該当しない。
+    // ================================================================
+    PERFUMER("perfumer", "調香のスレッド", 300041, NamedTextColor.LIGHT_PURPLE,
+        0, 0, null, 0, 0, 0, 0, Material.FLOWER_BANNER_PATTERN),
+    APIARIST("apiarist", "養蜂のスレッド", 300042, NamedTextColor.YELLOW,
+        0, 0, null, 0, 0, 0, 0, Material.FIELD_MASONED_BANNER_PATTERN),
+    HERDER("herder", "牧人のスレッド", 300043, NamedTextColor.GREEN,
+        0, 0, null, 0, 0, 0, 0, Material.PIGLIN_BANNER_PATTERN),
+    APPRAISER("appraiser", "鑑識のスレッド", 300044, NamedTextColor.GOLD,
+        0, 0, null, 0, 0, 0, 0, Material.PRIZE_POTTERY_SHERD),
+    EXCAVATION("excavation", "削岩のスレッド", 300045, NamedTextColor.DARK_GRAY,
+        0, 0, null, 0, 0, 0, 0, Material.NETHERITE_UPGRADE_SMITHING_TEMPLATE);
 
     private final String id;
     private final String displayName;
