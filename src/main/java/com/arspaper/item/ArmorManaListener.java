@@ -54,11 +54,18 @@ public class ArmorManaListener implements Listener {
     private static final int POTION_DURATION = -1; // Paper 1.20+: 無限持続
     private final JavaPlugin plugin;
 
+    /**
+     * スレッドが付与しうるポーション効果の全種。{@link #updatePotionEffects} はこの配列だけを
+     * 走査して付与/解除するので、{@link ThreadType} にポーション系スレッドを足したら
+     * ここにも足すこと ── 漏らすと【付けても効かず、外しても剥がれない】(どちらも無言)。
+     */
     private static final PotionEffectType[] THREAD_POTION_TYPES = {
         PotionEffectType.SPEED, PotionEffectType.JUMP_BOOST,
         PotionEffectType.NIGHT_VISION, PotionEffectType.FIRE_RESISTANCE,
         PotionEffectType.DOLPHINS_GRACE, PotionEffectType.CONDUIT_POWER,
-        PotionEffectType.HERO_OF_THE_VILLAGE, PotionEffectType.HEALTH_BOOST
+        PotionEffectType.HERO_OF_THE_VILLAGE, PotionEffectType.HEALTH_BOOST,
+        // 2026-08-02 スレッド16→40種で追加。SLOW_FALLING/LUCK はどちらもバニラ実在。
+        PotionEffectType.SLOW_FALLING, PotionEffectType.LUCK
     };
 
     public ArmorManaListener(JavaPlugin plugin) {

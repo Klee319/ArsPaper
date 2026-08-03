@@ -853,6 +853,12 @@ public final class TrinityForgeBridge {
         try {
             if (MaterialTier.of(item.getType()).isEquipment() || isArsQualityStamped(item)) {
                 finalizeArsSmithingResult(item, crafter, materialTokens);
+            } else {
+                // 2026-08-03 実サーバ報告「Ars鍛冶の経験値が入らない」の修正: 品質を刻む対象では
+                // ない(装備でも刻印済みArsアイテムでもない) tfcatalog 儀式結果でも、儀式を行った
+                // 労力ぶんのEXPだけは常に付与する。品質とEXPを同じ門に相乗りさせていたのが誤り
+                // (下の grantArsSmithingExpOnly javadoc 参照)。
+                grantArsSmithingExpOnly(item, crafter, materialTokens);
             }
             if (!item.hasItemMeta()) {
                 return;
@@ -872,9 +878,16 @@ public final class TrinityForgeBridge {
     }
 
     /**
-     * Completes one Ars smithing production action. Quality and EXP deliberately share this boundary:
-     * both native Ars ritual results and {@code tfcatalog:} ritual results therefore use the same
-     * finished-item use-level scaling configured by TrinityForge.
+     * Completes one Ars smithing production action <b>that is eligible for a quality stamp</b>
+     * (equipment, or a native Ars item that opts into quality via {@code isQualityStamped()}).
+     *
+     * <p><b>2026-08-03 訂正</b>: このメソッドの旧javadocは "Quality and EXP deliberately share
+     * this boundary" と書いていたが、これは誤り（実サーバ報告「Ars鍛冶の経験値が入らない」の真因）
+     * だった。品質を刻めない(＝刻む意味が無い)儀式結果——ソースジェムの系譜・エンチャント本・
+     * ウェイストーン・テレポートコンパス等——を呼び出し元がこのメソッドの手前で弾いていたため、
+     * それらは<b>一度もEXP付与へ到達しなかった</b>。品質は「刻めるものにだけ刻む」が正しい線引きで、
+     * EXPは「儀式を行った労力」に対して払うものなので<b>門を分ける必要がある</b>。品質を刻まない
+     * 結果には代わりに {@link #grantArsSmithingExpOnly} を使うこと(呼び出し元を参照)。
      */
     public static void finalizeArsSmithingResult(ItemStack item, Player crafter) {
         finalizeArsSmithingResult(item, crafter, java.util.List.of());
@@ -894,11 +907,38 @@ public final class TrinityForgeBridge {
             return;
         }
         stampCraftedQuality(item, crafter);
+        grantArsSmithingExpOnly(item, crafter, materialTokens);
+    }
+
+    /**
+     * 品質を刻まない(刻む意味が無い)儀式結果にも、儀式を行った労力ぶんのEXPだけを付与する
+     * (2026-08-03 実サーバ報告「Ars鍛冶の経験値が入らない」の修正)。
+     *
+     * <p>ソースジェムの系譜(source_gem→…→singularity_proof)・エンチャント本(mana_regen/boost/
+     * share/soulbound)・ウェイストーン・テレポートコンパス等が対象。いずれも
+     * {@code RitualManager}/{@code RitualRecipe} に分解・逆儀式の概念が無い(grep 確認済み)ため、
+     * ここでEXPを開いても「作って分解して作り直す」無限EXP経路にはならない
+     * (圧縮素材の compress/decompress は<b>別系統</b>のバニラ作業台レシピ({@code RecipeManager}の
+     * {@code reversible: true})であり、そちらは {@code CraftQualityListener} 側の
+     * 「完成品に使用可能レベルが無ければEXPを出さない」ゲートで既に保護されている——本メソッドとは
+     * 無関係)。
+     *
+     * <p>失敗を完全に握り潰さない — 従来 {@code catch (Throwable) {}} で完全に無言だったため、
+     * TrinityForge 側の API 不整合(フォークの {@code libs/TrinityForge.jar} が古い等)が起きても
+     * 誰にも気付けなかった。ここでは最低限の警告ログを残す。
+     */
+    public static void grantArsSmithingExpOnly(ItemStack item, Player crafter,
+                                                Collection<String> materialTokens) {
+        if (item == null || crafter == null || item.getType().isAir()) {
+            return;
+        }
         try {
             ArsProgressionBridge.grantSmithingCraftExp(ArsPaper.getInstance(), crafter, item,
                     materialTokens == null ? java.util.List.of() : materialTokens);
         } catch (Throwable t) {
-            // TF absent / older API: keep the successfully crafted and quality-stamped result.
+            ArsPaper.getInstance().getLogger().warning(
+                    "Ars鍛冶(儀式)EXP付与に失敗しました(item=" + item.getType()
+                            + ", crafter=" + crafter.getName() + "): " + t);
         }
     }
 
@@ -1064,6 +1104,31 @@ public final class TrinityForgeBridge {
     }
 
     /**
+     * TrinityForge の {@code items/catalog.yml} で {@code draft: true}(準備中)と宣言されたIDか。
+     *
+     * <p><b>なぜ Ars 側から問い合わせるのか</b>: 準備中アイテムは「カタログには定義があるが
+     * ゲーム内では一切入手できない」状態が仕様で、TF 側は
+     * {@code CrossPluginItemResolver#create} 1箇所でそれを保証している。しかし Ars は
+     * <b>同じ id の実体を自前のレジストリで持っている</b>ため、Ars のルートテーブルや
+     * 儀式から配ると TF のゲートを一度も通らない。判定そのものを増やさず TF の1箇所へ
+     * 問い合わせることで、{@code draft:} フラグを唯一のスイッチに保つ。
+     *
+     * <p>TF 未ロード / API 不一致のときは {@code false}(＝従来どおり配る)。準備中判定が取れない
+     * ことを理由にルートを止めると、TF 抜きで動かす構成でチェストが空になる。
+     */
+    public static boolean isCatalogDraft(String catalogId) {
+        try {
+            TrinityForge tf = TrinityForge.getInstance();
+            if (tf == null || catalogId == null || catalogId.isBlank()) {
+                return false;
+            }
+            return tf.config().itemCatalog().isDraft(catalogId);
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /**
      * TFカタログエントリの表示名(MiniMessageタグ除去済みプレーン文字列)を返す。
      * レシピブラウザで Ars レジストリ未登録の catalog 素材(圧縮ブロック等)を表示するため。
      * TF未ロード/未知id/表示名未設定時は null。
@@ -1077,7 +1142,9 @@ public final class TrinityForgeBridge {
             return tf.config().itemCatalog().template(catalogId)
                     .map(t -> t.displayName())
                     .filter(n -> n != null && !n.isBlank())
-                    .map(n -> n.replaceAll("<[^>]+>", ""))
+                    // MiniMessage を正規表現で削るのではなく実パーサへ通す(書式解釈は DisplayText 1本)。
+                    .map(com.arspaper.util.DisplayText::plain)
+                    .filter(n -> !n.isBlank())
                     .orElse(null);
         } catch (Throwable t) {
             return null;

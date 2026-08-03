@@ -12,13 +12,14 @@ import org.bukkit.plugin.java.JavaPlugin;
  * Ars Nouveau Tier 2, mana 50相当。
  *
  * ダメージ計算:
- *   damage = 5.0 + 2.5 * amplifyLevel + min(heightAboveGround, 10.0)
+ *   damage = 5.0 + min(heightAboveGround, 10.0)
  * エンティティが地面上にいる場合（heightAboveGround == 0）はダメージなし。
+ * 増幅(Amplify)は固定値加算ではなく、dealSpellDamage 側で Sharpness と同じ乗算ボーナス
+ * (既定1段+10%)として上記の合計に適用される(2026-08-02)。
  */
 public class WindshearEffect implements SpellEffect {
 
     private static final double BASE_DAMAGE = 5.0;
-    private static final double AMPLIFY_BONUS = 2.5;
     private static final double MAX_HEIGHT_BONUS = 10.0;
     private static final int MAX_SCAN_DEPTH = 64; // 地面スキャンの最大深度
     private final NamespacedKey id;
@@ -39,10 +40,9 @@ public class WindshearEffect implements SpellEffect {
         double baseDamage = config.getParam("windshear", "base-damage", BASE_DAMAGE);
         double maxHeightBonus = config.getParam("windshear", "max-height-bonus", MAX_HEIGHT_BONUS);
         double heightBonus = Math.min(height, maxHeightBonus);
-        double amplifyBonus = config.getParam("windshear", "amplify-bonus", AMPLIFY_BONUS);
-        double damage = baseDamage + amplifyBonus * context.getAmplifyLevel() + heightBonus;
+        double damage = baseDamage + heightBonus;
 
-        // 対称パイプラインへ供給し最終ダメージを適用
+        // 対称パイプラインへ供給し最終ダメージを適用(増幅の乗算ボーナスはdealSpellDamage側で適用)
         context.dealSpellDamage(target, damage, id.getKey());
 
         Location loc = target.getLocation().add(0, 1, 0);

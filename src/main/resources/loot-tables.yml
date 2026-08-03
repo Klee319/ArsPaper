@@ -91,6 +91,18 @@ pools:
         chance: 0.04
       - item: custom:thread_health_boost
         chance: 0.03
+      # 【採取・生活系スレッド】 2026-08-02 追加。スレッド40種のうち「入手経路=ルート」に
+      # 割り当てた8種のうち、序盤に触れてほしい採取3種をここに置く。
+      # 儀式(catalog.yml)にもモブドロップ(mob-level-table.yml)にも載せていないので、
+      # この抽選が唯一の入手経路 = 構造物を探す動機そのものになる。
+      # 廃坑は掘る場所・砂漠/ジャングルの寺院は開拓の目的地なので、採掘/農耕/伐採の
+      # 3種はここが一番テーマに合う。
+      - item: custom:thread_miner
+        chance: 0.04
+      - item: custom:thread_harvest
+        chance: 0.03
+      - item: custom:thread_timber
+        chance: 0.03
       - item: custom:source_shard
         chance: 0.10
         min: 1
@@ -113,6 +125,15 @@ pools:
         chance: 0.05
       - item: custom:thread_spell_cost_down
         chance: 0.05
+      # 【採取・生活系スレッド】 2026-08-02 追加。到達に手間がかかる帯なので、
+      # 「効率を上げる」側(釣り運/スキルEXP/空腹節約)の3種をここに置く。
+      # 序盤の採取3種(shallow)より一段上のレイヤという位置付け。
+      - item: custom:thread_angler
+        chance: 0.04
+      - item: custom:thread_diligence
+        chance: 0.04
+      - item: custom:thread_endurance
+        chance: 0.04
       - item: custom:source_shard
         chance: 0.14
         min: 1
@@ -140,6 +161,13 @@ pools:
       - item: custom:thread_health_boost
         chance: 0.06
       - item: custom:thread_spell_cost_down
+        chance: 0.06
+      # 【採取・生活系スレッド】 2026-08-02 追加。ネザー要塞跡・古代都市・エンドシティは
+      # 「落ちたら死ぬ / 補給が効かない」場所なので、低速落下と食事回復の2種をここに置く。
+      # 残り6種は shallow / mid 側にあるので、ここでしか手に入らないのはこの2種だけ。
+      - item: custom:thread_slow_falling
+        chance: 0.06
+      - item: custom:thread_gourmet
         chance: 0.06
       - item: custom:reality_thread_core
         chance: 0.06
@@ -173,6 +201,28 @@ pools:
         chance: 0.04
       - item: custom:thread_spell_cost_down
         chance: 0.04
+      # 【採取・生活系スレッド】 2026-08-02 追加。バニラ側の3プール(shallow/mid/deep)に
+      # 分散させた8種を、ここでは一括で薄く(各2%)出す。データパックの構造物は
+      # 「どれが浅くてどれが深いか」を namespace ワイルドカードでは判別できないため、
+      # テーマ分けはせず全種を等確率に落としてある。
+      # 確率を 2% に抑えているのは、データパック構造物は生成数が読めず、バニラ側と
+      # 同じ4-6%にすると実効入手率がバニラの数倍に化けかねないため。
+      - item: custom:thread_miner
+        chance: 0.02
+      - item: custom:thread_angler
+        chance: 0.02
+      - item: custom:thread_harvest
+        chance: 0.02
+      - item: custom:thread_timber
+        chance: 0.02
+      - item: custom:thread_diligence
+        chance: 0.02
+      - item: custom:thread_endurance
+        chance: 0.02
+      - item: custom:thread_gourmet
+        chance: 0.02
+      - item: custom:thread_slow_falling
+        chance: 0.02
       - item: custom:source_shard
         chance: 0.12
         min: 1

@@ -172,4 +172,44 @@ public final class ThreadApplicationPolicy {
                 || materialName.endsWith("_CHESTPLATE") || materialName.equals("ELYTRA")
                 || materialName.endsWith("_LEGGINGS") || materialName.endsWith("_BOOTS");
     }
+
+    /**
+     * {@code material} が「純粋なツール」(採掘・採取・作業用具で、戦闘武器を兼ねないもの)か
+     * (2026-08-02 依頼#44: Bedrock/Geyser はコマンド UX が弱いため、ツールだけ
+     * スニーク+見上げ+右クリックの GUI 入口を追加する)。
+     *
+     * <p><b>斧は含めない</b>。TrinityForge {@code EquipmentSlotResolver} は斧を
+     * {@code weapon}/{@code tool} の<b>両方</b>に分類する(木こりの実採取にも使うが、殴打武器でもある)。
+     * ここは「戦闘武器を兼ねる品はコマンド入口のまま」という {@link ThreadGuiOpenListener} の
+     * 既存方針(弓/クロスボウ/トライデント/斧は通常操作でスニーク+右クリックする)を崩さないため、
+     * 戦闘武器と重ならない{@code tool}専用の集合(つるはし/シャベル/クワ/釣竿/ハサミ/火打石)だけを対象にする。
+     *
+     * <p>{@link #isArmorSlotMaterial} と同じフォールバック規約: TF が未リンクの環境
+     * (このフォークの単体テスト実行時)では材質名の接尾辞で判定する。
+     */
+    public static boolean isToolMaterial(Material material) {
+        if (material == null) {
+            return false;
+        }
+        try {
+            java.util.Set<String> categories = com.trinityforge.stats.EquipmentSlotResolver.statCategories(material);
+            return categories.contains(com.trinityforge.stats.EquipmentSlotResolver.CATEGORY_TOOL)
+                    && !categories.contains(com.trinityforge.stats.EquipmentSlotResolver.CATEGORY_WEAPON);
+        } catch (Throwable tfUnavailable) {
+            return isToolMaterialName(material.name());
+        }
+    }
+
+    /** {@link #isToolMaterial} の TF 非依存フォールバック(材質名だけで判定、斧は除外)。 */
+    public static boolean isToolMaterialName(String materialName) {
+        if (materialName == null) {
+            return false;
+        }
+        return materialName.endsWith("_PICKAXE")
+                || materialName.endsWith("_SHOVEL")
+                || materialName.endsWith("_HOE")
+                || materialName.equals("FISHING_ROD")
+                || materialName.equals("SHEARS")
+                || materialName.equals("FLINT_AND_STEEL");
+    }
 }

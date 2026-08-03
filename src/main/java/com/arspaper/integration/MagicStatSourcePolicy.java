@@ -114,4 +114,59 @@ public final class MagicStatSourcePolicy {
         }
         return base * multiplier;
     }
+
+    /**
+     * 増幅(Amplify)グリフ 1段あたりの乗率の既定値。{@code glyphs.yml} の
+     * {@code amplify.params.damage-rate-per-stack} が実際に使う値で、これは読めない時のフォールバック。
+     */
+    public static final double DEFAULT_AMPLIFY_DAMAGE_RATE = 0.10;
+
+    /**
+     * 乗率計算に使う増幅段数の絶対値上限の既定値。{@code glyphs.yml} の
+     * {@code amplify.params.max-damage-level} が実値。ダメージ系グリフは既に
+     * {@code max-augments.amplify}（グリフ互換性チェック、出荷時点で harm/scorch/cold_snap/
+     * crush_wave/windshear/lightning/sonic_boom/heavy_impact のいずれも6）で増幅の積み増し自体を
+     * 構造的に止めているが、将来の設定変更でその上限が外れても乗率計算側だけは青天井にしない保険。
+     */
+    public static final int DEFAULT_MAX_AMPLIFY_DAMAGE_LEVEL = 20;
+
+    /**
+     * 増幅(Amplify)/減衰(Dampen)の段数を、Sharpness 等ダメージ増加エンチャントと同じ乗算方式で
+     * 基礎ダメージへ適用する（2026-08-02。旧仕様は各ダメージ系グリフが「増幅1段+3.0HP」のように
+     * <b>グリフ自身の基礎ダメージにだけ</b>固定値を加算していた）。
+     *
+     * <p><b>変更理由</b>: 杖の攻撃力(attack-power)は {@link #effectiveBase} でこの後に別途加算される。
+     * 触媒(杖)が育つほど、グリフ側の固定加算(最大でも数十HP)は攻撃力(Lv100帯で10000超)に対して
+     * 相対的に無意味化していた。乗算にすることで、杖の攻撃力を含めた合計ダメージに対して
+     * 常に一定割合のボーナスになり、触媒ビルドでも増幅グリフの価値が保たれる。
+     *
+     * <p>適用点は {@link #effectiveBase} の<b>後</b>（{@link #applyGlyphMultiplier} と同じ理由:
+     * グリフ基礎だけに掛けると高攻撃力帯で実質無効になる。守備力等の対称パイプラインより<b>前</b>
+     * であることも同じ——最終ダメージへ掛けると守備力の減算より後ろになり、防御が意味を持たなくなる）。
+     *
+     * <p>倍率は0未満にしない（{@code base} が正である限り、符号反転で回復に化けさせない。
+     * 対称パイプライン側の負クランプによる回復変換は既存の別経路（{@code SpellContext#dealSpellDamage}
+     * の負ダメージ処理）に任せる）。
+     *
+     * @param base         {@link #effectiveBase} 適用後の基礎ダメージ
+     * @param amplifyLevel 増幅段数（{@code SpellContext#getAmplifyLevel()}。Dampenで負にもなり得る）
+     * @param ratePerStack 1段あたりの乗率（既定 {@link #DEFAULT_AMPLIFY_DAMAGE_RATE} = 0.10 = +10%）
+     * @param maxLevel     乗率計算に使う段数の絶対値上限（0以下ならクランプなし）
+     * @return {@code base * max(0, 1 + ratePerStack * clamp(amplifyLevel, -maxLevel, maxLevel))}。
+     *         {@code amplifyLevel==0} または {@code ratePerStack} が非有限/0のときは {@code base} をそのまま返す
+     */
+    public static double applyAmplifyMultiplier(double base, int amplifyLevel, double ratePerStack, int maxLevel) {
+        if (amplifyLevel == 0 || !Double.isFinite(ratePerStack) || ratePerStack == 0.0) {
+            return base;
+        }
+        int clampedLevel = amplifyLevel;
+        if (maxLevel > 0) {
+            clampedLevel = Math.max(-maxLevel, Math.min(maxLevel, amplifyLevel));
+        }
+        double multiplier = 1.0 + ratePerStack * clampedLevel;
+        if (multiplier < 0.0) {
+            multiplier = 0.0;
+        }
+        return base * multiplier;
+    }
 }

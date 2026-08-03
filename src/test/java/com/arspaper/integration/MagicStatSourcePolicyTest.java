@@ -18,16 +18,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>実測値の根拠:
  * <ul>
- *   <li>害悪(harm) 最大増幅のグリフ基礎ダメージ = {@code glyphs.yml} の
- *       {@code base-damage 9.0 + amplify 6 × amplify-bonus 3.0} = 27.0</li>
+ *   <li>害悪(harm) の基礎ダメージ = {@code glyphs.yml} の {@code base-damage} = 9.0
+ *       （2026-08-02: 増幅(Amplify)は固定値加算からSharpness型の乗算方式へ変更したため、
+ *       もはや glyphs.yml の base-damage に amplify-bonus を織り込まない。
+ *       {@link #applyAmplifyMultiplier} のテストは本ファイル下部を参照）</li>
  *   <li>インフィニティの杖 {@code BLAZE_ROD#400012} の attack-power(fixed) =
  *       TF {@code stats/item-stats.yml} の 10584</li>
  * </ul>
  */
 class MagicStatSourcePolicyTest {
 
-    /** 害悪(harm)最大増幅のグリフ基礎ダメージ: 9.0 + 6 × 3.0。 */
-    private static final double HARM_MAX_SPELL_BASE = 27.0;
+    /** 害悪(harm)のグリフ基礎ダメージ({@code glyphs.yml} の {@code base-damage}、増幅を含まない)。 */
+    private static final double HARM_BASE_DAMAGE = 9.0;
     /** インフィニティの杖 BLAZE_ROD#400012 の attack-power(fixed)。 */
     private static final double INFINITY_CANE_ATTACK_POWER = 10584.0;
     /** combat/damage.yml level-scaling.per-level 0.01 × コンバットレベル100。 */
@@ -69,8 +71,8 @@ class MagicStatSourcePolicyTest {
         assertEquals(MagicStatSourcePolicy.StatSource.NONE,
                 MagicStatSourcePolicy.chooseStatSource(false, false));
         // 攻撃力の加算値も 0(剣の attack-power は一切引かれない)。
-        assertEquals(HARM_MAX_SPELL_BASE,
-                MagicStatSourcePolicy.effectiveBase(HARM_MAX_SPELL_BASE, 0.0, 1.0), 1e-9);
+        assertEquals(HARM_BASE_DAMAGE,
+                MagicStatSourcePolicy.effectiveBase(HARM_BASE_DAMAGE, 0.0, 1.0), 1e-9);
     }
 
     @Test
@@ -78,8 +80,8 @@ class MagicStatSourcePolicyTest {
     void spellBookDirectCastKeepsZeroAttackPower() {
         assertEquals(MagicStatSourcePolicy.StatSource.NONE,
                 MagicStatSourcePolicy.chooseStatSource(false, false));
-        assertEquals(HARM_MAX_SPELL_BASE,
-                MagicStatSourcePolicy.effectiveBase(HARM_MAX_SPELL_BASE, 0.0, 1.0), 1e-9);
+        assertEquals(HARM_BASE_DAMAGE,
+                MagicStatSourcePolicy.effectiveBase(HARM_BASE_DAMAGE, 0.0, 1.0), 1e-9);
     }
 
     @Test
@@ -101,15 +103,14 @@ class MagicStatSourcePolicyTest {
     // --- 基礎ダメージ合成 ---
 
     @Test
-    @DisplayName("infinity_cane(10584)で harm を撃つと実効ベースが 27 -> 10611 になる")
+    @DisplayName("infinity_cane(10584)で harm を撃つと実効ベースが 9 -> 10593 になる")
     void infinityCaneAddsItsAttackPowerToTheSpellBase() {
         double effectiveBase = MagicStatSourcePolicy.effectiveBase(
-                HARM_MAX_SPELL_BASE, INFINITY_CANE_ATTACK_POWER, 1.0);
-        assertEquals(10611.0, effectiveBase, 1e-9);
+                HARM_BASE_DAMAGE, INFINITY_CANE_ATTACK_POWER, 1.0);
+        assertEquals(10593.0, effectiveBase, 1e-9);
         // 参考(TF側の後段): コンバットレベル100・防御ゼロ相当の的なら
-        // 10611 × (1 + 0.01×100) × base-coefficient 1.0 = 21222。
-        // 修正前は 27 × 2 = 54(報告値「50程度」)だったので、杖の攻撃力が乗ったことが数値で分かる。
-        assertEquals(21222.0, effectiveBase * COMBAT_LEVEL_100_MULTIPLIER, 1e-9);
+        // 10593 × (1 + 0.01×100) × base-coefficient 1.0 = 21186。
+        assertEquals(21186.0, effectiveBase * COMBAT_LEVEL_100_MULTIPLIER, 1e-9);
     }
 
     @Test
@@ -117,15 +118,15 @@ class MagicStatSourcePolicyTest {
     void zeroScaleRemovesTheAddendEntirely() {
         assertEquals(0.0,
                 MagicStatSourcePolicy.scaledAttackPower(INFINITY_CANE_ATTACK_POWER, 0.0), 0.0);
-        assertEquals(HARM_MAX_SPELL_BASE, MagicStatSourcePolicy.effectiveBase(
-                HARM_MAX_SPELL_BASE, INFINITY_CANE_ATTACK_POWER, 0.0), 1e-9);
+        assertEquals(HARM_BASE_DAMAGE, MagicStatSourcePolicy.effectiveBase(
+                HARM_BASE_DAMAGE, INFINITY_CANE_ATTACK_POWER, 0.0), 1e-9);
     }
 
     @Test
     @DisplayName("attack-power-scale は係数として効く(0.25 なら 1/4)")
     void scaleActsAsAMultiplier() {
-        assertEquals(HARM_MAX_SPELL_BASE + 2646.0, MagicStatSourcePolicy.effectiveBase(
-                HARM_MAX_SPELL_BASE, INFINITY_CANE_ATTACK_POWER, 0.25), 1e-9);
+        assertEquals(HARM_BASE_DAMAGE + 2646.0, MagicStatSourcePolicy.effectiveBase(
+                HARM_BASE_DAMAGE, INFINITY_CANE_ATTACK_POWER, 0.25), 1e-9);
     }
 
     @Test
@@ -151,9 +152,9 @@ class MagicStatSourcePolicyTest {
     @DisplayName("glyph_damage_multiplier_bonus は合成後の基礎ダメージへ掛かる")
     void glyphMultiplierAppliesToTheCombinedBase() {
         double base = MagicStatSourcePolicy.effectiveBase(
-                HARM_MAX_SPELL_BASE, INFINITY_CANE_ATTACK_POWER, 1.0);
+                HARM_BASE_DAMAGE, INFINITY_CANE_ATTACK_POWER, 1.0);
         // 「害悪強化 +30%」= TrinityForge#glyphDamageMultiplier が 1.3 を返すケース。
-        assertEquals(10611.0 * 1.3, MagicStatSourcePolicy.applyGlyphMultiplier(base, 1.3), 1e-9);
+        assertEquals(10593.0 * 1.3, MagicStatSourcePolicy.applyGlyphMultiplier(base, 1.3), 1e-9);
     }
 
     @Test
@@ -163,5 +164,66 @@ class MagicStatSourcePolicyTest {
         assertEquals(100.0, MagicStatSourcePolicy.applyGlyphMultiplier(100.0, 0.0), 1e-9);
         assertEquals(100.0, MagicStatSourcePolicy.applyGlyphMultiplier(100.0, -1.0), 1e-9);
         assertEquals(100.0, MagicStatSourcePolicy.applyGlyphMultiplier(100.0, Double.NaN), 1e-9);
+    }
+
+    // --- 2026-08-02: 増幅(Amplify)のダメージ乗算ボーナス ---
+    // 「触媒想定の環境で増幅が弱い」報告への対処。旧仕様(グリフ基礎への固定値加算)から
+    // Sharpness等ダメージ増加エンチャントと同じ乗算方式(1段+10%)へ変更。
+
+    @Test
+    @DisplayName("増幅0段は基礎ダメージを変えない")
+    void amplifyMultiplierIsNoOpAtLevelZero() {
+        assertEquals(10593.0, MagicStatSourcePolicy.applyAmplifyMultiplier(
+                10593.0, 0, MagicStatSourcePolicy.DEFAULT_AMPLIFY_DAMAGE_RATE, 0), 1e-9);
+    }
+
+    @Test
+    @DisplayName("増幅1段は合成後の基礎ダメージを+10%する")
+    void amplifyMultiplierAppliesOneStack() {
+        // infinity_cane で harm(9.0)を撃った実効ベース 10593.0 に対して増幅1段(+10%)。
+        double base = MagicStatSourcePolicy.effectiveBase(
+                HARM_BASE_DAMAGE, INFINITY_CANE_ATTACK_POWER, 1.0);
+        assertEquals(10593.0 * 1.10, MagicStatSourcePolicy.applyAmplifyMultiplier(
+                base, 1, MagicStatSourcePolicy.DEFAULT_AMPLIFY_DAMAGE_RATE, 0), 1e-9);
+    }
+
+    @Test
+    @DisplayName("増幅5段は+50%(触媒ビルドでも攻撃力込みの合計へ掛かることの確認)")
+    void amplifyMultiplierAppliesFiveStacksToTheCombinedBase() {
+        double base = MagicStatSourcePolicy.effectiveBase(
+                HARM_BASE_DAMAGE, INFINITY_CANE_ATTACK_POWER, 1.0);
+        // 旧仕様なら増幅5段の寄与は 5×3.0=15.0(実効ベース比 0.14%)で無意味だったが、
+        // 新仕様は攻撃力込みの合計 10593.0 に対して+50%(=5296.5)効く。
+        assertEquals(10593.0 * 1.50, MagicStatSourcePolicy.applyAmplifyMultiplier(
+                base, 5, MagicStatSourcePolicy.DEFAULT_AMPLIFY_DAMAGE_RATE, 0), 1e-9);
+    }
+
+    @Test
+    @DisplayName("段数上限(maxLevel)を超えた増幅はクランプされる(暴走防止)")
+    void amplifyMultiplierClampsToMaxLevel() {
+        // maxLevel=6(harm等の max-augments.amplify と同じ値)で、level=50 を渡しても+60%止まり。
+        assertEquals(100.0 * 1.60, MagicStatSourcePolicy.applyAmplifyMultiplier(
+                100.0, 50, MagicStatSourcePolicy.DEFAULT_AMPLIFY_DAMAGE_RATE, 6), 1e-9);
+        // maxLevel<=0はクランプなし(仕様上の「無制限」)。
+        assertEquals(100.0 * 6.0, MagicStatSourcePolicy.applyAmplifyMultiplier(
+                100.0, 50, MagicStatSourcePolicy.DEFAULT_AMPLIFY_DAMAGE_RATE, 0), 1e-9);
+    }
+
+    @Test
+    @DisplayName("Dampenによる負の段数は乗率を下げる(0未満にはしない)")
+    void amplifyMultiplierNeverGoesNegative() {
+        // level=-1 → 1 - 0.10 = 0.90倍。
+        assertEquals(100.0 * 0.90, MagicStatSourcePolicy.applyAmplifyMultiplier(
+                100.0, -1, MagicStatSourcePolicy.DEFAULT_AMPLIFY_DAMAGE_RATE, 0), 1e-9);
+        // 極端な負の段数でも乗率は0未満にならない(符号反転で回復に化けさせない)。
+        assertEquals(0.0, MagicStatSourcePolicy.applyAmplifyMultiplier(
+                100.0, -50, MagicStatSourcePolicy.DEFAULT_AMPLIFY_DAMAGE_RATE, 0), 1e-9);
+    }
+
+    @Test
+    @DisplayName("乗率が非有限/0のときは基礎ダメージを変えない(fail-open)")
+    void amplifyMultiplierIsNoOpForInvalidRate() {
+        assertEquals(100.0, MagicStatSourcePolicy.applyAmplifyMultiplier(100.0, 3, 0.0, 0), 1e-9);
+        assertEquals(100.0, MagicStatSourcePolicy.applyAmplifyMultiplier(100.0, 3, Double.NaN, 0), 1e-9);
     }
 }

@@ -378,11 +378,21 @@ public class RitualManager {
                         if (rid != null && rid.startsWith(CatalogRitualRegistrar.RESULT_PREFIX)) {
                             TrinityForgeBridge.finalizeCatalogRitualResult(result, player, consumedTokens);
                         } else {
-                            ArsPaper.getInstance().getItemRegistry()
+                            // 2026-08-03 実サーバ報告「Ars鍛冶の経験値が入らない」の修正: 品質刻印の
+                            // 可否(isQualityStamped)はEXP付与の可否と別物。ソースジェムの系譜・
+                            // エンチャント本・ウェイストーン・テレポートコンパス等、品質を刻む対象で
+                            // ない儀式結果でも、儀式を行った労力ぶんのEXPは常に付与する
+                            // (TrinityForgeBridge#grantArsSmithingExpOnly のjavadoc参照。分解/逆儀式
+                            // が無いため無限EXP経路にはならないことを確認済み)。
+                            boolean qualityStamped = ArsPaper.getInstance().getItemRegistry()
                                 .get(recipe.resultId())
                                 .filter(BaseCustomItem::isQualityStamped)
-                                .ifPresent(bci -> TrinityForgeBridge.finalizeArsSmithingResult(
-                                    result, player, consumedTokens));
+                                .isPresent();
+                            if (qualityStamped) {
+                                TrinityForgeBridge.finalizeArsSmithingResult(result, player, consumedTokens);
+                            } else {
+                                TrinityForgeBridge.grantArsSmithingExpOnly(result, player, consumedTokens);
+                            }
                         }
                     }
 

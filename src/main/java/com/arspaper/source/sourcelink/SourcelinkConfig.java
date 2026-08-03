@@ -30,12 +30,13 @@ public class SourcelinkConfig {
             String displayName,
             int customModelData,
             List<String> lore,
-            String type) {
+            String type,
+            double transferMultiplier) {
 
-        /** 旧来の5固定id用 (type は id から推定)。 */
+        /** 旧来の5固定id用 (type は id から推定、transfer-multiplier は既定1.0)。 */
         public ItemDef(String id, Material material, String displayName,
                        int customModelData, List<String> lore) {
-            this(id, material, displayName, customModelData, lore, inferType(id, ""));
+            this(id, material, displayName, customModelData, lore, inferType(id, ""), 1.0);
         }
     }
 
@@ -137,12 +138,33 @@ public class SourcelinkConfig {
                         entry.getString("display-name", id),
                         entry.getInt("custom-model-data", 0),
                         List.copyOf(entry.getStringList("lore")),
-                        type));
+                        type,
+                        readTransferMultiplier(entry, id, logger)));
             } catch (IllegalArgumentException ex) {
                 logger.warning("sourcelinks.yml: items." + id + " invalid: " + ex.getMessage());
             }
         }
         return Collections.unmodifiableMap(result);
+    }
+
+    /**
+     * {@code items.<id>.transfer-multiplier}(K-16対応: 階梯でソース転送レートを上げる階梯値)。
+     * 未設定なら 1.0(挙動不変)。0以下・非有限値は設定ミスとして警告のうえ 1.0 にフォールバックする
+     * ({@link com.arspaper.source.SourceTransferConfig#clampBuffer} と同じく「壊す方向のtypoを
+     * 黙って通さない」方針)。
+     */
+    /* package-private for SourcelinkConfigTest */
+    static double readTransferMultiplier(ConfigurationSection entry, String id, Logger logger) {
+        if (!entry.isSet("transfer-multiplier")) {
+            return 1.0;
+        }
+        double raw = entry.getDouble("transfer-multiplier", 1.0);
+        if (!Double.isFinite(raw) || raw <= 0) {
+            logger.warning("sourcelinks.yml: items." + id + ".transfer-multiplier=" + raw
+                    + " is invalid (must be > 0) — falling back to 1.0");
+            return 1.0;
+        }
+        return raw;
     }
 
     private ItemCostTable loadSection(YamlConfiguration config, String path,

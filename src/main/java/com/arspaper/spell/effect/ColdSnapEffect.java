@@ -14,14 +14,13 @@ import org.bukkit.potion.PotionEffectType;
 /**
  * 凍結・鈍化・水濡れ状態のエンティティに爆発ダメージを与えるEffect。Ars Nouveau準拠。
  * エンティティがSlowness、凍結中（freezeTicks > 0）、または水中にある場合のみ発動する。
- * ダメージ: 6.0 + 2.5 * min(amp, 2)
+ * 基礎ダメージ: 6.0。増幅(Amplify)は固定値加算ではなく、dealSpellDamage 側で Sharpness と
+ * 同じ乗算ボーナス(既定1段+10%)として適用される(2026-08-02)。
  * 氷パーティクルを生成する。
  */
 public class ColdSnapEffect implements SpellEffect {
 
     private static final double BASE_DAMAGE = 6.0;
-    private static final double AMPLIFY_BONUS = 2.5;
-    private static final int MAX_AMP = 2;
 
     private final NamespacedKey id;
     private final GlyphConfig config;
@@ -43,11 +42,9 @@ public class ColdSnapEffect implements SpellEffect {
             return;
         }
 
-        double baseDamage = config.getParam("cold_snap", "base-damage", BASE_DAMAGE);
-        double amplifyBonus = config.getParam("cold_snap", "amplify-bonus", AMPLIFY_BONUS);
-        double damage = Math.max(0, baseDamage + context.getAmplifyLevel() * amplifyBonus);
+        double damage = config.getParam("cold_snap", "base-damage", BASE_DAMAGE);
 
-        // 対称パイプラインへ供給し最終ダメージを適用
+        // 対称パイプラインへ供給し最終ダメージを適用(増幅の乗算ボーナスはdealSpellDamage側で適用)
         context.dealSpellDamage(target, damage, id.getKey());
 
         spawnColdSnapFx(target.getLocation());

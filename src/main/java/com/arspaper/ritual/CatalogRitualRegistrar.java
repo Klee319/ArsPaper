@@ -75,8 +75,10 @@ public final class CatalogRitualRegistrar {
                     }
                 }
                 String display = template.displayName() != null ? template.displayName() : e.getKey();
-                // Strip MiniMessage tags roughly for ritual announce name.
-                display = display.replaceAll("<[^>]+>", "");
+                // TF カタログの display-name は MiniMessage。正規表現でタグを削るのではなく
+                // 実際のパーサへ通す(書式解釈は DisplayText 1本に寄せる)。
+                String plain = com.arspaper.util.DisplayText.plain(display);
+                display = plain.isBlank() ? e.getKey() : plain;
                 RitualRecipe ritual = new RitualRecipe(
                         recipeId,
                         display,

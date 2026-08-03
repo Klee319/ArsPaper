@@ -6,6 +6,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -25,6 +26,13 @@ public class ThreadConfig {
     private final Map<String, Integer> manaMaxPercent = new HashMap<>();
     private final Map<String, Integer> regenPercent = new HashMap<>();
     private final Map<String, Integer> backpackSlots = new HashMap<>();
+    /**
+     * threads.yml の {@code lore:}(汎用説明行)。ThreadConfig が数値として解釈するキーを1つも
+     * 持たないスレッド ── 効果の実体が thread-sets.yml のセット効果側にあるスレッド ── は、
+     * ここを書かないと【説明文が1行も出ない】。種類ごとに Java の switch を足す代わりに、
+     * yml の行をそのまま lore へ流す汎用経路を1本だけ用意する(2026-08-02 スレッド16→40種)。
+     */
+    private final Map<String, List<String>> extraLore = new HashMap<>();
 
     public ThreadConfig(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -42,6 +50,7 @@ public class ThreadConfig {
         manaMaxPercent.clear();
         regenPercent.clear();
         backpackSlots.clear();
+        extraLore.clear();
         load();
     }
 
@@ -97,6 +106,21 @@ public class ThreadConfig {
             if (section.contains("slots")) {
                 backpackSlots.put(key, section.getInt("slots"));
             }
+            // lore: は「文字列のリスト」でも「1行の文字列」でも書ける(1行しか要らない側で
+            // わざわざ - を書かせないため)。空行だけの記述は捨てる。
+            if (section.contains("lore")) {
+                List<String> lines = section.getStringList("lore");
+                if (lines.isEmpty()) {
+                    String single = section.getString("lore");
+                    if (single != null && !single.isBlank()) {
+                        lines = List.of(single);
+                    }
+                }
+                lines = lines.stream().filter(line -> line != null && !line.isBlank()).toList();
+                if (!lines.isEmpty()) {
+                    extraLore.put(key, lines);
+                }
+            }
         }
     }
 
@@ -150,6 +174,11 @@ public class ThreadConfig {
         return backpackSlots.getOrDefault(type.getId(), 27);
     }
 
+    /** threads.yml の {@code lore:}(未記載なら空リスト)。 */
+    public List<String> getExtraLore(ThreadType type) {
+        return extraLore.getOrDefault(type.getId(), List.of());
+    }
+
     /**
      * ThreadConfigの値を反映したloreを生成する。
      * ThreadType.getEffectLore()はEnum定数値を使うため、YAMLオーバーライドが反映されない。
@@ -165,6 +194,17 @@ public class ThreadConfig {
         if (mana > 0) {
             lore.add(loreText("マナ最大値 +" + mana, net.kyori.adventure.text.format.NamedTextColor.BLUE));
         }
+        // mana-max-percent / regen-percent は ThreadConfig も ManaManager も配線済みなのに
+        // lore を1行も出していなかった(＝出荷 threads.yml に1件も無かったので露見しなかった)。
+        // 割合版スレッドを入れる以上、ここを書かないと「効いているのに説明が無い」ままになる。
+        int manaPercent = getManaMaxPercent(type);
+        if (manaPercent > 0) {
+            lore.add(loreText("マナ最大値 +" + manaPercent + "%", net.kyori.adventure.text.format.NamedTextColor.BLUE));
+        }
+        int regenPct = getRegenPercent(type);
+        if (regenPct > 0) {
+            lore.add(loreText("マナ回復速度 +" + regenPct + "%", net.kyori.adventure.text.format.NamedTextColor.AQUA));
+        }
         if (type.hasPotionEffect()) {
             String effectName = switch (type.getId()) {
                 case "speed" -> "移動速度上昇";
@@ -175,6 +215,8 @@ public class ThreadConfig {
                 case "conduit_power" -> "コンジットパワー";
                 case "hero_of_the_village" -> "村の英雄";
                 case "health_boost" -> "体力増強";
+                case "slow_falling" -> "落下速度低下";
+                case "luck" -> "幸運";
                 default -> "ポーション効果";
             };
             lore.add(loreText(effectName + " (装備中常時)", net.kyori.adventure.text.format.NamedTextColor.GREEN));
@@ -197,6 +239,12 @@ public class ThreadConfig {
         if (type.isBackpackThread()) {
             int slots = getBackpackSlots(type);
             lore.add(loreText("追加インベントリ " + slots + "スロット", net.kyori.adventure.text.format.NamedTextColor.DARK_GREEN));
+        }
+        // 汎用フォールバック: 効果の実体が thread-sets.yml 側にあるスレッドは上のどの分岐にも
+        // 引っかからないので、ここで threads.yml の lore: をそのまま出す。これが無いと
+        // 「説明文が1行も無いスレッド」になり、種類を増やすたびに Java の switch を足す羽目になる。
+        for (String line : getExtraLore(type)) {
+            lore.add(loreText(line, type.getColor()));
         }
         return lore;
     }

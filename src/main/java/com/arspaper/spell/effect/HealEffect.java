@@ -39,9 +39,11 @@ public class HealEffect implements SpellEffect {
 
         if (isUndead(target)) {
             // アンデッドにはマジックダメージ。
-            // 増強(amplify)は amount 算出に既に内包済みのため、対称パイプラインへの
-            // 二重適用を避けるためここでは加算しない（他Effectと同じ dealSpellDamage 経路）。
-            context.dealSpellDamage(target, amount, id.getKey());
+            // 増強(amplify)は amount 算出(heal用のamplify-bonus)に既に内包済みのため、
+            // dealSpellDamage 側の増幅乗算ボーナス(2026-08-02、他のダメージ系Effectのデフォルト)は
+            // 明示的にfalseで無効化し、二重計上を避ける（heal glyphは「火力」グリフ扱いではないため、
+            // 対アンデッド分岐だけ従来の固定値加算を維持する設計判断）。
+            context.dealSpellDamage(target, amount, id.getKey(), false);
         } else {
             // 通常エンティティ・プレイヤーを回復
             double maxHealth = target.getMaxHealth();

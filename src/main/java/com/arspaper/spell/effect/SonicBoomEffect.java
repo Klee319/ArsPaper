@@ -26,14 +26,14 @@ import java.util.UUID;
  * エンティティと透過ブロックはデフォルトで貫通。
  * ソリッドブロックで停止（貫通増強で 2×n ブロック貫通可能）。
  * 分裂: 左右に拡散ソニックブーム追加。
- * 増幅: ダメージ威力増加。
+ * 増幅: 固定値加算ではなく、dealSpellDamage 側で Sharpness と同じ乗算ボーナス
+ *   (既定1段+10%)として適用される(2026-08-02)。
  * 互換形態: 自己のみ。
  */
 public class SonicBoomEffect implements SpellEffect {
 
     private static final double BASE_RANGE = 20.0;
     private static final double BASE_DAMAGE = 10.0;
-    private static final double AMPLIFY_DAMAGE_BONUS = 4.0;
     private static final double SPREAD_ANGLE_STEP = 0.15;
     private static final double SCAN_STEP = 0.5;
     private static final double HIT_RADIUS = 1.0;
@@ -53,9 +53,8 @@ public class SonicBoomEffect implements SpellEffect {
         if (caster == null) return;
 
         double range = config.getParam("sonic_boom", "range", BASE_RANGE);
-        double baseDamage = config.getParam("sonic_boom", "base-damage", BASE_DAMAGE);
-        double amplifyBonus = config.getParam("sonic_boom", "amplify-damage-bonus", AMPLIFY_DAMAGE_BONUS);
-        double damage = baseDamage + context.getAmplifyLevel() * amplifyBonus;
+        // 増幅の乗算ボーナスは dealSpellDamage 側で適用される(2026-08-02)。
+        double damage = config.getParam("sonic_boom", "base-damage", BASE_DAMAGE);
 
         int totalBeams = 1 + Math.min(context.getSplitCount(), 6);
         // 貫通1個 = ソリッドブロック2個分貫通

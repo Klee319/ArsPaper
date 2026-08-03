@@ -17,13 +17,14 @@ import org.bukkit.plugin.java.JavaPlugin;
  * 基本ダメージ: 3.0 (ハート1.5個分)
  * 炎上中のエンティティには1.5倍ダメージ。
  * ※ 閃炎と異なり、炎上していなくても基本ダメージが入る。
+ * 増幅(Amplify)は固定値加算ではなく、dealSpellDamage 側で Sharpness と同じ乗算ボーナス
+ * (既定1段+10%)として適用される(2026-08-02)。
  *
  * 互換増強: 増幅/減衰（威力）、半径増加（ダメージエリア）、遅延、初期化のみ。
  */
 public class ScorchEffect implements SpellEffect {
 
     private static final double DEFAULT_BASE_DAMAGE = 3.0;
-    private static final double DEFAULT_AMPLIFY_BONUS = 2.0;
     private static final double FIRE_MULTIPLIER = 1.5;
 
     private final NamespacedKey id;
@@ -36,16 +37,14 @@ public class ScorchEffect implements SpellEffect {
 
     @Override
     public void applyToEntity(SpellContext context, LivingEntity target) {
-        double baseDamage = config.getParam("scorch", "base-damage", DEFAULT_BASE_DAMAGE);
-        double amplifyBonus = config.getParam("scorch", "amplify-bonus", DEFAULT_AMPLIFY_BONUS);
-        double damage = Math.max(0, baseDamage + context.getAmplifyLevel() * amplifyBonus);
+        double damage = config.getParam("scorch", "base-damage", DEFAULT_BASE_DAMAGE);
 
         // 炎上状態の敵にダメージ1.5倍
         if (target.getFireTicks() > 0) {
             damage *= config.getParam("scorch", "fire-multiplier", FIRE_MULTIPLIER);
         }
 
-        // 対称パイプラインへ供給し最終ダメージを適用
+        // 対称パイプラインへ供給し最終ダメージを適用(増幅の乗算ボーナスはdealSpellDamage側で適用)
         context.dealSpellDamage(target, damage, id.getKey());
         spawnScorchFx(target.getLocation());
     }

@@ -13,14 +13,15 @@ import org.bukkit.potion.PotionEffectType;
 
 /**
  * 対象に物理ダメージを与えるEffect。
- * Ars Nouveau準拠: damage = 5.0 + 2.0 * amplifyLevel
+ * 基礎ダメージ = base-damage(既定5.0)。増幅(Amplify)は固定値加算ではなく、
+ * dealSpellDamage 側で Sharpness と同じ乗算ボーナス(既定1段+10%)として適用される
+ * (2026-08-02、{@link com.arspaper.integration.MagicStatSourcePolicy#applyAmplifyMultiplier} 参照)。
  * ExtendTimeがある場合: 直接ダメージの代わりにPoisonを付与
- *   Poison持続 = 5秒 + 3秒 × durationLevel、レベル = amplifyLevel
+ *   Poison持続 = 5秒 + 3秒 × durationLevel、レベル = amplifyLevel(こちらは従来どおり段数のまま使用)
  */
 public class HarmEffect implements SpellEffect {
 
     private static final double DEFAULT_BASE_DAMAGE = 5.0;
-    private static final double DEFAULT_AMPLIFY_BONUS = 2.0;
     private static final int DEFAULT_BASE_POISON_SECONDS = 5;
     private static final int DEFAULT_POISON_SECONDS_PER_DURATION = 3;
     private final NamespacedKey id;
@@ -53,11 +54,9 @@ public class HarmEffect implements SpellEffect {
                     dotType, durationTicks, amplifier, false, true, true));
             }
         } else {
-            // 通常: 直接ダメージ
-            double baseDamage = config.getParam("harm", "base-damage", DEFAULT_BASE_DAMAGE);
-            double amplifyBonus = config.getParam("harm", "amplify-bonus", DEFAULT_AMPLIFY_BONUS);
-            double damage = Math.max(0, baseDamage + context.getAmplifyLevel() * amplifyBonus);
-            // 増減グリフを内包した基礎ダメージを対称パイプラインへ供給し、最終ダメージを適用。
+            // 通常: 直接ダメージ。増幅の乗算ボーナスは dealSpellDamage 側で適用する
+            // (グリフ基礎だけに固定値加算すると触媒ビルドで相対的に無意味化するため2026-08-02に変更)。
+            double damage = config.getParam("harm", "base-damage", DEFAULT_BASE_DAMAGE);
             context.dealSpellDamage(target, damage, id.getKey());
         }
         SpellFxUtil.spawnHarmFx(target.getLocation());

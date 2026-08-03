@@ -14,16 +14,18 @@ import org.bukkit.potion.PotionEffectType;
 
 /**
  * 対象に実際の雷を落とすEffect。Ars Nouveau Tier 3, mana 100相当。
- * - 基本ダメージ: 5.0 + Amplifyごとに 3.0（最大2スタック）
+ * - 基本ダメージ: 5.0。増幅(Amplify)は固定値加算ではなく、dealSpellDamage 側で Sharpness と
+ *   同じ乗算ボーナス(既定1段+10%)として適用される(2026-08-02)。
  * - strikeLightning()で火災・帯電クリーパー効果を伴う本物の雷を落とす
  * - 被弾後にShocked状態（Slowness I）を付与: base 100 ticks + durationLevel * 60 ticks
  * - 水中または雨中のエンティティは +2.0 ボーナスダメージ
+ * - {@code base-damage} を config で0以下にした場合のみ、ダメージ・火災なしの演出雷になる
+ *   (旧仕様はDampenの積み増しでも到達できたが、出荷時点の max-augments.dampen=1 では元々
+ *   到達不能だったため実質未変更)
  */
 public class LightningEffect implements SpellEffect {
 
     private static final double BASE_DAMAGE = 5.0;
-    private static final double AMPLIFY_BONUS = 3.0;
-    private static final int MAX_AMPLIFY = 2;
     private static final double WET_BONUS_DAMAGE = 2.0;
     private static final int SHOCKED_BASE_TICKS = 100;    // 5秒
     private static final int SHOCKED_PER_LEVEL = 60;      // 3秒/stack
@@ -37,12 +39,8 @@ public class LightningEffect implements SpellEffect {
 
     @Override
     public void applyToEntity(SpellContext context, LivingEntity target) {
-        // ダメージ計算（Amplifyは最大2スタック、Dampenで減少・0以下で演出雷）
-        double baseDamage = config.getParam("lightning", "base-damage", BASE_DAMAGE);
-        int maxAmplify = (int) config.getParam("lightning", "max-amplify", (double) MAX_AMPLIFY);
-        int amp = Math.min(context.getAmplifyLevel(), maxAmplify);
-        double amplifyBonus = config.getParam("lightning", "amplify-bonus", AMPLIFY_BONUS);
-        double damage = baseDamage + amp * amplifyBonus;
+        // ダメージ計算。増幅の乗算ボーナスは dealSpellDamage 側で適用される(2026-08-02)。
+        double damage = config.getParam("lightning", "base-damage", BASE_DAMAGE);
 
         if (damage <= 0) {
             // 演出雷: ���メージ・火災なし（strikeLightningEffect）
@@ -70,11 +68,7 @@ public class LightningEffect implements SpellEffect {
 
     @Override
     public void applyToBlock(SpellContext context, Location blockLocation) {
-        double baseDamage = config.getParam("lightning", "base-damage", BASE_DAMAGE);
-        int maxAmplify = (int) config.getParam("lightning", "max-amplify", (double) MAX_AMPLIFY);
-        int amp = Math.min(context.getAmplifyLevel(), maxAmplify);
-        double amplifyBonus = config.getParam("lightning", "amplify-bonus", AMPLIFY_BONUS);
-        double damage = baseDamage + amp * amplifyBonus;
+        double damage = config.getParam("lightning", "base-damage", BASE_DAMAGE);
 
         if (damage <= 0) {
             blockLocation.getWorld().strikeLightningEffect(blockLocation);

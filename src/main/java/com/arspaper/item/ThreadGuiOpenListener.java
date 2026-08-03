@@ -27,10 +27,20 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * スレッド枠を持つ装備の {@link ThreadGui} 入口と、その入口の案内。
  *
- * <h2>入口は2つ</h2>
+ * <h2>入口は3つ</h2>
  * <ul>
  *   <li><b>着用防具</b>: スニーク+右クリックで直接 {@link ThreadGui} を開く(従来どおり)。</li>
- *   <li><b>手持ち装備(武器・触媒・ツール)</b>: {@code /ars thread}
+ *   <li><b>手持ちのツール</b>(つるはし/シャベル/クワ/釣竿/ハサミ/火打石。{@code
+ *       ThreadApplicationPolicy#isToolMaterial}。<b>斧は含まない</b> ── 戦闘武器も兼ねるため下記の
+ *       通常操作の理屈がそのまま当てはまる): <b>スニーク+真上を見る+右クリック</b>
+ *       (2026-08-02 依頼#44)。Bedrock/Geyser はコマンド UX が弱い(スラッシュコマンドの補完が弱く、
+ *       画面キーボード入力が重い)ため、頻繁に持ち替えるツールにだけジェスチャー入口を足す。
+ *       「真上を見る」を同時に要求するのは、下記(手持ち武器)と同じ理由でスニーク+右クリック単独では
+ *       採掘・耕作・伐採などの<b>通常操作と衝突する</b>ため ── ツール使用中に真上(ピッチ -80°以下)を
+ *       見ることは実プレイでまず起きない。{@code /ars thread} コマンドも引き続き有効
+ *       (ジェスチャーは追加入口であり置き換えではない。真上ジェスチャーが取りづらい環境や、
+ *       視点操作が苦手なプレイヤーの保険にする)。</li>
+ *   <li><b>手持ちの武器・触媒</b>(剣・斧・弓・クロスボウ・トライデント・鎌・メイス・杖): {@code /ars thread}
  *       ({@link com.arspaper.command.handlers.ThreadCommands})。右クリックでは開かない ──
  *       {@link com.arspaper.spell.SpellBindListener}(NORMAL 優先度)が同じ右クリックで呪文を
  *       発動させるので「呪文が飛びつつ画面が開く」二重発火になる
@@ -65,7 +75,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * 5秒ごとに無限に上書きし続ける</b>。「自分から試した操作だから毎回応答したい」という前提が
  * この操作には成り立たない。持ち替え時の案内(30秒 + 同一アイテム1セッション1回)と
  * {@code /ars help} で発見経路は足りているので、右クリック側は<b>案内も GUI も出さない</b>
- * (防具の GUI 起動だけが残る)。
+ * (防具の GUI 起動だけが残る)。<b>この段落はツール以外の手持ち武器に限る</b> ── ツールは
+ * 「真上を見る」という平常時に起きない姿勢を追加で要求しているため、無条件スニーク+右クリックと
+ * 同じ誤爆リスクを持たない(上の「入口は3つ」を参照)。
  *
  * <p>コマンド一覧側の発見経路は {@code /ars help}
  * ({@link com.arspaper.command.handlers.HelpCommands})。
@@ -102,12 +114,21 @@ public final class ThreadGuiOpenListener implements Listener {
         if (item == null || item.getType().isAir()) {
             return;
         }
-        if (!isArmorPiece(item)) {
-            // 手持ち装備(武器・触媒・ツール)はこの経路では何もしない ── GUI は /ars thread が唯一の
-            // 入口で、案内も出さない。スニーク+右クリックは弓/クロスボウ/トライデント/斧/鍬の
-            // 通常操作なので、ここで喋ると TF の EXP/会心アクションバーを潰し続ける(F6 指摘3)。
-            // 発見経路は持ち替え時の案内(hintForSelectedItem)と /ars help。
-            return;
+        boolean armor = isArmorPiece(item);
+        if (!armor) {
+            if (!isToolItem(item)) {
+                // 手持ち武器・触媒はこの経路では何もしない ── GUI は /ars thread が唯一の
+                // 入口で、案内も出さない。スニーク+右クリックは弓/クロスボウ/トライデント/斧の
+                // 通常操作なので、ここで喋ると TF の EXP/会心アクションバーを潰し続ける(F6 指摘3)。
+                // 発見経路は持ち替え時の案内(hintForSelectedItem)と /ars help。
+                return;
+            }
+            if (!isLookingStraightUp(player)) {
+                // ツールは採掘・耕作・伐採等でスニーク+右クリックを常用するため、「真上を見ている」
+                // ことも同時に要求して誤爆を防ぐ(依頼#44)。この条件を満たさない間は
+                // 通常のツール操作としてそのまま素通りさせる(GUI も案内も出さない)。
+                return;
+            }
         }
         int slots = effectiveThreadSlots(item, player);
         if (slots <= 0) {
@@ -244,6 +265,22 @@ public final class ThreadGuiOpenListener implements Listener {
 
     private static boolean isArmorPiece(ItemStack item) {
         return ThreadApplicationPolicy.isArmorSlotMaterial(item.getType());
+    }
+
+    private static boolean isToolItem(ItemStack item) {
+        return ThreadApplicationPolicy.isToolMaterial(item.getType());
+    }
+
+    /**
+     * プレイヤーがほぼ真上(ピッチ -80°以下。-90°が真上)を見ているか。
+     *
+     * <p>閾値を -90°ちょうどにしないのは、Bedrock/Geyser 側の視点入力が Java 版ほど滑らかでなく
+     * ちょうど真上でピタッと止めにくいため(ヒットボックス的な余裕を持たせる)。-80°は
+     * 「見上げてはいるが地平線付近」を除外しつつ、通常のツール操作(採掘・耕作は水平〜下向き、
+     * 釣りは水平、火打石は目の前のブロック)では自然に到達しない角度として選んだ。
+     */
+    private static boolean isLookingStraightUp(Player player) {
+        return player.getLocation().getPitch() <= -80f;
     }
 
     private static int effectiveThreadSlots(ItemStack item, Player player) {

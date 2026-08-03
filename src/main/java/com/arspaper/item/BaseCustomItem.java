@@ -117,8 +117,16 @@ public abstract class BaseCustomItem {
         FunctionalItemConfig config = instance != null ? instance.getFunctionalItemConfig() : null;
         String override = config != null ? config.displayNameOverride(itemId) : null;
 
-        if (override != null && !override.isBlank() && hardcoded instanceof TextComponent text) {
-            return text.content(override);
+        if (override != null && !override.isBlank()) {
+            // 上書きに色記法(MiniMessage / レガシー &)が書かれていたら、その解釈は
+            // DisplayText 1本へ寄せる。素通しすると "<gold>" や "&6" が名前に出る。
+            if (com.arspaper.util.DisplayText.hasMarkup(override)) {
+                return com.arspaper.util.DisplayText.component(override);
+            }
+            if (hardcoded instanceof TextComponent text) {
+                // 色指定が無い上書きはハードコード側の色/装飾を維持する(従来挙動)。
+                return text.content(override);
+            }
         }
         return hardcoded;
     }
@@ -135,8 +143,7 @@ public abstract class BaseCustomItem {
 
         if (override != null) {
             return override.stream()
-                .map(line -> MiniMessage.miniMessage().deserialize(line == null ? "" : line)
-                    .decoration(TextDecoration.ITALIC, false))
+                .map(com.arspaper.util.DisplayText::component)
                 .collect(Collectors.toList());
         }
         return getDefaultLore();

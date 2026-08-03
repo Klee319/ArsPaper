@@ -136,6 +136,13 @@ public class LootTableListener implements Listener {
             warnOnce(entry.item(), "アイテム指定が壊れています: " + malformed.getMessage());
             return null;
         }
+        // TrinityForge の items/catalog.yml で draft: true(準備中)と宣言されたIDは配らない。
+        // Ars は自前のレジストリから実体を作れてしまうので、TF 側の CrossPluginItemResolver の
+        // draft ゲートを一度も通らない ―― この経路だけが「準備中なのに構造物チェストから出る」
+        // 抜け穴になっていた(2026-08-03)。判定は TF の1箇所(ItemCatalogConfig#isDraft)に委ねる。
+        if (ref.custom() && com.arspaper.integration.TrinityForgeBridge.isCatalogDraft(ref.id())) {
+            return null;
+        }
         // ItemCostRef#createStack は未登録のカスタムIDに対して PAPER を返す仕様なので、
         // ここで存在を確かめる。確かめないと「チェストから紙が出る」だけで原因が分からない。
         if (ref.custom() && !isKnownCustom(ref.id())) {

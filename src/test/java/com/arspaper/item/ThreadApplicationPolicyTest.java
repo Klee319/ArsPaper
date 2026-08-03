@@ -109,4 +109,43 @@ class ThreadApplicationPolicyTest {
         assertFalse(ThreadApplicationPolicy.isArmorSlotMaterialName("BLAZE_ROD"));
         assertFalse(ThreadApplicationPolicy.isArmorSlotMaterialName(null));
     }
+
+    @Test
+    @DisplayName("依頼#44: 純粋ツール判定は真(つるはし/シャベル/クワ/釣竿/ハサミ/火打石)、"
+            + "斧・武器・防具・nullは偽")
+    void toolMaterialDetectionExcludesTheDualClassifiedAxe() {
+        assertTrue(ThreadApplicationPolicy.isToolMaterial(Material.NETHERITE_PICKAXE));
+        assertTrue(ThreadApplicationPolicy.isToolMaterial(Material.DIAMOND_SHOVEL));
+        assertTrue(ThreadApplicationPolicy.isToolMaterial(Material.IRON_HOE));
+        assertTrue(ThreadApplicationPolicy.isToolMaterial(Material.FISHING_ROD));
+        assertTrue(ThreadApplicationPolicy.isToolMaterial(Material.SHEARS));
+        assertTrue(ThreadApplicationPolicy.isToolMaterial(Material.FLINT_AND_STEEL));
+
+        // 斧は TF 側で weapon/tool の両方に分類される(木こり実採取もこなす殴打武器)ため、
+        // ここでは対象外 ── /ars thread コマンドのままにする既存方針を崩さない。
+        assertFalse(ThreadApplicationPolicy.isToolMaterial(Material.NETHERITE_AXE));
+        assertFalse(ThreadApplicationPolicy.isToolMaterial(Material.NETHERITE_SWORD));
+        assertFalse(ThreadApplicationPolicy.isToolMaterial(Material.BOW));
+        assertFalse(ThreadApplicationPolicy.isToolMaterial(Material.CROSSBOW));
+        assertFalse(ThreadApplicationPolicy.isToolMaterial(Material.TRIDENT));
+        assertFalse(ThreadApplicationPolicy.isToolMaterial(Material.MACE));
+        assertFalse(ThreadApplicationPolicy.isToolMaterial(Material.BLAZE_ROD));
+        assertFalse(ThreadApplicationPolicy.isToolMaterial(Material.DIAMOND_HELMET));
+        assertFalse(ThreadApplicationPolicy.isToolMaterial(Material.AIR));
+        assertFalse(ThreadApplicationPolicy.isToolMaterial(null));
+    }
+
+    @Test
+    @DisplayName("依頼#44: ツール材質名フォールバックも斧を除外する")
+    void toolMaterialNameFallbackExcludesAxe() {
+        assertTrue(ThreadApplicationPolicy.isToolMaterialName("NETHERITE_PICKAXE"));
+        assertTrue(ThreadApplicationPolicy.isToolMaterialName("DIAMOND_SHOVEL"));
+        assertTrue(ThreadApplicationPolicy.isToolMaterialName("IRON_HOE"));
+        assertTrue(ThreadApplicationPolicy.isToolMaterialName("FISHING_ROD"));
+        assertTrue(ThreadApplicationPolicy.isToolMaterialName("SHEARS"));
+        assertTrue(ThreadApplicationPolicy.isToolMaterialName("FLINT_AND_STEEL"));
+        assertFalse(ThreadApplicationPolicy.isToolMaterialName("NETHERITE_AXE"));
+        assertFalse(ThreadApplicationPolicy.isToolMaterialName("NETHERITE_SWORD"));
+        assertFalse(ThreadApplicationPolicy.isToolMaterialName(null));
+    }
 }

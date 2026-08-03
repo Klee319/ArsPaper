@@ -121,8 +121,11 @@ public class SourceJar extends CustomBlock {
 
     @Override
     public Component getDisplayName() {
+        // sourcejars.yml の display-name はレガシー &記法 (例 "&bソースジャー II")。
+        // Component.text(生文字列) で包むと "&b" がそのまま名前に出る(2026-08-03 実バグ)ため、
+        // 書式解釈は DisplayText 1本へ寄せる。
         return jarDef()
-                .map(d -> Component.text(d.displayName()).decoration(TextDecoration.ITALIC, false))
+                .map(d -> com.arspaper.util.DisplayText.component(d.displayName()))
                 .orElse(Component.text("ソースジャー", NamedTextColor.BLUE)
                         .decoration(TextDecoration.ITALIC, false));
     }
@@ -137,8 +140,11 @@ public class SourceJar extends CustomBlock {
         if (def.isPresent() && !def.get().lore().isEmpty()) {
             List<Component> lines = new ArrayList<>(def.get().lore().size());
             for (String line : def.get().lore()) {
-                lines.add(Component.text(line, NamedTextColor.GRAY)
-                        .decoration(TextDecoration.ITALIC, false));
+                // 色指定が書かれていればそれを尊重し、無ければ従来どおり灰色。
+                lines.add(com.arspaper.util.DisplayText.hasMarkup(line)
+                        ? com.arspaper.util.DisplayText.component(line)
+                        : Component.text(line, NamedTextColor.GRAY)
+                                .decoration(TextDecoration.ITALIC, false));
             }
             return lines;
         }

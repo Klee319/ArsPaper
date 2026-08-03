@@ -1081,6 +1081,15 @@ public class RecipeBrowserGui extends BaseGui {
         // 並べ替えキー(使用スキル種別 / 使用可能レベル)は、表示アイテムが最終確定した後にまとめて取る。
         for (RecipeEntry entry : entries) {
             applySortKeys(entry);
+            // 表示名の書式はここが最後の砦。displayName は yml(レガシー &記法) / TFカタログ
+            // (MiniMessage) / ItemStack の3経路から来るので、描画側で Component.text() に渡す前に
+            // 必ずプレーン化する ―― 1経路でも生記号が残ると画面にそのまま出る(2026-08-03 実バグ)。
+            if (entry.displayName != null && com.arspaper.util.DisplayText.hasMarkup(entry.displayName)) {
+                String plain = com.arspaper.util.DisplayText.plain(entry.displayName);
+                if (!plain.isBlank()) {
+                    entry.displayName = plain;
+                }
+            }
         }
         applyCategories(entries);
         return entries;
@@ -1476,15 +1485,21 @@ public class RecipeBrowserGui extends BaseGui {
             return com.arspaper.integration.TrinityForgeBridge.materialListLabel(listId) + " (いずれか)";
         }
 
-        // カスタムアイテム: レジストリから表示名を取得（Ars未登録ならTFカタログ表示名へフォールバック）
+        // カスタムアイテム: レジストリから表示名を取得（Ars未登録ならTFカタログ表示名へフォールバック）。
+        // どちらでも解決できないときだけ生IDが出る = config の配備ズレのサイン。黙って出すと
+        // 「レシピGUIにIDが出る」実バグ(2026-08-03 source_singularity_jar)に気づけないので警告を残す。
         if (materialOrCustom.startsWith("custom:")) {
             String customId = materialOrCustom.substring("custom:".length());
             return ArsPaper.getInstance().getItemRegistry().get(customId)
-                .map(item -> net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
-                    .serialize(item.resolveDisplayName()))
+                .map(item -> com.arspaper.util.DisplayText.plain(item.resolveDisplayName()))
+                .filter(name -> !name.isBlank())
                 .orElseGet(() -> {
                     String tfName = com.arspaper.integration.TrinityForgeBridge.catalogDisplayNamePlain(customId);
-                    return tfName != null ? tfName : customId;
+                    if (tfName != null && !tfName.isBlank()) {
+                        return tfName;
+                    }
+                    warnUnresolved(customId);
+                    return customId;
                 });
         }
 
@@ -1511,6 +1526,27 @@ public class RecipeBrowserGui extends BaseGui {
 
     private String localizeMaterial(Material mat) {
         return com.arspaper.util.JaTranslations.translate(mat);
+    }
+
+    /** 既に警告した未解決id(1回開くたびに何十行も出さない)。 */
+    private static final java.util.Set<String> WARNED_UNRESOLVED =
+        java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /**
+     * {@code custom:<id>} が Ars にも TF カタログにも無いときの警告。GUIには生IDが出るしかないが、
+     * 「なぜIDが出ているのか」をサーバ側で追えるようにする(実例: materials.yml だけ新しく配備され
+     * sourcejars.yml が古いままで {@code source_singularity_jar} が解決できなかった)。
+     */
+    private static void warnUnresolved(String customId) {
+        if (customId == null || !WARNED_UNRESOLVED.add(customId)) {
+            return;
+        }
+        ArsPaper plugin = ArsPaper.getInstance();
+        if (plugin != null) {
+            plugin.getLogger().warning("RecipeBrowserGui: 'custom:" + customId
+                + "' を Ars レジストリでも TrinityForge カタログでも解決できません"
+                + " — レシピGUIに内部IDが出ます(config の配備漏れ / id のtypo を疑う)");
+        }
     }
 
     private String describeChoice(org.bukkit.inventory.RecipeChoice choice) {

@@ -4,13 +4,21 @@
 # (着用防具4部位 + メインハンド + オフハンド(offhand-stats-apply: true の品)のスレを集計→攻撃/防御に反映)。
 # ※ 常時ポーション効果・飛行・バックパックは着用防具のみ。セット効果と厳選ステは手持ちでも効きます。
 #
-# ■ このファイルが定義するもの = セット効果(個数ボーナス)だけ
-#   スレッド1個ごとの個別ステは【TrinityForge の stats/item-stats.yml】側で MATERIAL#CMD キーに定義します。
-#   各スレッドは固有のトリム材(baseMaterial) + CustomModelData(300002〜300016) を持ちます。例:
+# ■ このファイルが定義するもの = セット効果(個数ボーナス)
+#   各スレッドは固有のトリム材/陶器の欠片(baseMaterial) + CustomModelData(300002〜300040) を持ちます。例:
 #     mana_regen      -> TIDE_ARMOR_TRIM_SMITHING_TEMPLATE#300002
 #     mana_boost      -> WARD_ARMOR_TRIM_SMITHING_TEMPLATE#300003
 #     damage_mana_recovery -> WILD_ARMOR_TRIM_SMITHING_TEMPLATE#300013
-#   (全16種の material#cmd は ThreadType enum 参照。item-stats.yml にそのキーで fixed: を書けばスレ単体のステになる)
+#   (全40種の material#cmd は ThreadType enum 参照)
+#
+# ⚠⚠ スレッド単体のステを【TrinityForge の stats/item-stats.yml】に MATERIAL#CMD で書いてはいけない ⚠⚠
+#   (2026-08-02 訂正。それ以前このファイルはそう書いていたが、実際には穴が開く)
+#   ArmorManaListener はソケット済みスレッドについて item-stats.yml を読むが、【同じエントリ】を
+#   TrinityForge の PlayerStatAggregator#aggregate が材質フィルタ無しでメインハンド寄与としても読む。
+#   つまりそこへ書くと「装備に挿さず、スレッドを手に持つだけで効果が乗る」。
+#   出荷 item-stats.yml に thread の行が0件なのは意図的で、開けてはいけない。
+#   スレッド1個分の効果を出したいときは、このファイルで【thresholds の1段目を 1 にする】。
+#   個数集計はソケット済みのスレッドしか数えないので、手持ちでは絶対に発動しない。
 #
 # ■ セット効果の加算モデル = 累積しきい値式
 #   同種スレッドの合計装備個数 N に対し、N 以上の全しきい値のボーナスを【合算】します。
@@ -46,9 +54,11 @@ thread-sets:
   #
   # ■ しきい値の到達可能性(これを外すと永久に発動しないティアになる)
   #   threads.yml の max は【装備1点あたり】の上限。スレッドを載せられる装備は
-  #     着用防具4部位 + メインハンド + オフハンド(item-stats の offhand-stats-apply: true の品だけ。
-  #     出荷 item-stats.yml には該当品が 0 件なので実質0)
-  #   なので、同種スレッドの到達可能な合計個数 = max x キャリア数(=5)、
+  #     着用防具4部位 + メインハンド + オフハンド(item-stats の offhand-stats-apply: true の品だけ)
+  #   オフハンドは現状キャリアにならない。offhand-stats-apply: true は AMETHYST_SHARD#5760 / #5761 の
+  #   2件あるが、どちらも thread-slots を持たないためスレッドを挿せないからで、
+  #   「該当品が0件だから」ではない(2026-08-02 訂正。以前ここは0件と書いていた)。
+  #   なので、同種スレッドの到達可能な合計個数 = max x キャリア数(=現状5)、
   #   かつ item-stats.yml の thread-slots 合計(最上位で 19)が実際の天井になる。
   #     max 3 (mana_regen / mana_boost / health_boost)   -> 上限 15
   #     max 2 (hit_mana_recovery / damage_mana_recovery) -> 上限 10
@@ -194,3 +204,284 @@ thread-sets:
     thresholds: {}
   backpack:
     thresholds: {}
+
+  # ==================================================================
+  # 2026-08-02 追加分(16種 -> 40種)。
+  #
+  # ■ 1段目が 1 なのはなぜか
+  #   スレッド単体の効果を item-stats.yml に書くと「手に持つだけで乗る」穴が開く
+  #   (ファイル冒頭の ⚠⚠ 参照)。1段目を 1 にすると【ソケット済み1個で発動】するので、
+  #   同じ体験を穴無しで作れる。ここが 24 種すべてで 1/3/5 になっている理由。
+  #   例外は4種:
+  #     mana_amplify / mana_circulate ... 1個分の効果は threads.yml の mana-max-percent /
+  #       regen-percent が担当する(fork 内部のマナ計算なので item-stats を経由せず穴が無い)。
+  #       ここに重ねて書くと二重取りになるため thresholds は空。
+  #     slow_falling / luck ............. 1個分の効果は「装備中常時のバニラポーション効果」。
+  #       既存8種のポーションスレッドと横並びにするため、セット効果は 3/5 段から始める
+  #       (1段目を 1 にすると新2種だけが既存8種の上位互換になる)。
+  #
+  # ■ しきい値 5 が上限である理由
+  #   下記24種のうち【22種】は stackable を書いていない = 1装備につき1個まで。
+  #   (例外は mana_amplify と mana_circulate の2種で、threads.yml で stackable: true / max: 3 を
+  #    持つ。ただしこの2種は下で thresholds を空にしているので、5段上限の話は関係しない。)
+  #
+  #   その22種の到達可能な合計個数はキャリア数ちょうど。6段以上を書くと物理的に到達不能な
+  #   死にティアになる(ThreadSetThresholdReachabilityTest が落とす)。
+  #
+  #   ⚠ キャリア数が 5 なのは【今の出荷 yml がそうだから】であって、5 という定数ではない。
+  #     キャリアは 防具4部位 + メインハンド + オフハンド で、オフハンドは
+  #     TrinityForge の item-stats.yml で offhand-stats-apply: true が付いた品だけが数えられる。
+  #     現在その指定を持つのは AMETHYST_SHARD#5760 / #5761 の2件だが、どちらも thread-slots を
+  #     持たない = スレッドを挿せないのでキャリアにならず、結果として今は 5 になっている。
+  #     【thread-slots と offhand-stats-apply: true を両方持つ品を1件でも足した瞬間に
+  #      キャリアは 6 になり、この「5が上限」という記述は嘘になる】。
+  #     そのときは ThreadSetThresholdReachabilityTest の CARRIER_SLOTS も一緒に直すこと。
+  #
+  # ■ 入手経路でレア度差を付けている(効果値は設計基準に対する倍率)
+  #   制作     … 基準どおり(×1.0)。儀式で確定入手できるぶん一番安い。
+  #   ルート   … 約1.2倍。ワールドのルートテーブル/採取から出る。
+  #   ダンジョン … 約1.5倍。踏破報酬。一番手に入りにくいので一番強い。
+  #
+  # ■ ここに書けるキーの条件(書いても効かないキーがある)
+  #   このファイルの値は AddonCombatStats(PDC)経由で TF へ渡り、消費側が
+  #   PlayerCombatAggregate#totalOf で読むキーだけが効く。
+  #   ・max-health / move-speed / attack-reach / knockback-resistance / thread-slots などの
+  #     ATTRIBUTE チャネルのキーは PerkAttributeApplier 側で適用されるため【無言で効かない】。
+  #   ・cooldown-reduction は「アイテムの使用クールダウン」であって、
+  #     アクティブスキルCT(<skillId>-cooldown-reduction)でも Ars の詠唱コストでもない。
+  #   ・値は生の値がそのまま使われる(PercentStatNormalize を通らない)。
+  #     割合キーは必ず分数で書くこと(0.03 = 3%)。「3」と書くと 300% になる。
+  # ==================================================================
+
+  # ---------- 制作枠(儀式・生産)。基準どおり(×1.0) ----------
+
+  # 効果の実体は threads.yml の mana-max-percent: 3(1個ごとに最大マナ+3%)。
+  # ここに書くと二重取りになるので空のままにする。
+  mana_amplify:
+    thresholds: {}
+  # 同上。効果の実体は threads.yml の regen-percent: 4。
+  mana_circulate:
+    thresholds: {}
+
+  # 儀式のソース消費を割合減。spell_cost_down が削るのは「マナ」なので消費資源そのものが別。
+  # RitualManager が clampReductionFraction([0,0.95]) を掛けるので全額無料化はしない。
+  source_thrift:
+    thresholds:
+      1:
+        source-cost-reduction: 0.02
+      3:
+        source-cost-reduction: 0.03
+      5:
+        source-cost-reduction: 0.03
+  # 作業台クラフトの品質 mode を押し上げる。CraftQualityService が int へ丸めるので
+  # 端数を書いても意味が無い(必ず整数で書く)。
+  artisan:
+    thresholds:
+      1:
+        workbench-quality-bonus: 1
+      3:
+        workbench-quality-bonus: 1
+      5:
+        workbench-quality-bonus: 1
+  # artisan の儀式版。CraftQualityService で作業台と儀式は別キーに分割済み。
+  ritualist:
+    thresholds:
+      1:
+        ritual-quality-bonus: 1
+      3:
+        ritual-quality-bonus: 1
+      5:
+        ritual-quality-bonus: 1
+  # 儀式の台座素材がまれに返る(RitualManager)。値が小さくても周回回数に比例して効くので、
+  # 数値を盛らずに意味が出る = 縦強化にならない。
+  thrift:
+    thresholds:
+      1:
+        material-refund-chance: 0.02
+      3:
+        material-refund-chance: 0.02
+      5:
+        material-refund-chance: 0.03
+  # アンビル解体の戻り量倍率(DisassemblyListener が 1.0+値 を掛ける)。
+  # 「引く→捨てる」ループの捨てる側を強化する枠。
+  salvage:
+    thresholds:
+      1:
+        disassembly-return-bonus: 0.05
+      3:
+        disassembly-return-bonus: 0.05
+      5:
+        disassembly-return-bonus: 0.05
+  # enchant-luck は確率そのものではなく「幸運の量」。実確率は
+  # stats/enchant-luck.yml の level-boost-chance-per-luck(0.02) × この値。
+  scholar:
+    thresholds:
+      1:
+        enchant-luck: 0.5
+      3:
+        enchant-cost-reduction: 0.02
+      5:
+        enchant-luck: 0.5
+
+  # ---------- ルート枠(採取・生活)。基準の約1.2倍 ----------
+
+  # 採掘の追加ドロップ期待値へ直接加算される。採掘「速度」は統合版でゴーストブロックになるので
+  # 絶対に触らない(MINING_EFFICIENCY/BLOCK_BREAK_SPEED 属性は使用禁止)。
+  miner:
+    thresholds:
+      1:
+        mining-fortune: 0.036
+      3:
+        mining-fortune: 0.024
+      5:
+        mining-fortune: 0.024
+  # 釣りの宝率シフト。dolphins_grace / conduit_power は「水中で動ける」だけで釣果には効かない。
+  angler:
+    thresholds:
+      1:
+        fishing-luck: 0.024
+      3:
+        fishing-luck: 0.012
+      5:
+        fishing-luck: 0.012
+  # 農作物の追加ドロップ。hero_of_the_village は取引価格であって収穫ではない。
+  harvest:
+    thresholds:
+      1:
+        harvest-extra-drop-chance: 0.024
+      3:
+        harvest-extra-drop-chance: 0.012
+      5:
+        harvest-extra-drop-chance: 0.012
+  # 伐採の追加ドロップ。採取4系統を別枠にすることで「どの職で遊ぶか」が装備選択に出る。
+  timber:
+    thresholds:
+      1:
+        woodcutting-extra-drop-chance: 0.024
+      3:
+        woodcutting-extra-drop-chance: 0.012
+      5:
+        woodcutting-extra-drop-chance: 0.012
+  # TFスキルEXP。育成中だけ挿して育ち切ったら外す「一時的に挿す枠」= 厳選のやり直し需要も生む。
+  diligence:
+    thresholds:
+      1:
+        skill-exp-bonus: 0.024
+      3:
+        skill-exp-bonus: 0.012
+      5:
+        skill-exp-bonus: 0.024
+  # 空腹消費の抑制。戦闘力に1も寄与しない純粋な生活枠(= 縦にならない典型)。
+  # NativeSurvivalPerkListener 側が 0.9 でクランプするので上限を超えても暴走はしない。
+  endurance:
+    thresholds:
+      1:
+        hunger-save-chance: 0.036
+      3:
+        hunger-save-chance: 0.024
+      5:
+        hunger-save-chance: 0.024
+  # food-restore-bonus / hidden-saturation-bonus はどちらも【割合】(1.0+値 を掛ける)。
+  # 設計書の 0.5 は「食料ポイント +0.5」のつもりだったが実装は倍率なので、
+  # +50%/回 は明らかに過剰。ルート枠の 1.2 倍を掛けた上で 0.12/0.18 へ落としてある。
+  gourmet:
+    thresholds:
+      1:
+        food-restore-bonus: 0.12
+      3:
+        hidden-saturation-bonus: 0.12
+      5:
+        food-restore-bonus: 0.18
+  # 1個分の効果は「装備中常時の落下速度低下」。既存8種のポーションスレッドと横並びにするため
+  # セット効果は 3 段から(1段目を 1 にすると新種だけが既存の上位互換になる)。
+  # 落下は物理ダメージなので phys-resistance。累計 0.048 は dolphins_grace(累計0.10)より弱く、
+  # 既存枠を食い潰さない位置に置いている。
+  slow_falling:
+    thresholds:
+      3:
+        phys-resistance: 0.024
+      5:
+        phys-resistance: 0.024
+
+  # ---------- ダンジョン枠(戦闘)。基準の約1.5倍 ----------
+
+  # モブドロップ倍率。既存16種は「倒す力」は伸ばすが「倒した後の取り分」には触れていない。
+  # 火力を上げずに周回効率だけ上げる横方向の枠。PvPでは効かない(死体複製防止のため実装側で除外)。
+  spoils:
+    thresholds:
+      1:
+        mob-drop-bonus: 0.03
+      3:
+        mob-drop-bonus: 0.015
+      5:
+        mob-drop-bonus: 0.03
+  # バニラ経験値。PlayerExpChangeEvent 一点集約済みなので全XP源に効く。
+  # エンチャント台とのループを作る枠で、TFスキルEXP(diligence)とは別勘定。
+  experience:
+    thresholds:
+      1:
+        vanilla-exp-bonus: 0.045
+      3:
+        vanilla-exp-bonus: 0.03
+      5:
+        vanilla-exp-bonus: 0.03
+  # 自然回復量の倍率。health_boost が「最大HPを増やす」のに対しこちらは「戻る速さ」で、
+  # 戦闘中の耐久ではなく戦闘間のダウンタイムに効く。無限リジェネ付与は縦強化なので採らない。
+  mending_flesh:
+    thresholds:
+      1:
+        health-regen-bonus: 0.03
+      3:
+        health-regen-bonus: 0.015
+      5:
+        health-regen-bonus: 0.03
+  # 反射。厳選の抽選表にも既存16系統のセット効果にも reflect 系は無い、まだ誰も持っていない防御軸。
+  thorn:
+    thresholds:
+      1:
+        reflect-percent: 0.03
+      3:
+        reflect-percent: 0.015
+      5:
+        reflect-flat: 3.0
+  # スタン。ダメージを増やさず「通す回数」を増やすので火力インフレに寄与しない。
+  # ⚠ stun-duration-bonus の単位は【tick】(base-stats.yml の 25tick に加算、100tickでクランプ)。
+  #   0〜1未満の値は旧仕様の分数として ×25 されるので、必ず 1 以上の整数tickで書くこと。
+  concussion:
+    thresholds:
+      1:
+        stun-chance: 0.015
+      3:
+        stun-duration-bonus: 6
+      5:
+        stun-chance: 0.03
+  # ⚠ cooldown-reduction は【アイテムの使用クールダウン】(item-cooldown を持つ武器)の短縮で、
+  #   アクティブスキルCT(<skillId>-cooldown-reduction)でも Ars の詠唱コストでもない。
+  #   CombatListener 側が 0.9 上限・下限係数0.05 でクランプする。
+  swiftcast:
+    thresholds:
+      1:
+        cooldown-reduction: 0.03
+      3:
+        cooldown-reduction: 0.015
+      5:
+        cooldown-reduction: 0.03
+  # 矢の節約と命中。arrow-piercing / velocity は火力に直結するので避け、消費と精度だけを触る。
+  marksman:
+    thresholds:
+      1:
+        ammo-save-chance: 0.045
+      3:
+        bow-accuracy: 0.03
+      5:
+        ammo-save-chance: 0.06
+  # 1個分の効果は「装備中常時の幸運」= バニラのルートテーブル(quality/bonus_rolls)へ効く唯一の手段。
+  # TF独自集計の loot 系ステとは別レイヤなので二重取りにならない。UNLUCK/BAD_OMEN 側は当然採らない。
+  # slow_falling と同じ理由でセット効果は 3 段から。spoils と同じキーだが、あちらは1個目から効く
+  # 専用枠でこちらは3個目からの上積み、という関係にしている。
+  luck:
+    thresholds:
+      3:
+        mob-drop-bonus: 0.03
+      5:
+        mob-drop-bonus: 0.045

@@ -125,17 +125,32 @@ class ThreadHandheldWiringTest {
     // --- (1) 入口 ---
 
     @Test
-    @DisplayName("右クリックの GUI 起動は防具のみ(手持ちは案内だけ出して開かない)")
-    void rightClickOpensGuiForArmorOnly() throws IOException {
+    @DisplayName("右クリックのGUI起動は防具、またはツールを真上を見ながら構えたときだけ"
+            + "(2026-08-02 依頼#44でツール分岐を追加)")
+    void rightClickOpensGuiForArmorOrLookingUpTool() throws IOException {
         String source = readSource("item", "ThreadGuiOpenListener.java");
 
-        assertTrue(source.contains("if (!isArmorPiece(item)) {"),
-                "手持ち装備でも右クリックで GUI を開こうとしている。SpellBindListener(NORMAL) が"
-                        + "同じ右クリックで呪文を発動させるので、バインド済み触媒で"
-                        + "『呪文が飛びつつ GUI が開く』二重発火になる。");
+        assertTrue(source.contains("boolean armor = isArmorPiece(item);"),
+                "防具判定を変数化していない(依頼#44でツール分岐を足す前提が崩れている)");
+        assertTrue(source.contains("if (!armor) {"), "非防具の分岐が見つからない");
+        assertTrue(source.contains("if (!isToolItem(item)) {"),
+                "武器・触媒と非武器ツールを分ける判定が見つからない(依頼#44)。これが無いと"
+                        + "剣や杖でも真上を見るだけでGUIが開いてしまう。");
+        assertTrue(source.contains("if (!isLookingStraightUp(player)) {"),
+                "真上を見ているかのゲートが見つからない(依頼#44)。ツールは採掘・耕作等で"
+                        + "スニーク+右クリックを常用するため、これが無いと通常操作と衝突する。");
         assertTrue(source.contains("/ars thread"),
-                "手持ち装備の入口(/ars thread)をプレイヤーへ案内していない。"
+                "手持ち武器の入口(/ars thread)をプレイヤーへ案内していない。"
                         + "辿れない機能は無いのと同じ。");
+
+        // ゲートの順序: 防具判定 → (非防具なら)ツール判定 → 見上げ判定 → 枠数解決、の順であること。
+        int armorCheck = source.indexOf("boolean armor = isArmorPiece(item);");
+        int toolCheck = source.indexOf("if (!isToolItem(item)) {");
+        int lookUpCheck = source.indexOf("if (!isLookingStraightUp(player)) {");
+        int slotsResolve = source.indexOf("int slots = effectiveThreadSlots(item, player);");
+        assertTrue(armorCheck >= 0 && armorCheck < toolCheck && toolCheck < lookUpCheck
+                        && lookUpCheck < slotsResolve,
+                "GUI起動前のゲート順序が壊れている(防具→ツール→見上げ→枠数解決の順であること)");
     }
 
     @Test
@@ -156,20 +171,23 @@ class ThreadHandheldWiringTest {
     }
 
     @Test
-    @DisplayName("スニーク+右クリックでは案内を出さない(弓/クロスボウ/トライデント/斧/鍬の通常操作・F6 指摘3)")
-    void sneakRightClickNeverSendsAHint() throws IOException {
-        // 報告された症状は「通常操作で案内が繰り返し出る」。これらは全て非防具なので
-        // onInteract の非防具ブランチを通り、そこは何も送らずに return しなければならない。
-        for (String material : new String[] {
-                "BOW", "CROSSBOW", "TRIDENT", "NETHERITE_AXE", "NETHERITE_HOE", "BLAZE_ROD"}) {
+    @DisplayName("手持ち武器はスニーク+右クリックで案内もGUIも出さない(弓/クロスボウ/トライデント/斧の"
+            + "通常操作・F6 指摘3)")
+    void sneakRightClickNeverOpensOrHintsForWeapons() throws IOException {
+        // 報告された症状は「通常操作で案内が繰り返し出る」。武器はツールと違い見上げゲートが無い
+        // (依頼#44はツールだけの追加入口なので、武器はこの経路では常に何もしない)。
+        for (String material : new String[] {"BOW", "CROSSBOW", "TRIDENT", "NETHERITE_AXE", "BLAZE_ROD"}) {
             assertFalse(ThreadApplicationPolicy.isArmorSlotMaterialName(material),
                     material + " が防具扱いになっている(非防具ブランチを通らなくなる)");
+            assertFalse(ThreadApplicationPolicy.isToolMaterialName(material),
+                    material + " がツール扱いになっている(見上げゲート付きでGUIが開いてしまう。"
+                            + "斧は weapon/tool 両方に分類されるが依頼#44の対象からは除外している)");
         }
 
         String source = readSource("item", "ThreadGuiOpenListener.java");
         assertFalse(source.contains("sendHandheldHint"),
                 "スニーク+右クリックの案内が復活している。スレッド枠を持つ弓5件・クロスボウ5件・"
-                        + "トライデント5件・斧4件・鍬でスニーク狙撃/スニーク耕作をすると、"
+                        + "トライデント5件・斧4件でスニーク狙撃をすると、"
                         + "TF の EXP/会心アクションバー(SkillExpFeedbackService / CombatListener)を"
                         + "5秒ごとに無限に上書きし続ける。");
         assertFalse(source.contains("allowInteractHint"),
@@ -182,15 +200,24 @@ class ThreadHandheldWiringTest {
         int send = source.indexOf("sendHint(player, slots);");
         assertTrue(selectHintGate >= 0 && selectHintGate < send,
                 "唯一の案内送出が allowSelectHint ゲートの後ろにない");
+    }
 
-        // 非防具ブランチが何も送らずに return していること(GUI も開かない)。
-        int nonArmorBranch = source.indexOf("if (!isArmorPiece(item)) {");
-        int branchEnd = source.indexOf("        }", nonArmorBranch);
-        assertTrue(nonArmorBranch >= 0 && branchEnd > nonArmorBranch, "非防具ブランチが見つからない");
-        String branch = source.substring(nonArmorBranch, branchEnd);
-        assertFalse(branch.contains("sendHint") || branch.contains("sendActionBar")
-                        || branch.contains("openForHeldItem"),
-                "非防具ブランチが案内かGUIを出している: " + branch);
+    @Test
+    @DisplayName("依頼#44: 純粋ツール(斧を除く)はisToolItem経由でGUI起動候補になる")
+    void toolsAreEligibleForTheNewGestureEntry() throws IOException {
+        for (String material : new String[] {
+                "NETHERITE_PICKAXE", "DIAMOND_SHOVEL", "NETHERITE_HOE",
+                "FISHING_ROD", "SHEARS", "FLINT_AND_STEEL"}) {
+            assertTrue(ThreadApplicationPolicy.isToolMaterialName(material),
+                    material + " が新ジェスチャーの対象ツール判定に入っていない(依頼#44)");
+        }
+        String source = readSource("item", "ThreadGuiOpenListener.java");
+        assertTrue(source.contains("private static boolean isToolItem(ItemStack item) {")
+                        && source.contains("ThreadApplicationPolicy.isToolMaterial(item.getType());"),
+                "isToolItemがThreadApplicationPolicy.isToolMaterialへ委譲していない");
+        assertTrue(source.contains("private static boolean isLookingStraightUp(Player player) {")
+                        && source.contains("getPitch() <= -80f"),
+                "真上判定のピッチ閾値(-80度)が見つからない");
     }
 
     // --- (F6 指摘1) スタックへの装着ガード ---

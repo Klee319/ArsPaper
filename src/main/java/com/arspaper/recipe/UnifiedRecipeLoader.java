@@ -186,7 +186,7 @@ public class UnifiedRecipeLoader {
             if (recipeSection == null) continue;
 
             try {
-                String name = threadSection.getString("display_name", id);
+                String name = displayName(threadSection.getString("display_name", id), id);
                 RitualIngredient coreItem = parseSingleIngredient(recipeSection.getString("core-item", null));
                 List<RitualIngredient> pedestalItems = parsePedestalItems(recipeSection.getStringList("pedestal-items"));
                 int source = recipeSection.getInt("source", 0);
@@ -325,7 +325,9 @@ public class UnifiedRecipeLoader {
 
     private void loadMaterialRitualFromSection(String id, ConfigurationSection recipeSection,
                                                 ConfigurationSection matSection) {
-        String name = matSection.getString("display_name", id) + "精製";
+        // 生の display_name を連結すると "&6&l無限ソース核精製" がそのままGUIへ出る(2026-08-03 実バグ)。
+        // materials.yml はレガシー &記法なので、必ず DisplayText でプレーン化してから連結する。
+        String name = displayName(matSection.getString("display_name", id), id) + "精製";
         RitualIngredient coreItem = parseSingleIngredient(recipeSection.getString("core-item", null));
         List<RitualIngredient> pedestalItems = parsePedestalItems(recipeSection.getStringList("pedestal-items"));
         int source = recipeSection.getInt("source", 0);
@@ -378,6 +380,8 @@ public class UnifiedRecipeLoader {
             // 結果アイテムの表示名から自動生成: "XXX 儀式レシピ"
             String resultStr = recipeSection.getString("result", "custom:" + id);
             name = resolveDisplayNameForRitual(resultStr, id);
+        } else {
+            name = displayName(name, id);
         }
         RitualIngredient coreItem = parseSingleIngredient(recipeSection.getString("core-item", null));
         List<RitualIngredient> pedestalItems = parsePedestalItems(recipeSection.getStringList("pedestal-items"));
@@ -405,7 +409,7 @@ public class UnifiedRecipeLoader {
     // Ritual effect parser (world effects, enchant books)
     // ============================
     private void loadRitualEffectFromSection(String id, ConfigurationSection section) {
-        String name = section.getString("name", id);
+        String name = displayName(section.getString("name", id), id);
         String effectType = section.getString("effect-type", "craft");
         Map<String, String> effectParams = parseEffectParams(section);
         RitualIngredient coreItem = parseSingleIngredient(section.getString("core-item", null));
@@ -497,17 +501,53 @@ public class UnifiedRecipeLoader {
     }
 
     /**
+     * yml に書かれた表示名を、レシピ名として使えるプレーン文字列へ落とす。
+     *
+     * <p>レシピ名は最終的に {@code Component.text(name, 色)} で描画されるため、レガシー {@code &}
+     * や MiniMessage タグを残したまま渡すと<b>記号がそのまま画面に出る</b>。書式の解釈は
+     * {@link com.arspaper.util.DisplayText} 1本に寄せてある(記法混在の唯一の吸収点)。
+     *
+     * @param raw        yml の生文字列(null 可)
+     * @param fallbackId 空になったときに使う id
+     */
+    private static String displayName(String raw, String fallbackId) {
+        String plain = com.arspaper.util.DisplayText.plain(raw);
+        return plain.isBlank() ? fallbackId : plain;
+    }
+
+    /**
      * 結果アイテムの表示名から儀式レシピ名を生成する。
-     * カスタムアイテムの場合はレジストリから表示名を取得。
+     *
+     * <p>解決順は「Ars カスタムアイテム → TrinityForge カタログ → バニラ Material の日本語名 → 生ID」。
+     * 以前は Ars レジストリを外した瞬間に<b>生ID</b>へ落ちており、config のズレ(例: materials.yml だけ
+     * 配備されて sourcejars.yml が古いまま)が起きると、レシピGUIに {@code source_singularity_jar} の
+     * ような内部IDが出ていた。生IDへ落ちるのは本当に何処にも定義が無いときだけにする。
      */
     private String resolveDisplayNameForRitual(String resultStr, String fallbackId) {
         if (resultStr != null && resultStr.startsWith("custom:")) {
             String customId = resultStr.substring("custom:".length());
             var itemOpt = com.arspaper.ArsPaper.getInstance().getItemRegistry().get(customId);
             if (itemOpt.isPresent()) {
-                String displayName = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
-                    .plainText().serialize(itemOpt.get().resolveDisplayName());
-                return displayName;
+                String displayName = com.arspaper.util.DisplayText
+                    .plain(itemOpt.get().resolveDisplayName());
+                if (!displayName.isBlank()) {
+                    return displayName;
+                }
+            }
+            String tfName = com.arspaper.integration.TrinityForgeBridge
+                .catalogDisplayNamePlain(customId);
+            if (tfName != null && !tfName.isBlank()) {
+                return tfName;
+            }
+            plugin.getLogger().warning("UnifiedRecipeLoader: 儀式 '" + fallbackId
+                + "' の結果 '" + resultStr + "' をArs/TFのどちらでも解決できません"
+                + " — レシピGUIに内部IDが出ます(config の配備漏れの可能性)");
+            return fallbackId;
+        }
+        if (resultStr != null && !resultStr.isBlank()) {
+            Material mat = Material.matchMaterial(resultStr);
+            if (mat != null) {
+                return com.arspaper.util.JaTranslations.translate(mat);
             }
         }
         return fallbackId;

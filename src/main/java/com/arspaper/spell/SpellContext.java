@@ -218,20 +218,10 @@ public class SpellContext {
     /** 後方互換: 旧durationTicks互換。各Effectが自分で解釈すべき。 */
     public int getDurationTicks() { return durationLevel * 200; }
 
-    /**
-     * スペル基礎ダメージを TrinityForge の対称ダメージパイプラインへ供給し、
-     * 返ってきた最終魔法ダメージを MAGIC ダメージソースで対象に適用する。
-     *
-     * <p>増強(Amplify)/減衰(Dampen) は呼び出し側で {@code spellBase} に内包済みであることが前提
-     * （MAGIC_BALANCE §2 の層分離: 増減グリフはデフォルト魔法ダメージの内側に閉じる）。
-     * 触媒・装備由来の会心/貫通等は TrinityForge 側の {@code AttackStats} が担当する。
-     *
-     * <p>バニラの攻撃力上昇/弱体化/耐性ポーション補正はここでは適用しない。
-     * COMBAT §5 の通り、それらは対称パイプライン側（防御率/守備力/耐性）へ一本化される。
-     *
-     * @param target    ダメージ対象
-     * @param spellBase スペル基礎ダメージ（Ars攻撃力 + 増減グリフを内包済み・最低0）
-     */
+    // 2026-08-02: 旧仕様（増強/減衰は呼び出し側で spellBase に内包済みが前提、という説明）は
+    // dealSpellDamage(target, spellBase, glyphId, boolean) の javadoc へ置き換えた
+    // （増幅の乗算ボーナスをどちらが持つかが呼び出し側で選べるようになったため）。
+
     /**
      * <b>防御無視ダメージ用の基礎ダメージ</b>（日輪/月輪の直接HP減少）。
      * <b>グリフ基礎＋増減グリフだけ</b>で、杖・触媒の攻撃力(attack-power)は<b>絶対に乗せない</b>。
@@ -290,17 +280,48 @@ public class SpellContext {
      * {@code stats/glyph-damage-boost.yml} に列挙されたグリフにだけ乗る設計で、
      * <b>ここでIDを渡さないと該当グリフでも倍率が無言で乗らない</b>（lore には出るのに効かない状態に戻る）。
      *
+     * <p>増幅(Amplify)の乗算ボーナス（2026-08-02）は既定で適用される
+     * （{@link #dealSpellDamage(LivingEntity, double, String, boolean)} の3引数省略形）。
+     *
      * @param glyphId ダメージを出したグリフのID。不明なら {@code null}（倍率なし）
      */
     public void dealSpellDamage(LivingEntity target, double spellBase, String glyphId) {
+        dealSpellDamage(target, spellBase, glyphId, true);
+    }
+
+    /**
+     * {@link #dealSpellDamage(LivingEntity, double, String)} に、増幅(Amplify)の乗算ボーナスを
+     * このグリフ呼び出しへ適用するかどうかを明示できる版（2026-08-02）。
+     *
+     * <p><b>増幅グリフの仕様変更</b>: 旧仕様は各ダメージ系エフェクト（{@code HarmEffect} 等）が
+     * 「増幅1段+3.0HP」のように {@code spellBase} 自身へ固定値を加算していた。杖の攻撃力
+     * (attack-power)は本メソッドの先で {@link com.arspaper.integration.MagicStatSourcePolicy#effectiveBase}
+     * が別途加算するため、触媒(杖)が育つほど固定加算の寄与が相対的に無意味化していた。現在は
+     * {@code applyAmplifyDamageMultiplier=true} のとき、この呼び出し時点の
+     * {@link #getAmplifyLevel()}（=increment済みの増幅段数）を Sharpness と同じ乗算方式
+     * （既定1段+10%、{@code glyphs.yml} の {@code amplify.params.damage-rate-per-stack}）で
+     * 「グリフ基礎＋杖の攻撃力」の合計へ掛ける（実装は
+     * {@link com.arspaper.integration.TrinityForgeBridge#magicalFinalDamage(java.util.UUID,
+     * LivingEntity, double, org.bukkit.inventory.ItemStack, org.bukkit.inventory.ItemStack, String, int)}）。
+     *
+     * <p><b>{@code false} を渡すべき場合</b>: 呼び出し側が {@code spellBase} へ既に増幅段数を
+     * 自前で織り込み済みのとき（例: {@code HealEffect} の対アンデッド分岐は heal 用の
+     * {@code amplify-bonus} を既に加算済み）。ここで {@code true} のままだと二重計上になる。
+     *
+     * @param glyphId                     ダメージを出したグリフのID。不明なら {@code null}（倍率なし）
+     * @param applyAmplifyDamageMultiplier 増幅の乗算ボーナスをこの呼び出しに適用するか
+     */
+    public void dealSpellDamage(LivingEntity target, double spellBase, String glyphId,
+                                 boolean applyAmplifyDamageMultiplier) {
         Player caster = getCaster();
         if (caster == null || target == null || spellBase <= 0) {
             return;
         }
+        int amplifyForDamage = applyAmplifyDamageMultiplier ? amplifyLevel : 0;
         // 杖/触媒の攻撃力・会心/貫通を対称パイプラインへ連携する。
         // ステ供給元が特定できない（儀式/タレット等の非プレイヤー詠唱）場合は plain(0) フォールバック。
         double finalDamage = com.arspaper.integration.TrinityForgeBridge
-            .magicalFinalDamage(casterUuid, target, spellBase, catalyst, castItem, glyphId);
+            .magicalFinalDamage(casterUuid, target, spellBase, catalyst, castItem, glyphId, amplifyForDamage);
         // #6: 負の最終魔法ダメージは対象を回復させる(TF物理側 CombatListener と対称。負クランプ設定時のみ発生)。
         // 0 は何もしない。正のときのみ MAGIC ダメージソースで適用する。
         if (finalDamage < 0) {

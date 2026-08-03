@@ -3,8 +3,6 @@ package com.arspaper.item.impl;
 import com.arspaper.item.BaseCustomItem;
 import com.arspaper.item.MaterialConfig;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.TextDecoration;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -32,9 +30,9 @@ public class ConfigurableMaterial extends BaseCustomItem {
 
     @Override
     public Component getDisplayName() {
-        return LegacyComponentSerializer.legacyAmpersand()
-            .deserialize(config.nameColor() + config.displayName())
-            .decoration(TextDecoration.ITALIC, false);
+        // 書式解釈は DisplayText 1本へ(materials.yml はレガシー &記法だが、
+        // MiniMessage で書かれても壊れないようにしておく)。
+        return com.arspaper.util.DisplayText.component(config.nameColor() + config.displayName());
     }
 
     @Override
@@ -54,9 +52,7 @@ public class ConfigurableMaterial extends BaseCustomItem {
         if (!config.lore().isEmpty()) {
             item.editMeta(meta -> meta.lore(
                 config.lore().stream()
-                    .map(line -> LegacyComponentSerializer.legacyAmpersand()
-                        .deserialize(line)
-                        .decoration(TextDecoration.ITALIC, false))
+                    .map(com.arspaper.util.DisplayText::component)
                     .collect(Collectors.toList())
             ));
         }

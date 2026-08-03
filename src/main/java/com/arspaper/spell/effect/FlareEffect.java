@@ -14,14 +14,15 @@ import org.bukkit.plugin.java.JavaPlugin;
 /**
  * 炎上中のエンティティに追加バーストダメージを与えるEffect。
  * Ars Nouveau Tier 2準拠:
- *   対象が炎上中の場合: 6.0 + 2.5 × amplifyLevel のバーストダメージ
+ *   対象が炎上中の場合: 基礎ダメージ6.0のバーストダメージ
  *   炎上していない場合: 何もしない
+ * 増幅(Amplify)は固定値加算ではなく、dealSpellDamage 側で Sharpness と同じ乗算ボーナス
+ * (既定1段+10%)として適用される(2026-08-02)。
  * 着弾時に炎パーティクルエフェクトを表示する。
  */
 public class FlareEffect implements SpellEffect {
 
     private static final double BASE_DAMAGE = 6.0;
-    private static final double AMPLIFY_BONUS = 2.5;
     private final NamespacedKey id;
     private final GlyphConfig config;
 
@@ -37,10 +38,8 @@ public class FlareEffect implements SpellEffect {
             return;
         }
 
-        double baseDamage = config.getParam("flare", "base-damage", BASE_DAMAGE);
-        double amplifyBonus = config.getParam("flare", "amplify-bonus", AMPLIFY_BONUS);
-        double damage = baseDamage + context.getAmplifyLevel() * amplifyBonus;
-        // 対称パイプラインへ供給し最終ダメージを適用
+        double damage = config.getParam("flare", "base-damage", BASE_DAMAGE);
+        // 対称パイプラインへ供給し最終ダメージを適用(増幅の乗算ボーナスはdealSpellDamage側で適用)
         context.dealSpellDamage(target, damage, id.getKey());
 
         spawnFlareFx(target.getLocation());

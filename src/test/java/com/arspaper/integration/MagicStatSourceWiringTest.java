@@ -14,12 +14,14 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * D6 / G5 / G10 の<b>配線</b>が外れていないことを固定する（2026-07-31）。
+ * D6 / G5 / G10 / 増幅ダメージ乗算(2026-08-02) の<b>配線</b>が外れていないことを固定する。
  *
  * <p>{@link MagicStatSourcePolicyTest} は判断と算術（純粋関数）を検証するが、それだけでは
  * 「policy は正しいのに呼び出し側が繋がっていない」状態を検出できない。まさにそれが G5
  * （{@code glyph-damage-multiplier-bonus} は公開APIがあるのに呼び出し元がゼロで、lore に出るのに
  * 効かなかった）と D6（castItem を運ぶ経路が無く杖の攻撃力が落ちていた）の正体だった。
+ * 増幅ダメージ乗算も同型のリスク（ダメージ系エフェクトが旧仕様の固定値加算を消し忘れると
+ * 乗算ボーナスと二重計上になる）を持つため、同じ配線検査で押さえる。
  *
  * <p>このフォークは Bukkit ランタイムを持たないので、{@code LegacyCastExperienceRemovalTest} と
  * 同じソーステキスト検査でこの種の「無言の断線」を止める。
@@ -63,8 +65,10 @@ class MagicStatSourceWiringTest {
     @DisplayName("SpellContext は castItem を通常ダメージ経路へ渡す")
     void spellContextForwardsCastItemToBridge() throws Exception {
         String context = read("spell/SpellContext.java");
-        assertTrue(context.contains("magicalFinalDamage(casterUuid, target, spellBase, catalyst, castItem, glyphId)"),
-                "dealSpellDamage は castItem と glyphId を bridge へ渡す必要がある");
+        assertTrue(context.contains(
+                        "magicalFinalDamage(casterUuid, target, spellBase, catalyst, castItem, glyphId, amplifyForDamage)"),
+                "dealSpellDamage は castItem・glyphId に加えて増幅段数(amplifyForDamage)も"
+                        + " bridge へ渡す必要がある(渡さないと増幅グリフの乗算ボーナスが無言で0のままになる)");
     }
 
     @Test
@@ -150,6 +154,50 @@ class MagicStatSourceWiringTest {
                 "グリフIDを渡していない dealSpellDamage 呼び出しがある。"
                         + "stats/glyph-damage-boost.yml にそのグリフを追加しても倍率が無言で乗らない: "
                         + offenders);
+    }
+
+    // --- 2026-08-02: 増幅(Amplify)の乗算ボーナス配線 ---
+
+    /** dealSpellDamage 側の乗算ボーナスに委ねた(=ローカルの固定値加算を撤去した)ダメージ系エフェクトと、
+     *  撤去済みであるべき glyphs.yml 由来のパラメータキー。HealEffect は対アンデッド分岐で
+     *  amount へ既に増幅を織り込む設計を維持しているため対象外(applyAmplifyDamageMultiplier=false)。 */
+    private static final java.util.Map<String, String> AMPLIFY_MULTIPLIER_EFFECTS = java.util.Map.ofEntries(
+            java.util.Map.entry("HarmEffect", "amplify-bonus"),
+            java.util.Map.entry("ColdSnapEffect", "amplify-bonus"),
+            java.util.Map.entry("CrushWaveEffect", "amplify-bonus"),
+            java.util.Map.entry("FlareEffect", "amplify-bonus"),
+            java.util.Map.entry("ScorchEffect", "amplify-bonus"),
+            java.util.Map.entry("WindshearEffect", "amplify-bonus"),
+            java.util.Map.entry("LightningEffect", "amplify-bonus"),
+            java.util.Map.entry("HeavyImpactEffect", "amplify-damage-bonus"),
+            java.util.Map.entry("SonicBoomEffect", "amplify-damage-bonus"));
+
+    @Test
+    @DisplayName("bridge は増幅の乗算ボーナスを MagicStatSourcePolicy 経由で適用する")
+    void bridgeAppliesAmplifyMultiplierViaPolicy() throws Exception {
+        String bridge = read("integration/TrinityForgeBridge.java");
+        assertTrue(bridge.contains("MagicStatSourcePolicy.applyAmplifyMultiplier("),
+                "増幅の乗算ボーナスの適用点も policy 経由に揃える必要がある"
+                        + "(直書きすると純関数テストと実装がズレても検出できない)");
+        assertTrue(bridge.contains("amplifyDamageRatePerStack()") && bridge.contains("maxAmplifyDamageLevel()"),
+                "乗率/上限は glyphs.yml の amplify.params から読む必要がある(決め打ち禁止)");
+    }
+
+    @Test
+    @DisplayName("ダメージ系エフェクトはローカルの増幅固定値加算を持たない(二重計上防止)")
+    void damageEffectsNoLongerBakeAmplifyLocally() throws Exception {
+        List<String> offenders = new ArrayList<>();
+        for (var entry : AMPLIFY_MULTIPLIER_EFFECTS.entrySet()) {
+            String src = read("spell/effect/" + entry.getKey() + ".java");
+            if (src.contains(entry.getValue())) {
+                offenders.add(entry.getKey() + " はまだ config.getParam(..., \"" + entry.getValue() + "\", ...) "
+                        + "を参照している(dealSpellDamage側の乗算ボーナスと二重計上になる)");
+            }
+            if (src.contains("getAmplifyLevel() *") || src.contains("* context.getAmplifyLevel()")) {
+                offenders.add(entry.getKey() + " はまだ getAmplifyLevel() をダメージ式へ直接掛けている");
+            }
+        }
+        assertTrue(offenders.isEmpty(), String.join("; ", offenders));
     }
 
     // --- G10: 杖の use-level-requirement / use-skill をバインド詠唱でも強制する ---

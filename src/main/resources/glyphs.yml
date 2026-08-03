@@ -16,7 +16,11 @@
 #         magebloom_fiber: 4
 #
 # ===== 増強カテゴリ一覧 =====
-# amplify    (増幅)     : 効果の強度・威力を上昇させる
+# amplify    (増幅)     : 効果の強度・威力を上昇させる。ダメージ系グリフ(harm/scorch/cold_snap/
+#                          crush_wave/windshear/lightning/sonic_boom/heavy_impact)に限っては
+#                          2026-08-02以降、固定値加算ではなくSharpness等と同じ乗算方式
+#                          (amplify.params.damage-rate-per-stack、既定1段+10%)。力/速度/持続時間/
+#                          召喚HP等はこれまでどおり段数に固定値を掛ける個別実装のまま
 # dampen     (減少)     : 効果の強度・威力を低下させる
 # aoe        (幅)         : 左右に範囲を広げる
 # aoe_height (上下)       : 上下に範囲を広げる
@@ -218,14 +222,15 @@ glyphs:
     mana-cost: 20
     max-augments:
       amplify: 6
-      dampen: 2   # 2個でamp-1(=2.0HP), 4個でamp-2(=0に近い)。これ以上積んでも変化なし
+      dampen: 2   # 2個でamp-1段(乗率-10%)、4個でamp-2段(乗率-20%)。これ以上積んでも変化なし
       extend_time: 8
       duration_down: 2
       linger: 6
       propagate: 4
     params:
-      base-damage: 9.0              # 基本ダメージ(HP)
-      amplify-bonus: 3.0            # 増幅1段あたりのダメージ増加(HP)
+      base-damage: 9.0              # 基本ダメージ(HP)。増幅の乗算ボーナスは amplify.params.
+                                     # damage-rate-per-stack が別途適用する(2026-08-02、旧
+                                     # amplify-bonus固定値加算は撤廃)
       base-poison-seconds: 6        # 基本毒持続(秒)
       poison-seconds-per-duration: 2 # 延長1段あたりの毒持続増加(秒)
     unlock-cost:
@@ -812,8 +817,8 @@ glyphs:
       linger: 6
       propagate: 4
     params:
-      base-damage: 6.0              # 基本ダメージ(HP、水中2倍)
-      amplify-bonus: 3.0            # 増幅1段あたりのダメージ増加(HP)
+      base-damage: 6.0              # 基本ダメージ(HP、水中2倍)。増幅の乗算ボーナスは
+                                     # amplify.params.damage-rate-per-stack が適用する(2026-08-02)
       water-multiplier: 2.0
     unlock-cost:
       level: 20
@@ -831,8 +836,8 @@ glyphs:
       linger: 6
       propagate: 4
     params:
-      base-damage: 9.0              # 基本ダメージ(HP、炎上中1.5倍)
-      amplify-bonus: 3.0            # 増幅1段あたりのダメージ増加(HP)
+      base-damage: 9.0              # 基本ダメージ(HP、炎上中1.5倍)。増幅の乗算ボーナスは
+                                     # amplify.params.damage-rate-per-stack が適用する(2026-08-02)
       fire-multiplier: 1.5          # 炎上中ボーナス倍率
     unlock-cost:
       level: 20
@@ -850,8 +855,8 @@ glyphs:
       linger: 6
       propagate: 4
     params:
-      base-damage: 12.0              # 基本凍結ダメージ(HP)
-      amplify-bonus: 4            # 増幅1段あたりのダメージ増加(HP)
+      base-damage: 12.0              # 基本凍結ダメージ(HP)。増幅の乗算ボーナスは
+                                      # amplify.params.damage-rate-per-stack が適用する(2026-08-02)
     unlock-cost:
       level: 20
       materials:
@@ -868,8 +873,8 @@ glyphs:
       linger: 6
       propagate: 4
     params:
-      base-damage: 5.0              # 基本風ダメージ(HP)
-      amplify-bonus: 2.5            # 増幅1段あたりのダメージ増加(HP)
+      base-damage: 5.0              # 基本風ダメージ(HP)。増幅の乗算ボーナスは
+                                     # amplify.params.damage-rate-per-stack が適用する(2026-08-02)
       max-height-bonus: 20.0        # 高度比例ボーナス最大値(HP)
     unlock-cost:
       level: 20
@@ -1104,9 +1109,11 @@ glyphs:
       linger: 6
       propagate: 4
     params:
-      base-damage: 10.0              # 基本落雷ダメージ(HP)
-      amplify-bonus: 5.0            # 増幅1段あたりのダメージ増加(HP)
-      max-amplify: 6                # 最大増幅段数
+      base-damage: 10.0              # 基本落雷ダメージ(HP、これが0以下の場合のみ演出雷になる)。
+                                      # 増幅の乗算ボーナスは amplify.params.damage-rate-per-stack が
+                                      # 適用する(2026-08-02。旧仕様のmax-amplifyクランプは撤去——
+                                      # 出荷時点のdampen最大スタック1では元々amplifyLevelを負にできず
+                                      # 演出雷分岐は実質未使用だった)
       wet-bonus-damage: 2.0         # 水濡れ時のボーナスダメージ(HP)
       shocked-base-ticks: 120       # 基本感電(鈍足)持続(tick=6秒)
       shocked-per-level: 40         # 延長1段あたりの感電持続増加(tick=2秒)
@@ -1346,8 +1353,8 @@ glyphs:
       linger: 6
       propagate: 4
     params:
-      base-damage: 6.0             # 基本バーストダメージ(HP、暫定)
-      amplify-bonus: 2.5           # 増幅1段あたりのダメージ増加(HP、暫定)
+      base-damage: 6.0             # 基本バーストダメージ(HP、暫定)。増幅の乗算ボーナスは
+                                    # amplify.params.damage-rate-per-stack が適用する(2026-08-02)
     unlock-cost:
       level: 20
       materials:
@@ -1429,6 +1436,18 @@ glyphs:
     mana-cost: 20
     params:
       per-stack: 1                   # 1個あたりの増幅レベル増加量
+      # --- ダメージ系グリフ(harm/scorch/cold_snap/crush_wave/windshear/lightning/sonic_boom/
+      #     heavy_impact)専用: 2026-08-02 以前は各グリフが「増幅1段+固定HP」を自分の基礎ダメージへ
+      #     加算していた。杖の攻撃力(attack-power)は触媒側で別途加算されるため、杖が育つほど
+      #     固定加算の相対的な価値が薄れる(触媒想定の環境で増幅が弱いという報告への対処)。
+      #     ダメージ増加のエンチャント(Sharpness等)と同じ乗算方式に変更した:
+      #     最終乗率 = 1 + damage-rate-per-stack × 増幅段数(Dampenで負にもなる)。
+      #     力/速度/持続時間/召喚HP等(knockback/launch/summon_*等)は対象外で従来どおり段数に
+      #     固定値を掛ける個別実装のまま(このparamは読まれない)。
+      damage-rate-per-stack: 0.10     # 増幅1段あたりのダメージ乗率(既定+10%)
+      max-damage-level: 10            # 乗率計算に使う段数の絶対値上限(暴走防止の保険。各グリフの
+                                       # max-augments.amplifyが出荷時点で全て6のため実質未使用だが、
+                                       # 将来その上限を外しても乗率だけは青天井にしないための安全弁)
     unlock-cost:
       level: 10
       materials:
@@ -1780,8 +1799,8 @@ glyphs:
     mana-cost: 200
     params:
       range: 20.0                   # 射程(ブロック)
-      base-damage: 10.0             # 基本ダメージ(HP)
-      amplify-damage-bonus: 5.0     # 増幅1段あたりのダメージ増加(HP)
+      base-damage: 10.0             # 基本ダメージ(HP)。増幅の乗算ボーナスは
+                                     # amplify.params.damage-rate-per-stack が適用する(2026-08-02)
       hit-radius: 1.0               # ヒット判定半径(ブロック)
       spread-angle-step: 0.15       # 分裂時の拡散角度(rad)
     max-augments:
@@ -1891,8 +1910,9 @@ glyphs:
     tier: 3
     mana-cost: 150
     params:
-      base-damage-per-hit: 3.0      # 1段あたりの基本ダメージ(HP)
-      amplify-damage-bonus: 1.5     # 増幅1段あたりのダメージ増加(HP)
+      base-damage-per-hit: 3.0      # 1段あたりの基本ダメージ(HP)。増幅の乗算ボーナスは
+                                     # amplify.params.damage-rate-per-stack が1発ごとに適用する
+                                     # (2026-08-02)
       base-radius: 2                # 基本衝撃範囲(3×3=中心+1ブロック)
       hit-count: 5                  # 連続ダメージ段数
       hit-interval-ticks: 3         # 連撃間隔(tick)

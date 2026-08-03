@@ -9,6 +9,12 @@ import org.bukkit.plugin.java.JavaPlugin;
 /**
  * パワー+1.0。ダメージ増、硬度増、各エフェクト固有の強化。
  * Ars Nouveau: amplification += 1.0
+ *
+ * <p>この augment 自身が積むのは「増幅段数({@code amplifyLevel})」のみ。段数の使い道は
+ * エフェクトごとに異なる（例: harm/scorch/lightning 等の直接ダメージ系は
+ * {@code SpellContext#dealSpellDamage} を通じて Sharpness と同じ乗算ボーナス(既定1段+10%、
+ * {@code glyphs.yml} の {@code amplify.params.damage-rate-per-stack} で調整可。2026-08-02変更)。
+ * knockback/launch 等の力・速度系や summon 系のHPは従来どおり段数に固定値を掛ける個別実装のまま）。
  */
 public class AmplifyAugment implements SpellAugment {
 

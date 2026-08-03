@@ -25,7 +25,8 @@ import java.util.Collection;
 /**
  * ヘビーインパクト — 衝撃波を走らせ、範囲内の全敵に無敵時間を無視した5段階連続ダメージ。
  *
- * 増幅: 1発あたりのダメージ増加
+ * 増幅: 固定値加算ではなく、dealSpellDamage 側で Sharpness と同じ乗算ボーナス
+ *   (既定1段+10%)として1発ごとに適用される(2026-08-02)。
  * 半径増加: 基本3×3から範囲拡大
  * 残留: 10秒間判定が残り、2秒毎にダメージ
  * ブロックが同心円状に波打つ演出。
@@ -34,7 +35,6 @@ import java.util.Collection;
 public class HeavyImpactEffect implements SpellEffect {
 
     private static final double BASE_DAMAGE_PER_HIT = 3.0;
-    private static final double AMPLIFY_DAMAGE_BONUS = 1.5;
     private static final int HIT_COUNT = 5;
     private static final int HIT_INTERVAL_TICKS = 3;       // 3tick(0.15秒)間隔
     private static final int BASE_RADIUS = 1;               // 3×3 = 中心+1ブロック
@@ -67,9 +67,8 @@ public class HeavyImpactEffect implements SpellEffect {
         Player caster = context.getCaster();
         if (caster == null) return;
 
-        double baseDmg = config.getParam("heavy_impact", "base-damage-per-hit", BASE_DAMAGE_PER_HIT);
-        double amplifyBonus = config.getParam("heavy_impact", "amplify-damage-bonus", AMPLIFY_DAMAGE_BONUS);
-        double damagePerHit = baseDmg + context.getAmplifyLevel() * amplifyBonus;
+        // 増幅の乗算ボーナスは dealSpellDamage 側で1発ごとに適用される(2026-08-02)。
+        double damagePerHit = config.getParam("heavy_impact", "base-damage-per-hit", BASE_DAMAGE_PER_HIT);
         int radius = (int) config.getParam("heavy_impact", "base-radius", (double) BASE_RADIUS)
             + context.getAoeRadiusLevel();
         int hitCount = (int) config.getParam("heavy_impact", "hit-count", (double) HIT_COUNT);

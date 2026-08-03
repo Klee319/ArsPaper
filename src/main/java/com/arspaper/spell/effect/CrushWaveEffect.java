@@ -17,13 +17,14 @@ import org.bukkit.plugin.java.JavaPlugin;
  * 水に関連した物理ダメージを与えるEffect。
  * 基本ダメージ: 3.0 (ハート1.5個分)
  * 水中のエンティティには2倍ダメージ。
+ * 増幅(Amplify)は固定値加算ではなく、dealSpellDamage 側で Sharpness と同じ乗算ボーナス
+ * (既定1段+10%)として適用される(2026-08-02)。
  *
  * 互換増強: 増幅/減衰（威力）、半径増加（ダメージエリア）、遅延、初期化のみ。
  */
 public class CrushWaveEffect implements SpellEffect {
 
     private static final double DEFAULT_BASE_DAMAGE = 3.0;
-    private static final double DEFAULT_AMPLIFY_BONUS = 2.0;
     private static final double WATER_MULTIPLIER = 2.0;
 
     private final NamespacedKey id;
@@ -36,16 +37,14 @@ public class CrushWaveEffect implements SpellEffect {
 
     @Override
     public void applyToEntity(SpellContext context, LivingEntity target) {
-        double baseDamage = config.getParam("crush_wave", "base-damage", DEFAULT_BASE_DAMAGE);
-        double amplifyBonus = config.getParam("crush_wave", "amplify-bonus", DEFAULT_AMPLIFY_BONUS);
-        double damage = Math.max(0, baseDamage + context.getAmplifyLevel() * amplifyBonus);
+        double damage = config.getParam("crush_wave", "base-damage", DEFAULT_BASE_DAMAGE);
 
         // 水に触れている敵にダメージ2倍
         if (target.isInWater() || target.isInRain()) {
             damage *= config.getParam("crush_wave", "water-multiplier", WATER_MULTIPLIER);
         }
 
-        // 対称パイプラインへ供給し最終ダメージを適用
+        // 対称パイプラインへ供給し最終ダメージを適用(増幅の乗算ボーナスはdealSpellDamage側で適用)
         context.dealSpellDamage(target, damage, id.getKey());
         spawnCrushWaveFx(target.getLocation());
     }

@@ -56,7 +56,83 @@ public enum ThreadType {
     FLIGHT("flight", "飛行のスレッド", 300015, NamedTextColor.WHITE,
         0, 0, null, 0, 0, 0, 0, Material.SPIRE_ARMOR_TRIM_SMITHING_TEMPLATE),
     BACKPACK("backpack", "バックパックのスレッド", 300016, NamedTextColor.DARK_GREEN,
-        0, 0, null, 0, 0, 0, 0, Material.SILENCE_ARMOR_TRIM_SMITHING_TEMPLATE);
+        0, 0, null, 0, 0, 0, 0, Material.SILENCE_ARMOR_TRIM_SMITHING_TEMPLATE),
+
+    // ================================================================
+    // 2026-08-02 スレッド 16 -> 40 種への拡張 (CMD 300017-300040)。
+    //
+    // ■ 以下 24 種の効果はどこに書いてあるか
+    //   - mana_amplify / mana_circulate ... threads.yml の mana-max-percent / regen-percent
+    //     (ThreadConfig と ManaManager が既に配線済みだったのに出荷 yml に1件も無かった遊休レバー)。
+    //   - slow_falling / luck ............. ここの potionEffect(装備中常時のバニラポーション効果)。
+    //   - 残り 20 種 ...................... thread-sets.yml の【しきい値1段目=1】。
+    //
+    // ■ なぜ item-stats.yml (MATERIAL#CMD) に単体ステを書かないのか【重要】
+    //   ArmorManaListener はソケット済みスレッドについて TF item-stats.yml を読むが、同じエントリを
+    //   TF の PlayerStatAggregator#aggregate が【材質フィルタ無しで】メインハンド寄与としても読む。
+    //   つまりそこへ書くと「装備に挿さず手に持つだけで効果が乗る」穴が開く。thread-sets.yml の
+    //   thresholds 1段目なら【ソケット済みしか数えない】ので手持ちでは発動しない。
+    //
+    // ■ id の禁止事項
+    //   - "hit" を含む id を作らない: ThreadConfig の recovery 振り分けが key.contains("hit") の
+    //     文字列判定なので、hit を含まない id に recovery: を書くと無言で攻撃時マナ回復に化ける。
+    //   - water_breathing / spell_power を再利用しない: fromId が明示的に null を返す後方互換分岐を
+    //     持っており、古い PDC が無言で復活する。
+    // ================================================================
+
+    // --- 制作(儀式・生産)系: 入手経路=制作。効果値は設計書の基準どおり ---
+    MANA_AMPLIFY("mana_amplify", "マナ増幅のスレッド", 300017, NamedTextColor.BLUE,
+        0, 0, null, 0, 0, 0, 0, Material.FLOW_ARMOR_TRIM_SMITHING_TEMPLATE),
+    MANA_CIRCULATE("mana_circulate", "循環のスレッド", 300018, NamedTextColor.AQUA,
+        0, 0, null, 0, 0, 0, 0, Material.BOLT_ARMOR_TRIM_SMITHING_TEMPLATE),
+    SOURCE_THRIFT("source_thrift", "源流節約のスレッド", 300019, NamedTextColor.DARK_AQUA,
+        0, 0, null, 0, 0, 0, 0, Material.FLOW_POTTERY_SHERD),
+    ARTISAN("artisan", "匠のスレッド", 300020, NamedTextColor.GOLD,
+        0, 0, null, 0, 0, 0, 0, Material.ARMS_UP_POTTERY_SHERD),
+    RITUALIST("ritualist", "儀式師のスレッド", 300021, NamedTextColor.LIGHT_PURPLE,
+        0, 0, null, 0, 0, 0, 0, Material.BREWER_POTTERY_SHERD),
+    THRIFT("thrift", "倹約のスレッド", 300022, NamedTextColor.YELLOW,
+        0, 0, null, 0, 0, 0, 0, Material.PLENTY_POTTERY_SHERD),
+    SALVAGE("salvage", "解体のスレッド", 300023, NamedTextColor.GRAY,
+        0, 0, null, 0, 0, 0, 0, Material.SCRAPE_POTTERY_SHERD),
+    SCHOLAR("scholar", "選書のスレッド", 300031, NamedTextColor.DARK_PURPLE,
+        0, 0, null, 0, 0, 0, 0, Material.BURN_POTTERY_SHERD),
+
+    // --- 採取・生活系: 入手経路=ルート。効果値は基準の約1.2倍 ---
+    MINER("miner", "豊鉱のスレッド", 300024, NamedTextColor.DARK_GRAY,
+        0, 0, null, 0, 0, 0, 0, Material.MINER_POTTERY_SHERD),
+    ANGLER("angler", "潮読みのスレッド", 300025, NamedTextColor.BLUE,
+        0, 0, null, 0, 0, 0, 0, Material.ANGLER_POTTERY_SHERD),
+    HARVEST("harvest", "実りのスレッド", 300026, NamedTextColor.YELLOW,
+        0, 0, null, 0, 0, 0, 0, Material.SHEAF_POTTERY_SHERD),
+    TIMBER("timber", "年輪のスレッド", 300027, NamedTextColor.DARK_GREEN,
+        0, 0, null, 0, 0, 0, 0, Material.SNORT_POTTERY_SHERD),
+    DILIGENCE("diligence", "研鑽のスレッド", 300029, NamedTextColor.GREEN,
+        0, 0, null, 0, 0, 0, 0, Material.FRIEND_POTTERY_SHERD),
+    ENDURANCE("endurance", "持久のスレッド", 300033, NamedTextColor.GOLD,
+        0, 0, null, 0, 0, 0, 0, Material.SHELTER_POTTERY_SHERD),
+    GOURMET("gourmet", "美食のスレッド", 300034, NamedTextColor.RED,
+        0, 0, null, 0, 0, 0, 0, Material.HEARTBREAK_POTTERY_SHERD),
+    SLOW_FALLING("slow_falling", "浮遊のスレッド", 300039, NamedTextColor.WHITE,
+        0, 0, PotionEffectType.SLOW_FALLING, 0, 0, 0, 0, Material.GUSTER_POTTERY_SHERD),
+
+    // --- 戦闘系: 入手経路=ダンジョン。効果値は基準の約1.5倍 ---
+    SPOILS("spoils", "戦利品のスレッド", 300028, NamedTextColor.GOLD,
+        0, 0, null, 0, 0, 0, 0, Material.SKULL_POTTERY_SHERD),
+    EXPERIENCE("experience", "経験のスレッド", 300030, NamedTextColor.GREEN,
+        0, 0, null, 0, 0, 0, 0, Material.HOWL_POTTERY_SHERD),
+    MENDING_FLESH("mending_flesh", "治癒のスレッド", 300032, NamedTextColor.RED,
+        0, 0, null, 0, 0, 0, 0, Material.HEART_POTTERY_SHERD),
+    THORN("thorn", "棘のスレッド", 300035, NamedTextColor.DARK_RED,
+        0, 0, null, 0, 0, 0, 0, Material.DANGER_POTTERY_SHERD),
+    CONCUSSION("concussion", "昏倒のスレッド", 300036, NamedTextColor.DARK_AQUA,
+        0, 0, null, 0, 0, 0, 0, Material.BLADE_POTTERY_SHERD),
+    SWIFTCAST("swiftcast", "速攻のスレッド", 300037, NamedTextColor.YELLOW,
+        0, 0, null, 0, 0, 0, 0, Material.MOURNER_POTTERY_SHERD),
+    MARKSMAN("marksman", "射手のスレッド", 300038, NamedTextColor.DARK_GREEN,
+        0, 0, null, 0, 0, 0, 0, Material.ARCHER_POTTERY_SHERD),
+    LUCK("luck", "幸運のスレッド", 300040, NamedTextColor.GOLD,
+        0, 0, PotionEffectType.LUCK, 0, 0, 0, 0, Material.EXPLORER_POTTERY_SHERD);
 
     private final String id;
     private final String displayName;
@@ -142,6 +218,8 @@ public enum ThreadType {
                 case "conduit_power" -> "コンジットパワー";
                 case "hero_of_the_village" -> "村の英雄";
                 case "health_boost" -> "体力増強";
+                case "slow_falling" -> "落下速度低下";
+                case "luck" -> "幸運";
                 default -> "ポーション効果";
             };
             lore.add(loreText(effectName + " (装備中常時)", NamedTextColor.GREEN));

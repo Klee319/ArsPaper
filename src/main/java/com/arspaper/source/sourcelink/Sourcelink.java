@@ -197,14 +197,25 @@ public abstract class Sourcelink extends CustomBlock {
     }
 
     /**
-     * {@code transfer.sourcelink.max-per-transfer} に、半径内であれば
-     * {@code transfer.infinity-core.transfer-multiplier} を掛けた値。
+     * {@code transfer.sourcelink.max-per-transfer} に、まず自分の {@code items.<id>.transfer-multiplier}
+     * (階梯レート。K-16対応、2026-08-02)を掛け、さらに infinity_source_core の半径内であれば
+     * {@code transfer.infinity-core.transfer-multiplier} を重ねて掛けた値。
+     *
+     * <p>⚠ K-16 の元の問題は「階梯(volcanic/mycelial/...)を上げても容量(buffer-cap)は伸びるが
+     * <b>転送レート</b>は伸びず、レートを上げる唯一の手段が『ソースリンクの台数を並べる』ことだった」点。
+     * ここで {@code transferMultiplier} を先に掛けることで、上位ソースリンク(例: {@code *_ii}/{@code *_iii})
+     * 単体でレートそのものが上がるようにする。buffer-cap 側は元々 int上限=実質無制限なので、
+     * 階梯による倍率はレート(このメソッド)にだけ掛ける。
      */
-    private static int effectiveMaxPerTransfer(Block block) {
+    private int effectiveMaxPerTransfer(Block block) {
         com.arspaper.source.SourceTransferConfig cfg = transferConfig();
         int base = cfg.sourcelinkMaxPerTransfer();
-        if (!withinInfinityCoreRadius(block, cfg.infinityCoreRadius())) return base;
-        return com.arspaper.source.InfinityCoreEffect.scaleCap(base, cfg.infinityCoreTransferMultiplier());
+        double tierMultiplier = itemDef()
+                .map(SourcelinkConfig.ItemDef::transferMultiplier)
+                .orElse(1.0);
+        int tiered = com.arspaper.source.InfinityCoreEffect.scaleCap(base, tierMultiplier);
+        if (!withinInfinityCoreRadius(block, cfg.infinityCoreRadius())) return tiered;
+        return com.arspaper.source.InfinityCoreEffect.scaleCap(tiered, cfg.infinityCoreTransferMultiplier());
     }
 
     /**
@@ -281,7 +292,9 @@ public abstract class Sourcelink extends CustomBlock {
     protected Component displayNameOr(Component fallback) {
         Optional<SourcelinkConfig.ItemDef> def = itemDef();
         if (def.isPresent()) {
-            return Component.text(def.get().displayName()).decoration(TextDecoration.ITALIC, false);
+            // sourcelinks.yml の display-name はレガシー &記法 (例 "&cヴォルカニックソースリンク II")。
+            // Component.text(生文字列) だと "&c" が名前に出る(2026-08-03 実バグ)。
+            return com.arspaper.util.DisplayText.component(def.get().displayName());
         }
         return fallback;
     }
@@ -299,8 +312,11 @@ public abstract class Sourcelink extends CustomBlock {
         if (def.isPresent() && !def.get().lore().isEmpty()) {
             lore = new ArrayList<>(def.get().lore().size());
             for (String line : def.get().lore()) {
-                lore.add(Component.text(line, NamedTextColor.GRAY)
-                        .decoration(TextDecoration.ITALIC, false));
+                // 色指定が書かれていればそれを尊重し、無ければ従来どおり灰色。
+                lore.add(com.arspaper.util.DisplayText.hasMarkup(line)
+                        ? com.arspaper.util.DisplayText.component(line)
+                        : Component.text(line, NamedTextColor.GRAY)
+                                .decoration(TextDecoration.ITALIC, false));
             }
         } else {
             lore = defaultLore;

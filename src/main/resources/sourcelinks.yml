@@ -39,6 +39,13 @@ transfer:
     #   「ソースリンクの台数を増やすこと」になっていた(K-16)。
     # ⚠ 上げると回収時間が線形に短くなる。台数で殴る運用をやめさせたいなら
     #    ここを上げて、代わりに1台あたりの設置価値を上げる方が素直。
+    #
+    # ■ K-16 解消(2026-08-02): ここは「全種別共通の基準レート」。個別ソースリンクの
+    #   items.<id>.transfer-multiplier がこの基準値に掛かるので、階梯を上げると
+    #   【台数を増やさずに1台あたりのレートそのもの】が上がる(Sourcelink#effectiveMaxPerTransfer)。
+    #   未設定は 1.0(挙動不変)。下の items.*_ii / *_iii がこのレバーの実例。
+    #   容量(buffer-cap)は既に int上限=実質無制限なのでボトルネックはレート側だけ、という前提で
+    #   buffer-cap 側には階梯倍率を掛けていない。
     max-per-transfer: 50
 
     # バッファ(ソースリンク内部の未排出分)の上限。
@@ -306,3 +313,188 @@ items:
         - custom:source_gem x2
       source: 300
       result: custom:botanical_sourcelink
+
+  # ===========================================================================
+  # 上位ソースリンク階梯 (2026-08-02 追加、K-16対応)
+  # ---------------------------------------------------------------------------
+  # 【解消した問題】それまでソースリンクは5種(volcanic/mycelial/alchemical/vitalic/botanical)が
+  #   1個ずつしか存在せず、転送レート(max-per-transfer)は全リンク共通の1値だったため、
+  #   レートを上げる唯一の手段が「同種リンクを並べて置くこと」になっていた(K-16)。
+  #   sourcejars.yml の上位ジャー階梯と違い、こちら側には階梯そのものが無かった。
+  #
+  # 【解決】各 items.<id> に transfer-multiplier(既定1.0)を追加できるようにし、
+  #   sourcelink.max-per-transfer(基準値) にこの倍率を掛けた値を実効レートとして使う
+  #   (Sourcelink#effectiveMaxPerTransfer、infinity_source_core の補正と多段で重なる)。
+  #   下の *_ii / *_iii がその実例。台数を増やさずに1台のレートそのものが上がる。
+  #
+  # 【レシピの考え方】sourcejars.yml の上位ジャーと同じ「前段を炉に、階梯触媒を台座に」形。
+  #   core-item は必ず前段の custom:<type>_sourcelink[_ii] にして、既存レシピと
+  #   (core-item, pedestal-items) の組が重複しないようにしている(重複すると後発が
+  #   findFirst に負けて永久にクラフト不可になる ── common-traps.md 参照)。
+  #   階梯触媒(source_shard/source_crystal)は sourcejars.yml の jar_ii/jar_iii と同じ物を使う
+  #   (ソース階梯のはしごを一本化するため、ソースリンク専用の新触媒は作らない)。
+  #
+  # 【レートの目安】既定 max-per-transfer=50/100tick=10/秒=864,000/日。
+  #   source_engine(3,000万)を焼べ切ってからジャーへ移し切るまで:
+  #     無印(x1.0) 約35日 → II(x2.0) 約17日 → III(x4.0) 約9日。
+  #   容量(buffer-cap)側は既に int上限=実質無制限で詰まらないため、倍率は速度だけに掛けている。
+  #
+  # 【見た目】custom-model-data は未設定 ── 割り当てるとリソースパック側(resourcepack/*、
+  #   別レーンが編集中)に新規CMD登録が要るため、今回は据え置く。無印と同じモデルで表示される
+  #   (display-name/lore と実際の block id で区別できるので機能面は問題ない)。見た目の分離は
+  #   リソースパック側の残タスクとして報告する。
+  # ===========================================================================
+  volcanic_sourcelink_ii:
+    material: FURNACE
+    display-name: "&cヴォルカニックソースリンク II"
+    lore:
+      - "強化された燃料炉。転送レート x2.0"
+    transfer-multiplier: 2.0
+    recipe:
+      method: ritual
+      core-item: custom:volcanic_sourcelink
+      pedestal-items:
+        - MAGMA_BLOCK x2
+        - BLAZE_POWDER x2
+        - custom:source_shard x4
+      source: 500
+      result: custom:volcanic_sourcelink_ii
+  volcanic_sourcelink_iii:
+    material: FURNACE
+    display-name: "&4ヴォルカニックソースリンク III"
+    lore:
+      - "極限まで高めた燃料炉。転送レート x4.0"
+    transfer-multiplier: 4.0
+    recipe:
+      method: ritual
+      core-item: custom:volcanic_sourcelink_ii
+      pedestal-items:
+        - MAGMA_BLOCK x4
+        - BLAZE_POWDER x4
+        - custom:source_crystal x4
+      source: 12000
+      result: custom:volcanic_sourcelink_iii
+
+  mycelial_sourcelink_ii:
+    material: SMOKER
+    display-name: "&aマイセリアルソースリンク II"
+    lore:
+      - "強化された燻製器。転送レート x2.0"
+    transfer-multiplier: 2.0
+    recipe:
+      method: ritual
+      core-item: custom:mycelial_sourcelink
+      pedestal-items:
+        - MYCELIUM x2
+        - BONE_MEAL x2
+        - custom:source_shard x4
+      source: 500
+      result: custom:mycelial_sourcelink_ii
+  mycelial_sourcelink_iii:
+    material: SMOKER
+    display-name: "&2マイセリアルソースリンク III"
+    lore:
+      - "極限まで高めた燻製器。転送レート x4.0"
+    transfer-multiplier: 4.0
+    recipe:
+      method: ritual
+      core-item: custom:mycelial_sourcelink_ii
+      pedestal-items:
+        - MYCELIUM x4
+        - BONE_MEAL x4
+        - custom:source_crystal x4
+      source: 12000
+      result: custom:mycelial_sourcelink_iii
+
+  alchemical_sourcelink_ii:
+    material: BLAST_FURNACE
+    display-name: "&dアルケミカルソースリンク II"
+    lore:
+      - "強化された溶鉱炉。転送レート x2.0"
+    transfer-multiplier: 2.0
+    recipe:
+      method: ritual
+      core-item: custom:alchemical_sourcelink
+      pedestal-items:
+        - NETHER_WART x2
+        - BLAZE_POWDER x2
+        - custom:source_shard x4
+      source: 500
+      result: custom:alchemical_sourcelink_ii
+  alchemical_sourcelink_iii:
+    material: BLAST_FURNACE
+    display-name: "&5アルケミカルソースリンク III"
+    lore:
+      - "極限まで高めた溶鉱炉。転送レート x4.0"
+    transfer-multiplier: 4.0
+    recipe:
+      method: ritual
+      core-item: custom:alchemical_sourcelink_ii
+      pedestal-items:
+        - NETHER_WART x4
+        - BLAZE_POWDER x4
+        - custom:source_crystal x4
+      source: 12000
+      result: custom:alchemical_sourcelink_iii
+
+  vitalic_sourcelink_ii:
+    material: BARREL
+    display-name: "&fバイタリックソースリンク II"
+    lore:
+      - "強化された生命の樽。転送レート x2.0"
+    transfer-multiplier: 2.0
+    recipe:
+      method: ritual
+      core-item: custom:vitalic_sourcelink
+      pedestal-items:
+        - GOLDEN_APPLE x2
+        - ROTTEN_FLESH x2
+        - custom:source_shard x4
+      source: 500
+      result: custom:vitalic_sourcelink_ii
+  vitalic_sourcelink_iii:
+    material: BARREL
+    display-name: "&7バイタリックソースリンク III"
+    lore:
+      - "極限まで高めた生命の樽。転送レート x4.0"
+    transfer-multiplier: 4.0
+    recipe:
+      method: ritual
+      core-item: custom:vitalic_sourcelink_ii
+      pedestal-items:
+        - GOLDEN_APPLE x4
+        - ROTTEN_FLESH x4
+        - custom:source_crystal x4
+      source: 12000
+      result: custom:vitalic_sourcelink_iii
+
+  botanical_sourcelink_ii:
+    material: BEEHIVE
+    display-name: "&eボタニカルソースリンク II"
+    lore:
+      - "強化された蜂の巣。転送レート x2.0"
+    transfer-multiplier: 2.0
+    recipe:
+      method: ritual
+      core-item: custom:botanical_sourcelink
+      pedestal-items:
+        - WHEAT x4
+        - GOLD_INGOT x2
+        - custom:source_shard x4
+      source: 500
+      result: custom:botanical_sourcelink_ii
+  botanical_sourcelink_iii:
+    material: BEEHIVE
+    display-name: "&6ボタニカルソースリンク III"
+    lore:
+      - "極限まで高めた蜂の巣。転送レート x4.0"
+    transfer-multiplier: 4.0
+    recipe:
+      method: ritual
+      core-item: custom:botanical_sourcelink_ii
+      pedestal-items:
+        - WHEAT x4
+        - GOLD_INGOT x4
+        - custom:source_crystal x4
+      source: 12000
+      result: custom:botanical_sourcelink_iii

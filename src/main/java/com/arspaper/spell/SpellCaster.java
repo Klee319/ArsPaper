@@ -274,17 +274,27 @@ public class SpellCaster {
         CatalystData catalystData = resolveCatalystData(catalyst);
         SpellBookTierData bookTierData = (catalystData == null) ? resolveSpellBookTierData(catalyst) : null;
 
+        // 触媒/魔導書のどちらかが「このアイテムのCTを既に持っている」かを判定する。
+        // 持っていれば下の item-cooldown 汎用パス(genericItemCooldownSeconds)は一切見ない
+        // ―― 触媒CT / 魔導書CT / item-cooldown の3経路は同一詠唱で重ねがけしない
+        // (優先順位: 触媒 > 魔導書 > item-cooldown汎用)。
+        // catalystOwnsCt は「catalysts.ymlのcooldown秒指定」と「catalyst自身が持つ
+        // item-cooldownステ」のどちらかがあれば true(既存のownsCt判定を条件外へ出しただけで
+        // 挙動は変えていない)。bookOwnsCt は spellbooks.yml の cooldown秒指定のみを見る
+        // (現状 spell-books: は全ティア cooldown:0 なので実質常にfalseだが、将来値が入っても
+        // 汎用パスと二重適用しないようにこのまま残す)。
+        boolean catalystOwnsCt = catalystData != null
+            && (catalystData.cooldownMs() > 0
+                || com.arspaper.integration.TrinityForgeBridge.itemCooldownSeconds(catalyst) > 0.0);
+        boolean bookOwnsCt = bookTierData != null && bookTierData.getCooldownMs() > 0;
+
         // 触媒のみ: アイテムCTゲージ(武器CT/詠唱CT)が残っている間は詠唱不可。
         // CT設定(item-cooldownステ or cooldownオプション)を持つ触媒だけをゲートし、
         // 同マテリアルのバニラ由来クールダウン(エンダーパール等)では誤ブロックしない
         // (CombatListener.meleeWeaponOnCooldown と同じ規則)。これにより近接命中で入ったCT中は
         // 詠唱も塞がれ、詠唱で入ったCT中の連続詠唱も塞がれる(攻撃側は既存のTFゲートが塞ぐ)。
-        if (catalystData != null && catalyst != null && caster.getCooldown(catalyst) > 0) {
-            boolean ownsCt = catalystData.cooldownMs() > 0
-                || com.arspaper.integration.TrinityForgeBridge.itemCooldownSeconds(catalyst) > 0.0;
-            if (ownsCt) {
-                return false;
-            }
+        if (catalystData != null && catalyst != null && caster.getCooldown(catalyst) > 0 && catalystOwnsCt) {
+            return false;
         }
 
         // 触媒別CT: form別CTとは別キー空間（"catalyst:" + id + ":" + uuid）でゲートする。
@@ -302,6 +312,31 @@ public class SpellCaster {
             bookCooldownKey = "book:" + bookTierData.getItemId() + ":" + caster.getUniqueId();
             Long lastBookCast = cooldowns.get(bookCooldownKey);
             if (lastBookCast != null && now - lastBookCast < bookTierData.getCooldownMs()) {
+                return false;
+            }
+        }
+
+        // item-cooldown 汎用パス(2026-08-02): 触媒/魔導書のどちらもCTを持たない詠唱でも、
+        // 「実際に右クリックして詠唱したアイテム」が item-stats.yml の item-cooldown ステを
+        // 持っていればCTを効かせる。effectiveCastItem は castItem(バインド品/杖など、
+        // catalyst引数と別物のケース)があればそれを、無ければ catalyst 自体(魔導書/触媒を
+        // 素で右クリックしたケース)を使う。
+        //
+        // これが無いと何が起きるか: TFカタログの杖10本(BLAZE_ROD#400002〜400008/
+        // 400012〜400014)は spellbooks.yml の catalysts: に未登録(catalystData==null)。
+        // かつ SpellBindListener 経由のバインド詠唱では catalyst 引数が「バインド先の
+        // 魔導書」に化け(D6)、その魔導書は bookTierData != null だが spell-books: の
+        // cooldown は全ティア0(cooldownMs()==0)。つまり catalystOwnsCt / bookOwnsCt が
+        // 両方false になり、item-stats.yml に設定した item-cooldown (3.0〜1.8秒)が
+        // 一本も読まれずに無視されていた。
+        double genericItemCooldownSeconds = 0.0;
+        org.bukkit.inventory.ItemStack effectiveCastItem = (castItem != null) ? castItem : catalyst;
+        if (!catalystOwnsCt && !bookOwnsCt && effectiveCastItem != null) {
+            genericItemCooldownSeconds =
+                com.arspaper.integration.TrinityForgeBridge.itemCooldownSeconds(effectiveCastItem);
+            // 触媒ゲート(282行目)と同じ規則: item-cooldownステを実際に持つアイテムだけをゲートし、
+            // 同マテリアルのバニラ由来クールダウン(エンダーパール等)では誤ブロックしない。
+            if (genericItemCooldownSeconds > 0.0 && caster.getCooldown(effectiveCastItem) > 0) {
                 return false;
             }
         }
@@ -388,6 +423,13 @@ public class SpellCaster {
         if (catalystData != null) {
             com.arspaper.integration.TrinityForgeBridge.startItemCooldown(
                 caster, catalyst, catalystData.cooldownMs() / 1000.0);
+        } else if (genericItemCooldownSeconds > 0.0 && effectiveCastItem != null) {
+            // item-cooldown 汎用パス(上のゲートと対): 触媒/魔導書のどちらもCTを持たない
+            // 詠唱で、実際に詠唱に使ったアイテム(杖など)が item-cooldown ステを持つ場合のみ
+            // ゲージを開始する。fallbackSeconds は 0.0(TrinityForgeBridge内部で
+            // itemCooldownSeconds を再解決するため、ここでの再計算は不要)。
+            com.arspaper.integration.TrinityForgeBridge.startItemCooldown(
+                caster, effectiveCastItem, 0.0);
         }
 
         // アクションバーにスペル名を表示
