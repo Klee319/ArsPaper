@@ -84,7 +84,9 @@ public class VitalicSourcelink extends Sourcelink {
         // ⚠ SOURCE_PER_TICK は「バッファ由来ではない」ので passive 側へ入れる。ここを fromBuffer に
         //    混ぜると、隣接ジャーが無い/満杯のとき毎周期 +5 がバッファへ積み上がり、
         //    ジャーの容量という上限が消えて実質無制限の貯蔵庫になる(2026-08-01 の実バグ)。
-        return SourceYield.of(drainBuffer(block), SOURCE_PER_TICK);
+        // 受動生成にも階梯の生成量倍率(items.<id>.yield-multiplier)を掛ける
+        // (バイタリックは燃料を焼べないので、ここを掛けないと上位階梯の生成量が伸びない)。
+        return SourceYield.of(drainBuffer(block), scaleGeneratedYield(SOURCE_PER_TICK));
     }
 
     @Override

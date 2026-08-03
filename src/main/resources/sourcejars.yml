@@ -64,11 +64,11 @@ jars:
   # ===========================================================================
   source_jar_ii:
     material: DECORATED_POT
-    display-name: "&bソースジャー II"
+    display-name: "&b蒼片の壺"
     custom-model-data: 200004
     capacity: 50000
     lore:
-      - "強化された貯蔵容器"
+      - "欠片を砕いて練り込んだ壺"
       - "容量 50,000"
     recipe:
       method: ritual
@@ -80,11 +80,11 @@ jars:
       result: custom:source_jar_ii
   source_jar_iii:
     material: DECORATED_POT
-    display-name: "&3ソースジャー III"
+    display-name: "&3結晶の大甕"
     custom-model-data: 200005
     capacity: 250000
     lore:
-      - "結晶で内張りされた貯蔵容器"
+      - "内側を結晶で張った大甕"
       - "容量 250,000"
     recipe:
       method: ritual

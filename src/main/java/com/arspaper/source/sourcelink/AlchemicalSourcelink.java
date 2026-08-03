@@ -133,7 +133,8 @@ public class AlchemicalSourcelink extends Sourcelink {
         if (sourceValue > 0) {
             int addCount = player.isSneaking() ? hand.getAmount() : 1;
             addCount = Math.min(addCount, hand.getAmount());
-            int totalAdded = sourceValue * addCount;
+            // 階梯の生成量倍率(items.<id>.yield-multiplier)は「新しく生まれた分」にだけ掛ける。
+            int totalAdded = scaleGeneratedYield((long) sourceValue * addCount);
 
             addToBuffer(block, totalAdded);
 

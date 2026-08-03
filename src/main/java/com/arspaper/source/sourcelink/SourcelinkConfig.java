@@ -31,12 +31,13 @@ public class SourcelinkConfig {
             int customModelData,
             List<String> lore,
             String type,
-            double transferMultiplier) {
+            double transferMultiplier,
+            double yieldMultiplier) {
 
-        /** 旧来の5固定id用 (type は id から推定、transfer-multiplier は既定1.0)。 */
+        /** 旧来の5固定id用 (type は id から推定、transfer/yield-multiplier は既定1.0)。 */
         public ItemDef(String id, Material material, String displayName,
                        int customModelData, List<String> lore) {
-            this(id, material, displayName, customModelData, lore, inferType(id, ""), 1.0);
+            this(id, material, displayName, customModelData, lore, inferType(id, ""), 1.0, 1.0);
         }
     }
 
@@ -139,7 +140,8 @@ public class SourcelinkConfig {
                         entry.getInt("custom-model-data", 0),
                         List.copyOf(entry.getStringList("lore")),
                         type,
-                        readTransferMultiplier(entry, id, logger)));
+                        readTransferMultiplier(entry, id, logger),
+                        readYieldMultiplier(entry, id, logger)));
             } catch (IllegalArgumentException ex) {
                 logger.warning("sourcelinks.yml: items." + id + " invalid: " + ex.getMessage());
             }
@@ -155,12 +157,32 @@ public class SourcelinkConfig {
      */
     /* package-private for SourcelinkConfigTest */
     static double readTransferMultiplier(ConfigurationSection entry, String id, Logger logger) {
-        if (!entry.isSet("transfer-multiplier")) {
+        return readPositiveMultiplier(entry, id, "transfer-multiplier", logger);
+    }
+
+    /**
+     * {@code items.<id>.yield-multiplier}(2026-08-03: 階梯で<b>生成量</b>も上げる階梯値)。
+     * 未設定なら 1.0(挙動不変)。0以下・非有限値は {@code transfer-multiplier} と同じ方針で
+     * 警告のうえ 1.0 にフォールバックする。
+     *
+     * <p>転送速度({@code transfer-multiplier})と分けているのは<b>効き方が違う</b>ため —— 転送速度は
+     * 「バッファから1周期に出せる量」で、上げても素材1個あたりの取得ソースは変わらない。
+     * 生成量はその素材効率そのものを上げる。実際に掛ける場所は
+     * {@link com.arspaper.source.SourceGenerationScaling}(返却経路に掛けない理由もそこに書いてある)。
+     */
+    /* package-private for SourcelinkConfigTest */
+    static double readYieldMultiplier(ConfigurationSection entry, String id, Logger logger) {
+        return readPositiveMultiplier(entry, id, "yield-multiplier", logger);
+    }
+
+    private static double readPositiveMultiplier(ConfigurationSection entry, String id,
+                                                 String key, Logger logger) {
+        if (!entry.isSet(key)) {
             return 1.0;
         }
-        double raw = entry.getDouble("transfer-multiplier", 1.0);
+        double raw = entry.getDouble(key, 1.0);
         if (!Double.isFinite(raw) || raw <= 0) {
-            logger.warning("sourcelinks.yml: items." + id + ".transfer-multiplier=" + raw
+            logger.warning("sourcelinks.yml: items." + id + "." + key + "=" + raw
                     + " is invalid (must be > 0) — falling back to 1.0");
             return 1.0;
         }

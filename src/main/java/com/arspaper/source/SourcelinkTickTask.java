@@ -224,7 +224,9 @@ public class SourcelinkTickTask implements Listener {
 
                 Block block = loc.getBlock();
                 if (!(block.getState() instanceof TileState)) continue;
-                sourcelink.addToBuffer(block, amount);
+                // 成長/撃破ボーナスも「新しく生まれた分」なので階梯の生成量倍率を掛ける
+                // (掛けないとボタニカル/バイタリックだけ階梯で生成量が伸びない)。
+                sourcelink.addToBuffer(block, sourcelink.scaleGeneratedYield(amount));
             }
         }
     }

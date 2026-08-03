@@ -219,6 +219,24 @@ public abstract class Sourcelink extends CustomBlock {
     }
 
     /**
+     * <b>新しく生まれた</b>ソース量に自分の {@code items.<id>.yield-multiplier}(階梯の生成量倍率、
+     * 2026-08-03)を掛ける。燃料投入・受動生成・成長/撃破ボーナスの各生成点から呼ぶ。
+     *
+     * <p>⚠ {@link #addToBuffer} の中では掛けない —— あちらは
+     * {@code SourceYield#refundToBuffer} の<b>返却</b>からも呼ばれるので、掛けると
+     * 「隣接ジャーが満杯の間だけソースが毎周期増える」増殖になる
+     * (理由の全文は {@link com.arspaper.source.SourceGenerationScaling})。
+     *
+     * @param rawAmount 倍率適用前の生成量。単価3000万×64個が int を越えるため long で受ける。
+     */
+    public int scaleGeneratedYield(long rawAmount) {
+        double multiplier = itemDef()
+                .map(SourcelinkConfig.ItemDef::yieldMultiplier)
+                .orElse(1.0);
+        return com.arspaper.source.SourceGenerationScaling.scaleYield(rawAmount, multiplier);
+    }
+
+    /**
      * 隣接するSource JarにSourceを供給する。
      * 供給成功時にパーティクルとサウンドを再生。
      *

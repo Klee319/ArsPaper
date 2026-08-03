@@ -425,8 +425,10 @@ public class CustomBlockListener implements Listener {
         ItemStack item = event.getItem();
         int sourceValue = sourcelink.getSourceValueForItem(item);
         if (sourceValue > 0) {
-            // ホッパーは1個ずつ移動するためそのまま消費してバッファに追加
-            sourcelink.addToBuffer(destState.getBlock(), sourceValue);
+            // ホッパーは1個ずつ移動するためそのまま消費してバッファに追加。
+            // 手投入と同じく階梯の生成量倍率(items.<id>.yield-multiplier)を掛ける
+            // — 掛けないと「ホッパー供給だと上位階梯の素材効率が落ちる」不一致になる。
+            sourcelink.addToBuffer(destState.getBlock(), sourcelink.scaleGeneratedYield(sourceValue));
             event.setCancelled(true);
             // ホッパー側のアイテムを1個減らす（次tickで反映）— Material だけでなく custom id も一致させる
             final ItemStack consumed = item.clone();

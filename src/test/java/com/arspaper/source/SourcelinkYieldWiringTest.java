@@ -50,9 +50,12 @@ class SourcelinkYieldWiringTest {
         String src = read("sourcelink/VitalicSourcelink.java");
         assertTrue(src.contains("public SourceYield generateSource(Block block)"),
                 "VitalicSourcelink#generateSource は SourceYield を返す必要がある");
-        assertTrue(src.contains("return SourceYield.of(drainBuffer(block), SOURCE_PER_TICK);"),
+        assertTrue(src.contains(
+                        "return SourceYield.of(drainBuffer(block), scaleGeneratedYield(SOURCE_PER_TICK));"),
                 "受動生成 SOURCE_PER_TICK は passive 側へ入れる必要がある"
-                        + "(fromBuffer に混ぜると毎周期バッファへ積み上がる = 2026-08-01 の実バグ)");
+                        + "(fromBuffer に混ぜると毎周期バッファへ積み上がる = 2026-08-01 の実バグ)。"
+                        + "2026-08-03: 階梯の生成量倍率 scaleGeneratedYield も通すこと"
+                        + "(バイタリックは燃料を焼べないので、ここが素の値だと階梯で生成量が伸びない)");
         assertFalse(src.contains("SOURCE_PER_TICK + bonus"),
                 "旧実装(受動生成とバッファ由来を int で合算)へ戻してはいけない");
     }
@@ -75,6 +78,56 @@ class SourcelinkYieldWiringTest {
                 "返却量は純関数 refundToBuffer で決める必要がある");
         assertFalse(task.contains("addToBuffer(block, leftover)"),
                 "残量を全額戻すと受動生成分まで蓄積する(2026-08-01 の実バグそのもの)");
+    }
+
+    /**
+     * 2026-08-03: 階梯の生成量倍率({@code items.<id>.yield-multiplier})が
+     * <b>生成点すべて</b>に掛かっていること。
+     */
+    @ParameterizedTest(name = "{0}Sourcelink の燃料投入は生成量倍率を通す")
+    @ValueSource(strings = {"Alchemical", "Mycelial", "Volcanic"})
+    @DisplayName("燃料/食料/素材の投入量は scaleGeneratedYield を通してからバッファへ入る")
+    void fuelBurnAppliesTheTierYieldMultiplier(String name) throws Exception {
+        String src = read("sourcelink/" + name + "Sourcelink.java");
+        assertTrue(src.contains("int totalAdded = scaleGeneratedYield((long) sourceValue * addCount);"),
+                name + "Sourcelink#onBlockInteract は投入量に生成量倍率を掛ける必要がある"
+                        + "(素の sourceValue * addCount だと上位階梯でも素材効率が無印と同じ)");
+        assertFalse(src.contains("int totalAdded = sourceValue * addCount;"),
+                name + "Sourcelink は倍率未適用の旧式へ戻してはいけない"
+                        + "(long キャストも必須: 単価3000万×64個で int が溢れる)");
+    }
+
+    @Test
+    @DisplayName("成長/撃破ボーナスとホッパー供給も生成量倍率を通す")
+    void eventDrivenGenerationAppliesTheTierYieldMultiplier() throws Exception {
+        String task = read("SourcelinkTickTask.java");
+        assertTrue(task.contains("sourcelink.addToBuffer(block, sourcelink.scaleGeneratedYield(amount));"),
+                "accumulateNear(成長/撃破ボーナス)も生成点なので倍率を掛ける必要がある"
+                        + "(掛けないとボタニカル/バイタリックだけ階梯で生成量が伸びない)");
+        String hopper = Files.readString(Path.of("src/main/java/com/arspaper/block/CustomBlockListener.java"));
+        assertTrue(hopper.contains(
+                        "sourcelink.addToBuffer(destState.getBlock(), sourcelink.scaleGeneratedYield(sourceValue));"),
+                "ホッパー供給も手投入と同じ倍率を掛ける必要がある"
+                        + "(片方だけだと「自動化すると素材効率が落ちる」不一致になる)");
+    }
+
+    @Test
+    @DisplayName("生成量倍率は返却経路には掛からない(満杯ジャーでの無限増殖を防ぐ)")
+    void theYieldMultiplierNeverTouchesTheRefundPath() throws Exception {
+        String task = read("SourcelinkTickTask.java");
+        assertTrue(task.contains("sourcelink.addToBuffer(block, refund);"),
+                "注ぎ切れなかった分の返却は倍率を掛けずにそのまま戻す必要がある");
+        assertFalse(task.contains("scaleGeneratedYield(refund)"),
+                "返却に倍率を掛けると「隣接ジャーが満杯の間だけ毎周期ソースが増える」増殖になる");
+
+        String base = read("sourcelink/Sourcelink.java");
+        int start = base.indexOf("public void addToBuffer(Block block, int amount) {");
+        assertTrue(start > 0, "addToBuffer の宣言が見つからない(テスト側の前提が古い)");
+        int end = base.indexOf("setBuffer(tile, next);", start);
+        assertTrue(end > start, "addToBuffer の本体末尾が見つからない(テスト側の前提が古い)");
+        assertFalse(base.substring(start, end).contains("scaleGeneratedYield"),
+                "倍率を addToBuffer の中で掛けてはいけない —— 生成と返却の両方から呼ばれる共通経路なので、"
+                        + "ここで掛けると返却分まで増える(SourceGenerationScaling の javadoc 参照)");
     }
 
     @Test
