@@ -2205,6 +2205,30 @@ _editor:
           - source_condenser
           - source_engine
           - infinity_source_core
+      # ダンジョンの鍵。実体は TF 側 items/catalog.yml (_editor.itemTabs で表示タブ key) にあり、
+      # ここに置くのは「素材」画面のカテゴリバーへ鍵タブを出すための並びだけ。
+      # materials: に同名の素材は無い(あってはいけない) — 鍵を materials.yml へ移すと
+      # dungeon/gates.yml の key-item 判定・カタログのレシピ・CMD台帳が全部切れる。
+      - id: cat_dungeon_keys
+        label: ダンジョンの鍵
+        itemIds:
+          - key_mines
+          - key_deep_mines
+          - key_quarry
+          - key_cave
+          - key_enchant_trial
+          - key_bridge
+          - key_city
+          - key_steamworks
+          - key_climb
+          - key_palace
+          - key_sewer_maze
+          - key_knight_castle
+          - key_dark_cathedral
+          - key_nether_bell
+          - key_nether_wastes
+          - key_fireworks
+          - key_binder
   orders:
     material:
       - source_gem
