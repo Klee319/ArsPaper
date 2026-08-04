@@ -571,24 +571,33 @@ public class ThreadGui extends BaseGui {
         });
     }
 
+    /**
+     * 装着済みスレッドの lore(装備側に書く分)。
+     *
+     * <p><b>1スレッド1行だけにする(2026-08-04 依頼#47)</b>: 以前はスレッドごとに
+     * 厳選ステの明細行({@link ThreadItem#rollLore})まで展開していたため、5枠を埋めた装備の
+     * ツールチップが数十行になり<b>装備本体のステが画面外へ押し出されていた</b>。
+     * 明細はツールチップから外し、{@link com.arspaper.item.ThreadStatChatListener}
+     * (装備を手に持って真上+スニーク)でチャットへ出す。
+     * 行の形は {@code ・<スレッド名>【品質】} ── 品質表記は
+     * {@link TrinityForgeBridge#qualityTierLabel}(=TF の quality-tiers.yml)が唯一の供給元で、
+     * ここで「品質3」等と数値化しないこと(TF 装備の品質行と食い違う)。
+     */
     private List<Component> buildThreadLore() {
         List<Component> lore = new ArrayList<>();
         lore.add(Component.text("スレッドスロット: " + threadSlotCount, NamedTextColor.DARK_AQUA)
             .decoration(TextDecoration.ITALIC, false));
 
-        // スレッド情報
         for (int i = 0; i < threadSlots.size(); i++) {
             String threadId = threadSlots.get(i);
-            if (threadId != null) {
-                ThreadType type = ThreadType.fromId(threadId);
-                if (type != null) {
-                    lore.add(Component.text("  " + (i + 1) + ": " + type.getDisplayName(), type.getColor())
-                        .decoration(TextDecoration.ITALIC, false));
-                    ThreadSlotIdentity slotIdentity = ThreadSlotIdentity.decode(rollAt(i));
-                    lore.addAll(ThreadItem.rollLore(type,
-                            new ThreadIdentity(slotIdentity.rollSeed(), slotIdentity.quality())));
-                }
+            if (threadId == null) {
+                continue;
             }
+            ThreadType type = ThreadType.fromId(threadId);
+            if (type == null) {
+                continue;
+            }
+            lore.add(SocketedThreads.summaryLine(type, ThreadSlotIdentity.decode(rollAt(i)).quality()));
         }
         return lore;
     }

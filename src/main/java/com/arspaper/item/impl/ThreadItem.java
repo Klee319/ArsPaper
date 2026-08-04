@@ -93,10 +93,16 @@ public class ThreadItem extends BaseCustomItem {
     }
 
     /**
-     * 厳選結果の lore 行。ステの表示名/単位/丸めは TF 側({@code stats/lore.yml})が正なので、
-     * フォークで独自に整形し直さない（{@link TrinityForgeBridge#threadStatDisplay}）。
+     * 厳選結果の lore 行。<b>整形は TF の {@code LoreComposer} に丸投げする</b>
+     * ({@link TrinityForgeBridge#threadStatLore})ので、表示名/アイコン/桁数/単位/色/カテゴリ順は
+     * TF 装備の lore と必ず一致する。
      * {@code identity} が {@link ThreadIdentity#NONE} でも(rollSeed=0, quality=0の)ステは
      * 決定的に解決されるので、必ず fixed 分だけは表示される。
+     *
+     * <p><b>2026-08-04 の修正</b>: 旧実装は表示名だけを1件ずつ引いて {@code "  ・ " + label + " " + value}
+     * を自前で組んでいた。引き当てが canonical 化の食い違いで<b>常に失敗していた</b>ため
+     * フォールバックが働き、実機ではステータスidが素で並んでいた(依頼#46)。加えて成功しても
+     * 黄色1色・アイコン無し・テンプレート無視で TF 装備と体裁が揃わなかった。連結は復活させないこと。
      *
      * @param type     ステを解決するための material/CMD 供給元（スレッドの種類）
      * @param identity そのスレッド個体の rollSeed + quality
@@ -110,18 +116,7 @@ public class ThreadItem extends BaseCustomItem {
         if (stats.isEmpty()) {
             return List.of();
         }
-        List<Component> lore = new ArrayList<>();
-        stats.forEach((key, value) -> {
-            if (value == null || !Double.isFinite(value) || value == 0.0) {
-                return;
-            }
-            String line = TrinityForgeBridge.threadStatDisplay(key, value)
-                    .map(display -> display.label() + " " + display.formattedValue())
-                    .orElseGet(() -> key + " +" + value);
-            lore.add(Component.text("  ・ " + line, NamedTextColor.YELLOW)
-                    .decoration(TextDecoration.ITALIC, false));
-        });
-        return lore;
+        return TrinityForgeBridge.threadStatLore(stats);
     }
 
     public ThreadType getThreadType() {

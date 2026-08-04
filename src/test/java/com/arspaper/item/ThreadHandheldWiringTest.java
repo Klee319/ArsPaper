@@ -125,29 +125,69 @@ class ThreadHandheldWiringTest {
     // --- (1) 入口 ---
 
     @Test
-    @DisplayName("右クリックのGUI起動は防具、または非防具(種別問わず)を真上を見ながら構えたときだけ"
-            + "(2026-08-04でツール限定から全装備へ拡張)")
-    void rightClickOpensGuiForArmorOrAnyLookingUpEquipment() throws IOException {
+    @DisplayName("右クリックのGUI起動は防具、または非防具(種別問わず)を『下を向いて直近にジャンプ』"
+            + "したときだけ(2026-08-04: 真上ジェスチャーはチャット出力へ譲った)")
+    void rightClickOpensGuiForArmorOrAnyDownwardJumpingEquipment() throws IOException {
         String source = readSource("item", "ThreadGuiOpenListener.java");
 
-        assertTrue(source.contains("boolean armor = isArmorPiece(item);"),
-                "防具判定を変数化していない");
-        assertTrue(source.contains("if (!armor && !isLookingStraightUp(player)) {"),
-                "非防具はisLookingStraightUpだけで判定する必要がある。素材カテゴリによる"
-                        + "絞り込みを復活させると、剣・弓・杖等が真上を見てもGUIが開かなくなる"
-                        + "(ユーザー確定要件『スレッド枠を持つ装備全般』への逆戻り違反)。");
+        assertTrue(source.contains("if (!isOpenGesture(player, item)) {"),
+                "GUI起動のジェスチャー判定が isOpenGesture へ集約されていない");
+        assertTrue(source.contains("return isLookingDown(player) && jumpedRecently(player);"),
+                "非防具のジェスチャーが『下向き かつ 直近ジャンプ』の AND になっていない。"
+                        + "下向きだけにすると採掘・耕作・パス化・ブロック設置(すべて下向き+スニーク+"
+                        + "右クリック)を奪う ── ジャンプが唯一の安全装置。");
+        assertFalse(source.contains("isLookingStraightUp("),
+                "真上判定が GUI 起動側に残っている。真上+スニークは "
+                        + "ThreadStatChatListener(内訳のチャット出力)へ割り当て済みなので、"
+                        + "両方が同じ姿勢を要求すると片方が無言で死ぬ。");
         assertFalse(source.contains("isToolItem("),
                 "isToolItemによる素材カテゴリの絞り込みが復活している(2026-08-04に撤廃済み)。");
         assertTrue(source.contains("/ars thread"),
                 "全装備共通のフォールバック入口(/ars thread)をプレイヤーへ案内していない。"
                         + "辿れない機能は無いのと同じ。");
 
-        // ゲートの順序: 防具判定 → (非防具なら)見上げ判定 → 枠数解決、の順であること。
-        int armorCheck = source.indexOf("boolean armor = isArmorPiece(item);");
-        int lookUpCheck = source.indexOf("if (!armor && !isLookingStraightUp(player)) {");
+        // ゲートの順序: ジェスチャー判定 → 枠数解決、の順であること。
+        int gesture = source.indexOf("if (!isOpenGesture(player, item)) {");
         int slotsResolve = source.indexOf("int slots = effectiveThreadSlots(item, player);");
-        assertTrue(armorCheck >= 0 && armorCheck < lookUpCheck && lookUpCheck < slotsResolve,
-                "GUI起動前のゲート順序が壊れている(防具→見上げ→枠数解決の順であること)");
+        assertTrue(gesture >= 0 && gesture < slotsResolve,
+                "GUI起動前のゲート順序が壊れている(ジェスチャー→枠数解決の順であること)");
+    }
+
+    @Test
+    @DisplayName("ジャンプ時刻を Paper の PlayerJumpEvent で拾い、退出時に捨てている")
+    void jumpTrackingIsWiredAndCleanedUp() throws IOException {
+        String source = readSource("item", "ThreadGuiOpenListener.java");
+
+        assertTrue(source.contains("PlayerJumpEvent event"),
+                "ジャンプを拾っていない。jumpedRecently が永久に false を返し、"
+                        + "非防具装備の GUI 入口が丸ごと死ぬ(=/ars thread しか残らない)。");
+        assertTrue(source.contains("lastJumpAt.put("), "ジャンプ時刻を記録していない");
+        assertTrue(source.contains("lastJumpAt.remove("),
+                "退出時にジャンプ時刻を捨てていない(常駐マップにオフラインプレイヤーが溜まる)");
+    }
+
+    @Test
+    @DisplayName("装着スレッドの内訳は真上+スニークでチャットへ出す(lore からは外した分の受け皿)")
+    void threadBreakdownGoesToChatOnLookUpSneak() throws IOException {
+        String source = readSource("item", "ThreadStatChatListener.java");
+
+        assertTrue(source.contains("PlayerToggleSneakEvent event"),
+                "スニーク開始で発火していない。右クリックを条件にすると手持ちの通常操作を奪う。");
+        assertTrue(source.contains("if (!event.isSneaking()) {"),
+                "スニーク解除でも出している(1操作で2回流れる)");
+        assertTrue(source.contains("STRAIGHT_UP_PITCH"),
+                "真上判定が無い。スニーク開始は頻繁なイベントなので、姿勢の限定が唯一の足切り。");
+        assertTrue(source.contains("SocketedThreads.read("),
+                "装着スレッドの読み出しが共通リーダーを経由していない。"
+                        + "別実装にすると『表示されているスレッドと効いているスレッドが違う』になる。");
+        assertTrue(source.contains("TrinityForgeBridge.threadStatLore("),
+                "明細の整形が TF の LoreComposer 経由でない(lore と桁・単位・色が食い違う)");
+        assertTrue(source.contains("COOLDOWN_MS"), "連打の間隔ガードが無い");
+
+        String plugin = readSource("ArsPaper.java");
+        assertTrue(plugin.contains("new com.arspaper.item.ThreadStatChatListener()"),
+                "ThreadStatChatListener が登録されていない。lore から明細を外した以上、"
+                        + "これが唯一の内訳確認手段なので未登録は機能喪失そのもの。");
     }
 
     @Test
@@ -168,12 +208,12 @@ class ThreadHandheldWiringTest {
     }
 
     @Test
-    @DisplayName("真上を見ていない通常のスニーク+右クリックは装備種別を問わず案内もGUIも出さない"
-            + "(弓/クロスボウ/トライデント/斧/剣等の通常操作・F6 指摘3。全装備へ対象を広げた後も不変)")
+    @DisplayName("ジェスチャー不成立のスニーク+右クリックは装備種別を問わず案内もGUIも出さない"
+            + "(弓/クロスボウ/トライデント/斧/剣等の通常操作・F6 指摘3)")
     void sneakRightClickAloneNeverOpensOrHintsRegardlessOfEquipment() throws IOException {
         // 2026-08-04: ジェスチャー対象をツール限定から全装備へ広げたため、
-        // 「武器だから見上げゲートが無い」という区別自体が無くなった。
-        // 見上げていない限り、装備種別を問わず何も起きないことだけを固定する。
+        // 「武器だから姿勢ゲートが無い」という区別自体が無くなった。
+        // ジェスチャーが成立しない限り、装備種別を問わず何も起きないことだけを固定する。
         for (String material : new String[] {
                 "BOW", "CROSSBOW", "TRIDENT", "NETHERITE_AXE", "NETHERITE_SWORD", "BLAZE_ROD"}) {
             assertFalse(ThreadApplicationPolicy.isArmorSlotMaterialName(material),
@@ -199,18 +239,18 @@ class ThreadHandheldWiringTest {
     }
 
     @Test
-    @DisplayName("2026-08-04: 斧・武器・杖・触媒もスレッド枠を持てば見上げジェスチャーの対象になる"
+    @DisplayName("2026-08-04: 斧・武器・杖・触媒もスレッド枠を持てばジェスチャーの対象になる"
             + "(素材カテゴリによる絞り込みを撤廃)")
     void weaponsAndToolsAreEligibleForTheGestureEntryViaThreadSlotsOnly() throws IOException {
         String source = readSource("item", "ThreadGuiOpenListener.java");
         assertFalse(source.contains("ThreadApplicationPolicy.isToolMaterial"),
                 "ThreadApplicationPolicy.isToolMaterialへの参照が残っている"
                         + "(素材カテゴリによる絞り込みは撤廃済みのはず)");
-        assertTrue(source.contains("private static boolean isLookingStraightUp(Player player) {")
-                        && source.contains("getPitch() <= -80f"),
-                "真上判定のピッチ閾値(-80度)が見つからない(値そのものは変更禁止)");
+        assertTrue(source.contains("private static boolean isLookingDown(Player player) {")
+                        && source.contains("getPitch() >= 55f"),
+                "下向き判定のピッチ閾値(+55度)が見つからない");
         assertTrue(source.contains("int slots = effectiveThreadSlots(item, player);"),
-                "見上げ判定の後にeffectiveThreadSlotsで枠数を解決していない"
+                "ジェスチャー判定の後にeffectiveThreadSlotsで枠数を解決していない"
                         + "(素材カテゴリではなく実際の枠数だけがゲートである必要がある)");
     }
 

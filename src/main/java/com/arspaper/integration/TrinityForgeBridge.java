@@ -1438,8 +1438,13 @@ public final class TrinityForgeBridge {
      * lore/チャット/GUI と桁数・％表記を必ず一致させるため、フォーク側で独自に数値を
      * 整形し直さないこと(過去に lore とチャットで桁が食い違った事故がある)。
      *
+     * <p>引き当ては {@code LoreConfig#displaySpecFor} 一本(綴りの違いを吸収する唯一の入口)。
+     * <b>{@code displayTable().get(...)} を自分で引かないこと</b> ── 表は yml の綴りそのまま
+     * (ハイフン)でキーになっているので、canonical 化した値で引くと 1 件も一致せず、
+     * 実機ではステータスidが素で表示される(2026-08-04 に実際に起きた)。
+     *
      * <p>{@code stats/lore.yml} にそのキーの定義が無い / TF未ロード / 例外時は
-     * {@link Optional#empty()}(呼び出し側はキー名をそのまま出す等のフォールバックを持つこと)。
+     * {@link Optional#empty()}。
      */
     public static Optional<ThreadStatDisplay> threadStatDisplay(String canonicalKey, double value) {
         if (canonicalKey == null || canonicalKey.isBlank()) {
@@ -1450,12 +1455,67 @@ public final class TrinityForgeBridge {
             if (tf == null || tf.config() == null || tf.config().lore() == null) {
                 return Optional.empty();
             }
-            com.trinityforge.stats.StatDisplaySpec spec = tf.config().lore().displayTable()
-                    .get(StatKeys.canonical(canonicalKey));
+            com.trinityforge.stats.StatDisplaySpec spec =
+                    tf.config().lore().displaySpecFor(canonicalKey);
             if (spec == null) {
                 return Optional.empty();
             }
             return Optional.of(new ThreadStatDisplay(spec.displayName(), spec.renderValue(value)));
+        } catch (Throwable t) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * 任意のステマップを <b>TF 装備とまったく同じ体裁</b>の lore 行へ組む
+     * ({@code stats/lore.yml} の {@code layout.line-template} / 表示名 / アイコン / 桁数 / 単位 / 色 /
+     * カテゴリ順 / {@code hide-when-zero} を全部通す)。スレッドの厳選値表示とチャット出力の唯一の入口。
+     *
+     * <p><b>自前で連結しないこと</b>: フォークが `label + " " + value` を組んでいた旧経路は
+     * 表示名の引き当てに失敗するとステータスidを素で出し、成功しても色/アイコン/テンプレートが
+     * TF 装備と別物になっていた({@link #threadStatDisplay} の javadoc 参照)。
+     * TF 未ロード / 例外時は空リスト(呼び出し側は「行が無い」として扱えばよい)。
+     */
+    public static java.util.List<net.kyori.adventure.text.Component> threadStatLore(
+            Map<String, Double> stats) {
+        if (stats == null || stats.isEmpty()) {
+            return java.util.List.of();
+        }
+        try {
+            TrinityForge tf = TrinityForge.getInstance();
+            if (tf == null || tf.config() == null || tf.config().lore() == null
+                    || tf.loreComposer() == null) {
+                return java.util.List.of();
+            }
+            Map<String, Double> finite = new LinkedHashMap<>();
+            stats.forEach((key, value) -> {
+                if (key != null && value != null && Double.isFinite(value) && value != 0.0) {
+                    finite.put(key, value);
+                }
+            });
+            if (finite.isEmpty()) {
+                return java.util.List.of();
+            }
+            return tf.loreComposer().compose(finite,
+                    tf.config().lore().displayTable(), tf.config().lore().layout());
+        } catch (Throwable t) {
+            return java.util.List.of();
+        }
+    }
+
+    /**
+     * 品質ティアのラベル({@code stats/quality-tiers.yml} の name/color を通した【名匠】等)。
+     * スレッド名の後ろに付ける品質表記の唯一の供給元 ── フォークで「品質3」等と数値表示しないこと
+     * (TF 装備の品質表記と食い違う)。未ロード / 範囲外は {@link Optional#empty()}。
+     */
+    public static Optional<net.kyori.adventure.text.Component> qualityTierLabel(int quality) {
+        try {
+            TrinityForge tf = TrinityForge.getInstance();
+            if (tf == null || tf.config() == null || tf.config().qualityTiers() == null) {
+                return Optional.empty();
+            }
+            return tf.config().qualityTiers().tierFor(quality)
+                    .map(com.trinityforge.stats.QualityTier::label);
         } catch (Throwable t) {
             return Optional.empty();
         }

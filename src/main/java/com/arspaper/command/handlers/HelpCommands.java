@@ -30,8 +30,10 @@ public final class HelpCommands {
 
     private static final List<Entry> ENTRIES = List.of(
             new Entry("/ars thread",
-                    "メインハンドの装備にスレッドを装着（武器・触媒・ツールはここが入口。"
-                            + "着用防具はスニーク+右クリックでも開く）", false),
+                    "メインハンドの装備にスレッドを装着（ジャンプ→下を見てスニーク+右クリックでも開く。"
+                            + "着用防具はスニーク+右クリックのみで開く）", false),
+            new Entry("(装備を手に持って真上を見てスニーク)",
+                    "その装備の装着スレッドの内訳（品質・上昇ステ）をチャットに表示", false),
             new Entry("/ars status", "自分のステータス（マナ・グリフ解放状況など）を表示", false),
             new Entry("/ars mana", "マナの上限・回復量の内訳を表示", false),
             new Entry("/ars mana notify", "マナ不足の通知をON/OFF", false),

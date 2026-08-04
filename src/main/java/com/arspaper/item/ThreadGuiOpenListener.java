@@ -27,28 +27,26 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * スレッド枠を持つ装備の {@link ThreadGui} 入口と、その入口の案内。
  *
- * <h2>入口は2種類 + コマンド(2026-08-04 依頼#44追補: ジェスチャー対象をツール限定から
- * 「スレッド枠を持つ装備全般」へ拡張)</h2>
+ * <h2>入口は2種類 + コマンド</h2>
  * <ul>
  *   <li><b>着用防具</b>: スニーク+右クリックで直接 {@link ThreadGui} を開く(従来どおり。
- *       真上を見る必要はない)。</li>
+ *       視線とジャンプの条件は無い)。</li>
  *   <li><b>スレッド枠を持つ非防具装備全般</b>(つるはし/シャベル/クワ/釣竿/ハサミ/火打石はもちろん、
- *       <b>斧・剣・弓・クロスボウ・トライデント・鎌・メイス・杖・触媒も含む</b>): <b>スニーク+
- *       真上を見る+右クリック</b>。旧実装は {@code ThreadApplicationPolicy#isToolMaterial}
- *       (斧を除く純粋ツールだけ)でこのジェスチャーを絞っていたが、ユーザー確定要件により
- *       「素材による分類」自体を撤廃し、{@link #effectiveThreadSlots} が正の値を返す装備なら
- *       種別を問わずこのジェスチャーで開けるようにした。
- *       <p><b>なぜ武器へ広げても誤爆しないか</b>: ジェスチャーの安全装置は元々「素材による絞り込み」
- *       ではなく<b>「真上(ピッチ -80°以下)を見ている」という姿勢そのもの</b>だった ──
- *       弓を構える・クロスボウを装填する・剣を振る・杖で詠唱する、いずれの通常操作も
- *       水平〜下向きの視点で行うため、真上を見た状態でのスニーク+右クリックは
- *       ツールと同じく実プレイでまず起きない。つまり「ツールだけ真上ジェスチャーが安全」なのではなく
- *       「真上ジェスチャーはどの装備種別でも安全」だったので、対象をツールに絞る理由がそもそも無かった
- *       (旧説明は誤り。武器を除外していた理由は「戦闘武器を兼ねるため」ではなく、単に
- *       このジェスチャーを導入した時点でツール以外を検討していなかっただけ)。
- *       Bedrock/Geyser はコマンド UX が弱い(スラッシュコマンドの補完が弱く、画面キーボード入力が
- *       重い)ため、頻繁に持ち替える装備全般にジェスチャー入口を持たせる意義が大きい。</li>
+ *       <b>斧・剣・弓・クロスボウ・トライデント・鎌・メイス・杖・触媒も含む</b>):
+ *       <b>下を向く + スニーク + 右クリック + 直近にジャンプ</b>
+ *       ({@link #isOpenGesture})。素材による分類は使わない ──
+ *       {@link #effectiveThreadSlots} が正の値を返す装備なら種別を問わず開ける。</li>
  * </ul>
+ *
+ * <h2>2026-08-04: 真上ジェスチャー → 下向き+ジャンプへ変更した理由</h2>
+ * このジェスチャーは以前「スニーク+<b>真上</b>を見る+右クリック」だった。真上は通常操作と重ならない
+ * 良い安全装置だったが、<b>真上+スニークを「装着スレッドの内訳をチャットへ出す」操作へ割り当てる</b>
+ * 仕様変更({@link ThreadStatChatListener})が入ったため、GUI 側を明け渡した。
+ *
+ * <p>置き換え先の「下向き」は<b>それ単独では安全装置にならない</b>点が真上と決定的に違う ──
+ * 採掘・耕作・パス化・ブロック設置はどれも「下を向いてスニーク+右クリック」なので、
+ * 下向きだけを条件にすると通常操作を奪う。そのため<b>直近のジャンプ</b>を必須条件として足している
+ * (意図しないと成立しない組み合わせ)。詳細は {@link #isLookingDown} / {@link #jumpedRecently}。
  * {@code /ars thread}({@link com.arspaper.command.handlers.ThreadCommands})は
  * 引き続き全装備共通のフォールバック入口として有効(ジェスチャーが取りづらい環境や、
  * 視点操作が苦手なプレイヤーの保険)。枠数は item-stats の {@code thread_slots} が正のときのみ
@@ -64,7 +62,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * <b>呪文が出たなら GUI は開かない</b>のが正しいので、開く直前でキャンセル済みかを見る。
  * <b>ジェスチャー対象を武器・杖・触媒へ広げたことで、この判定の重要性はさらに上がった</b> ──
  * 剣・杖・弓等は {@link com.arspaper.spell.SpellBindListener}(NORMAL 優先度)経由で
- * バインド詠唱の対象になり得るため、真上ジェスチャーで GUI を開こうとした瞬間に
+ * バインド詠唱の対象になり得るため、ジェスチャーで GUI を開こうとした瞬間に
  * 同じ右クリックで詠唱も飛びうる。この {@code isCancelled()} ガードが二重発火を唯一防いでいる。
  *
  * <h2>案内は「持ち替えたとき」だけに寄せる(2026-07-31 F3 指摘1 → F6 指摘3 で縮小、挙動不変)</h2>
@@ -75,19 +73,15 @@ import java.util.concurrent.ConcurrentHashMap;
  * (持ち替え/オフハンド入れ替え/ホットバースワップ)。スパム防止は {@link ThreadSlotHintPolicy} の
  * 二重ガード(間隔30秒 + 同一アイテム1セッション1回)。
  *
- * <p><b>⚠️ スニーク+右クリック単独(真上を見ていない状態)の案内は撤去したまま(F6 指摘3)</b>:
+ * <p><b>⚠️ ジェスチャー不成立時に案内を出してはいけない(F6 指摘3)</b>:
  * 一時的に「キャンセル済みでも案内は出す」形にしていたが、<b>スニーク+右クリックは通常操作</b>である
  * ── 弓(5件)・クロスボウ(5件)・トライデント(5件)・斧(4件)・鍬はスレッド枠を持ち、
  * スニーク狙撃やスニーク耕作は普通の遊び方なので、5秒間隔のガードでは
  * <b>TF の EXP/会心アクションバー({@code SkillExpFeedbackService} / {@code CombatListener})を
  * 5秒ごとに無限に上書きし続ける</b>。「自分から試した操作だから毎回応答したい」という前提が
  * この操作には成り立たない。持ち替え時の案内(30秒 + 同一アイテム1セッション1回)と
- * {@code /ars help} で発見経路は足りているので、真上を見ていない通常のスニーク+右クリックは
- * <b>装備種別を問わず案内も GUI も出さない</b>(防具の GUI 起動だけが真上判定なしで残る)。
- * <b>この段落は現在ではツールに限らず非防具装備全般に適用される</b>
- * ── かつては「ツールだけ真上ジェスチャーの対象」だったため武器はこの経路で常に無反応だったが、
- * 対象を全装備へ広げた現在は、真上を見ていない非防具装備が同じ理由でここに該当する
- * (真上を見ていれば装備種別に関わらずGUIが開く。上の「入口は2種類」参照)。
+ * {@code /ars help} で発見経路は足りているので、ジェスチャーが成立しないスニーク+右クリックは
+ * <b>装備種別を問わず案内も GUI も出さない</b>(防具の GUI 起動だけが視線/ジャンプ判定なしで残る)。
  *
  * <p>コマンド一覧側の発見経路は {@code /ars help}
  * ({@link com.arspaper.command.handlers.HelpCommands})。
@@ -102,6 +96,12 @@ public final class ThreadGuiOpenListener implements Listener {
      * {@code forget} 系と同じ流儀で並行安全な集合にしておく。
      */
     private final Set<UUID> pendingSelectHint = ConcurrentHashMap.newKeySet();
+
+    /** 「直近にジャンプ」と認める猶予。ジャンプ→着地→スニーク→右クリックが無理なく入る幅。 */
+    private static final long JUMP_WINDOW_MS = 1_500L;
+
+    /** プレイヤーごとの最終ジャンプ時刻(ms)。{@link #jumpedRecently} が読む。 */
+    private final Map<UUID, Long> lastJumpAt = new ConcurrentHashMap<>();
 
     public ThreadGuiOpenListener(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -124,13 +124,8 @@ public final class ThreadGuiOpenListener implements Listener {
         if (item == null || item.getType().isAir()) {
             return;
         }
-        boolean armor = isArmorPiece(item);
-        if (!armor && !isLookingStraightUp(player)) {
-            // 非防具はスレッド枠を持つ装備全般(ツール/武器/杖/触媒問わず)が対象(2026-08-04で
-            // ツール限定から拡張)。スニーク+右クリック単独は近接/遠隔戦闘・採掘・耕作・伐採等の
-            // 通常操作と衝突するため、「真上を見ている」ことも同時に要求して誤爆を防ぐ(依頼#44)。
-            // 着用防具だけはこの条件を課さない(装備中に振り向くだけの動作なので通常操作と衝突しない)。
-            // 満たさない間は通常操作としてそのまま素通りさせる(GUI も案内も出さない)。
+        if (!isOpenGesture(player, item)) {
+            // 条件を満たさない間は通常操作としてそのまま素通りさせる(GUI も案内も出さない)。
             return;
         }
         int slots = effectiveThreadSlots(item, player);
@@ -209,6 +204,7 @@ public final class ThreadGuiOpenListener implements Listener {
     public void onQuit(PlayerQuitEvent event) {
         hintPolicy.forget(event.getPlayer().getUniqueId());
         pendingSelectHint.remove(event.getPlayer().getUniqueId());
+        lastJumpAt.remove(event.getPlayer().getUniqueId());
     }
 
     /**
@@ -245,7 +241,8 @@ public final class ThreadGuiOpenListener implements Listener {
 
     private static void sendHint(Player player, int slots) {
         player.sendActionBar(Component.text(
-                "スレッド枠 " + slots + "枠 — /ars thread で装着", NamedTextColor.AQUA));
+                "スレッド枠 " + slots + "枠 — ジャンプ→下を見てスニーク右クリック / または /ars thread",
+                NamedTextColor.AQUA));
     }
 
     /**
@@ -271,17 +268,56 @@ public final class ThreadGuiOpenListener implements Listener {
     }
 
     /**
-     * プレイヤーがほぼ真上(ピッチ -80°以下。-90°が真上)を見ているか。
+     * GUI を開くジェスチャーが成立しているか。
      *
-     * <p>閾値を -90°ちょうどにしないのは、Bedrock/Geyser 側の視点入力が Java 版ほど滑らかでなく
-     * ちょうど真上でピタッと止めにくいため(ヒットボックス的な余裕を持たせる)。-80°は
-     * 「見上げてはいるが地平線付近」を除外しつつ、通常のツール操作(採掘・耕作は水平〜下向き、
-     * 釣りは水平、火打石は目の前のブロック)や通常の武器操作(近接・遠隔とも水平〜下向きの視点で
-     * 行う)では自然に到達しない角度として選んだ(2026-08-04: 対象をツールから全装備へ広げた際、
-     * 武器にも同じ閾値がそのまま安全に転用できる根拠。クラスjavadoc参照。値自体は変更していない)。
+     * <ul>
+     *   <li><b>着用材質の防具</b>: スニーク+右クリックだけで成立(従来どおり。防具を手に持って
+     *       右クリックする通常操作が無いので、追加の安全装置が要らない)。</li>
+     *   <li><b>それ以外のスレッド枠付き装備</b>: <b>下を向いている + 直近にジャンプした</b>の両方。</li>
+     * </ul>
      */
-    private static boolean isLookingStraightUp(Player player) {
-        return player.getLocation().getPitch() <= -80f;
+    private boolean isOpenGesture(Player player, ItemStack item) {
+        if (isArmorPiece(item)) {
+            return true;
+        }
+        return isLookingDown(player) && jumpedRecently(player);
+    }
+
+    /**
+     * プレイヤーがはっきり下(ピッチ +55°以上。+90°が真下)を向いているか。
+     *
+     * <p>閾値を +90°ちょうどにしないのは、Bedrock/Geyser 側の視点入力が Java 版ほど滑らかでなく
+     * ちょうど真下でピタッと止めにくいため(余裕を持たせる)。+55°は「足元付近を見ている」姿勢を拾い、
+     * 水平前方を見る通常の戦闘/移動を除外する角度。
+     *
+     * <p><b>下向き単独では安全装置にならない</b>のがこのジェスチャーの難所 ── 採掘・耕作・
+     * 土のパス化・ブロック設置はどれも「下を向いてスニーク+右クリック」で、旧仕様の真上ジェスチャーと
+     * 違って通常操作そのものと重なる。そこで {@link #jumpedRecently} を必須条件として足している
+     * (2026-08-04 の仕様変更)。真上は {@link ThreadStatChatListener}(内訳のチャット出力)に譲った。
+     */
+    private static boolean isLookingDown(Player player) {
+        return player.getLocation().getPitch() >= 55f;
+    }
+
+    /**
+     * 直近 {@link #JUMP_WINDOW_MS} 以内にジャンプしたか。
+     *
+     * <p>「下向き+スニーク+右クリック」は採掘・耕作・設置と同じ姿勢なので、これ単独では通常操作を
+     * 奪ってしまう。<b>直前にジャンプを挟む</b>のは意図しないと成立しない組み合わせで、かつ
+     * Bedrock/Geyser でも確実に入力できる(スラッシュコマンドや視点の微調整より易しい)。
+     */
+    private boolean jumpedRecently(Player player) {
+        Long at = lastJumpAt.get(player.getUniqueId());
+        return at != null && System.currentTimeMillis() - at <= JUMP_WINDOW_MS;
+    }
+
+    /**
+     * ジャンプ時刻を記録する。{@code PlayerJumpEvent} は Paper 専用イベントで、移動パケットから
+     * ジャンプだけを切り出してくれる(自前で速度やY差分を見る必要がない)。
+     */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onJump(com.destroystokyo.paper.event.player.PlayerJumpEvent event) {
+        lastJumpAt.put(event.getPlayer().getUniqueId(), System.currentTimeMillis());
     }
 
     private static int effectiveThreadSlots(ItemStack item, Player player) {

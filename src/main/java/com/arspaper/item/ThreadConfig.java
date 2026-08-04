@@ -188,22 +188,22 @@ public class ThreadConfig {
 
         int regen = getRegenBonus(type);
         if (regen > 0) {
-            lore.add(loreText("マナ回復速度 +" + regen + "/tick", net.kyori.adventure.text.format.NamedTextColor.AQUA));
+            lore.add(loreText("マナ回復速度 +" + regen + "/tick"));
         }
         int mana = getManaBonus(type);
         if (mana > 0) {
-            lore.add(loreText("マナ最大値 +" + mana, net.kyori.adventure.text.format.NamedTextColor.BLUE));
+            lore.add(loreText("マナ最大値 +" + mana));
         }
         // mana-max-percent / regen-percent は ThreadConfig も ManaManager も配線済みなのに
         // lore を1行も出していなかった(＝出荷 threads.yml に1件も無かったので露見しなかった)。
         // 割合版スレッドを入れる以上、ここを書かないと「効いているのに説明が無い」ままになる。
         int manaPercent = getManaMaxPercent(type);
         if (manaPercent > 0) {
-            lore.add(loreText("マナ最大値 +" + manaPercent + "%", net.kyori.adventure.text.format.NamedTextColor.BLUE));
+            lore.add(loreText("マナ最大値 +" + manaPercent + "%"));
         }
         int regenPct = getRegenPercent(type);
         if (regenPct > 0) {
-            lore.add(loreText("マナ回復速度 +" + regenPct + "%", net.kyori.adventure.text.format.NamedTextColor.AQUA));
+            lore.add(loreText("マナ回復速度 +" + regenPct + "%"));
         }
         if (type.hasPotionEffect()) {
             String effectName = switch (type.getId()) {
@@ -219,38 +219,48 @@ public class ThreadConfig {
                 case "luck" -> "幸運";
                 default -> "ポーション効果";
             };
-            lore.add(loreText(effectName + " (装備中常時)", net.kyori.adventure.text.format.NamedTextColor.GREEN));
+            lore.add(loreText(effectName + " (装備中常時)"));
         }
         int hit = getHitManaRecovery(type);
         if (hit > 0) {
-            lore.add(loreText("被弾時マナ回復 +" + hit, net.kyori.adventure.text.format.NamedTextColor.GOLD));
+            lore.add(loreText("被弾時マナ回復 +" + hit));
         }
         int dmg = getDamageManaRecovery(type);
         if (dmg > 0) {
-            lore.add(loreText("攻撃時マナ回復 +" + dmg, net.kyori.adventure.text.format.NamedTextColor.DARK_RED));
+            lore.add(loreText("攻撃時マナ回復 +" + dmg));
         }
         int cost = getCostReduction(type);
         if (cost > 0) {
-            lore.add(loreText("マナコスト -" + cost + "%", net.kyori.adventure.text.format.NamedTextColor.YELLOW));
+            lore.add(loreText("マナコスト -" + cost + "%"));
         }
         if (type.isFlightThread()) {
-            lore.add(loreText("エリトラ飛行 (装備中常時)", net.kyori.adventure.text.format.NamedTextColor.WHITE));
+            lore.add(loreText("エリトラ飛行 (装備中常時)"));
         }
         if (type.isBackpackThread()) {
             int slots = getBackpackSlots(type);
-            lore.add(loreText("追加インベントリ " + slots + "スロット", net.kyori.adventure.text.format.NamedTextColor.DARK_GREEN));
+            lore.add(loreText("追加インベントリ " + slots + "スロット"));
         }
         // 汎用フォールバック: 効果の実体が thread-sets.yml 側にあるスレッドは上のどの分岐にも
         // 引っかからないので、ここで threads.yml の lore: をそのまま出す。これが無いと
         // 「説明文が1行も無いスレッド」になり、種類を増やすたびに Java の switch を足す羽目になる。
         for (String line : getExtraLore(type)) {
-            lore.add(loreText(line, type.getColor()));
+            lore.add(loreText(line));
         }
         return lore;
     }
 
-    private static net.kyori.adventure.text.Component loreText(String text, net.kyori.adventure.text.format.NamedTextColor color) {
-        return net.kyori.adventure.text.Component.text(text, color)
+    /**
+     * スレッドの効果説明1行。
+     *
+     * <p><b>色は灰色で固定する(2026-08-04 依頼#46)</b>: 以前は効果の種類ごとに
+     * AQUA/BLUE/GREEN/GOLD/DARK_RED/YELLOW を振っていたため、1本のスレッドの lore の中で色が
+     * バラバラに並び、しかも TF 装備の lore(灰色テンプレート {@code stats/lore.yml}
+     * {@code layout.line-template})とも体裁が揃っていなかった。説明文は TF 側と同じ灰色に寄せ、
+     * <b>色で意味を伝えるのはスレッド名(種別色)と数値(TF 側の正負色)だけ</b>にする。
+     */
+    private static net.kyori.adventure.text.Component loreText(String text) {
+        return net.kyori.adventure.text.Component.text(
+                text, net.kyori.adventure.text.format.NamedTextColor.GRAY)
             .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false);
     }
 }

@@ -5,8 +5,6 @@ import com.arspaper.enchant.ArsEnchantments;
 import com.arspaper.mana.ManaKeys;
 import com.arspaper.mana.ManaManager;
 import com.destroystokyo.paper.event.player.PlayerArmorChangeEvent;
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -29,7 +27,6 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import com.arspaper.integration.TrinityForgeBridge;
 
-import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -50,7 +47,6 @@ import java.util.Set;
  */
 public class ArmorManaListener implements Listener {
 
-    private static final Gson GSON = new Gson();
     private static final int POTION_DURATION = -1; // Paper 1.20+: 無限持続
     private final JavaPlugin plugin;
 
@@ -371,7 +367,7 @@ public class ArmorManaListener implements Listener {
         // (2026-08-03統合: 以前はここで(a)厳選PDCの生値合算(b)テンプレ値(quality=0固定)合算の
         // 2回を別々に足していて二重計上になっていた。ArmorManaListener#collectThreadsIntoの
         // javadoc/報告参照)。
-        for (EquippedThread equipped : collectEquippedThreads(pdc, effectiveSlotCap)) {
+        for (SocketedThreads.Entry equipped : SocketedThreads.read(pdc, effectiveSlotCap)) {
             ThreadType thread = equipped.type();
             totals.threadMana += threadConfig.getManaBonus(thread);
             totals.threadRegen += threadConfig.getRegenBonus(thread);
@@ -411,10 +407,6 @@ public class ArmorManaListener implements Listener {
                 // TF未ロード等: このスレの戦闘ステはスキップ(マナ機能は無影響)。
             }
         }
-    }
-
-    /** 装着スレッド1個ぶん: 種類 + そのスロットの厳選(rollSeed/quality)。 */
-    private record EquippedThread(ThreadType type, long rollSeed, int quality) {
     }
 
     /** {@link #tfManaDeltas} の結果を {@code totals} のマナ系4カウンタへ足す。 */
@@ -472,74 +464,6 @@ public class ArmorManaListener implements Listener {
             return false;
         }
         return ThreadApplicationPolicy.isArmorSlotMaterial(item.getType());
-    }
-
-    /**
-     * 装備PDCのスレッドJSON({@link ItemKeys#THREAD_SLOTS})と厳選JSON
-     * ({@link ItemKeys#THREAD_SLOT_ROLLS})を<b>同じ添字</b>で突き合わせ、ステ適用対象の
-     * スレッド一覧を(種類, rollSeed, quality)ぶんまとめて収集する。
-     *
-     * <p>厳選配列が短い/欠落している添字は {@link ThreadSlotIdentity#NONE}
-     * (rollSeed=0, quality=0 = 個体差なしの従来どおりの幅)にフォールバックする ──
-     * 厳選導入前の装備・旧形式が残る装備のどちらもこの経路で自然に扱える(fail-open)。
-     *
-     * @param pdc            装備アイテムのPDC(防具4部位／メインハンド／オフハンドいずれも)
-     * @param effectiveSlots 装着者に対する実効スレッド枠上限(基本枠+拡張枠perk保有時のみ拡張分)。
-     *                       PDC格納順(=GUIのスロット順)の先頭からこの枠数までのみ適用対象とし、
-     *                       上限超過分(例: 拡張枠perk喪失後に残る5枠目以降のスレッド)は無視する
-     *                       (PDCデータ自体は保持したまま、ステ適用のみ除外する)。
-     */
-    private static List<EquippedThread> collectEquippedThreads(PersistentDataContainer pdc, int effectiveSlots) {
-        List<EquippedThread> result = new ArrayList<>();
-        if (effectiveSlots <= 0) {
-            return result;
-        }
-
-        String threadSlotsJson = pdc.get(ItemKeys.THREAD_SLOTS, PersistentDataType.STRING);
-        if (threadSlotsJson != null) {
-            try {
-                List<String> slots = GSON.fromJson(threadSlotsJson,
-                    new TypeToken<List<String>>(){}.getType());
-                if (slots != null) {
-                    List<String> rolls = collectThreadSlotRolls(pdc);
-                    int cappedSize = Math.min(slots.size(), effectiveSlots);
-                    for (int i = 0; i < cappedSize; i++) {
-                        String threadId = slots.get(i);
-                        if (threadId == null) continue;
-                        ThreadType thread = ThreadType.fromId(threadId);
-                        if (thread == null || !thread.hasEffect()) continue;
-                        ThreadSlotIdentity identity = i < rolls.size()
-                                ? ThreadSlotIdentity.decode(rolls.get(i)) : ThreadSlotIdentity.NONE;
-                        result.add(new EquippedThread(thread, identity.rollSeed(), identity.quality()));
-                    }
-                }
-            } catch (Exception ignored) {}
-        } else {
-            // 旧単一スレッド形式(THREAD_SLOTS導入以前)にはロール配列が無い ──
-            // この経路が生きている装備自体、個体差の概念がまだ無かった時代のものなので0/0で扱う。
-            String oldThreadId = pdc.get(ItemKeys.THREAD_TYPE, PersistentDataType.STRING);
-            if (oldThreadId != null) {
-                ThreadType thread = ThreadType.fromId(oldThreadId);
-                if (thread != null && thread.hasEffect()) {
-                    result.add(new EquippedThread(thread, 0L, 0));
-                }
-            }
-        }
-        return result;
-    }
-
-    /** {@link ItemKeys#THREAD_SLOT_ROLLS} の生JSON配列を読む。壊れている/未設定なら空リスト。 */
-    private static List<String> collectThreadSlotRolls(PersistentDataContainer pdc) {
-        String json = pdc.get(ItemKeys.THREAD_SLOT_ROLLS, PersistentDataType.STRING);
-        if (json == null || json.isBlank()) {
-            return List.of();
-        }
-        try {
-            List<String> rolls = GSON.fromJson(json, new TypeToken<List<String>>(){}.getType());
-            return rolls != null ? rolls : List.of();
-        } catch (RuntimeException malformed) {
-            return List.of();
-        }
     }
 
     /**
