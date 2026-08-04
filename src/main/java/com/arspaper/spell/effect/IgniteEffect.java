@@ -11,13 +11,12 @@ import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
-import org.bukkit.damage.DamageSource;
-import org.bukkit.damage.DamageType;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
@@ -28,7 +27,10 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * 対象を燃焼させるEffect。
  * カスタム火炎ダメージタスクにより、ダメージ量・間隔・持続を全て設定可能。
- * DamageType.ON_FIREを使用するため火炎耐性が有効。
+ * ダメージはTFの対称パイプライン({@link SpellContext#dealSpellDamage})を経由するため
+ * DamageType.ON_FIREのバニラ自動判定は使えない（cause=MAGIC固定）。代わりに
+ * {@code PotionEffectType.FIRE_RESISTANCE} を明示チェックして火炎耐性を維持する
+ * （2026-08-04、TFスケール未適用だった修正の一環）。
  * 増幅でダメージ増加、延長で持続延長。
  *
  * params:
@@ -72,7 +74,7 @@ public class IgniteEffect implements SpellEffect {
         // 視覚的な炎上エフェクト（バニラの炎表示のみ、ダメージはカスタムタスクで）
         target.setFireTicks(Math.max(1, totalTicks));
 
-        // カスタム火炎ダメージタスク（DamageType.ON_FIREで火炎耐性が有効）
+        // カスタム火炎ダメージタスク（TFパイプライン経由。火炎耐性はタスク内で自前判定）
         final double finalDamage = Math.max(0.5, damage);
         final int interval = Math.max(1, damageInterval);
 
@@ -93,9 +95,15 @@ public class IgniteEffect implements SpellEffect {
                     return;
                 }
 
-                // 火炎ダメージ（火炎耐性で軽減/無効化される）
-                DamageSource fireSource = DamageSource.builder(DamageType.ON_FIRE).build();
-                target.damage(finalDamage, fireSource);
+                // 火炎ダメージ。旧実装は DamageType.ON_FIRE の DamageSource を使い、バニラが
+                // 自動で火炎耐性を判定していた。TFの対称パイプライン(dealSpellDamage)は
+                // 常に DamageType.MAGIC で適用するため、この経路では火炎耐性を自動判定できない
+                // （common-traps.md 参照）。ここで明示的に火炎耐性を判定して劣化を防ぐ。
+                // 増幅(amplify)は既に上のfinalDamage計算(base-damage + amplifyLevel*amplify-damage-bonus)
+                // へ手動加算済みなので、dealSpellDamage側の乗算ボーナスは適用しない(二重計上防止)。
+                if (!target.hasPotionEffect(PotionEffectType.FIRE_RESISTANCE)) {
+                    context.dealSpellDamage(target, finalDamage, id.getKey(), false);
+                }
             }
         }.runTaskTimer(plugin, interval, interval);
         activeFireTasks.put(target.getUniqueId(), task);

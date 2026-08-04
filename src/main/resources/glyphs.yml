@@ -758,9 +758,11 @@ glyphs:
       aoe_radius: 6
       extract: 1  # ※ON/OFFのみ
     params:
-      base-power: 2  # createExplosionのpower値
+      base-power: 2  # createExplosionのpower値（見た目・音・ノックバックのみ。ダメージには使わない）
       aoe-power-bonus: 1.5  # 半径増加1段あたりのpower増加
       max-power: 10.0  # 爆発power上限。※大きすぎるとサーバー負荷、注意
+      damage-per-power: 3.0  # power1あたりの中心(爆心地)ダメージ。TFの対称パイプラインへ供給する基礎値
+      damage-radius-multiplier: 2.0  # ダメージ判定半径 = power × この値。中心からの距離に応じて線形減衰
     unlock-cost:
       level: 35
       materials:
