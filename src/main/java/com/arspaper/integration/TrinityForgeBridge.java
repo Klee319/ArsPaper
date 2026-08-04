@@ -1427,44 +1427,11 @@ public final class TrinityForgeBridge {
         }
     }
 
-    /** {@link #threadStatDisplay(String, double)} の戻り値: TF由来の表示名+整形済み値文字列。 */
-    public record ThreadStatDisplay(String label, String formattedValue) {
-    }
-
-    /**
-     * canonical stat key(例 {@code bleed-damage})の TF表示名 + 整形済み値
-     * ({@code stats/lore.yml} の {@code format}/{@code decimals}/{@code unit} を通した文字列、
-     * {@link com.trinityforge.stats.StatDisplaySpec#renderValue}) を返す。
-     * lore/チャット/GUI と桁数・％表記を必ず一致させるため、フォーク側で独自に数値を
-     * 整形し直さないこと(過去に lore とチャットで桁が食い違った事故がある)。
-     *
-     * <p>引き当ては {@code LoreConfig#displaySpecFor} 一本(綴りの違いを吸収する唯一の入口)。
-     * <b>{@code displayTable().get(...)} を自分で引かないこと</b> ── 表は yml の綴りそのまま
-     * (ハイフン)でキーになっているので、canonical 化した値で引くと 1 件も一致せず、
-     * 実機ではステータスidが素で表示される(2026-08-04 に実際に起きた)。
-     *
-     * <p>{@code stats/lore.yml} にそのキーの定義が無い / TF未ロード / 例外時は
-     * {@link Optional#empty()}。
-     */
-    public static Optional<ThreadStatDisplay> threadStatDisplay(String canonicalKey, double value) {
-        if (canonicalKey == null || canonicalKey.isBlank()) {
-            return Optional.empty();
-        }
-        try {
-            TrinityForge tf = TrinityForge.getInstance();
-            if (tf == null || tf.config() == null || tf.config().lore() == null) {
-                return Optional.empty();
-            }
-            com.trinityforge.stats.StatDisplaySpec spec =
-                    tf.config().lore().displaySpecFor(canonicalKey);
-            if (spec == null) {
-                return Optional.empty();
-            }
-            return Optional.of(new ThreadStatDisplay(spec.displayName(), spec.renderValue(value)));
-        } catch (Throwable t) {
-            return Optional.empty();
-        }
-    }
+    // 【復活させないこと】かつてここに threadStatDisplay(表示名+整形済み値を1件返す)があった。
+    // 呼び出し側が "label + \" \" + value" を自前で連結する形になり、
+    // (1) 引き当てに失敗するとステータスidを素で出す (2) 色/アイコン/テンプレートが TF 装備と別物、
+    // という2つの食い違いを同時に生んだ(2026-08-04 のスレッド lore の実害)。
+    // 表示は threadStatLore(=TF の LoreComposer#statLines)一本から作る。
 
     /**
      * 任意のステマップを <b>TF 装備とまったく同じ体裁</b>の lore 行へ組む
@@ -1496,7 +1463,10 @@ public final class TrinityForgeBridge {
             if (finite.isEmpty()) {
                 return java.util.List.of();
             }
-            return tf.loreComposer().compose(finite,
+            // statLines(=区切り線/header/footer なし)を使う。compose を使うとカテゴリごとに
+            // 「そのときの最長行」で幅が決まる ==== が入り、返却/リロールで旧行を内容一致で
+            // 消している経路(restoreRoll / ThreadRerollRitualEffect)に古い区切り線が溜まる。
+            return tf.loreComposer().statLines(finite,
                     tf.config().lore().displayTable(), tf.config().lore().layout());
         } catch (Throwable t) {
             return java.util.List.of();

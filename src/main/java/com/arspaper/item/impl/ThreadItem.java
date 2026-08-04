@@ -104,6 +104,13 @@ public class ThreadItem extends BaseCustomItem {
      * フォールバックが働き、実機ではステータスidが素で並んでいた(依頼#46)。加えて成功しても
      * 黄色1色・アイコン無し・テンプレート無視で TF 装備と体裁が揃わなかった。連結は復活させないこと。
      *
+     * <p><b>返る行に区切り線({@code ====})が混ざってはいけない</b>: この結果は
+     * {@link com.arspaper.gui.ThreadGui} のスレッド返却と
+     * {@link com.arspaper.ritual.effect.ThreadRerollRitualEffect} が<b>「前回の行を内容一致で消してから
+     * 新しい行を足す」</b>形で使う。区切り線の幅は「そのときの最長行」で決まるので、値の桁が変わると
+     * 古い線が消えずに溜まる。だから {@code threadStatLore} は TF の
+     * {@code LoreComposer#statLines}(区切り線なし)を使っている。
+     *
      * @param type     ステを解決するための material/CMD 供給元（スレッドの種類）
      * @param identity そのスレッド個体の rollSeed + quality
      */

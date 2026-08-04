@@ -154,6 +154,65 @@ class ThreadHandheldWiringTest {
     }
 
     @Test
+    @DisplayName("装備の lore は『・スレッド名【品質】』の1行だけで、厳選ステの明細を展開していない")
+    void equipmentLoreKeepsOnlyTheSummaryLinePerThread() throws IOException {
+        String gui = readSource("gui", "ThreadGui.java");
+
+        int build = gui.indexOf("private List<Component> buildThreadLore() {");
+        assertTrue(build >= 0, "buildThreadLore が見つからない(テストの前提が変わった)");
+        int buildEnd = gui.indexOf("\n    }", build);
+        assertTrue(buildEnd > build, "buildThreadLore の終端が取れない");
+        String body = gui.substring(build, buildEnd);
+
+        assertTrue(body.contains("SocketedThreads.summaryLine("),
+                "装備 lore が共通の要約行(・スレッド名【品質】)を使っていない");
+        assertFalse(body.contains("ThreadItem.rollLore("),
+                "装備 lore に厳選ステの明細を展開している。5枠埋めるとツールチップが数十行になり、"
+                        + "装備本体のステが画面外へ押し出される(明細は ThreadStatChatListener でチャットへ)。");
+
+        String socketed = readSource("item", "SocketedThreads.java");
+        assertTrue(socketed.contains("qualityTierLabel("),
+                "品質表記が TF の quality-tiers.yml 由来でない。ここで『品質3』等と数値化すると"
+                        + "TF 装備の品質行と食い違う。");
+    }
+
+    @Test
+    @DisplayName("スレッドのステ表示を自前で連結していない(ステータスidが素で出る形へ戻さない)")
+    void threadStatLinesAreBuiltByTrinityForgeOnly() throws IOException {
+        // javadoc の引用文に反応しないよう、rollLore の【本体】だけを切り出して見る。
+        String item = readSource("item", "impl", "ThreadItem.java");
+        int roll = item.indexOf("public static List<Component> rollLore(");
+        assertTrue(roll >= 0, "rollLore が見つからない(テストの前提が変わった)");
+        int rollEnd = item.indexOf("\n    }", roll);
+        assertTrue(rollEnd > roll, "rollLore の終端が取れない");
+        String body = item.substring(roll, rollEnd);
+
+        assertTrue(body.contains("TrinityForgeBridge.threadStatLore(stats)"),
+                "厳選ステの整形が TF の LoreComposer 経由でない");
+        assertFalse(body.contains("Component.text("),
+                "rollLore が行を自前で組み立てている。TF の整形結果をそのまま返すこと"
+                        + "(色/アイコン/桁数/単位/テンプレートが TF 装備と揃わなくなる)。");
+        assertFalse(body.contains("orElseGet(") || body.contains("forEach("),
+                "表示名の引き当て失敗時にキー名を素で出すフォールバックや自前ループが復活している"
+                        + "(実機でステータスidが並んだ 2026-08-04 の症状そのもの)");
+
+        String bridge = readSource("integration", "TrinityForgeBridge.java");
+        assertTrue(bridge.contains("loreComposer().statLines("),
+                "threadStatLore が statLines(区切り線なし)を使っていない。compose を使うと"
+                        + "カテゴリごとに幅可変の ==== が入り、返却/リロールで旧行を内容一致で消している"
+                        + "経路(restoreRoll / ThreadRerollRitualEffect)に古い区切り線が溜まる。");
+        assertFalse(bridge.contains("Optional<ThreadStatDisplay> threadStatDisplay"),
+                "自前連結を招く threadStatDisplay が復活している(撤去済み。理由は同ファイルのコメント)");
+
+        String config = readSource("item", "ThreadConfig.java");
+        assertFalse(config.contains("NamedTextColor.AQUA")
+                        || config.contains("NamedTextColor.GOLD")
+                        || config.contains("NamedTextColor.DARK_RED"),
+                "効果説明の色が効果ごとのバラバラな指定へ戻っている。1本のスレッドの lore で色が"
+                        + "混在し、TF 装備の灰色テンプレートとも揃わない(依頼#46)。");
+    }
+
+    @Test
     @DisplayName("ジャンプ時刻を Paper の PlayerJumpEvent で拾い、退出時に捨てている")
     void jumpTrackingIsWiredAndCleanedUp() throws IOException {
         String source = readSource("item", "ThreadGuiOpenListener.java");
