@@ -79,6 +79,36 @@ class RitualQualityExpGateSeparationTest {
                 "grantArsSmithingExpOnly の catch 節が警告ログを出していない");
     }
 
+    /**
+     * 2026-08-04 実サーバ報告「Ars鍛冶で作ったものが手に持つまでステータスがつかない」の回帰テスト。
+     *
+     * <p><b>真因</b>: {@code stampCraftedQuality} は儀式時点で rollSeed+quality を PDC へ
+     * {@code writeItemRoll} で書くだけで、TF の {@code ItemFactory#stamp}(lore/属性のフル再組み立て)を
+     * 呼んでいなかった。そのため「品質は入っているのにステータスが表示されない」まま台座にドロップされ、
+     * 手に持って別の refresh 経路が走るまでステータスが出なかった。さらに台座の成果物は
+     * <b>誰が回収するか儀式時点では確定しない</b>ので、儀式実行者のステで焼き込むのは仕様としても誤り。
+     *
+     * <p>修正後は「品質未決定」マーカーだけを刻み、TF の {@code PickupQualityListener} が
+     * 最初にインベントリへ入ったプレイヤーのステでロールしてフル再組み立てする。
+     * ここでは<b>境界の向き</b>(儀式時点で焼かない／マーカーを刻む)だけを固定する。
+     */
+    @Test
+    @DisplayName("儀式時点では品質を焼かず「未決定」マーカーだけ刻む(品質は回収者のステで決まる)")
+    void ritualDefersQualityRollToThePicker() throws Exception {
+        String source = flattened("src/main/java/com/arspaper/integration/TrinityForgeBridge.java");
+
+        int start = source.indexOf("public static void stampCraftedQuality(");
+        assertTrue(start >= 0, "stampCraftedQuality が見つからない");
+        String body = source.substring(start, Math.min(source.length(), start + 700));
+
+        assertTrue(body.contains("markPendingCraftQuality"),
+                "儀式成果物に「品質未決定」マーカーを刻んでいない。刻まないと回収者のステで"
+                        + "品質を決める TF 側経路(PickupQualityListener)が起動しない。");
+        assertFalse(body.contains("writeItemRoll"),
+                "儀式時点で rollSeed+quality を焼いている。PDCだけ書いても lore/属性は再組み立て"
+                        + "されないので「手に持つまでステータスがつかない」不具合が再発する。");
+    }
+
     private static String flattened(String relativePath) throws Exception {
         String source = Files.readString(Path.of(relativePath));
         return source.replaceAll("\\s+", " ");

@@ -1222,21 +1222,28 @@ public final class TrinityForgeBridge {
             return;
         }
         try {
-            TrinityForge tf = TrinityForge.getInstance();
-            if (tf == null) {
-                return;
-            }
-            CraftQualityService svc = tf.craftQualityService();
-            if (svc == null) {
-                return;
-            }
-            final int quality = rollQualityWithOffset(svc, crafter, item);
-            // 段2「鍛冶ロール」パーク補正(儀式クラフトにも反映)。TF API欠落時は NONE で no-op。
-            CraftRollMods rollMods = svc.craftRollMods(crafter);
-            long seed = UUID.randomUUID().getMostSignificantBits();
-            item.editMeta(meta -> writeItemRoll(meta, seed, quality, rollMods));
+            // 「品質はまだ決めない」マーカーだけを刻む(2026-08-04 仕様変更)。実際の品質ロールと
+            // lore/属性のフル再組み立ては TF 側 PickupQualityListener が「最初にインベントリへ
+            // 入ったプレイヤー」のステータスで行う。crafter は互換のため受け取るが参照しない
+            // (儀式結果は台座にドロップされるので、儀式実行者と回収者は一致しない)。
+            item.editMeta(TrinityForgeBridge::markPendingCraftQuality);
         } catch (Throwable t) {
-            // TF未ロード / API不整合: 品質刻印はスキップ(品質0のまま、既存生成は維持)。
+            // TF未ロード / API不整合: マーカーはスキップ(品質0のまま、既存生成は維持)。
+        }
+    }
+
+    /**
+     * TF {@link ItemData} の「品質未決定」マーカーを刻む。TF未ロード / 旧 TrinityForge jar
+     * (マーカー未対応)では {@link NoSuchMethodError} を拾って no-op(従来どおり品質0のまま)。
+     */
+    private static void markPendingCraftQuality(ItemMeta meta) {
+        if (meta == null) {
+            return;
+        }
+        try {
+            ItemData.of(meta).markPendingCraftQuality();
+        } catch (Throwable t) {
+            // TF未ロード / 旧jar: マーカー無しで進む。
         }
     }
 
