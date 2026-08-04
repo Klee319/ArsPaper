@@ -87,23 +87,6 @@ materials:
         i: STONE
         g: custom:source_gem
       amount: 8
-  oak_wood_1x:
-    base_material: OAK_LOG
-    custom_model_data: 5201
-    display_name: 9倍圧縮オークの原木
-    enchant_glow: false
-    lore:
-      - "&7&o9個分の原木を凝縮した修繕用木材。"
-    recipe:
-      method: workbench
-      reversible: true
-      type: shaped
-      ingredients:
-        i: OAK_LOG
-      shape:
-        - iii
-        - iii
-        - iii
   stone_1x:
     base_material: STONE
     custom_model_data: 100041
@@ -344,6 +327,36 @@ materials:
         - iii
         - iii
         - iii
+  netherrack_3x:
+    base_material: NETHERRACK
+    custom_model_data: 1003
+    display_name: "&f729倍圧縮ネザーラック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:netherrack_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  netherrack_4x:
+    base_material: NETHERRACK
+    custom_model_data: 1004
+    display_name: "&f6561倍圧縮ネザーラック"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:netherrack_3x
+      shape:
+        - iii
+        - iii
+        - iii
   end_stone_1x:
     base_material: END_STONE
     custom_model_data: 999
@@ -370,6 +383,36 @@ materials:
       type: shaped
       ingredients:
         i: custom:end_stone_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  end_stone_3x:
+    base_material: END_STONE
+    custom_model_data: 1005
+    display_name: "&7729倍圧縮エンドストーン"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:end_stone_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  end_stone_4x:
+    base_material: END_STONE
+    custom_model_data: 1006
+    display_name: "&76561倍圧縮エンドストーン"
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:end_stone_3x
       shape:
         - iii
         - iii
@@ -704,6 +747,583 @@ materials:
         - iii
         - iii
         - iii
+  deepslate_1x:
+    base_material: DEEPSLATE
+    custom_model_data: 17
+    display_name: "&89倍圧縮深層岩"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: DEEPSLATE
+      shape:
+        - iii
+        - iii
+        - iii
+  deepslate_2x:
+    base_material: DEEPSLATE
+    custom_model_data: 18
+    display_name: "&881倍圧縮深層岩"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:deepslate_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  deepslate_3x:
+    base_material: DEEPSLATE
+    custom_model_data: 19
+    display_name: "&8729倍圧縮深層岩"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:deepslate_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  deepslate_4x:
+    base_material: DEEPSLATE
+    custom_model_data: 20
+    display_name: "&86561倍圧縮深層岩"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:deepslate_3x
+      shape:
+        - iii
+        - iii
+        - iii
+  sand_1x:
+    base_material: SAND
+    custom_model_data: 21
+    display_name: "&e9倍圧縮砂"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: SAND
+      shape:
+        - iii
+        - iii
+        - iii
+  sand_2x:
+    base_material: SAND
+    custom_model_data: 34
+    display_name: "&e81倍圧縮砂"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:sand_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  sand_3x:
+    base_material: SAND
+    custom_model_data: 35
+    display_name: "&e729倍圧縮砂"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:sand_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  sand_4x:
+    base_material: SAND
+    custom_model_data: 36
+    display_name: "&e6561倍圧縮砂"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:sand_3x
+      shape:
+        - iii
+        - iii
+        - iii
+  oak_wood_1x:
+    base_material: OAK_LOG
+    custom_model_data: 5201
+    display_name: 9倍圧縮オークの原木
+    enchant_glow: false
+    lore:
+      - "&7&o9個分の原木を凝縮した修繕用木材。"
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: OAK_LOG
+      shape:
+        - iii
+        - iii
+        - iii
+  oak_wood_2x:
+    base_material: OAK_LOG
+    custom_model_data: 5421
+    display_name: "&681倍圧縮オークの原木"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:oak_wood_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  oak_wood_3x:
+    base_material: OAK_LOG
+    custom_model_data: 5422
+    display_name: "&6729倍圧縮オークの原木"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:oak_wood_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  birch_wood_1x:
+    base_material: BIRCH_LOG
+    custom_model_data: 37
+    display_name: "&e9倍圧縮シラカバの原木"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: BIRCH_LOG
+      shape:
+        - iii
+        - iii
+        - iii
+  birch_wood_2x:
+    base_material: BIRCH_LOG
+    custom_model_data: 38
+    display_name: "&e81倍圧縮シラカバの原木"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:birch_wood_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  birch_wood_3x:
+    base_material: BIRCH_LOG
+    custom_model_data: 39
+    display_name: "&e729倍圧縮シラカバの原木"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:birch_wood_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  spruce_wood_1x:
+    base_material: SPRUCE_LOG
+    custom_model_data: 40
+    display_name: "&29倍圧縮トウヒの原木"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: SPRUCE_LOG
+      shape:
+        - iii
+        - iii
+        - iii
+  spruce_wood_2x:
+    base_material: SPRUCE_LOG
+    custom_model_data: 41
+    display_name: "&281倍圧縮トウヒの原木"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:spruce_wood_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  spruce_wood_3x:
+    base_material: SPRUCE_LOG
+    custom_model_data: 42
+    display_name: "&2729倍圧縮トウヒの原木"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:spruce_wood_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  jungle_wood_1x:
+    base_material: JUNGLE_LOG
+    custom_model_data: 43
+    display_name: "&a9倍圧縮ジャングルの原木"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: JUNGLE_LOG
+      shape:
+        - iii
+        - iii
+        - iii
+  jungle_wood_2x:
+    base_material: JUNGLE_LOG
+    custom_model_data: 44
+    display_name: "&a81倍圧縮ジャングルの原木"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:jungle_wood_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  jungle_wood_3x:
+    base_material: JUNGLE_LOG
+    custom_model_data: 45
+    display_name: "&a729倍圧縮ジャングルの原木"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:jungle_wood_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  acacia_wood_1x:
+    base_material: ACACIA_LOG
+    custom_model_data: 46
+    display_name: "&69倍圧縮アカシアの原木"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: ACACIA_LOG
+      shape:
+        - iii
+        - iii
+        - iii
+  acacia_wood_2x:
+    base_material: ACACIA_LOG
+    custom_model_data: 47
+    display_name: "&681倍圧縮アカシアの原木"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:acacia_wood_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  acacia_wood_3x:
+    base_material: ACACIA_LOG
+    custom_model_data: 48
+    display_name: "&6729倍圧縮アカシアの原木"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:acacia_wood_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  dark_oak_wood_1x:
+    base_material: DARK_OAK_LOG
+    custom_model_data: 59
+    display_name: "&89倍圧縮ダークオークの原木"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: DARK_OAK_LOG
+      shape:
+        - iii
+        - iii
+        - iii
+  dark_oak_wood_2x:
+    base_material: DARK_OAK_LOG
+    custom_model_data: 60
+    display_name: "&881倍圧縮ダークオークの原木"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:dark_oak_wood_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  dark_oak_wood_3x:
+    base_material: DARK_OAK_LOG
+    custom_model_data: 61
+    display_name: "&8729倍圧縮ダークオークの原木"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:dark_oak_wood_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  mangrove_wood_1x:
+    base_material: MANGROVE_LOG
+    custom_model_data: 69
+    display_name: "&c9倍圧縮マングローブの原木"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: MANGROVE_LOG
+      shape:
+        - iii
+        - iii
+        - iii
+  mangrove_wood_2x:
+    base_material: MANGROVE_LOG
+    custom_model_data: 70
+    display_name: "&c81倍圧縮マングローブの原木"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:mangrove_wood_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  mangrove_wood_3x:
+    base_material: MANGROVE_LOG
+    custom_model_data: 71
+    display_name: "&c729倍圧縮マングローブの原木"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:mangrove_wood_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  pale_oak_wood_1x:
+    base_material: PALE_OAK_LOG
+    custom_model_data: 72
+    display_name: "&f9倍圧縮淡いオークの原木"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: PALE_OAK_LOG
+      shape:
+        - iii
+        - iii
+        - iii
+  pale_oak_wood_2x:
+    base_material: PALE_OAK_LOG
+    custom_model_data: 131
+    display_name: "&f81倍圧縮淡いオークの原木"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:pale_oak_wood_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  pale_oak_wood_3x:
+    base_material: PALE_OAK_LOG
+    custom_model_data: 132
+    display_name: "&f729倍圧縮淡いオークの原木"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:pale_oak_wood_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  dirt_1x:
+    base_material: DIRT
+    custom_model_data: 5427
+    display_name: "&69倍圧縮土"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: DIRT
+      shape:
+        - iii
+        - iii
+        - iii
+  dirt_2x:
+    base_material: DIRT
+    custom_model_data: 5428
+    display_name: "&681倍圧縮土"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:dirt_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  dirt_3x:
+    base_material: DIRT
+    custom_model_data: 5429
+    display_name: "&6729倍圧縮土"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:dirt_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  dirt_4x:
+    base_material: DIRT
+    custom_model_data: 5431
+    display_name: "&66561倍圧縮土"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:dirt_3x
+      shape:
+        - iii
+        - iii
+        - iii
   echo_shard_1x:
     base_material: ECHO_SHARD
     custom_model_data: 100081
@@ -748,6 +1368,486 @@ materials:
       type: shaped
       ingredients:
         i: COOKED_BEEF
+      shape:
+        - iii
+        - iii
+        - iii
+  carrot_1x:
+    base_material: CARROT
+    custom_model_data: 184
+    display_name: "&69倍圧縮ニンジン"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: CARROT
+      shape:
+        - iii
+        - iii
+        - iii
+  carrot_2x:
+    base_material: CARROT
+    custom_model_data: 186
+    display_name: "&681倍圧縮ニンジン"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:carrot_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  carrot_3x:
+    base_material: CARROT
+    custom_model_data: 187
+    display_name: "&6729倍圧縮ニンジン"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:carrot_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  potato_1x:
+    base_material: POTATO
+    custom_model_data: 189
+    display_name: "&e9倍圧縮ジャガイモ"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: POTATO
+      shape:
+        - iii
+        - iii
+        - iii
+  potato_2x:
+    base_material: POTATO
+    custom_model_data: 190
+    display_name: "&e81倍圧縮ジャガイモ"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:potato_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  potato_3x:
+    base_material: POTATO
+    custom_model_data: 192
+    display_name: "&e729倍圧縮ジャガイモ"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:potato_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  beetroot_1x:
+    base_material: BEETROOT
+    custom_model_data: 193
+    display_name: "&49倍圧縮ビートルート"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: BEETROOT
+      shape:
+        - iii
+        - iii
+        - iii
+  beetroot_2x:
+    base_material: BEETROOT
+    custom_model_data: 195
+    display_name: "&481倍圧縮ビートルート"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:beetroot_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  beetroot_3x:
+    base_material: BEETROOT
+    custom_model_data: 196
+    display_name: "&4729倍圧縮ビートルート"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:beetroot_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  beef_1x:
+    base_material: BEEF
+    custom_model_data: 197
+    display_name: "&c9倍圧縮生の牛肉"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: BEEF
+      shape:
+        - iii
+        - iii
+        - iii
+  beef_2x:
+    base_material: BEEF
+    custom_model_data: 198
+    display_name: "&c81倍圧縮生の牛肉"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:beef_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  beef_3x:
+    base_material: BEEF
+    custom_model_data: 199
+    display_name: "&c729倍圧縮生の牛肉"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:beef_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  porkchop_1x:
+    base_material: PORKCHOP
+    custom_model_data: 200
+    display_name: "&d9倍圧縮生の豚肉"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: PORKCHOP
+      shape:
+        - iii
+        - iii
+        - iii
+  porkchop_2x:
+    base_material: PORKCHOP
+    custom_model_data: 201
+    display_name: "&d81倍圧縮生の豚肉"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:porkchop_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  porkchop_3x:
+    base_material: PORKCHOP
+    custom_model_data: 202
+    display_name: "&d729倍圧縮生の豚肉"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:porkchop_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  chicken_1x:
+    base_material: CHICKEN
+    custom_model_data: 203
+    display_name: "&f9倍圧縮生の鶏肉"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: CHICKEN
+      shape:
+        - iii
+        - iii
+        - iii
+  chicken_2x:
+    base_material: CHICKEN
+    custom_model_data: 204
+    display_name: "&f81倍圧縮生の鶏肉"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:chicken_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  chicken_3x:
+    base_material: CHICKEN
+    custom_model_data: 205
+    display_name: "&f729倍圧縮生の鶏肉"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:chicken_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  mutton_1x:
+    base_material: MUTTON
+    custom_model_data: 206
+    display_name: "&79倍圧縮生の羊肉"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: MUTTON
+      shape:
+        - iii
+        - iii
+        - iii
+  mutton_2x:
+    base_material: MUTTON
+    custom_model_data: 207
+    display_name: "&781倍圧縮生の羊肉"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:mutton_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  mutton_3x:
+    base_material: MUTTON
+    custom_model_data: 208
+    display_name: "&7729倍圧縮生の羊肉"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:mutton_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  rabbit_1x:
+    base_material: RABBIT
+    custom_model_data: 209
+    display_name: "&69倍圧縮生の兎肉"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: RABBIT
+      shape:
+        - iii
+        - iii
+        - iii
+  rabbit_2x:
+    base_material: RABBIT
+    custom_model_data: 210
+    display_name: "&681倍圧縮生の兎肉"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:rabbit_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  rabbit_3x:
+    base_material: RABBIT
+    custom_model_data: 211
+    display_name: "&6729倍圧縮生の兎肉"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:rabbit_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  cod_1x:
+    base_material: COD
+    custom_model_data: 212
+    display_name: "&b9倍圧縮生鱈"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: COD
+      shape:
+        - iii
+        - iii
+        - iii
+  cod_2x:
+    base_material: COD
+    custom_model_data: 213
+    display_name: "&b81倍圧縮生鱈"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:cod_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  cod_3x:
+    base_material: COD
+    custom_model_data: 214
+    display_name: "&b729倍圧縮生鱈"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:cod_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  salmon_1x:
+    base_material: SALMON
+    custom_model_data: 215
+    display_name: "&d9倍圧縮生鮭"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: SALMON
+      shape:
+        - iii
+        - iii
+        - iii
+  salmon_2x:
+    base_material: SALMON
+    custom_model_data: 216
+    display_name: "&d81倍圧縮生鮭"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:salmon_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  salmon_3x:
+    base_material: SALMON
+    custom_model_data: 217
+    display_name: "&d729倍圧縮生鮭"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:salmon_2x
       shape:
         - iii
         - iii
@@ -920,37 +2020,7 @@ materials:
       shape:
         - ii
         - ii
-  # 2026-07-31 追加: 4系統目のコア。切削(DIGGING)ツリー側の到達点として置く
-  # (ウッド=伐採 / ベジタブル・ミート=農業 / ジュエリー=採掘 と対になる)。
-  # 解放ゲートは skilltree/digging.yml E ノードの recipe:tf_core_dirt。
-  tf_core_dirt:
-    base_material: DIRT
-    custom_model_data: 5106
-    display_name: ダートコア
-    enchant_glow: false
-    lore:
-      - "&7&o右クリックで大地のグリフを解放する。"
-      - ""
-      - "&5積み重なった時間を宿す核"
-    recipe:
-      method: workbench
-      type: shaped
-      shape:
-        - abc
-        - def
-        - ghi
-      # 素材重さはジュエリーコアと同等(型は tf_core_wood のコメント参照)。
-      ingredients:
-        a: custom:dirt_3x
-        b: custom:guardian_spine
-        c: custom:dirt_3x
-        d: custom:endermite_soot
-        e: custom:emerald_block_3x
-        f: custom:husk_cloth
-        g: custom:dirt_3x
-        h: custom:parched_sandy_bone
-        i: custom:dirt_3x
-  tf_core_jewelry:
+  core_jewelry:
     base_material: EMERALD
     custom_model_data: 5104
     display_name: ジュエリーコア
@@ -976,7 +2046,7 @@ materials:
         g: custom:lapis_block_3x
         h: custom:emerald_block_3x
         i: custom:quartz_block_3x
-  tf_core_meat:
+  core_meat:
     base_material: LEATHER
     custom_model_data: 5103
     display_name: ミートコア
@@ -992,7 +2062,6 @@ materials:
         - abc
         - def
         - ghi
-      # 2026-07-31: 素材重さをジュエリーコアと同等へ(型は tf_core_wood のコメント参照)。
       ingredients:
         a: custom:compressed_cooked_beef_3x
         b: custom:hoglin_tusk
@@ -1003,7 +2072,7 @@ materials:
         g: custom:compressed_cooked_beef_3x
         h: custom:ravager_hide
         i: custom:compressed_cooked_beef_3x
-  tf_core_vegetable:
+  core_vegetable:
     base_material: WHEAT
     custom_model_data: 5102
     display_name: ベジタブルコア
@@ -1019,7 +2088,6 @@ materials:
         - abc
         - def
         - ghi
-      # 2026-07-31: 素材重さをジュエリーコアと同等へ(型は tf_core_wood のコメント参照)。
       ingredients:
         a: custom:compressed_bread_3x
         b: custom:pillager_plate
@@ -1030,7 +2098,7 @@ materials:
         g: custom:compressed_bread_3x
         h: custom:skeleton_horse_bone
         i: custom:compressed_bread_3x
-  tf_core_wood:
+  core_wood:
     base_material: STICK
     custom_model_data: 5101
     display_name: ウッドコア
@@ -1039,13 +2107,6 @@ materials:
       - "&7&o右クリックで自然のグリフを解放する。"
       - ""
       - "&5森の記憶が宿る核"
-    # 【2026-07-31 コア4種の素材重さをジュエリーコアと同等へ】
-    # 以前はバニラ原木9種だけで作れたため、ジュエリーコア(9 x 729倍ブロック)と比べて
-    # 桁が3つ違う「見た目だけエンドコンテンツ」だった。共通の型は
-    #   四隅   = そのコアの系統の729倍圧縮アイテム(かさの担保)
-    #   四辺   = 高レベル敵/EMダンジョン限定のモブ素材4種(狩る動機の担保)
-    #   中央   = 729倍圧縮エメラルドブロック(4種で共通のアンカー)
-    # モブ素材はクラフト不可なので、圧縮だけを自動化しても作れない。
     recipe:
       method: workbench
       type: shaped
@@ -1070,15 +2131,15 @@ materials:
     enchant_glow: false
     lore:
       - "&7&o透き通るように輝く、結晶化した特別なリンゴ。"
-  tf_gacha_ticket:
+  gacha_ticket_0:
     base_material: PAPER
-    custom_model_data: 5001
-    display_name: ガチャ券
+    custom_model_data: 5016
+    display_name: "&8ガチャ券【入門】"
     enchant_glow: false
     lore:
       - "&7&o手に持って右クリックすると、景品が1つ抽選される。"
-      - "&8景品プールは gacha.yml で設定"
-  tf_gacha_ticket_1:
+      - "&8序盤向けの、もっとも基本的な景品プール。"
+  gacha_ticket_1:
     base_material: PAPER
     custom_model_data: 5011
     display_name: "&7ガチャ券【I】"
@@ -1086,7 +2147,7 @@ materials:
     lore:
       - "&7&o手に持って右クリックすると、景品が1つ抽選される。"
       - "&8もっとも入手しやすい、初級の景品プール。"
-  tf_gacha_ticket_2:
+  gacha_ticket_2:
     base_material: PAPER
     custom_model_data: 5012
     display_name: "&aガチャ券【II】"
@@ -1094,7 +2155,7 @@ materials:
     lore:
       - "&7&o手に持って右クリックすると、景品が1つ抽選される。"
       - "&8初級より少し豪華な景品プール。"
-  tf_gacha_ticket_3:
+  gacha_ticket_3:
     base_material: PAPER
     custom_model_data: 5013
     display_name: "&bガチャ券【III】"
@@ -1102,7 +2163,7 @@ materials:
     lore:
       - "&7&o手に持って右クリックすると、景品が1つ抽選される。"
       - "&8中級の景品プール。"
-  tf_gacha_ticket_4:
+  gacha_ticket_4:
     base_material: PAPER
     custom_model_data: 5014
     display_name: "&dガチャ券【IV】"
@@ -1110,14 +2171,14 @@ materials:
     lore:
       - "&7&o手に持って右クリックすると、景品が1つ抽選される。"
       - "&8上級の景品プール。"
-  tf_gacha_ticket_5:
+  gacha_ticket_5:
     base_material: PAPER
     custom_model_data: 5015
-    display_name: ガチャ券【V】
+    display_name: "&6ガチャ券【V】"
     enchant_glow: false
     lore:
       - "&7&o手に持って右クリックすると、景品が1つ抽選される。"
-      - "&8釣りなどでまれに入手できる、最上級の景品プール。"
+      - "&8ごくまれに入手できる、最上級の景品プール。"
   tf_scrap:
     base_material: IRON_NUGGET
     custom_model_data: 5301
@@ -1127,29 +2188,6 @@ materials:
       - "&7&oジャンク品を分解して得られる金属片"
       - ""
       - "&5何かの素材に使えそうだ"
-  # 【解体で返るスクラップ】base_material(見た目)と recipe.result(4個で戻る素材)は別物。
-  # インゴットより小さい欠片に見せるため base は NUGGET 系にしているが、戻るのはインゴット。
-  # 2026-07-26: result を明示。未指定だと UnifiedRecipeLoader が "custom:<自分自身>" を既定にするため、
-  # 「4個 -> 自分自身1個」という純粋な破壊レシピになり、解体で得たスクラップに用途が無くなる。
-  plank_scrap:
-    base_material: OAK_PLANKS
-    custom_model_data: 5311
-    display_name: "&6木材スクラップ"
-    enchant_glow: false
-    lore:
-      - "&7&o木製装備を解体して得られる木片。4個でオークの板材に戻せる。"
-      - ""
-      - "&5役割を終えた"
-    recipe:
-      result: OAK_PLANKS
-      method: inventory
-      type: shaped
-      ingredients:
-        i: custom:plank_scrap
-      shape:
-        - ii
-        - ii
-      amount: 1
   copper_ingot_scrap:
     base_material: COPPER_NUGGET
     custom_model_data: 5312
@@ -1160,7 +2198,7 @@ materials:
       - ""
       - "&5決して自然の姿ではない"
     recipe:
-      result: COPPER_INGOT  # 未指定だと自分自身に戻る破壊レシピになる(plank_scrap 上のコメント参照)
+      result: COPPER_INGOT
       method: inventory
       type: shaped
       ingredients:
@@ -1179,7 +2217,7 @@ materials:
       - ""
       - "&5意思をもって行っている"
     recipe:
-      result: IRON_INGOT  # 未指定だと自分自身に戻る破壊レシピになる(plank_scrap 上のコメント参照)
+      result: IRON_INGOT
       method: inventory
       type: shaped
       ingredients:
@@ -1198,7 +2236,7 @@ materials:
       - ""
       - "&5いわば人工物である証明"
     recipe:
-      result: GOLD_INGOT  # 未指定だと自分自身に戻る破壊レシピになる(plank_scrap 上のコメント参照)
+      result: GOLD_INGOT
       method: inventory
       type: shaped
       ingredients:
@@ -1217,7 +2255,7 @@ materials:
       - ""
       - "&5役立つものだと"
     recipe:
-      result: DIAMOND  # 未指定だと自分自身に戻る破壊レシピになる(plank_scrap 上のコメント参照)
+      result: DIAMOND
       method: inventory
       type: shaped
       ingredients:
@@ -1236,7 +2274,7 @@ materials:
       - ""
       - "&5そう主に示すだろう"
     recipe:
-      result: NETHERITE_INGOT  # 未指定だと自分自身に戻る破壊レシピになる(plank_scrap 上のコメント参照)
+      result: NETHERITE_INGOT
       method: inventory
       type: shaped
       ingredients:
@@ -1255,7 +2293,7 @@ materials:
       - ""
       - "&5使い古されたもの"
     recipe:
-      result: LEATHER  # 未指定だと自分自身に戻る破壊レシピになる(plank_scrap 上のコメント参照)
+      result: LEATHER
       method: inventory
       type: shaped
       ingredients:
@@ -1274,7 +2312,7 @@ materials:
       - ""
       - "&5生物も例外ではない"
     recipe:
-      result: TURTLE_SCUTE  # 未指定だと自分自身に戻る破壊レシピになる(plank_scrap 上のコメント参照)
+      result: TURTLE_SCUTE
       method: inventory
       type: shaped
       ingredients:
@@ -1418,15 +2456,51 @@ materials:
       shape:
         - ii
         - ii
-  # ============================================================
-  # 高レベル敵/EMダンジョン限定のモブ素材 (2026-07-31 追加)
-  # ------------------------------------------------------------
-  # recipe を持たない = クラフト不可。入手経路は combat/mob-level-table.yml の add-drops
-  # (レベル帯 x EntityType で絞る)と combat/mob-overrides.yml の drops (EMボス個別)だけ。
-  # ドロップ側は必ず custom:<このid> で書くこと(素のidだとバニラMaterial扱いで解決に失敗する)。
-  # 用途はコア系レシピ・醸造(crafting-features.yml brew-unlocks)・儀式。
-  # 「敵を選んで狩る」動機を作るのが目的なので、汎用素材で代替可能にしないこと。
-  # ============================================================
+  core_ground:
+    base_material: DIRT
+    custom_model_data: 5106
+    display_name: グランドコア
+    enchant_glow: false
+    lore:
+      - "&7&o右クリックで大地のグリフを解放する。"
+      - ""
+      - "&5積み重なった時間を宿す核"
+    recipe:
+      method: workbench
+      type: shaped
+      shape:
+        - abc
+        - def
+        - ghi
+      ingredients:
+        a: custom:dirt_3x
+        b: custom:guardian_spine
+        c: custom:dirt_3x
+        d: custom:endermite_soot
+        e: custom:emerald_block_3x
+        f: custom:husk_cloth
+        g: custom:dirt_3x
+        h: custom:parched_sandy_bone
+        i: custom:dirt_3x
+  plank_scrap:
+    base_material: OAK_PLANKS
+    custom_model_data: 5311
+    display_name: "&6木材スクラップ"
+    enchant_glow: false
+    lore:
+      - "&7&o木製装備を解体して得られる木片。4個でオークの板材に戻せる。"
+      - ""
+      - "&5役割を終えた"
+    recipe:
+      result: OAK_PLANKS
+      method: inventory
+      type: shaped
+      ingredients:
+        i: custom:plank_scrap
+      shape:
+        - ii
+        - ii
+      amount: 1
   ravager_hide:
     base_material: LEATHER
     custom_model_data: 5401
@@ -1544,45 +2618,6 @@ materials:
       - "&7&o乾き切った骨。砂を払っても砂が出てくる。"
       - ""
       - "&5渇いた者の残り"
-
-  # ============================================================
-  # コア系の素材重さを揃えるための圧縮段 (2026-07-31 追加)
-  # ------------------------------------------------------------
-  # 既存の圧縮系と同じ規約: _1x = バニラ9個、以降は「1段前を9個」。reversible: true で戻せる。
-  # コア4種の素材重さをジュエリーコア(9 x 729倍ブロック)と同等にするため 3x まで用意する。
-  # ============================================================
-  oak_wood_2x:
-    base_material: OAK_LOG
-    custom_model_data: 5421
-    display_name: "&681倍圧縮オークの原木"
-    enchant_glow: false
-    lore: []
-    recipe:
-      method: workbench
-      reversible: true
-      type: shaped
-      ingredients:
-        i: custom:oak_wood_1x
-      shape:
-        - iii
-        - iii
-        - iii
-  oak_wood_3x:
-    base_material: OAK_LOG
-    custom_model_data: 5422
-    display_name: "&6729倍圧縮オークの原木"
-    enchant_glow: false
-    lore: []
-    recipe:
-      method: workbench
-      reversible: true
-      type: shaped
-      ingredients:
-        i: custom:oak_wood_2x
-      shape:
-        - iii
-        - iii
-        - iii
   compressed_bread_2x:
     base_material: BREAD
     custom_model_data: 5423
@@ -1647,73 +2682,6 @@ materials:
         - iii
         - iii
         - iii
-  dirt_1x:
-    base_material: DIRT
-    custom_model_data: 5427
-    display_name: "&69倍圧縮土"
-    enchant_glow: false
-    lore: []
-    recipe:
-      method: workbench
-      reversible: true
-      type: shaped
-      ingredients:
-        i: DIRT
-      shape:
-        - iii
-        - iii
-        - iii
-  dirt_2x:
-    base_material: DIRT
-    custom_model_data: 5428
-    display_name: "&681倍圧縮土"
-    enchant_glow: false
-    lore: []
-    recipe:
-      method: workbench
-      reversible: true
-      type: shaped
-      ingredients:
-        i: custom:dirt_1x
-      shape:
-        - iii
-        - iii
-        - iii
-  dirt_3x:
-    base_material: DIRT
-    custom_model_data: 5429
-    display_name: "&6729倍圧縮土"
-    enchant_glow: false
-    lore: []
-    recipe:
-      method: workbench
-      reversible: true
-      type: shaped
-      ingredients:
-        i: custom:dirt_2x
-      shape:
-        - iii
-        - iii
-        - iii
-
-  # ============================================================
-  # ソース階梯の触媒 (2026-07-31 追加) — 「1億ソース」目標の生産側
-  # ------------------------------------------------------------
-  # 【ループの形】ソースを注いで触媒を作る -> その触媒をソースリンクへ焼べると、
-  # 注いだ量より多くのソースが返る。返り倍率は段が上がるほど大きい
-  # (sourcelinks.yml alchemical で設定。shard 5倍 -> engine 約18倍)。
-  # つまり「素材(石炭/ソースジェム/ネザライト)の供給量」と「儀式を回す回数」だけが
-  # 実質のボトルネックになる。クッキークリッカーの upgrade と同じ構造。
-  #
-  # 【儀式1回で4個できる理由】result-amount: 4。1段上へ行くには前段が8個要るので、
-  # 4個ずつ出さないと儀式回数が段ごとに8倍に膨らみ、最終段まで4000回以上になってしまう。
-  # 4個出しなら「engine 8個」までの必要儀式回数が概ね 16+8+4+2 = 30回程度に収まる。
-  # ここが「作業厨で1ヶ月」に合わせる最重要レバーなので、重すぎ/軽すぎはこの数字で直す。
-  #
-  # 【見た目】いずれも custom_model_data を持つが、リソースパック側のモデルは未作成。
-  # 未作成の CMD は上書きが引かれないので、当面はベースアイテム(アメジストの欠片など)の
-  # 見た目で出る。テクスチャを足すときは既に採番済みのこの CMD をそのまま使うこと。
-  # ============================================================
   source_shard:
     base_material: AMETHYST_SHARD
     custom_model_data: 5441
@@ -1731,6 +2699,8 @@ materials:
       source: 100
       result: custom:source_shard
       result-amount: 4
+      type: shapeless
+      ingredients: []
   source_crystal:
     base_material: PRISMARINE_CRYSTALS
     custom_model_data: 5442
@@ -1749,6 +2719,8 @@ materials:
       source: 2500
       result: custom:source_crystal
       result-amount: 4
+      type: shapeless
+      ingredients: []
   source_condenser:
     base_material: HEART_OF_THE_SEA
     custom_model_data: 5443
@@ -1767,6 +2739,8 @@ materials:
       source: 60000
       result: custom:source_condenser
       result-amount: 4
+      type: shapeless
+      ingredients: []
   source_engine:
     base_material: CONDUIT
     custom_model_data: 5444
@@ -1785,6 +2759,8 @@ materials:
       source: 1000000
       result: custom:source_engine
       result-amount: 4
+      type: shapeless
+      ingredients: []
   infinity_source_core:
     base_material: NETHER_STAR
     custom_model_data: 5445
@@ -1797,10 +2773,6 @@ materials:
       - "&e第2の目標「1億ソース」の到達証明"
       - "&8※ 焼べられない(焼べたら証明が消える)"
     recipe:
-      # 到達証明なので result-amount は 1。特異点の壺4個 + ソース機関8個を溶かす。
-      # 「1億の証明」は文字どおり、それまでに積み上げた設備を焚べた結果になる。
-      # 儀式コスト 4500万は「5個目の特異点の壺」に貯めてから回すことを想定している
-      # (4個はペデスタルへ載せて溶けるので、燃料タンクは別に1個要る)。
       method: ritual
       core-item: custom:source_singularity_jar
       pedestal-items:
@@ -1809,19 +2781,8 @@ materials:
       source: 45000000
       result: custom:infinity_source_core
       result-amount: 1
-
-  # ============================================================
-  # ダンジョンの印 (2026-07-31 追加) — 図鑑にボス討伐を載せるための代替手段
-  # ------------------------------------------------------------
-  # 図鑑のモブ記録はバニラ EntityType 単位なので(CollectionListener が
-  # event.getEntityType().name() を使う)、「世界を繋ぐ者を倒した」を直接書けない。
-  # そこでダンジョンごとに最終ボスから 100% 落ちる印アイテムを置き、
-  # 図鑑カテゴリ dungeon にまとめて「どこを踏破したか」の一覧にする。
-  # 印そのものには用途を持たせない(集めること自体が目的)。捨てても図鑑からは消えない。
-  #
-  # 配線先は combat/mob-overrides.yml の drops:。実ワールド名は連番が付く
-  # (em_id_the_mines_1 等)ので、必ず設計図ワールド名の側に書くこと。
-  # ============================================================
+      type: shapeless
+      ingredients: []
   dungeon_seal_mines:
     base_material: BRICK
     custom_model_data: 5461
@@ -1993,13 +2954,6 @@ materials:
       - "&7&o世界を繋ぐ者の聖所の主を討った証。"
       - ""
       - "&6踏破の証明(図鑑に記録される)"
-
-  # ============================================================
-  # EMダンジョン限定素材 (2026-07-31 追加)
-  # ------------------------------------------------------------
-  # ダンジョンの外では絶対に手に入らない3種。制作(儀式/醸造)と厳選の入口になる。
-  # recipe を持たない = mob-overrides.yml の drops: だけが入手経路。
-  # ============================================================
   binder_fragment:
     base_material: NETHERITE_SCRAP
     custom_model_data: 5451
@@ -2028,7 +2982,6 @@ materials:
       - "&7&o高位のダンジョン主だけが体内に抱える金属。"
       - ""
       - "&5中間装備と儀式の触媒"
-
 _editor:
   categories:
     material:
@@ -2092,6 +3045,45 @@ _editor:
           - amethyst_block_1x
           - quartz_block_3x
           - amethyst_block_2x
+          - oak_wood_2x
+          - oak_wood_3x
+          - dirt_1x
+          - dirt_3x
+          - dirt_2x
+          - dirt_4x
+          - netherrack_3x
+          - netherrack_4x
+          - end_stone_3x
+          - end_stone_4x
+          - deepslate_1x
+          - deepslate_2x
+          - deepslate_3x
+          - deepslate_4x
+          - sand_1x
+          - sand_2x
+          - sand_3x
+          - sand_4x
+          - birch_wood_1x
+          - birch_wood_2x
+          - birch_wood_3x
+          - spruce_wood_1x
+          - spruce_wood_2x
+          - spruce_wood_3x
+          - jungle_wood_1x
+          - jungle_wood_2x
+          - jungle_wood_3x
+          - acacia_wood_1x
+          - acacia_wood_2x
+          - acacia_wood_3x
+          - dark_oak_wood_1x
+          - dark_oak_wood_2x
+          - dark_oak_wood_3x
+          - mangrove_wood_1x
+          - mangrove_wood_2x
+          - mangrove_wood_3x
+          - pale_oak_wood_1x
+          - pale_oak_wood_2x
+          - pale_oak_wood_3x
       - id: cat_1784626872880
         label: 圧縮素材
         itemIds:
@@ -2110,32 +3102,23 @@ _editor:
           - breeze_rod_3x
           - wither_rose_2x
           - echo_shard_2x
-          - oak_wood_2x
-          - oak_wood_3x
-          - compressed_bread_2x
-          - compressed_bread_3x
-          - compressed_cooked_beef_2x
-          - compressed_cooked_beef_3x
-          - dirt_1x
-          - dirt_2x
-          - dirt_3x
       - id: cat_1784733247787
         label: コア
         itemIds:
-          - tf_core_meat
-          - tf_core_jewelry
-          - tf_core_vegetable
-          - tf_core_wood
-          - tf_core_dirt
+          - core_meat
+          - core_jewelry
+          - core_vegetable
+          - core_wood
+          - core_ground
       - id: cat_1784733270033
         label: ガチャ券
         itemIds:
-          - tf_gacha_ticket
-          - tf_gacha_ticket_1
-          - tf_gacha_ticket_2
-          - tf_gacha_ticket_3
-          - tf_gacha_ticket_4
-          - tf_gacha_ticket_5
+          - gacha_ticket_0
+          - gacha_ticket_1
+          - gacha_ticket_2
+          - gacha_ticket_3
+          - gacha_ticket_4
+          - gacha_ticket_5
       - id: cat_1784733285048
         label: Ars(魔法)
         itemIds:
@@ -2143,12 +3126,51 @@ _editor:
           - source_gem_block
           - magebloom_fiber
           - sourcestone
+          - source_shard
+          - source_crystal
+          - source_condenser
+          - source_engine
+          - infinity_source_core
       - id: cat_1784733374294
         label: 食料
         itemIds:
           - tf_crystal_apple
           - compressed_bread_1x
           - compressed_cooked_beef_1x
+          - compressed_bread_3x
+          - compressed_bread_2x
+          - compressed_cooked_beef_2x
+          - compressed_cooked_beef_3x
+          - carrot_1x
+          - carrot_2x
+          - carrot_3x
+          - potato_1x
+          - potato_2x
+          - potato_3x
+          - beetroot_1x
+          - beetroot_2x
+          - beetroot_3x
+          - beef_1x
+          - beef_2x
+          - beef_3x
+          - porkchop_1x
+          - porkchop_2x
+          - porkchop_3x
+          - chicken_1x
+          - chicken_2x
+          - chicken_3x
+          - mutton_1x
+          - mutton_2x
+          - mutton_3x
+          - rabbit_1x
+          - rabbit_2x
+          - rabbit_3x
+          - cod_1x
+          - cod_2x
+          - cod_3x
+          - salmon_1x
+          - salmon_2x
+          - salmon_3x
       - id: cat_20260723_drop
         label: ドロップ素材
         itemIds:
@@ -2169,6 +3191,9 @@ _editor:
           - husk_cloth
           - bogged_mossy_bone
           - parched_sandy_bone
+          - binder_fragment
+          - reality_thread_core
+          - abyssal_ingot
       - id: cat_20260731_dungeon_seal
         label: ダンジョンの印
         itemIds:
@@ -2191,6 +3216,8 @@ _editor:
           - dungeon_seal_hallosseum
           - dungeon_seal_north_pole
           - dungeon_seal_binder
+      # 2026-08-04 復旧: この2カテゴリは editor 保存の副作用で消えていた
+      # (中のアイテムは materials に全部残っていたので、分類だけを失っていた)。
       - id: cat_20260731_em_exclusive
         label: EM限定素材
         itemIds:
@@ -2205,10 +3232,6 @@ _editor:
           - source_condenser
           - source_engine
           - infinity_source_core
-      # ダンジョンの鍵。実体は TF 側 items/catalog.yml (_editor.itemTabs で表示タブ key) にあり、
-      # ここに置くのは「素材」画面のカテゴリバーへ鍵タブを出すための並びだけ。
-      # materials: に同名の素材は無い(あってはいけない) — 鍵を materials.yml へ移すと
-      # dungeon/gates.yml の key-item 判定・カタログのレシピ・CMD台帳が全部切れる。
       - id: cat_dungeon_keys
         label: ダンジョンの鍵
         itemIds:
@@ -2235,7 +3258,6 @@ _editor:
       - source_gem_block
       - magebloom_fiber
       - sourcestone
-      - oak_wood_1x
       - stone_1x
       - stone_2x
       - stone_3x
@@ -2252,8 +3274,20 @@ _editor:
       - gold_block_3x
       - netherrack_1x
       - netherrack_2x
+      - netherrack_3x
+      - netherrack_4x
       - end_stone_1x
       - end_stone_2x
+      - end_stone_3x
+      - end_stone_4x
+      - deepslate_1x
+      - deepslate_2x
+      - deepslate_3x
+      - deepslate_4x
+      - sand_1x
+      - sand_2x
+      - sand_3x
+      - sand_4x
       - lapis_block_1x
       - lapis_block_2x
       - lapis_block_3x
@@ -2276,9 +3310,67 @@ _editor:
       - quartz_block_3x
       - amethyst_block_1x
       - amethyst_block_2x
+      - oak_wood_1x
+      - oak_wood_2x
+      - oak_wood_3x
+      - birch_wood_1x
+      - birch_wood_2x
+      - birch_wood_3x
+      - spruce_wood_1x
+      - spruce_wood_2x
+      - spruce_wood_3x
+      - jungle_wood_1x
+      - jungle_wood_2x
+      - jungle_wood_3x
+      - acacia_wood_1x
+      - acacia_wood_2x
+      - acacia_wood_3x
+      - dark_oak_wood_1x
+      - dark_oak_wood_2x
+      - dark_oak_wood_3x
+      - mangrove_wood_1x
+      - mangrove_wood_2x
+      - mangrove_wood_3x
+      - pale_oak_wood_1x
+      - pale_oak_wood_2x
+      - pale_oak_wood_3x
+      - dirt_1x
+      - dirt_2x
+      - dirt_3x
+      - dirt_4x
       - echo_shard_1x
       - compressed_bread_1x
       - compressed_cooked_beef_1x
+      - carrot_1x
+      - carrot_2x
+      - carrot_3x
+      - potato_1x
+      - potato_2x
+      - potato_3x
+      - beetroot_1x
+      - beetroot_2x
+      - beetroot_3x
+      - beef_1x
+      - beef_2x
+      - beef_3x
+      - porkchop_1x
+      - porkchop_2x
+      - porkchop_3x
+      - chicken_1x
+      - chicken_2x
+      - chicken_3x
+      - mutton_1x
+      - mutton_2x
+      - mutton_3x
+      - rabbit_1x
+      - rabbit_2x
+      - rabbit_3x
+      - cod_1x
+      - cod_2x
+      - cod_3x
+      - salmon_1x
+      - salmon_2x
+      - salmon_3x
       - breeze_rod_1x
       - breeze_rod_2x
       - breeze_rod_3x
@@ -2291,17 +3383,17 @@ _editor:
       - dragon_breath_2x
       - dragon_breath_3x
       - wither_rose_1x
-      - tf_core_jewelry
-      - tf_core_meat
-      - tf_core_vegetable
-      - tf_core_wood
+      - core_jewelry
+      - core_meat
+      - core_vegetable
+      - core_wood
       - tf_crystal_apple
-      - tf_gacha_ticket
-      - tf_gacha_ticket_1
-      - tf_gacha_ticket_2
-      - tf_gacha_ticket_3
-      - tf_gacha_ticket_4
-      - tf_gacha_ticket_5
+      - gacha_ticket_0
+      - gacha_ticket_1
+      - gacha_ticket_2
+      - gacha_ticket_3
+      - gacha_ticket_4
+      - gacha_ticket_5
       - tf_scrap
       - copper_ingot_scrap
       - iron_ingot_scrap
