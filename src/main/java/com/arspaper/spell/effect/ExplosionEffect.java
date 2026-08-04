@@ -3,7 +3,6 @@ package com.arspaper.spell.effect;
 import com.arspaper.spell.GlyphConfig;
 import com.arspaper.spell.SpellContext;
 import com.arspaper.spell.SpellEffect;
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -64,7 +63,11 @@ public class ExplosionEffect implements SpellEffect, Listener {
     public ExplosionEffect(JavaPlugin plugin, GlyphConfig config) {
         this.id = new NamespacedKey(plugin, "explosion");
         this.config = config;
-        Bukkit.getPluginManager().registerEvents(this, plugin);
+        // Listenerとしての登録は ArsPaper#registerListeners() の
+        // 「spellRegistry.getAll()からListener実装のEffectを一括登録するループ」に一本化する
+        // (ここで自己登録すると同一インスタンスが2重登録され、onVanillaExplosionDamageが
+        // 1イベントにつき2回発火する。setCancelled(true)のみなので実害はないが、
+        // HexEffectと同型の誤りなので合わせて修正する。2026-08-04）。
     }
 
     /**

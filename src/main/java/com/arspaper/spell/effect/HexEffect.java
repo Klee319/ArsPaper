@@ -60,8 +60,10 @@ public class HexEffect implements SpellEffect, Listener {
         this.id = new NamespacedKey(plugin, "hex");
         this.config = config;
         this.plugin = plugin;
-        // ダメージ追撃リスナーを登録
-        Bukkit.getPluginManager().registerEvents(this, plugin);
+        // Listenerとしての登録は ArsPaper#registerListeners() の
+        // 「spellRegistry.getAll()からListener実装のEffectを一括登録するループ」に一本化する
+        // (ここで自己登録すると同一インスタンスが2重登録され、onEntityDamageが1イベントにつき
+        // 2回発火して追撃ダメージが2倍になる。2026-08-04修正)。
     }
 
     @Override
