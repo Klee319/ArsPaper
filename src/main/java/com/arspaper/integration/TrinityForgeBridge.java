@@ -847,18 +847,29 @@ public final class TrinityForgeBridge {
      */
     public static void finalizeCatalogRitualResult(ItemStack item, Player crafter,
                                                    Collection<String> materialTokens) {
+        finalizeCatalogRitualResult(item, crafter, materialTokens, 0);
+    }
+
+    /**
+     * {@link #finalizeCatalogRitualResult(ItemStack, Player, Collection)} に<b>消費ソース量</b>を
+     * 伝える版 (2026-08-04)。TrinityForge 側が {@code ars-smithing.exp-per-source} を掛けて
+     * 儀式EXPへ足し込む。0 を渡せば従来と同一挙動。
+     */
+    public static void finalizeCatalogRitualResult(ItemStack item, Player crafter,
+                                                   Collection<String> materialTokens,
+                                                   int consumedSource) {
         if (item == null || crafter == null || item.getType().isAir()) {
             return;
         }
         try {
             if (MaterialTier.of(item.getType()).isEquipment() || isArsQualityStamped(item)) {
-                finalizeArsSmithingResult(item, crafter, materialTokens);
+                finalizeArsSmithingResult(item, crafter, materialTokens, consumedSource);
             } else {
                 // 2026-08-03 実サーバ報告「Ars鍛冶の経験値が入らない」の修正: 品質を刻む対象では
                 // ない(装備でも刻印済みArsアイテムでもない) tfcatalog 儀式結果でも、儀式を行った
                 // 労力ぶんのEXPだけは常に付与する。品質とEXPを同じ門に相乗りさせていたのが誤り
                 // (下の grantArsSmithingExpOnly javadoc 参照)。
-                grantArsSmithingExpOnly(item, crafter, materialTokens);
+                grantArsSmithingExpOnly(item, crafter, materialTokens, consumedSource);
             }
             if (!item.hasItemMeta()) {
                 return;
@@ -903,11 +914,21 @@ public final class TrinityForgeBridge {
      */
     public static void finalizeArsSmithingResult(ItemStack item, Player crafter,
                                                  Collection<String> materialTokens) {
+        finalizeArsSmithingResult(item, crafter, materialTokens, 0);
+    }
+
+    /**
+     * {@link #finalizeArsSmithingResult(ItemStack, Player, Collection)} に<b>消費ソース量</b>を
+     * 伝える版 (2026-08-04)。0 を渡せば従来と同一挙動。
+     */
+    public static void finalizeArsSmithingResult(ItemStack item, Player crafter,
+                                                 Collection<String> materialTokens,
+                                                 int consumedSource) {
         if (item == null || crafter == null || item.getType().isAir()) {
             return;
         }
         stampCraftedQuality(item, crafter);
-        grantArsSmithingExpOnly(item, crafter, materialTokens);
+        grantArsSmithingExpOnly(item, crafter, materialTokens, consumedSource);
     }
 
     /**
@@ -929,12 +950,28 @@ public final class TrinityForgeBridge {
      */
     public static void grantArsSmithingExpOnly(ItemStack item, Player crafter,
                                                 Collection<String> materialTokens) {
+        grantArsSmithingExpOnly(item, crafter, materialTokens, 0);
+    }
+
+    /**
+     * {@link #grantArsSmithingExpOnly(ItemStack, Player, Collection)} に<b>消費ソース量</b>を
+     * 伝える版 (2026-08-04)。
+     *
+     * <p><b>ここに渡すのは「本当に消えたソース量」でなければならない</b>。予約直後の値を渡すと、
+     * 中断・素材差し替え・効果検証失敗などで {@code refundSource} がジャーへ返した分まで
+     * EXPになり、儀式をわざと失敗させ続けるだけでEXPを稼げる経路になる
+     * ({@code recordSourceSpent} が予約直後ではなく全返還経路の通過後に呼ばれているのと同じ理由)。
+     */
+    public static void grantArsSmithingExpOnly(ItemStack item, Player crafter,
+                                                Collection<String> materialTokens,
+                                                int consumedSource) {
         if (item == null || crafter == null || item.getType().isAir()) {
             return;
         }
         try {
             ArsProgressionBridge.grantSmithingCraftExp(ArsPaper.getInstance(), crafter, item,
-                    materialTokens == null ? java.util.List.of() : materialTokens);
+                    materialTokens == null ? java.util.List.of() : materialTokens,
+                    consumedSource);
         } catch (Throwable t) {
             ArsPaper.getInstance().getLogger().warning(
                     "Ars鍛冶(儀式)EXP付与に失敗しました(item=" + item.getType()

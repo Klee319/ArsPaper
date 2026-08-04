@@ -35,7 +35,11 @@ class RitualQualityExpGateSeparationTest {
     void ritualManagerGrantsExpEvenWithoutQualityStamp() throws Exception {
         String source = flattened("src/main/java/com/arspaper/ritual/RitualManager.java");
 
-        assertTrue(source.contains("grantArsSmithingExpOnly(result, player, consumedTokens)"),
+        // 引数の並びを literal で固定しない(2026-08-04 に消費ソース量が増えたときのように、
+        // 不変条件は保ったまま引数が増えるだけで誤検知するため)。「result/player/消費素材を
+        // 渡してこのメソッドを呼んでいる」ことだけを見る。
+        assertTrue(source.matches(
+                        ".*grantArsSmithingExpOnly\\( *result, *player, *consumedTokens[,)].*"),
                 "品質を刻めない儀式結果(isQualityStamped=false)のEXP付与経路が無い。"
                         + "isQualityStamped で弾いた先で TrinityForgeBridge#grantArsSmithingExpOnly "
                         + "を呼ぶこと。");
@@ -47,7 +51,8 @@ class RitualQualityExpGateSeparationTest {
     void catalogBridgeGrantsExpEvenWithoutQualityStamp() throws Exception {
         String source = flattened("src/main/java/com/arspaper/integration/TrinityForgeBridge.java");
 
-        assertTrue(source.contains("grantArsSmithingExpOnly(item, crafter, materialTokens)"),
+        assertTrue(source.matches(
+                        ".*grantArsSmithingExpOnly\\( *item, *crafter, *materialTokens[,)].*"),
                 "finalizeCatalogRitualResult の else 分岐(装備でも刻印済みArsアイテムでもない)"
                         + "でEXP付与を呼んでいない。");
     }
@@ -57,9 +62,12 @@ class RitualQualityExpGateSeparationTest {
     void grantArsSmithingExpOnlyLogsOnFailure() throws Exception {
         String source = flattened("src/main/java/com/arspaper/integration/TrinityForgeBridge.java");
 
-        int methodStart = source.indexOf("public static void grantArsSmithingExpOnly(");
-        assertTrue(methodStart >= 0, "grantArsSmithingExpOnly メソッドが見つからない");
-        String methodBody = source.substring(methodStart, Math.min(source.length(), methodStart + 800));
+        // メソッド名で先頭から探すと、委譲するだけのオーバーロード(引数が増えたときに生える)を
+        // 掴んでしまい「catch が無い」と誤検知する。実際に TF 境界を越える呼び出しを起点にする。
+        int callStart = source.indexOf("ArsProgressionBridge.grantSmithingCraftExp(");
+        assertTrue(callStart >= 0,
+                "TrinityForgeBridge から TF の grantSmithingCraftExp を呼んでいない");
+        String methodBody = source.substring(callStart, Math.min(source.length(), callStart + 800));
 
         assertTrue(methodBody.contains("catch (Throwable t)"),
                 "TF側APIの不整合(フォークの libs/TrinityForge.jar が古い等)を吸収するcatchが無い");

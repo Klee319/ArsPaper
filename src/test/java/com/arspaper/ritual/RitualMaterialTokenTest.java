@@ -62,14 +62,51 @@ class RitualMaterialTokenTest {
                 Path.of("src/main/java/com/arspaper/ritual/RitualManager.java"));
         assertTrue(source.contains("consumedMaterialTokens(recipe)"),
                 "消費素材を集めていない");
-        assertTrue(source.contains("finalizeCatalogRitualResult(result, player, consumedTokens)"),
-                "TFカタログ儀式が定額のまま(素材を渡していない)");
         // 旧実装にも finalizeArsSmithingResult( はあったので、「呼んでいるか」では何も守れない。
         // 素材トークンを渡しているか(=consumedTokens が引数に入っているか)を見る。
-        // 改行位置に依存しないよう連続空白を1つに潰してから照合する。
+        // 改行位置に依存しないよう連続空白を1つに潰してから照合し、引数の並びは literal で
+        // 固定しない(2026-08-04 に消費ソース量が増えたときのように、不変条件は保ったまま
+        // 引数が増えるだけで誤検知するため)。
         String flattened = source.replaceAll("\\s+", " ");
-        assertTrue(flattened.contains("finalizeArsSmithingResult( result, player, consumedTokens)")
-                        || flattened.contains("finalizeArsSmithingResult(result, player, consumedTokens)"),
+        assertTrue(flattened.matches(
+                        ".*finalizeCatalogRitualResult\\( *result, *player, *consumedTokens[,)].*"),
+                "TFカタログ儀式が定額のまま(素材を渡していない)");
+        assertTrue(flattened.matches(
+                        ".*finalizeArsSmithingResult\\( *result, *player, *consumedTokens[,)].*"),
                 "Ars カスタム儀式が定額のまま(素材トークンを渡していない)");
+    }
+
+    /**
+     * 消費ソース量ぶんの追加EXP (2026-08-04) の配線と、その<b>悪用防止条件</b>の回帰テスト。
+     *
+     * <p>3経路すべてに {@code reservedSource} を渡していること、かつその呼び出しが
+     * {@code recordSourceSpent}(=全ての {@code refundSource} 返還経路を通過した地点)より
+     * <b>後ろ</b>にあることを固定する。前に置くと「儀式をわざと失敗させて返還させるだけで
+     * EXPを稼げる」経路になる。
+     */
+    @Test
+    @DisplayName("消費ソース量を渡しており、その地点は全返還経路の通過後(recordSourceSpentより後)である")
+    void ritualCompletionForwardsTheConsumedSourceAfterAllRefundPaths() throws Exception {
+        String source = Files.readString(
+                Path.of("src/main/java/com/arspaper/ritual/RitualManager.java"))
+                .replaceAll("\\s+", " ");
+
+        int spentAt = source.indexOf("recordSourceSpent(player, reservedSource)");
+        assertTrue(spentAt >= 0, "recordSourceSpent の呼び出しが見つからない");
+
+        for (String method : List.of("finalizeCatalogRitualResult", "finalizeArsSmithingResult",
+                "grantArsSmithingExpOnly")) {
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+                            java.util.regex.Pattern.quote(method)
+                                    + "\\( *result, *player, *consumedTokens, *reservedSource *\\)")
+                    .matcher(source);
+            int callAt = m.find() ? m.start() : -1;
+            assertTrue(callAt >= 0,
+                    method + " に reservedSource(消費ソース量)を渡していない。"
+                            + "ars-smithing.exp-per-source が儀式で一切効かなくなる。");
+            assertTrue(callAt > spentAt,
+                    method + " の呼び出しが recordSourceSpent より前にある。"
+                            + "返還されたソースまでEXPになる(儀式をわざと失敗させるだけで稼げる)。");
+        }
     }
 }

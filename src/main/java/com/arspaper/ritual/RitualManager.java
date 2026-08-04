@@ -375,8 +375,13 @@ public class RitualManager {
                         String rid = recipe.resultId();
                         // U1/N6: 儀式EXPを素材ごとに決めるため、消費素材のトークンを渡す。
                         List<String> consumedTokens = consumedMaterialTokens(recipe);
+                        // 2026-08-04: 消費ソース量ぶんの追加EXP。ここは全ての refundSource 経路を
+                        // 通過した後(recordSourceSpent と同じ地点より下)なので、reservedSource は
+                        // 「本当に消えたソース量」と一致する。予約直後の値を渡すと、儀式をわざと
+                        // 失敗させて返還させるだけでEXPを稼げる経路になる。
                         if (rid != null && rid.startsWith(CatalogRitualRegistrar.RESULT_PREFIX)) {
-                            TrinityForgeBridge.finalizeCatalogRitualResult(result, player, consumedTokens);
+                            TrinityForgeBridge.finalizeCatalogRitualResult(
+                                    result, player, consumedTokens, reservedSource);
                         } else {
                             // 2026-08-03 実サーバ報告「Ars鍛冶の経験値が入らない」の修正: 品質刻印の
                             // 可否(isQualityStamped)はEXP付与の可否と別物。ソースジェムの系譜・
@@ -389,9 +394,11 @@ public class RitualManager {
                                 .filter(BaseCustomItem::isQualityStamped)
                                 .isPresent();
                             if (qualityStamped) {
-                                TrinityForgeBridge.finalizeArsSmithingResult(result, player, consumedTokens);
+                                TrinityForgeBridge.finalizeArsSmithingResult(
+                                        result, player, consumedTokens, reservedSource);
                             } else {
-                                TrinityForgeBridge.grantArsSmithingExpOnly(result, player, consumedTokens);
+                                TrinityForgeBridge.grantArsSmithingExpOnly(
+                                        result, player, consumedTokens, reservedSource);
                             }
                         }
                     }
