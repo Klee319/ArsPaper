@@ -125,32 +125,29 @@ class ThreadHandheldWiringTest {
     // --- (1) 入口 ---
 
     @Test
-    @DisplayName("右クリックのGUI起動は防具、またはツールを真上を見ながら構えたときだけ"
-            + "(2026-08-02 依頼#44でツール分岐を追加)")
-    void rightClickOpensGuiForArmorOrLookingUpTool() throws IOException {
+    @DisplayName("右クリックのGUI起動は防具、または非防具(種別問わず)を真上を見ながら構えたときだけ"
+            + "(2026-08-04でツール限定から全装備へ拡張)")
+    void rightClickOpensGuiForArmorOrAnyLookingUpEquipment() throws IOException {
         String source = readSource("item", "ThreadGuiOpenListener.java");
 
         assertTrue(source.contains("boolean armor = isArmorPiece(item);"),
-                "防具判定を変数化していない(依頼#44でツール分岐を足す前提が崩れている)");
-        assertTrue(source.contains("if (!armor) {"), "非防具の分岐が見つからない");
-        assertTrue(source.contains("if (!isToolItem(item)) {"),
-                "武器・触媒と非武器ツールを分ける判定が見つからない(依頼#44)。これが無いと"
-                        + "剣や杖でも真上を見るだけでGUIが開いてしまう。");
-        assertTrue(source.contains("if (!isLookingStraightUp(player)) {"),
-                "真上を見ているかのゲートが見つからない(依頼#44)。ツールは採掘・耕作等で"
-                        + "スニーク+右クリックを常用するため、これが無いと通常操作と衝突する。");
+                "防具判定を変数化していない");
+        assertTrue(source.contains("if (!armor && !isLookingStraightUp(player)) {"),
+                "非防具はisLookingStraightUpだけで判定する必要がある。素材カテゴリによる"
+                        + "絞り込みを復活させると、剣・弓・杖等が真上を見てもGUIが開かなくなる"
+                        + "(ユーザー確定要件『スレッド枠を持つ装備全般』への逆戻り違反)。");
+        assertFalse(source.contains("isToolItem("),
+                "isToolItemによる素材カテゴリの絞り込みが復活している(2026-08-04に撤廃済み)。");
         assertTrue(source.contains("/ars thread"),
-                "手持ち武器の入口(/ars thread)をプレイヤーへ案内していない。"
+                "全装備共通のフォールバック入口(/ars thread)をプレイヤーへ案内していない。"
                         + "辿れない機能は無いのと同じ。");
 
-        // ゲートの順序: 防具判定 → (非防具なら)ツール判定 → 見上げ判定 → 枠数解決、の順であること。
+        // ゲートの順序: 防具判定 → (非防具なら)見上げ判定 → 枠数解決、の順であること。
         int armorCheck = source.indexOf("boolean armor = isArmorPiece(item);");
-        int toolCheck = source.indexOf("if (!isToolItem(item)) {");
-        int lookUpCheck = source.indexOf("if (!isLookingStraightUp(player)) {");
+        int lookUpCheck = source.indexOf("if (!armor && !isLookingStraightUp(player)) {");
         int slotsResolve = source.indexOf("int slots = effectiveThreadSlots(item, player);");
-        assertTrue(armorCheck >= 0 && armorCheck < toolCheck && toolCheck < lookUpCheck
-                        && lookUpCheck < slotsResolve,
-                "GUI起動前のゲート順序が壊れている(防具→ツール→見上げ→枠数解決の順であること)");
+        assertTrue(armorCheck >= 0 && armorCheck < lookUpCheck && lookUpCheck < slotsResolve,
+                "GUI起動前のゲート順序が壊れている(防具→見上げ→枠数解決の順であること)");
     }
 
     @Test
@@ -171,23 +168,22 @@ class ThreadHandheldWiringTest {
     }
 
     @Test
-    @DisplayName("手持ち武器はスニーク+右クリックで案内もGUIも出さない(弓/クロスボウ/トライデント/斧の"
-            + "通常操作・F6 指摘3)")
-    void sneakRightClickNeverOpensOrHintsForWeapons() throws IOException {
-        // 報告された症状は「通常操作で案内が繰り返し出る」。武器はツールと違い見上げゲートが無い
-        // (依頼#44はツールだけの追加入口なので、武器はこの経路では常に何もしない)。
-        for (String material : new String[] {"BOW", "CROSSBOW", "TRIDENT", "NETHERITE_AXE", "BLAZE_ROD"}) {
+    @DisplayName("真上を見ていない通常のスニーク+右クリックは装備種別を問わず案内もGUIも出さない"
+            + "(弓/クロスボウ/トライデント/斧/剣等の通常操作・F6 指摘3。全装備へ対象を広げた後も不変)")
+    void sneakRightClickAloneNeverOpensOrHintsRegardlessOfEquipment() throws IOException {
+        // 2026-08-04: ジェスチャー対象をツール限定から全装備へ広げたため、
+        // 「武器だから見上げゲートが無い」という区別自体が無くなった。
+        // 見上げていない限り、装備種別を問わず何も起きないことだけを固定する。
+        for (String material : new String[] {
+                "BOW", "CROSSBOW", "TRIDENT", "NETHERITE_AXE", "NETHERITE_SWORD", "BLAZE_ROD"}) {
             assertFalse(ThreadApplicationPolicy.isArmorSlotMaterialName(material),
                     material + " が防具扱いになっている(非防具ブランチを通らなくなる)");
-            assertFalse(ThreadApplicationPolicy.isToolMaterialName(material),
-                    material + " がツール扱いになっている(見上げゲート付きでGUIが開いてしまう。"
-                            + "斧は weapon/tool 両方に分類されるが依頼#44の対象からは除外している)");
         }
 
         String source = readSource("item", "ThreadGuiOpenListener.java");
         assertFalse(source.contains("sendHandheldHint"),
                 "スニーク+右クリックの案内が復活している。スレッド枠を持つ弓5件・クロスボウ5件・"
-                        + "トライデント5件・斧4件でスニーク狙撃をすると、"
+                        + "トライデント5件・斧4件・剣類でスニーク攻撃をすると、"
                         + "TF の EXP/会心アクションバー(SkillExpFeedbackService / CombatListener)を"
                         + "5秒ごとに無限に上書きし続ける。");
         assertFalse(source.contains("allowInteractHint"),
@@ -203,21 +199,19 @@ class ThreadHandheldWiringTest {
     }
 
     @Test
-    @DisplayName("依頼#44: 純粋ツール(斧を除く)はisToolItem経由でGUI起動候補になる")
-    void toolsAreEligibleForTheNewGestureEntry() throws IOException {
-        for (String material : new String[] {
-                "NETHERITE_PICKAXE", "DIAMOND_SHOVEL", "NETHERITE_HOE",
-                "FISHING_ROD", "SHEARS", "FLINT_AND_STEEL"}) {
-            assertTrue(ThreadApplicationPolicy.isToolMaterialName(material),
-                    material + " が新ジェスチャーの対象ツール判定に入っていない(依頼#44)");
-        }
+    @DisplayName("2026-08-04: 斧・武器・杖・触媒もスレッド枠を持てば見上げジェスチャーの対象になる"
+            + "(素材カテゴリによる絞り込みを撤廃)")
+    void weaponsAndToolsAreEligibleForTheGestureEntryViaThreadSlotsOnly() throws IOException {
         String source = readSource("item", "ThreadGuiOpenListener.java");
-        assertTrue(source.contains("private static boolean isToolItem(ItemStack item) {")
-                        && source.contains("ThreadApplicationPolicy.isToolMaterial(item.getType());"),
-                "isToolItemがThreadApplicationPolicy.isToolMaterialへ委譲していない");
+        assertFalse(source.contains("ThreadApplicationPolicy.isToolMaterial"),
+                "ThreadApplicationPolicy.isToolMaterialへの参照が残っている"
+                        + "(素材カテゴリによる絞り込みは撤廃済みのはず)");
         assertTrue(source.contains("private static boolean isLookingStraightUp(Player player) {")
                         && source.contains("getPitch() <= -80f"),
-                "真上判定のピッチ閾値(-80度)が見つからない");
+                "真上判定のピッチ閾値(-80度)が見つからない(値そのものは変更禁止)");
+        assertTrue(source.contains("int slots = effectiveThreadSlots(item, player);"),
+                "見上げ判定の後にeffectiveThreadSlotsで枠数を解決していない"
+                        + "(素材カテゴリではなく実際の枠数だけがゲートである必要がある)");
     }
 
     // --- (F6 指摘1) スタックへの装着ガード ---
