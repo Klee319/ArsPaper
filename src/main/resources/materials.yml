@@ -1852,6 +1852,296 @@ materials:
         - iii
         - iii
         - iii
+  # 圧縮シリーズ 追加6種(小麦俵/カボチャ/スイカ/グロウベリー/スイートベリー/リンゴ)
+  # CMDは tools/config-editor/lib/cmd-registry.js の allocateBulk で払い出し済み(218-235)。
+  hay_block_1x:
+    base_material: HAY_BLOCK
+    custom_model_data: 218
+    display_name: "&e9倍圧縮小麦俵"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: HAY_BLOCK
+      shape:
+        - iii
+        - iii
+        - iii
+  hay_block_2x:
+    base_material: HAY_BLOCK
+    custom_model_data: 219
+    display_name: "&e81倍圧縮小麦俵"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:hay_block_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  hay_block_3x:
+    base_material: HAY_BLOCK
+    custom_model_data: 220
+    display_name: "&e729倍圧縮小麦俵"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:hay_block_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  pumpkin_1x:
+    base_material: PUMPKIN
+    custom_model_data: 221
+    display_name: "&69倍圧縮カボチャ"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: PUMPKIN
+      shape:
+        - iii
+        - iii
+        - iii
+  pumpkin_2x:
+    base_material: PUMPKIN
+    custom_model_data: 222
+    display_name: "&681倍圧縮カボチャ"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:pumpkin_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  pumpkin_3x:
+    base_material: PUMPKIN
+    custom_model_data: 223
+    display_name: "&6729倍圧縮カボチャ"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:pumpkin_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  melon_1x:
+    base_material: MELON
+    custom_model_data: 224
+    display_name: "&29倍圧縮スイカ"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: MELON
+      shape:
+        - iii
+        - iii
+        - iii
+  melon_2x:
+    base_material: MELON
+    custom_model_data: 225
+    display_name: "&281倍圧縮スイカ"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:melon_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  melon_3x:
+    base_material: MELON
+    custom_model_data: 226
+    display_name: "&2729倍圧縮スイカ"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:melon_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  glow_berries_1x:
+    base_material: GLOW_BERRIES
+    custom_model_data: 227
+    display_name: "&d9倍圧縮グロウベリー"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: GLOW_BERRIES
+      shape:
+        - iii
+        - iii
+        - iii
+  glow_berries_2x:
+    base_material: GLOW_BERRIES
+    custom_model_data: 228
+    display_name: "&d81倍圧縮グロウベリー"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:glow_berries_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  glow_berries_3x:
+    base_material: GLOW_BERRIES
+    custom_model_data: 229
+    display_name: "&d729倍圧縮グロウベリー"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:glow_berries_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  sweet_berries_1x:
+    base_material: SWEET_BERRIES
+    custom_model_data: 230
+    display_name: "&49倍圧縮スイートベリー"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: SWEET_BERRIES
+      shape:
+        - iii
+        - iii
+        - iii
+  sweet_berries_2x:
+    base_material: SWEET_BERRIES
+    custom_model_data: 231
+    display_name: "&481倍圧縮スイートベリー"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:sweet_berries_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  sweet_berries_3x:
+    base_material: SWEET_BERRIES
+    custom_model_data: 232
+    display_name: "&4729倍圧縮スイートベリー"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:sweet_berries_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  apple_1x:
+    base_material: APPLE
+    custom_model_data: 233
+    display_name: "&c9倍圧縮リンゴ"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: APPLE
+      shape:
+        - iii
+        - iii
+        - iii
+  apple_2x:
+    base_material: APPLE
+    custom_model_data: 234
+    display_name: "&c81倍圧縮リンゴ"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:apple_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  apple_3x:
+    base_material: APPLE
+    custom_model_data: 235
+    display_name: "&c729倍圧縮リンゴ"
+    enchant_glow: false
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:apple_2x
+      shape:
+        - iii
+        - iii
+        - iii
   breeze_rod_1x:
     base_material: BREEZE_ROD
     custom_model_data: 99
@@ -2059,15 +2349,15 @@ materials:
       method: workbench
       type: shaped
       shape:
-        - abc
-        - def
-        - ghi
+        - adb
+        - cec
+        - bda
       ingredients:
-        a: custom:compressed_cooked_beef_3x
-        b: custom:hoglin_tusk
-        c: custom:compressed_cooked_beef_3x
-        d: custom:piglin_ear
-        e: custom:emerald_block_3x
+        a: custom:beef_3x
+        b: custom:porkchop_3x
+        c: custom:mutton_3x
+        d: custom:chicken_3x
+        e: custom:rabbit_3x
         f: custom:piglin_brute_plate
         g: custom:compressed_cooked_beef_3x
         h: custom:ravager_hide
@@ -2179,7 +2469,7 @@ materials:
     lore:
       - "&7&o手に持って右クリックすると、景品が1つ抽選される。"
       - "&8ごくまれに入手できる、最上級の景品プール。"
-  tf_scrap:
+  scrap:
     base_material: IRON_NUGGET
     custom_model_data: 5301
     display_name: "&7スクラップ"
@@ -2988,7 +3278,7 @@ _editor:
       - id: cat_1784733348418
         label: 中間素材
         itemIds:
-          - tf_scrap
+          - scrap
           - plank_scrap
           - copper_ingot_scrap
           - iron_ingot_scrap
@@ -3001,6 +3291,9 @@ _editor:
           - heavy_metal
           - hard_metal
           - reinforced_leather
+          - binder_fragment
+          - reality_thread_core
+          - abyssal_ingot
       - id: cat_1784625931991
         label: 圧縮ブロック
         itemIds:
@@ -3129,8 +3422,8 @@ _editor:
           - source_shard
           - source_crystal
           - source_condenser
-          - source_engine
           - infinity_source_core
+          - source_engine
       - id: cat_1784733374294
         label: 食料
         itemIds:
@@ -3171,6 +3464,24 @@ _editor:
           - salmon_1x
           - salmon_2x
           - salmon_3x
+          - hay_block_1x
+          - hay_block_2x
+          - hay_block_3x
+          - pumpkin_1x
+          - pumpkin_2x
+          - pumpkin_3x
+          - melon_1x
+          - melon_2x
+          - melon_3x
+          - glow_berries_1x
+          - glow_berries_2x
+          - glow_berries_3x
+          - sweet_berries_1x
+          - sweet_berries_2x
+          - sweet_berries_3x
+          - apple_1x
+          - apple_2x
+          - apple_3x
       - id: cat_20260723_drop
         label: ドロップ素材
         itemIds:
@@ -3191,9 +3502,6 @@ _editor:
           - husk_cloth
           - bogged_mossy_bone
           - parched_sandy_bone
-          - binder_fragment
-          - reality_thread_core
-          - abyssal_ingot
       - id: cat_20260731_dungeon_seal
         label: ダンジョンの印
         itemIds:
@@ -3216,22 +3524,6 @@ _editor:
           - dungeon_seal_hallosseum
           - dungeon_seal_north_pole
           - dungeon_seal_binder
-      # 2026-08-04 復旧: この2カテゴリは editor 保存の副作用で消えていた
-      # (中のアイテムは materials に全部残っていたので、分類だけを失っていた)。
-      - id: cat_20260731_em_exclusive
-        label: EM限定素材
-        itemIds:
-          - binder_fragment
-          - reality_thread_core
-          - abyssal_ingot
-      - id: cat_20260731_source_ladder
-        label: ソース階梯
-        itemIds:
-          - source_shard
-          - source_crystal
-          - source_condenser
-          - source_engine
-          - infinity_source_core
       - id: cat_dungeon_keys
         label: ダンジョンの鍵
         itemIds:
@@ -3371,6 +3663,24 @@ _editor:
       - salmon_1x
       - salmon_2x
       - salmon_3x
+      - hay_block_1x
+      - hay_block_2x
+      - hay_block_3x
+      - pumpkin_1x
+      - pumpkin_2x
+      - pumpkin_3x
+      - melon_1x
+      - melon_2x
+      - melon_3x
+      - glow_berries_1x
+      - glow_berries_2x
+      - glow_berries_3x
+      - sweet_berries_1x
+      - sweet_berries_2x
+      - sweet_berries_3x
+      - apple_1x
+      - apple_2x
+      - apple_3x
       - breeze_rod_1x
       - breeze_rod_2x
       - breeze_rod_3x
@@ -3394,7 +3704,7 @@ _editor:
       - gacha_ticket_3
       - gacha_ticket_4
       - gacha_ticket_5
-      - tf_scrap
+      - scrap
       - copper_ingot_scrap
       - iron_ingot_scrap
       - gold_ingot_scrap
