@@ -3498,8 +3498,10 @@ _editor:
           - guardian_spine
           - husk_cloth
           - bogged_mossy_bone
-          - parched_sandy_bone
           - binder_fragment
+          - parched_sandy_bone
+          # 2026-08-05: 「EM限定素材」カテゴリを廃止し、その3件をここへ統合した
+          # (EM限定という括りは分類として要らない、というユーザー判断)。
           - reality_thread_core
           - abyssal_ingot
       - id: cat_20260731_dungeon_seal
@@ -3524,22 +3526,12 @@ _editor:
           - dungeon_seal_hallosseum
           - dungeon_seal_north_pole
           - dungeon_seal_binder
-      # 2026-08-04 復旧: この2カテゴリは editor 保存の副作用で消えていた
-      # (中のアイテムは materials に全部残っていたので、分類だけを失っていた)。
-      - id: cat_20260731_em_exclusive
-        label: EM限定素材
-        itemIds:
-          - binder_fragment
-          - reality_thread_core
-          - abyssal_ingot
-      - id: cat_20260731_source_ladder
-        label: ソース階梯
-        itemIds:
-          - source_shard
-          - source_crystal
-          - source_condenser
-          - source_engine
-          - infinity_source_core
+      # 2026-08-05 ユーザー決定でカテゴリを2つ廃止した。
+      #   cat_20260731_em_exclusive (EM限定素材) → 「ドロップ素材」へ統合(3件を上へ移動済み)
+      #   cat_20260731_source_ladder (ソース階梯) → 「Ars(魔法)」へ統合
+      #     (ソース階梯の5件は元から Ars(魔法) にも入っていたので、こちらは純粋な削除)
+      # 2026-08-04 に「editor 保存の副作用で消えた」として復旧したカテゴリだが、
+      # 今回は意図的な削除。editor で再作成しないこと。
       - id: cat_dungeon_keys
         label: ダンジョンの鍵
         itemIds:
