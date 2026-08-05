@@ -2349,15 +2349,15 @@ materials:
       method: workbench
       type: shaped
       shape:
-        - adb
-        - cec
-        - bda
+        - abc
+        - def
+        - ghi
       ingredients:
-        a: custom:beef_3x
-        b: custom:porkchop_3x
-        c: custom:mutton_3x
-        d: custom:chicken_3x
-        e: custom:rabbit_3x
+        a: custom:compressed_cooked_beef_3x
+        b: custom:hoglin_tusk
+        c: custom:compressed_cooked_beef_3x
+        d: custom:piglin_ear
+        e: custom:emerald_block_3x
         f: custom:piglin_brute_plate
         g: custom:compressed_cooked_beef_3x
         h: custom:ravager_hide
@@ -2469,7 +2469,7 @@ materials:
     lore:
       - "&7&o手に持って右クリックすると、景品が1つ抽選される。"
       - "&8ごくまれに入手できる、最上級の景品プール。"
-  scrap:
+  tf_scrap:
     base_material: IRON_NUGGET
     custom_model_data: 5301
     display_name: "&7スクラップ"
@@ -3278,7 +3278,7 @@ _editor:
       - id: cat_1784733348418
         label: 中間素材
         itemIds:
-          - scrap
+          - tf_scrap
           - plank_scrap
           - copper_ingot_scrap
           - iron_ingot_scrap
@@ -3291,9 +3291,6 @@ _editor:
           - heavy_metal
           - hard_metal
           - reinforced_leather
-          - binder_fragment
-          - reality_thread_core
-          - abyssal_ingot
       - id: cat_1784625931991
         label: 圧縮ブロック
         itemIds:
@@ -3422,8 +3419,8 @@ _editor:
           - source_shard
           - source_crystal
           - source_condenser
-          - infinity_source_core
           - source_engine
+          - infinity_source_core
       - id: cat_1784733374294
         label: 食料
         itemIds:
@@ -3502,6 +3499,9 @@ _editor:
           - husk_cloth
           - bogged_mossy_bone
           - parched_sandy_bone
+          - binder_fragment
+          - reality_thread_core
+          - abyssal_ingot
       - id: cat_20260731_dungeon_seal
         label: ダンジョンの印
         itemIds:
@@ -3524,6 +3524,22 @@ _editor:
           - dungeon_seal_hallosseum
           - dungeon_seal_north_pole
           - dungeon_seal_binder
+      # 2026-08-04 復旧: この2カテゴリは editor 保存の副作用で消えていた
+      # (中のアイテムは materials に全部残っていたので、分類だけを失っていた)。
+      - id: cat_20260731_em_exclusive
+        label: EM限定素材
+        itemIds:
+          - binder_fragment
+          - reality_thread_core
+          - abyssal_ingot
+      - id: cat_20260731_source_ladder
+        label: ソース階梯
+        itemIds:
+          - source_shard
+          - source_crystal
+          - source_condenser
+          - source_engine
+          - infinity_source_core
       - id: cat_dungeon_keys
         label: ダンジョンの鍵
         itemIds:
@@ -3704,7 +3720,7 @@ _editor:
       - gacha_ticket_3
       - gacha_ticket_4
       - gacha_ticket_5
-      - scrap
+      - tf_scrap
       - copper_ingot_scrap
       - iron_ingot_scrap
       - gold_ingot_scrap
