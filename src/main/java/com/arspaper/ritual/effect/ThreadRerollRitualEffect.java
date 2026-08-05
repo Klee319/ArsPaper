@@ -18,8 +18,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -85,10 +83,6 @@ public class ThreadRerollRitualEffect implements RitualEffect {
             return;
         }
 
-        // 旧厳選の lore 行だけを取り除いてから新しい行を入れる（種類ごとの効果説明は残す）。
-        // rollSeed を上書きする前に、上書き前の識別子で旧lore行を確定させておく必要がある。
-        List<Component> previousRollLore = ThreadItem.rollLore(type, TrinityForgeBridge.readThreadIdentity(core));
-
         // quality は据え置き、rollSeed だけを新規発番して刻み直す。
         Optional<ThreadIdentity> rerolledOpt = TrinityForgeBridge.rerollThreadIdentity(core);
         if (rerolledOpt.isEmpty()) {
@@ -98,17 +92,10 @@ public class ThreadRerollRitualEffect implements RitualEffect {
         }
         ThreadIdentity rerolled = rerolledOpt.get();
 
-        core.editMeta(meta -> {
-            List<Component> current = meta.lore() == null ? List.<Component>of() : meta.lore();
-            List<Component> rebuilt = new ArrayList<>();
-            for (Component line : current) {
-                if (!previousRollLore.contains(line)) {
-                    rebuilt.add(line);
-                }
-            }
-            rebuilt.addAll(ThreadItem.rollLore(type, rerolled));
-            meta.lore(rebuilt);
-        });
+        // lore はまるごと組み直す(2026-08-05)。旧実装は「旧厳選の行と内容一致した行を消してから足す」
+        // 方式で、ステ部分が装備と同じ体裁(幅可変の区切り線を含む)になった以上、値の桁が変わると
+        // 古い区切り線が一致せず溜まり続ける。
+        core.editMeta(meta -> meta.lore(ThreadItem.fullLore(meta, type, rerolled)));
         RitualCore.setStoredItem(tileState, core);
 
         Location effectLoc = coreLocation.clone().add(0.5, 1.5, 0.5);

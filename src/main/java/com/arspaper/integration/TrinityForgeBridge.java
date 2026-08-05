@@ -1474,6 +1474,38 @@ public final class TrinityForgeBridge {
     }
 
     /**
+     * <b>装備とまったく同じ体裁</b>のステ lore ブロック(品質行【名匠】…pt / カテゴリ区切り線 /
+     * ロール色 / 確率付与色 / 乗算行つき)を TF の装備経路そのものから組む
+     * ({@code ItemFactory#statLoreBlock} → {@code ItemAssembler#statLoreBlock})。
+     *
+     * <p>2026-08-05 の要望「スレッドに表記するステータスの lore の体裁とフォントを通常の装備と
+     * 同じにしてほしい」への入口。{@link #threadStatLore} は<b>区切り線と品質行を落とし全行を
+     * fixed 色で描く</b>ので装備とは体裁が揃わない ── あちらは「他のアイテムの lore へ差し込む行」
+     * 専用(幅可変の区切り線が差し込み先に溜まる事故を避けるため)で、用途が違う。
+     *
+     * <p><b>この結果を「前回の行を内容一致で消してから足す」方式で使ってはいけない</b>:
+     * 区切り線の幅は最長行で決まるので、値の桁が変わると古い線が消えずに溜まる。
+     * スレッドの lore は必ず<b>まるごと組み直す</b>こと({@code ThreadItem#fullLore})。
+     *
+     * <p>TF 未ロード / 例外時は空リスト(呼び出し側は「行が無い」として扱えばよい)。
+     */
+    public static java.util.List<net.kyori.adventure.text.Component> threadEquipmentStyleLore(
+            Material material, Integer cmd, int quality, long rollSeed) {
+        if (material == null) {
+            return java.util.List.of();
+        }
+        try {
+            TrinityForge tf = TrinityForge.getInstance();
+            if (tf == null || tf.itemFactory() == null) {
+                return java.util.List.of();
+            }
+            return tf.itemFactory().statLoreBlock(material, cmd, quality, rollSeed);
+        } catch (Throwable t) {
+            return java.util.List.of();
+        }
+    }
+
+    /**
      * 品質ティアのラベル({@code stats/quality-tiers.yml} の name/color を通した【名匠】等)。
      * スレッド名の後ろに付ける品質表記の唯一の供給元 ── フォークで「品質3」等と数値表示しないこと
      * (TF 装備の品質表記と食い違う)。未ロード / 範囲外は {@link Optional#empty()}。

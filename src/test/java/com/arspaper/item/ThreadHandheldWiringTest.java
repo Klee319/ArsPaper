@@ -198,9 +198,12 @@ class ThreadHandheldWiringTest {
 
         String bridge = readSource("integration", "TrinityForgeBridge.java");
         assertTrue(bridge.contains("loreComposer().statLines("),
-                "threadStatLore が statLines(区切り線なし)を使っていない。compose を使うと"
-                        + "カテゴリごとに幅可変の ==== が入り、返却/リロールで旧行を内容一致で消している"
-                        + "経路(restoreRoll / ThreadRerollRitualEffect)に古い区切り線が溜まる。");
+                "threadStatLore が statLines(区切り線なし)を使っていない。差し込み用/チャット用の経路は"
+                        + "区切り線を含めてはいけない(幅可変なので差し込み先に溜まる)。");
+        assertTrue(bridge.contains("itemFactory().statLoreBlock("),
+                "スレッドアイテム自身の lore が TF の装備経路(statLoreBlock)を通っていない。"
+                        + "2026-08-05 の要望『スレッドのステ lore の体裁とフォントを通常の装備と同じに』は"
+                        + "品質行と区切り線を含む装備の lore 経路をそのまま使うことで満たしている。");
         assertFalse(bridge.contains("Optional<ThreadStatDisplay> threadStatDisplay"),
                 "自前連結を招く threadStatDisplay が復活している(撤去済み。理由は同ファイルのコメント)");
 

@@ -141,10 +141,28 @@ public class BackpackGui {
             List<net.kyori.adventure.text.Component> lore = meta.lore();
             if (lore == null) lore = new ArrayList<>();
             else lore = new ArrayList<>(lore);
-            lore.add(Component.text("※ アイテムデータ保持中", NamedTextColor.GOLD)
-                .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, true));
+            appendItemDataLore(meta, lore);
             meta.lore(lore);
         });
+    }
+
+    /**
+     * バックパックデータを保持しているスレッドにだけ「※ アイテムデータ保持中」行を足す。
+     *
+     * <p>スレッドの lore を<b>まるごと組み直す</b>経路({@code ThreadItem#fullLore})から呼ばれる:
+     * 組み直しでこの行を落とすと、中身は PDC に残っているのに表示だけ消えて
+     * 「バックパックの中身が消えた」と誤認される。行の文言/色をここに一本化しておくこと。
+     */
+    public static void appendItemDataLore(org.bukkit.inventory.meta.ItemMeta meta,
+                                          List<net.kyori.adventure.text.Component> lore) {
+        if (meta == null || lore == null) {
+            return;
+        }
+        if (!meta.getPersistentDataContainer().has(BACKPACK_THREAD_DATA_KEY, PersistentDataType.STRING)) {
+            return;
+        }
+        lore.add(Component.text("※ アイテムデータ保持中", NamedTextColor.GOLD)
+            .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, true));
     }
 
     /**

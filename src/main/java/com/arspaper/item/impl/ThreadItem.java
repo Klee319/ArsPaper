@@ -76,20 +76,57 @@ public class ThreadItem extends BaseCustomItem {
             meta.getPersistentDataContainer().set(
                 ItemKeys.THREAD_ITEM_TYPE, PersistentDataType.STRING, threadType.getId()
             );
-
-            List<Component> lore = new ArrayList<>();
-            if (threadType.hasEffect()) {
-                lore.addAll(com.arspaper.ArsPaper.getInstance().getThreadConfig().getEffectLore(threadType));
-            } else {
-                lore.add(Component.text("儀式で効果付きスレッドに変換できます", NamedTextColor.GRAY)
-                    .decoration(TextDecoration.ITALIC, false));
-            }
-            lore.addAll(rollLore(threadType, identity));
-            lore.add(Component.text("防具のスレッドスロットにセット可能", NamedTextColor.DARK_GRAY)
-                .decoration(TextDecoration.ITALIC, false));
-            meta.lore(lore);
+            meta.lore(fullLore(meta, threadType, identity));
         });
         return item;
+    }
+
+    /**
+     * スレッドアイテムの lore <b>全体</b>を組む。スレッドの lore を書き換える経路は
+     * 生成({@link #createItemStack(Player)})・返却({@code ThreadGui#restoreRoll})・
+     * 振り直し({@code ThreadRerollRitualEffect})の3つあり、<b>全部この1本でまるごと組み直す</b>。
+     *
+     * <p><b>部分書き換え(「前回の行を内容一致で消してから足す」)へ戻さないこと</b>:
+     * ステ部分は装備と同じ体裁になり幅可変の区切り線を含む(2026-08-05 の要望)。区切り線の幅は
+     * そのときの最長行で決まるので、値の桁が変わった瞬間に古い線が一致せず消えずに溜まる
+     * (2026-08-05 に一度踏んだ実害そのもの)。まるごと組み直せば桁が変わっても溜まらない。
+     *
+     * <p>バックパックデータ行は PDC を見て {@link com.arspaper.gui.BackpackGui#appendItemDataLore}
+     * が足す — 組み直しで落とすと「中身は残っているのに表示だけ消える」ため。
+     */
+    public static List<Component> fullLore(org.bukkit.inventory.meta.ItemMeta meta,
+                                           ThreadType type, ThreadIdentity identity) {
+        List<Component> lore = new ArrayList<>();
+        if (type != null && type.hasEffect()) {
+            lore.addAll(com.arspaper.ArsPaper.getInstance().getThreadConfig().getEffectLore(type));
+        } else {
+            lore.add(Component.text("儀式で効果付きスレッドに変換できます", NamedTextColor.GRAY)
+                .decoration(TextDecoration.ITALIC, false));
+        }
+        lore.addAll(equipmentStyleRollLore(type, identity));
+        lore.add(Component.text("防具のスレッドスロットにセット可能", NamedTextColor.DARK_GRAY)
+            .decoration(TextDecoration.ITALIC, false));
+        com.arspaper.gui.BackpackGui.appendItemDataLore(meta, lore);
+        return lore;
+    }
+
+    /**
+     * 厳選結果を<b>装備とまったく同じ体裁</b>で組んだ lore 行(品質行【名匠】…pt / カテゴリ区切り線 /
+     * ロール色つき)。2026-08-05 の要望「スレッドに表記するステータスの lore の体裁とフォントを
+     * 通常の装備と同じにしてほしい」への対応で、TF の装備経路そのもの
+     * ({@code ItemAssembler#statLoreBlock})へ丸投げしている。
+     *
+     * <p>差し込み用の {@link #rollLore}(区切り線・品質行なし)との使い分け:
+     * <b>まるごと組み直す先だけ</b>こちらを使う。他アイテムの lore へ差し込む/チャットへ流す用途は
+     * {@link #rollLore} のまま(区切り線が差し込み先に溜まる、チャットで無駄に幅を取る)。
+     */
+    public static List<Component> equipmentStyleRollLore(ThreadType type, ThreadIdentity identity) {
+        if (type == null || identity == null || !type.hasEffect()) {
+            return List.of();
+        }
+        return TrinityForgeBridge.threadEquipmentStyleLore(
+                type.getBaseMaterial(), type.getCustomModelData(),
+                identity.quality(), identity.rollSeed());
     }
 
     /**

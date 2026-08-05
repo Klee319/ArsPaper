@@ -426,7 +426,10 @@ public class ThreadGui extends BaseGui {
                 .decoration(TextDecoration.ITALIC, false));
         }
         ThreadSlotIdentity slotIdentity = ThreadSlotIdentity.decode(encodedRoll);
-        lore.addAll(ThreadItem.rollLore(type, new ThreadIdentity(slotIdentity.rollSeed(), slotIdentity.quality())));
+        // GUIのボタンはrender毎に作り直すので、区切り線つきの装備体裁でも溜まらない
+        // (アイテム本体の lore と同じ見た目に揃える。2026-08-05)。
+        lore.addAll(ThreadItem.equipmentStyleRollLore(
+            type, new ThreadIdentity(slotIdentity.rollSeed(), slotIdentity.quality())));
         lore.add(Component.text("クリックで取り外し", NamedTextColor.DARK_GRAY)
             .decoration(TextDecoration.ITALIC, false));
 
@@ -500,20 +503,13 @@ public class ThreadGui extends BaseGui {
     private static void restoreRoll(ItemStack threadItem, String encodedRoll) {
         ThreadSlotIdentity slotIdentity = ThreadSlotIdentity.decode(encodedRoll);
         ThreadType type = threadTypeOf(threadItem);
-        ThreadIdentity fresh = TrinityForgeBridge.readThreadIdentity(threadItem);
-        List<Component> freshLore = ThreadItem.rollLore(type, fresh);
         ThreadIdentity saved = new ThreadIdentity(slotIdentity.rollSeed(), slotIdentity.quality());
         threadItem.editMeta(meta -> {
             TrinityForgeBridge.writeItemRoll(meta, saved.rollSeed(), saved.quality());
-            List<Component> current = meta.lore() == null ? List.<Component>of() : meta.lore();
-            List<Component> rebuilt = new ArrayList<>();
-            for (Component line : current) {
-                if (!freshLore.contains(line)) {
-                    rebuilt.add(line);
-                }
-            }
-            rebuilt.addAll(ThreadItem.rollLore(type, saved));
-            meta.lore(rebuilt);
+            // まるごと組み直す(2026-08-05)。旧実装は「新しい厳選の行と内容一致した行を消してから足す」
+            // 方式で、ステ部分が装備と同じ体裁(幅可変の区切り線を含む)になった以上、桁が変わると
+            // 古い区切り線が一致せず溜まり続ける。組み直しなら桁が変わっても溜まらない。
+            meta.lore(ThreadItem.fullLore(meta, type, saved));
         });
     }
 
