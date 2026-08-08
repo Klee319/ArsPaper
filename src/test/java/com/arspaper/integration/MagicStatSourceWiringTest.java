@@ -99,7 +99,10 @@ class MagicStatSourceWiringTest {
         String bridge = read("integration/TrinityForgeBridge.java");
         assertTrue(bridge.contains("ItemStack statSource = resolveMagicStatSource(catalyst, castItem);"),
                 "magicalFinalDamage は statSource を1回だけ解決する必要がある");
-        assertTrue(bridge.contains("resolveMagicAttackStats(casterUuid, statSource)"),
+        // 引数リスト全体ではなく「同じ statSource を渡していること」だけを見る。ここを閉じ括弧まで
+        // 固定していたため、2026-08-08 にエンチャント補正(enchantBonuses)を足しただけで
+        // 不変条件は保たれているのに赤くなった。守りたいのは引数の個数ではなく供給元の一致。
+        assertTrue(bridge.contains("resolveMagicAttackStats(casterUuid, statSource"),
                 "攻撃ステ(会心/貫通)も同じ statSource から引く必要がある");
         assertTrue(bridge.contains("notifyMagicBleed(casterUuid, victim, statSource,"),
                 "魔法出血が読む集約と魔法ダメージが読む集約を一致させる既存要件"

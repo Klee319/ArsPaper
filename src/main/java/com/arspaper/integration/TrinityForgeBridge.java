@@ -9,6 +9,7 @@ import com.trinityforge.combat.AddonCombatStats;
 import com.trinityforge.combat.AttackStats;
 import com.trinityforge.combat.CombatHitResult;
 import com.trinityforge.combat.CritFlash;
+import com.trinityforge.combat.EnchantmentStatBridge;
 import com.trinityforge.combat.PlayerStatAggregator;
 import com.trinityforge.combat.SymmetricCombatService;
 import com.trinityforge.combat.WeaponAttackStatResolver;
@@ -218,8 +219,23 @@ public final class TrinityForgeBridge {
         // なく「実際に詠唱に使った杖(castItem)」も含む。TFカタログの杖11本は catalysts.yml に
         // 載っていないため、以前は触媒引数が魔導書に化けて杖の attack-power が完全に落ちていた。
         ItemStack statSource = resolveMagicStatSource(catalyst, castItem);
+        // 2026-08-08: ステへ加算できるエンチャントを魔法にも効かせる(近接と対称)。
+        // それまで魔法側は item-stats の生の attack-power しか読んでおらず、ダメージ増加/特攻/
+        // 破壊(Breach)が「杖に付けられるのに一切効かない」状態だった。物理側は CombatListener が
+        // 同じ EnchantmentStatBridge を通しているので、係数(ダメージ増加 +5%/lv・特攻 +7.5%/lv・
+        // Breach 貫通 +10%/lv)はそちらと共通で、ここで新しい数値は一切定義しない。
+        //
+        // 二重計上は起きない: adjustedAttackPower の呼び出し元は CombatListener(近接専用)だけで、
+        // PlayerStatAggregator / WeaponAttackStatResolver はエンチャントを集計に含めない。
+        //
+        // victim を渡すのが要点 — 特攻(Smite/Bane/Impaling)は対象の種類が一致したときだけ乗る。
+        // null を渡すと特攻が黙って落ちて「アンデッドに聖なる力が効かない」形のバグになる。
+        EnchantmentStatBridge.Bonuses enchantBonuses =
+                EnchantmentStatBridge.bonuses(statSource, victim);
+        double enchantedAttackPower = EnchantmentStatBridge.adjustedAttackPower(
+                itemAttackPower(statSource), enchantBonuses);
         double effectiveBase = MagicStatSourcePolicy.effectiveBase(
-                spellBase, itemAttackPower(statSource), magicalAttackPowerScale());
+                spellBase, enchantedAttackPower, magicalAttackPowerScale());
         // 2026-08-02: 増幅(Amplify)の乗算ボーナス。「グリフ基礎＋杖の攻撃力」の合計へ掛ける
         // (理由は MagicStatSourcePolicy#applyAmplifyMultiplier の javadoc — グリフ基礎だけに
         // 掛けると触媒ビルドで実質無効になるのが変更の動機そのものなので、glyph倍率と同じ層で掛ける)。
@@ -233,7 +249,8 @@ public final class TrinityForgeBridge {
         try {
             // service が effectiveBase を defaultDamage として注入し、攻撃ステ(会心/貫通等)を別レイヤーで加味する。
             CombatHitResult hit = service.magicalFinalDamageResult(
-                    casterUuid, victim, effectiveBase, resolveMagicAttackStats(casterUuid, statSource));
+                    casterUuid, victim, effectiveBase,
+                    resolveMagicAttackStats(casterUuid, statSource, enchantBonuses));
             if (hit.crit()) {
                 CritFlash.play(victim);
             }
@@ -333,7 +350,8 @@ public final class TrinityForgeBridge {
      *
      * @param statSource {@link #resolveMagicStatSource} が選んだステ供給元。無ければ {@code null}
      */
-    private static AttackStats resolveMagicAttackStats(UUID casterUuid, ItemStack statSource) {
+    private static AttackStats resolveMagicAttackStats(UUID casterUuid, ItemStack statSource,
+                                                       EnchantmentStatBridge.Bonuses enchantBonuses) {
         try {
             Player caster = casterUuid != null ? Bukkit.getPlayer(casterUuid) : null;
             if (caster == null) {
@@ -352,6 +370,15 @@ public final class TrinityForgeBridge {
             // メインハンド武器が乗算対象に含まれるのと対称にするため、TF側の集計APIへ渡す。
             Map<String, Double> attackerStats = new LinkedHashMap<>(
                     aggregator.aggregateExcludingMainhandWith(caster, statSource));
+            // 2026-08-08: 破壊(Breach)の貫通を TF の貫通ステへ加算する。合算マップへ merge するのは
+            // CombatListener(近接)と同じ位置 — bridgeStats の内側にある乗算レイヤを同じように通す
+            // ため。AttackStats を後から組み直すと乗算の外側になり近接と値がズレる。
+            // fail-open のフォールバック(詠唱者オフライン/TF未ロード)では集計自体を行わないので、
+            // そちらはエンチャント分も乗らない(従来の安全側フォールバックと同じ扱い)。
+            if (enchantBonuses != null && enchantBonuses.penetrationBonus() > 0) {
+                attackerStats.merge(StatKeys.canonical("penetration"),
+                        enchantBonuses.penetrationBonus(), Double::sum);
+            }
             return resolver.bridgeStats(attackerStats);
         } catch (Throwable t) {
             return resolveCatalystStats(statSource);
