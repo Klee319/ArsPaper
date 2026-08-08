@@ -42,6 +42,8 @@ public class SpellCaster {
     private final Map<UUID, Long> glyphCacheExpiry = new ConcurrentHashMap<>();
     /** form別CT秒数(ms換算)。config.yml の form-cooldowns から設定駆動で読み込む。 */
     private volatile Map<String, Long> formCooldownMs = Map.of();
+    /** 詠唱1回あたりの杖の耐久消費。config.yml の cast-durability から読み込む。 */
+    private volatile CastDurabilityPolicy castDurability = CastDurabilityPolicy.DISABLED;
     /** 使用ゲート（perk所持→glyph使用許可）。 */
     private final UsageGate usageGate;
 
@@ -69,6 +71,8 @@ public class SpellCaster {
             }
         }
         this.formCooldownMs = Map.copyOf(newMap);
+        this.castDurability = CastDurabilityPolicy.from(
+            ArsPaper.getInstance().getConfig().getConfigurationSection("cast-durability"));
     }
 
     /**
@@ -417,6 +421,10 @@ public class SpellCaster {
             return false;
         }
 
+        // M-5: 詠唱に使ったアイテム(杖)の耐久を消費する。キャンセル時はマナを返すのと同じ理屈で
+        // 減らさないので、必ず上の isCancelled ブロックより後に置くこと。
+        consumeCastDurability(caster, effectiveCastItem);
+
         // P9: 触媒詠唱成功時にアイテムクールダウンゲージ(武器CT相当)を表示する。触媒の実クールダウン
         // (catalystData.cooldownMs())をフォールバック秒として渡し、触媒の解決済みitem-cooldownステが
         // あればそちらを優先する。触媒未使用(catalystData==null)の詠唱には何も表示しない(従来挙動)。
@@ -436,6 +444,81 @@ public class SpellCaster {
         caster.sendActionBar(Component.text("§d" + recipe.getName()));
 
         return true;
+    }
+
+    /**
+     * 詠唱に使ったアイテム(杖)の耐久を1詠唱ぶん減らす。
+     *
+     * <p><b>減らす対象は「手に持っている実体」だけ</b>: {@code effectiveCastItem} は
+     * PlayerInteractEvent 由来のスタックで、実装によっては<b>インベントリのコピー</b>が来る。
+     * コピーを書き換えても手持ちの耐久は1も減らない（＝実機で「減らない」と報告されるまで気づけない）ので、
+     * メインハンド／オフハンドを照合してから<b>そのスロットの実体</b>を減らして置き直す。
+     * どちらの手でもない詠唱（将来の遠隔経路など）は対象外にする。
+     *
+     * <p><b>{@code damageItemStack} を使わないのは意図的</b>: MockBukkit 未実装で、TF 側では
+     * テストが失敗ではなく SKIPPED に化ける既知の罠。TF の {@code ChainBreakSupport#damageHeldTool} と
+     * 同じく {@link org.bukkit.inventory.meta.Damageable} を直接操作する。
+     *
+     * <p>最大耐久0の素材（魔導書の BOOK、旧素材の BLAZE_ROD）は自動的に無視される。
+     * つまり<b>剣系へ移した杖だけが減る</b>ので、配布済みの旧杖を壊してしまうこともない。
+     */
+    private void consumeCastDurability(Player caster, org.bukkit.inventory.ItemStack castItem) {
+        CastDurabilityPolicy policy = castDurability;
+        if (policy == null || !policy.enabled() || castItem == null || castItem.getType().isAir()) {
+            return;
+        }
+        if (caster.getGameMode() == org.bukkit.GameMode.CREATIVE
+                || caster.getGameMode() == org.bukkit.GameMode.SPECTATOR) {
+            return;
+        }
+        org.bukkit.inventory.PlayerInventory inventory = caster.getInventory();
+        org.bukkit.inventory.EquipmentSlot slot;
+        org.bukkit.inventory.ItemStack held;
+        if (castItem.isSimilar(inventory.getItemInMainHand())) {
+            slot = org.bukkit.inventory.EquipmentSlot.HAND;
+            held = inventory.getItemInMainHand();
+        } else if (castItem.isSimilar(inventory.getItemInOffHand())) {
+            slot = org.bukkit.inventory.EquipmentSlot.OFF_HAND;
+            held = inventory.getItemInOffHand();
+        } else {
+            return;
+        }
+
+        org.bukkit.inventory.meta.ItemMeta meta = held.getItemMeta();
+        if (!(meta instanceof org.bukkit.inventory.meta.Damageable damageable) || meta.isUnbreakable()) {
+            return;
+        }
+        int maxDurability = damageable.hasMaxDamage()
+            ? damageable.getMaxDamage()
+            : held.getType().getMaxDurability();
+        if (maxDurability <= 0) {
+            return; // BOOK / BLAZE_ROD など耐久を持たない素材
+        }
+        int amount = policy.damageFor(
+            held.getEnchantmentLevel(org.bukkit.enchantments.Enchantment.UNBREAKING),
+            java.util.concurrent.ThreadLocalRandom.current().nextDouble());
+        if (amount <= 0) {
+            return;
+        }
+        int next = damageable.getDamage() + amount;
+        if (next >= maxDurability) {
+            setHeld(inventory, slot, null);
+            caster.playSound(caster, org.bukkit.Sound.ENTITY_ITEM_BREAK, 1.0f, 1.0f);
+            return;
+        }
+        damageable.setDamage(next);
+        held.setItemMeta(meta);
+        setHeld(inventory, slot, held);
+    }
+
+    private static void setHeld(org.bukkit.inventory.PlayerInventory inventory,
+                                org.bukkit.inventory.EquipmentSlot slot,
+                                org.bukkit.inventory.ItemStack item) {
+        if (slot == org.bukkit.inventory.EquipmentSlot.OFF_HAND) {
+            inventory.setItemInOffHand(item);
+        } else {
+            inventory.setItemInMainHand(item);
+        }
     }
 
     /**
