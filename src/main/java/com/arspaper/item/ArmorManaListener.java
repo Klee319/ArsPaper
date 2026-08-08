@@ -28,11 +28,10 @@ import org.bukkit.plugin.java.JavaPlugin;
 import com.arspaper.integration.TrinityForgeBridge;
 
 import java.util.EnumMap;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * プレイヤーの装備状態を監視し、マナボーナスを計算・更新する。
@@ -51,18 +50,14 @@ public class ArmorManaListener implements Listener {
     private final JavaPlugin plugin;
 
     /**
-     * スレッドが付与しうるポーション効果の全種。{@link #updatePotionEffects} はこの配列だけを
-     * 走査して付与/解除するので、{@link ThreadType} にポーション系スレッドを足したら
-     * ここにも足すこと ── 漏らすと【付けても効かず、外しても剥がれない】(どちらも無言)。
+     * スレッドが付与しうるポーション効果の全種は、もう固定配列ではなく
+     * {@link ThreadConfig#allPotionTypes()} が動的に返す(2026-08-08、threads.yml の
+     * {@code potion-effect:} でスレッドごとに型を選べるようにした際に動的化)。
+     * {@link #updatePotionEffects} はこの動的集合を都度取得して走査する ── ここが静的配列の
+     * ままだと、config で新しい型を選べても【付けても効かず、外しても剥がれない】(どちらも無言)。
+     * 新しい許可効果を増やすときは {@link ThreadConfig#ALLOWED_POTION_EFFECTS} を編集すればよく、
+     * このクラスを触る必要はない。
      */
-    private static final PotionEffectType[] THREAD_POTION_TYPES = {
-        PotionEffectType.SPEED, PotionEffectType.JUMP_BOOST,
-        PotionEffectType.NIGHT_VISION, PotionEffectType.FIRE_RESISTANCE,
-        PotionEffectType.DOLPHINS_GRACE, PotionEffectType.CONDUIT_POWER,
-        PotionEffectType.HERO_OF_THE_VILLAGE, PotionEffectType.HEALTH_BOOST,
-        // 2026-08-02 スレッド16→40種で追加。SLOW_FALLING/LUCK はどちらもバニラ実在。
-        PotionEffectType.SLOW_FALLING, PotionEffectType.LUCK
-    };
 
     public ArmorManaListener(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -185,7 +180,8 @@ public class ArmorManaListener implements Listener {
         int manaMaxPercent;
         int regenPercent;
         boolean flightThread;
-        final Set<PotionEffectType> potions = new HashSet<>();
+        /** 型 → amplifier(レベル-1)。同じ型を複数のスレッドが与える場合は amplifier の最大値を採る。 */
+        final Map<PotionEffectType, Integer> potions = new HashMap<>();
         /** 装着スレッド1個ごとの厳選ステ + item-stats ステの合計(canonical化はTF側)。 */
         final Map<String, Double> combatStats = new LinkedHashMap<>();
         /** 同種スレッドの合計個数(thread-sets.yml の累積しきい値判定用)。 */
@@ -264,7 +260,7 @@ public class ArmorManaListener implements Listener {
         int totalMaxPercent = totals.manaMaxPercent;
         int totalRegenPercent = totals.regenPercent;
         boolean hasFlightThread = totals.flightThread;
-        Set<PotionEffectType> activeThreadPotions = totals.potions;
+        Map<PotionEffectType, Integer> activeThreadPotions = totals.potions;
         Map<String, Double> threadCombatStats = totals.combatStats;
         Map<ThreadType, Integer> threadCounts = totals.counts;
 
@@ -310,7 +306,7 @@ public class ArmorManaListener implements Listener {
         playerPdc.set(ManaKeys.THREAD_MANA_MAX_PERCENT, PersistentDataType.INTEGER, totalMaxPercent);
         playerPdc.set(ManaKeys.THREAD_REGEN_PERCENT, PersistentDataType.INTEGER, totalRegenPercent);
 
-        updatePotionEffects(player, activeThreadPotions);
+        updatePotionEffects(player, activeThreadPotions, threadConfig);
 
         // 飛行スレッド: エリトラなしで滑空可能にする（インスタンスメソッド呼出）
         ArmorManaListener listener = ArsPaper.getInstance().getArmorManaListener();
@@ -376,10 +372,17 @@ public class ArmorManaListener implements Listener {
             totals.regenPercent += threadConfig.getRegenPercent(thread);
             totals.hitRecovery += threadConfig.getHitManaRecovery(thread);
             totals.damageRecovery += threadConfig.getDamageManaRecovery(thread);
-            if (ambient && thread.hasPotionEffect()) {
-                totals.potions.add(thread.getPotionEffect());
+            if (ambient) {
+                // config優先(ThreadConfig#getPotionEffect)で解決する。潜在的な型は
+                // ThreadConfig#allPotionTypes() が超集合として持つので、ここで見つかった型は
+                // 必ず updatePotionEffects の走査対象に含まれる。
+                PotionEffectType potionType = threadConfig.getPotionEffect(thread);
+                if (potionType != null) {
+                    int amplifier = threadConfig.getPotionLevel(thread) - 1;
+                    totals.potions.merge(potionType, amplifier, Integer::max);
+                }
             }
-            if (ambient && thread.isFlightThread()) {
+            if (ambient && threadConfig.isFlightThread(thread)) {
                 totals.flightThread = true;
             }
 
@@ -467,31 +470,40 @@ public class ArmorManaListener implements Listener {
     }
 
     /**
-     * スレッド由来の効果は「無期限 かつ 振幅0」を自前の署名とみなす。
+     * スレッド由来の効果は「無期限(isInfinite)」を自前の署名とみなす。
      *
      * <p>2026-07-26: 以前は付与側が無条件 {@code addPotionEffect} で、Bukkit の仕様上これは
      * 同種の既存効果を**上書き**する。そのため HEALTH_BOOST スレッドを装備したまま
      * 体力増強II（振幅1）のポーションを飲むと、次の再計算（ホットバーのスクロールでも走る）で
      * レベル1・無期限に書き換えられていた。解除側も「無期限なら剥がす」だけで自前由来かを
      * 判定しておらず、他ソースの無期限効果を誤爆で剥がし得た。
+     *
+     * <p><b>2026-08-08</b>: amplifier<=0 の判定条件は削除した。potion-level(1以上)対応で
+     * 自前付与の amplifier が0以外にもなるため、amplifier で自前判定すると
+     * レベル2以上のスレッドを外したときに解除できなくなる(【外しても剥がれない】の再発)。
+     * 無期限(isInfinite)であることが唯一の識別子で、バニラの通常ポーションは必ず有限期間なので
+     * amplifierを見なくても誤検出しない。
      */
     private static boolean isThreadGranted(PotionEffect effect) {
         if (effect == null) return false;
-        boolean endless = effect.isInfinite() || effect.getDuration() >= Integer.MAX_VALUE - 100;
-        return endless && effect.getAmplifier() <= 0;
+        return effect.isInfinite() || effect.getDuration() >= Integer.MAX_VALUE - 100;
     }
 
-    private static void updatePotionEffects(Player player, Set<PotionEffectType> activeThreadPotions) {
-        for (PotionEffectType type : THREAD_POTION_TYPES) {
+    private static void updatePotionEffects(Player player, Map<PotionEffectType, Integer> activeThreadPotions,
+                                             ThreadConfig threadConfig) {
+        for (PotionEffectType type : threadConfig.allPotionTypes()) {
             PotionEffect existing = player.getPotionEffect(type);
-            if (activeThreadPotions.contains(type)) {
+            Integer desiredAmplifier = activeThreadPotions.get(type);
+            if (desiredAmplifier != null) {
                 // 既により強い効果（ポーション等）が乗っているなら格下げしない。
-                // その効果が切れた後は次の再計算（装備変更/持ち替え/参加/リスポーン）で復帰する。
-                if (existing != null && existing.getAmplifier() > 0) {
+                // amplifierが常に0だった前提の旧判定(ゼロより大きいかだけを見る比較)だと、
+                // レベル2以上のスレッド(desiredAmplifier が1以上)が自分自身の付与済み効果を
+                // 「既存のほうが強い」と誤判定し一生付かなくなる。desiredAmplifierとの比較に直す。
+                if (existing != null && existing.getAmplifier() > desiredAmplifier) {
                     continue;
                 }
                 player.addPotionEffect(new PotionEffect(
-                    type, POTION_DURATION, 0, true, false, true
+                    type, POTION_DURATION, desiredAmplifier, true, false, true
                 ));
             } else if (isThreadGranted(existing)) {
                 player.removePotionEffect(type);

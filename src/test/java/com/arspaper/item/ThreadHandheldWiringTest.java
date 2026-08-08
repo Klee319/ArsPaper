@@ -115,10 +115,14 @@ class ThreadHandheldWiringTest {
 
         assertTrue(source.contains("ThreadApplicationPolicy.appliesAmbientEffects(origin)"),
                 "常時効果のスロット判定が policy を経由していない");
-        assertTrue(source.contains("if (ambient && thread.hasPotionEffect())"),
+        // 2026-08-08: potion-effect の config 上書き(ThreadConfig#getPotionEffect)対応で
+        // thread.hasPotionEffect() 直読みから threadConfig.getPotionEffect(thread) != null へ
+        // 変わった。判定の入口が ambient のif分岐であることは変わらない。
+        assertTrue(source.contains("if (ambient) {")
+                        && source.contains("PotionEffectType potionType = threadConfig.getPotionEffect(thread);"),
                 "ポーション効果がスロット判定なしで立っている。手持ちで発動すると"
                         + "持ち替えのたびに点滅する(除外の理由は ThreadApplicationPolicy の javadoc)。");
-        assertTrue(source.contains("if (ambient && thread.isFlightThread())"),
+        assertTrue(source.contains("if (ambient && threadConfig.isFlightThread(thread))"),
                 "飛行スレッドがスロット判定なしで立っている。剣を握っただけで滑空が付く。");
     }
 

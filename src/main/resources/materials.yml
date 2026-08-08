@@ -1372,6 +1372,108 @@ materials:
         - iii
         - iii
         - iii
+  baked_potato_1x:
+    base_material: BAKED_POTATO
+    custom_model_data: 252
+    display_name: 圧縮ベイクドポテト
+    enchant_glow: false
+    lore:
+      - "&7&o9個分のベイクドポテトを1個に凝縮した保存食。"
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: BAKED_POTATO
+      shape:
+        - iii
+        - iii
+        - iii
+  cooked_porkchop_1x:
+    base_material: COOKED_PORKCHOP
+    custom_model_data: 253
+    display_name: 圧縮焼き豚
+    enchant_glow: false
+    lore:
+      - "&7&o9個分の焼き豚を1個に凝縮した保存食。"
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: COOKED_PORKCHOP
+      shape:
+        - iii
+        - iii
+        - iii
+  cooked_mutton_1x:
+    base_material: COOKED_MUTTON
+    custom_model_data: 254
+    display_name: 圧縮焼き羊肉
+    enchant_glow: false
+    lore:
+      - "&7&o9個分の焼き羊肉を1個に凝縮した保存食。"
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: COOKED_MUTTON
+      shape:
+        - iii
+        - iii
+        - iii
+  cooked_chicken_1x:
+    base_material: COOKED_CHICKEN
+    custom_model_data: 255
+    display_name: 圧縮焼き鳥
+    enchant_glow: false
+    lore:
+      - "&7&o9個分の焼き鳥を1個に凝縮した保存食。"
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: COOKED_CHICKEN
+      shape:
+        - iii
+        - iii
+        - iii
+  cookie_1x:
+    base_material: COOKIE
+    custom_model_data: 256
+    display_name: 圧縮クッキー
+    enchant_glow: false
+    lore:
+      - "&7&o9個分のクッキーを1個に凝縮した保存食。"
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: COOKIE
+      shape:
+        - iii
+        - iii
+        - iii
+  pumpkin_pie_1x:
+    base_material: PUMPKIN_PIE
+    custom_model_data: 257
+    display_name: 圧縮パンプキンパイ
+    enchant_glow: false
+    lore:
+      - "&7&o9個分のパンプキンパイを1個に凝縮した保存食。"
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: PUMPKIN_PIE
+      shape:
+        - iii
+        - iii
+        - iii
   carrot_1x:
     base_material: CARROT
     custom_model_data: 184
@@ -3431,6 +3533,12 @@ _editor:
           - compressed_bread_2x
           - compressed_cooked_beef_2x
           - compressed_cooked_beef_3x
+          - baked_potato_1x
+          - cooked_porkchop_1x
+          - cooked_mutton_1x
+          - cooked_chicken_1x
+          - cookie_1x
+          - pumpkin_pie_1x
           - carrot_1x
           - carrot_2x
           - carrot_3x
@@ -3641,6 +3749,12 @@ _editor:
       - echo_shard_1x
       - compressed_bread_1x
       - compressed_cooked_beef_1x
+      - baked_potato_1x
+      - cooked_porkchop_1x
+      - cooked_mutton_1x
+      - cooked_chicken_1x
+      - cookie_1x
+      - pumpkin_pie_1x
       - carrot_1x
       - carrot_2x
       - carrot_3x
