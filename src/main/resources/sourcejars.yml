@@ -8,14 +8,23 @@
 # =============================================================================
 
 # 設定リファレンス(本文コメント移設先): docs/config-reference/arspaper/sourcejars.md
+
 jars:
+  # 【capacity 10,000 → 20,000 (2026-08-08)】
+  #   TF カタログの儀式191件のソース費用は中央値 15,000 で、10,000 のままだと
+  #   191件中99件が「ジャー1個では足りない」= 最初のジャーを作った直後の儀式がまず通らない。
+  #   儀式は半径5・y±2 の箱にあるジャーを全部合算して吸うので複数置けば回るが、
+  #   「基本ジャーが典型的なレシピ1回分すら入らない」のは入口として重すぎる。
+  #   20,000 にすると中央値を1個でまかなえて、なお191件中55件は複数ジャーが要る
+  #   (=下の「増やす vs 良いのに替える」パズルは残る)。
+  #   ⚠ この値を変えると上位ジャーとの比も変わる (source_jar_ii へは 5.0倍 → 2.5倍)。
   source_jar:
     material: DECORATED_POT
-    display-name: "ソースジャー"
+    display-name: ソースジャー
     custom-model-data: 200002
-    capacity: 10000
+    capacity: 20000
     lore:
-      - "魔法のソースエネルギーを貯蔵"
+      - 魔法のソースエネルギーを貯蔵
     recipe:
       method: workbench
       type: shaped
@@ -28,11 +37,11 @@ jars:
         S: custom:source_berry
   creative_source_jar:
     material: DECORATED_POT
-    display-name: "クリエイティブソースジャー"
+    display-name: クリエイティブソースジャー
     custom-model-data: 200003
     capacity: -1
     lore:
-      - "無限のソースエネルギーを供給"
+      - 無限のソースエネルギーを供給
 
   # ===========================================================================
   # 上位ジャー階梯 (2026-07-31 追加) — 「1億ソース」目標の貯蔵側
@@ -61,6 +70,10 @@ jars:
   # 【バランスの調整レバー】capacity と recipe.source の2つだけ。触媒の「燃やすと何点か」は
   #   sourcelinks.yml 側。段数を増やしたい/減らしたいときは、ここに段を足すか消すだけでよい
   #   (Java 側は id を一切知らない)。
+  #
+  # ⚠ このコメント塊は 2026-08-08 に復元したもの。設定エディタで sourcejars.yml を保存すると
+  #   本文途中のコメントが落ちる (yamlio.serializeConfig の既存仕様)。落ちていたら
+  #   git の履歴から戻すこと — ここが階梯の設計意図が書いてある唯一の場所。
   # ===========================================================================
   source_jar_ii:
     material: DECORATED_POT
@@ -68,8 +81,8 @@ jars:
     custom-model-data: 200004
     capacity: 50000
     lore:
-      - "欠片を砕いて練り込んだ壺"
-      - "容量 50,000"
+      - 欠片を砕いて練り込んだ壺
+      - 容量 50,000
     recipe:
       method: ritual
       core-item: custom:source_jar
@@ -78,51 +91,59 @@ jars:
         - BRICK x4
       source: 500
       result: custom:source_jar_ii
+      type: shapeless
+      ingredients: []
   source_jar_iii:
     material: DECORATED_POT
     display-name: "&3結晶の大甕"
     custom-model-data: 200005
     capacity: 250000
     lore:
-      - "内側を結晶で張った大甕"
-      - "容量 250,000"
+      - 内側を結晶で張った大甕
+      - 容量 250,000
     recipe:
       method: ritual
       core-item: custom:source_jar_ii
       pedestal-items:
         - custom:source_crystal x4
         - PRISMARINE_BRICKS x4
-      source: 12000
+      source: 50000
       result: custom:source_jar_iii
+      type: shapeless
+      ingredients: []
   source_reservoir:
     material: DECORATED_POT
     display-name: "&9ソース貯水槽"
     custom-model-data: 200006
     capacity: 2000000
     lore:
-      - "ひとつで小さな湖ほどのソースを抱える"
-      - "容量 2,000,000"
+      - ひとつで小さな湖ほどのソースを抱える
+      - 容量 2,000,000
     recipe:
       method: ritual
       core-item: custom:source_jar_iii
       pedestal-items:
         - custom:source_condenser x4
         - custom:source_gem_block x2
-      source: 300000
+      source: 250000
       result: custom:source_reservoir
+      type: shapeless
+      ingredients: []
   source_singularity_jar:
     material: DECORATED_POT
     display-name: "&5特異点の壺"
     custom-model-data: 200007
     capacity: 50000000
     lore:
-      - "内側が外側より広い。覗き込まないこと"
-      - "容量 50,000,000"
+      - 内側が外側より広い。覗き込まないこと
+      - 容量 50,000,000
     recipe:
       method: ritual
       core-item: custom:source_reservoir
       pedestal-items:
         - custom:source_engine x4
         - custom:tf_core_jewelry
-      source: 3000000
+      source: 2000000
       result: custom:source_singularity_jar
+      type: shapeless
+      ingredients: []

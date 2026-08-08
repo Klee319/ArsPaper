@@ -19,7 +19,14 @@ import java.util.logging.Logger;
  */
 public final class SourceJarConfig {
 
-    public static final int FALLBACK_CAPACITY = 10000;
+    /**
+     * sourcejars.yml が読めなかった/ジャーidが引けなかったときの容量。
+     *
+     * <p>出荷 yml の {@code jars.source_jar.capacity} と同じ値にしておくこと
+     * (ズレていると「設定が読めない時だけ容量が変わる」= 再現しない不具合になる)。
+     * 2026-08-08 に 10,000 → 20,000。理由は sourcejars.yml の該当コメント。
+     */
+    public static final int FALLBACK_CAPACITY = 20000;
 
     public record JarDef(
             String id,

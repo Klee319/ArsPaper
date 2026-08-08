@@ -91,6 +91,24 @@ public class SourceJar extends CustomBlock {
     }
 
     /**
+     * そのジャー個体が満杯か。<b>投入経路はすべてここを通すこと</b>。
+     *
+     * <p>2026-08-08 追加。以前はホッパー投入だけが static 定数 {@link #MAX_SOURCE}
+     * (=設定未読込時のフォールバック 10,000) と比べており、手投入だけが
+     * {@link #maxSource(TileState)} を見ていた。そのため上位ジャーでは
+     * 「手では入るのにホッパーでは 10,000 で止まる」というズレが出る。
+     * 容量を解決する場所を1箇所に畳んで、経路ごとに食い違えないようにする。
+     *
+     * <p>無限ジャー(クリエイティブ)は常に {@code false}。
+     */
+    public static boolean isFull(TileState tileState) {
+        if (isInfinite(tileState)) {
+            return false;
+        }
+        return getSourceAmount(tileState) >= maxSource(tileState);
+    }
+
+    /**
      * sourcejars.yml に定義済みのジャーidかどうか。儀式・ソースリンク・パーティクルの
      * 「これはジャーか」判定はすべてここを通す({@code "source_jar"} の決め打ちを置き換えた)。
      * 設定が読めない場合は既定の2種だけを真とみなし、最低限の互換を保つ。
@@ -231,7 +249,7 @@ public class SourceJar extends CustomBlock {
                 .get(ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING);
             if ("source_berry".equals(customId) && !isInfinite(tileState)) {
                 int currentSource = getSourceAmount(tileState);
-                if (currentSource >= maxSource(tileState)) {
+                if (isFull(tileState)) {
                     player.sendMessage(Component.text("ソースジャーは満タンです", NamedTextColor.YELLOW));
                     return;
                 }

@@ -393,8 +393,11 @@ public class CustomBlockListener implements Listener {
                 if ("source_berry".equals(customItemId)) {
                     int sourcePerBerry = 100; // ソースベリー1個=100ソース
                     if (!com.arspaper.block.impl.SourceJar.isInfinite(destTile)) {
-                        int current = com.arspaper.block.impl.SourceJar.getSourceAmount(destTile);
-                        if (current < com.arspaper.block.impl.SourceJar.MAX_SOURCE) {
+                        // ⚠ 容量判定は SourceJar#isFull に一本化してある。
+                        //    ここで static 定数 SourceJar.MAX_SOURCE(=フォールバック 10,000)と比べると、
+                        //    容量 5,000万 の特異点の壺でもホッパー投入が 10,000 で止まる
+                        //    (手投入は個体容量を見ていたので「手では入るのにホッパーでは入らない」形で出た)。
+                        if (!com.arspaper.block.impl.SourceJar.isFull(destTile)) {
                             com.arspaper.block.impl.SourceJar.addSource(destTile, sourcePerBerry);
                             event.setCancelled(true);
                             // ホッパー側のアイテムを1個減らす
