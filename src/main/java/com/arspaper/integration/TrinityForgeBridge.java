@@ -1923,6 +1923,19 @@ public final class TrinityForgeBridge {
     /**
      * ArsTier上限加算(int, +N)の動的ゲートID。TF {@code GateEffectId.ARS_TIER} と同一の裸リテラル
      * (2026-07-23 stat-gate-overhaul §3.1: 旧 dedicated-effect id {@code ars-tier-unlock} から追随)。
+     *
+     * <p>⚠ 2026-08-13 レーンD監査で判明: {@code ars_magic.yml} のノード A・E は
+     * {@code buffs: {ars-tier-bonus: 1}}(stat語彙 {@code ars_tier_bonus} 経由、
+     * {@link com.trinityforge.integration.ars.ArsNativeBridge} がパーク general + 永続バフ + 役職バフ +
+     * base-stats を合算する現行の唯一の正規チャネル)と、この {@code dedicated-effects: [id: ars-tier]}
+     * (perk保有のみを合算する旧チャネル)を<b>両方</b>同じ値で置いていた。{@link #tfArsTierUnlockBonus}
+     * が両チャネルを加算していたため、ノードA・Eをそれぞれ2倍(合計+4、正しくは+2)にカウントする
+     * 二重計上バグだった({@link #EFFECT_GLYPH_SLOT_PLUS}と違い、こちらの {@code GateEffectId.parse}
+     * は "ars-tier" を有効なFLAGとして受理するため実際に非ゼロを返し、死んでいなかった)。
+     * {@link #tfArsTierUnlockBonus} はこのチャネルを2026-08-13以降参照しない
+     * ({@code ars_tier_bonus} stat語彙チャネルへ一本化)。{@code ars_magic.yml} 側の
+     * {@code dedicated-effects: id: ars-tier} 記述は無害な死んだ記述として残る
+     * (削除は別レーンが編集中の {@code ars_magic.yml} と衝突するため見送り、レポートのみで報告済み)。
      */
     public static final String EFFECT_ARS_TIER = "ars-tier";
     /** マナ不足時にソースを自動でマナ代わりに消費するflagのdedicated-effectキー(要件⑥ source-auto-consume)。 */
@@ -2258,10 +2271,20 @@ public final class TrinityForgeBridge {
                 + tfNativeArsDouble(player, "glyphSlots"));
     }
 
-    /** 使用可能Ars tier上限加算(int, +N, floor/0クランプ済み)。dedicated(ars-tier) + native arsmagic_unlockedtier_add。 */
+    /**
+     * 使用可能Ars tier上限加算(int, +N, floor/0クランプ済み)。native arsmagic_unlockedtier_add
+     * ({@code ars_tier_bonus} stat語彙、{@link com.trinityforge.integration.ars.ArsNativeBridge}が
+     * パーク general + 永続バフ + 役職バフ + base-stats を合算する唯一の正規チャネル)のみを読む。
+     *
+     * <p>⚠ 2026-08-13 レーンD監査で修正: 以前は {@code tfEffectValue(player, EFFECT_ARS_TIER)}
+     * (dedicated-effectsの {@code ars-tier} チャネル、perk保有のみを合算)もここに加算していたが、
+     * {@code ars_magic.yml} のノードA・Eは {@code buffs: ars-tier-bonus} と
+     * {@code dedicated-effects: id: ars-tier} を同じ値で両方置いていたため、2チャネル合算が
+     * 二重計上になっていた(該当ノード保有プレイヤーの実効tier加算が意図の2倍)。詳細は
+     * {@link #EFFECT_ARS_TIER} のjavadoc参照。
+     */
     public static int tfArsTierUnlockBonus(Player player) {
-        return clampNonNegativeFloor(tfEffectValue(player, EFFECT_ARS_TIER)
-                + tfNativeArsDouble(player, "unlockedTier"));
+        return clampNonNegativeFloor(tfNativeArsDouble(player, "unlockedTier"));
     }
 
     /** native arsmagic_maxmanabonus_add（TF Services / ArsNativeBridge）。 */
