@@ -20,7 +20,14 @@
 #     scribing_table/waystone/source_berry)のレシピは全て functional-items.yml へ統合済み。
 #     カタログ登録済みの通常アイテム(source_gem系, sourcestone, magebloom_fiber, スレッド,
 #     魔導書等)のレシピは引き続き TrinityForge items/catalog.yml 側。
-#     ここには Ars 専用アイテム(バニラ結果/エンチャント本/ワールドエフェクト)のみ残す。
+#
+# 注(2026-08-14): エンチャント本8件(enchant_book_*)も functional-items.yml へ移した。
+#     設定エディタの本ファイル用画面は ritual_effects: しか描画しないため、
+#     items: に置いたエントリは editor から見ることも編集することもできなかった
+#     (ユーザー報告「回生とマナ関連のエンチャント本の儀式レシピが消えている」の正体)。
+#     残る items: の2件(trident / エンチャントされた金リンゴ)も同じ理由で editor 非表示。
+#     どちらもバニラアイテムを結果に持つレシピで「特殊アイテム」画面の対象外なので、
+#     移設せず reports/ACTIVE_RECORD.md の残タスクとして追跡する。
 
 items:
   trident:
@@ -48,120 +55,6 @@ items:
       source: 3000
       result: ENCHANTED_GOLDEN_APPLE
 
-  enchant_book_mana_regen_1:
-    recipe:
-      method: ritual
-      name: マナ再生I
-      effect-type: enchant_book
-      effect-params:
-        enchantment: mana_regen
-        level: 1
-      core-item: BOOK
-      pedestal-items:
-        - custom:source_gem x2
-        - GHAST_TEAR
-        - LAPIS_LAZULI x2
-      source: 500
-  enchant_book_mana_regen_2:
-    recipe:
-      method: ritual
-      name: マナ再生II
-      effect-type: enchant_book
-      effect-params:
-        enchantment: mana_regen
-        level: 2
-      core-item: BOOK
-      pedestal-items:
-        - custom:source_gem x3
-        - GHAST_TEAR x2
-        - DIAMOND_BLOCK
-      source: 1000
-  enchant_book_mana_regen_3:
-    recipe:
-      method: ritual
-      name: マナ再生III
-      effect-type: enchant_book
-      effect-params:
-        enchantment: mana_regen
-        level: 3
-      core-item: BOOK
-      pedestal-items:
-        - custom:source_gem x4
-        - GHAST_TEAR x2
-        - NETHER_STAR
-      source: 2000
-  enchant_book_mana_boost_1:
-    recipe:
-      method: ritual
-      name: マナ上昇I
-      effect-type: enchant_book
-      effect-params:
-        enchantment: mana_boost
-        level: 1
-      core-item: BOOK
-      pedestal-items:
-        - custom:source_gem x2
-        - ECHO_SHARD
-        - LAPIS_LAZULI x2
-      source: 500
-  enchant_book_mana_boost_2:
-    recipe:
-      method: ritual
-      name: マナ上昇II
-      effect-type: enchant_book
-      effect-params:
-        enchantment: mana_boost
-        level: 2
-      core-item: BOOK
-      pedestal-items:
-        - custom:source_gem x3
-        - ECHO_SHARD
-        - DIAMOND_BLOCK
-      source: 1000
-  enchant_book_mana_boost_3:
-    recipe:
-      method: ritual
-      name: マナ上昇III
-      effect-type: enchant_book
-      effect-params:
-        enchantment: mana_boost
-        level: 3
-      core-item: BOOK
-      pedestal-items:
-        - custom:source_gem x4
-        - ECHO_SHARD
-        - NETHER_STAR
-      source: 2000
-  enchant_book_share:
-    recipe:
-      method: ritual
-      name: 共有
-      effect-type: enchant_book
-      effect-params:
-        enchantment: share
-        level: 1
-      core-item: BOOK
-      pedestal-items:
-        - custom:source_gem_block x2
-        - ENDER_EYE x4
-        - NETHER_STAR
-        - DIAMOND_BLOCK
-      source: 3000
-  enchant_book_soulbound:
-    recipe:
-      method: ritual
-      name: 回生
-      effect-type: enchant_book
-      effect-params:
-        enchantment: soulbound
-        level: 1
-      core-item: BOOK
-      pedestal-items:
-        - custom:source_gem_block x2
-        - DIAMOND_BLOCK
-        - TOTEM_OF_UNDYING
-        - GOLDEN_APPLE x2
-      source: 2000
 ritual_effects:
   weather_clear:
     name: 晴天の儀式

@@ -5,6 +5,14 @@
 #                scribing_table / waystone / source_berry
 # (ワンド/コンパス/儀式ブロック等、プログラム制御の機能アイテム)
 #
+# 2026-08-14 追加: エンチャント本8件 (enchant_book_*)。
+#   items.yml の items: セクションに置いていたが、設定エディタの「儀式エフェクト」画面が
+#   ritual_effects: しか表示しない実装だったため、editor から一切見えず編集もできなかった
+#   (=「儀式レシピが消えている」の正体。yml とゲーム内には最初から在った)。
+#   本ファイルは FunctionalItemConfig が items: の全キーを総なめで読むので、ここへ移せば
+#   display-name / lore / enchant-glow の上書きがそのまま効く。レシピの登録キーは
+#   エントリID そのままなので、移動しても儀式の成立条件も解放ゲートのキーも変わらない。
+#
 # 編集可能なキー:
 #   display-name : 表示名 (MiniMessage記法)
 #   lore          : 説明文リスト (MiniMessage記法)
@@ -140,3 +148,175 @@ items:
       ingredients:
         - GLOW_BERRIES
         - AMETHYST_SHARD
+
+  # ============================================================
+  # エンチャント本 (儀式) — 2026-08-14 に items.yml から移設
+  # ============================================================
+  # 素材は本(BOOK)をコアに置き、台座の素材と Source を消費してカスタムエンチャント本になる。
+  # recipe.effect-type: enchant_book / effect-params.enchantment+level が結果を決める
+  # (この2キーはプログラムが解釈するのでリネーム不可)。
+  # display-name / lore を書くと、生成されるエンチャント本の表示がそのまま置き換わる
+  # (EnchantBookRitualEffect が FunctionalItemConfig を参照する)。
+  # 省略した場合は「<エンチャント名> <ローマ数字>」のハードコード表示へフォールバックする。
+  # material は変更できない(結果は常に ENCHANTED_BOOK。エンチャント格納メタが必須のため)。
+  enchant_book_mana_regen_1:
+    display-name: "<light_purple>マナ再生 I</light_purple>"
+    lore:
+      - "<gray>マナ再生 I</gray>"
+      - ""
+      - "<dark_gray>金床でメイジアーマーに適用</dark_gray>"
+    recipe:
+      method: ritual
+      name: マナ再生I
+      effect-type: enchant_book
+      effect-params:
+        enchantment: mana_regen
+        level: 1
+      core-item: BOOK
+      pedestal-items:
+        - custom:source_gem x2
+        - GHAST_TEAR
+        - LAPIS_LAZULI x2
+      source: 500
+
+  enchant_book_mana_regen_2:
+    display-name: "<light_purple>マナ再生 II</light_purple>"
+    lore:
+      - "<gray>マナ再生 II</gray>"
+      - ""
+      - "<dark_gray>金床でメイジアーマーに適用</dark_gray>"
+    recipe:
+      method: ritual
+      name: マナ再生II
+      effect-type: enchant_book
+      effect-params:
+        enchantment: mana_regen
+        level: 2
+      core-item: BOOK
+      pedestal-items:
+        - custom:source_gem x3
+        - GHAST_TEAR x2
+        - DIAMOND_BLOCK
+      source: 1000
+
+  enchant_book_mana_regen_3:
+    display-name: "<light_purple>マナ再生 III</light_purple>"
+    lore:
+      - "<gray>マナ再生 III</gray>"
+      - ""
+      - "<dark_gray>金床でメイジアーマーに適用</dark_gray>"
+    recipe:
+      method: ritual
+      name: マナ再生III
+      effect-type: enchant_book
+      effect-params:
+        enchantment: mana_regen
+        level: 3
+      core-item: BOOK
+      pedestal-items:
+        - custom:source_gem x4
+        - GHAST_TEAR x2
+        - NETHER_STAR
+      source: 2000
+
+  enchant_book_mana_boost_1:
+    display-name: "<light_purple>マナ上昇 I</light_purple>"
+    lore:
+      - "<gray>マナ上昇 I</gray>"
+      - ""
+      - "<dark_gray>金床でメイジアーマーに適用</dark_gray>"
+    recipe:
+      method: ritual
+      name: マナ上昇I
+      effect-type: enchant_book
+      effect-params:
+        enchantment: mana_boost
+        level: 1
+      core-item: BOOK
+      pedestal-items:
+        - custom:source_gem x2
+        - ECHO_SHARD
+        - LAPIS_LAZULI x2
+      source: 500
+
+  enchant_book_mana_boost_2:
+    display-name: "<light_purple>マナ上昇 II</light_purple>"
+    lore:
+      - "<gray>マナ上昇 II</gray>"
+      - ""
+      - "<dark_gray>金床でメイジアーマーに適用</dark_gray>"
+    recipe:
+      method: ritual
+      name: マナ上昇II
+      effect-type: enchant_book
+      effect-params:
+        enchantment: mana_boost
+        level: 2
+      core-item: BOOK
+      pedestal-items:
+        - custom:source_gem x3
+        - ECHO_SHARD
+        - DIAMOND_BLOCK
+      source: 1000
+
+  enchant_book_mana_boost_3:
+    display-name: "<light_purple>マナ上昇 III</light_purple>"
+    lore:
+      - "<gray>マナ上昇 III</gray>"
+      - ""
+      - "<dark_gray>金床でメイジアーマーに適用</dark_gray>"
+    recipe:
+      method: ritual
+      name: マナ上昇III
+      effect-type: enchant_book
+      effect-params:
+        enchantment: mana_boost
+        level: 3
+      core-item: BOOK
+      pedestal-items:
+        - custom:source_gem x4
+        - ECHO_SHARD
+        - NETHER_STAR
+      source: 2000
+
+  enchant_book_share:
+    display-name: "<light_purple>共有 I</light_purple>"
+    lore:
+      - "<gray>共有 I</gray>"
+      - ""
+      - "<dark_gray>金床でメイジアーマーに適用</dark_gray>"
+    recipe:
+      method: ritual
+      name: 共有
+      effect-type: enchant_book
+      effect-params:
+        enchantment: share
+        level: 1
+      core-item: BOOK
+      pedestal-items:
+        - custom:source_gem_block x2
+        - ENDER_EYE x4
+        - NETHER_STAR
+        - DIAMOND_BLOCK
+      source: 3000
+
+  enchant_book_soulbound:
+    display-name: "<light_purple>回生 I</light_purple>"
+    lore:
+      - "<gray>回生 I</gray>"
+      - ""
+      - "<dark_gray>金床でメイジアーマーに適用</dark_gray>"
+    recipe:
+      method: ritual
+      name: 回生
+      effect-type: enchant_book
+      effect-params:
+        enchantment: soulbound
+        level: 1
+      core-item: BOOK
+      pedestal-items:
+        - custom:source_gem_block x2
+        - DIAMOND_BLOCK
+        - TOTEM_OF_UNDYING
+        - GOLDEN_APPLE x2
+      source: 2000
