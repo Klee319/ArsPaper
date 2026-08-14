@@ -1,6 +1,7 @@
 package com.arspaper.integration;
 
 import com.arspaper.item.ItemKeys;
+import com.arspaper.mana.ManaConfig;
 import com.arspaper.util.PdcHelper;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -30,12 +31,17 @@ import java.util.Map;
 public final class SourceAutoConsume {
 
     /**
-     * 2026-08-14 追加: プレイヤーごとの「最後に変換が成立した時刻(ms)」。
+     * 2026-08-14 追加: プレイヤー×アイテムごとの「最後に変換が成立した時刻(ms)」。
      * <b>成立した時だけ</b>記録する ── 変換不発(perk未所持/アイテム不足)でCTを開始してしまうと、
      * アイテムを持っていないだけの人がCTで縛られる。退出時は {@link #forget} でクリアする
      * (ManaManager#onPlayerQuit から呼ぶ。呼ばないとUUIDが溜まり続ける)。
+     *
+     * <p>アイテム単位にしているのは、CTをアイテムごとに設定できるようにしたため
+     * (ユーザー指示「マナ回復量とCTがそれぞれ設定できるべき」)。プレイヤー1本の共有CTだと、
+     * 短いCTのアイテムが長いCTのアイテムに引きずられて使えなくなる。
      */
-    private static final Map<java.util.UUID, Long> LAST_CONVERT_MILLIS = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final Map<java.util.UUID, Map<String, Long>> LAST_CONVERT_MILLIS =
+        new java.util.concurrent.ConcurrentHashMap<>();
 
     private SourceAutoConsume() {
     }
@@ -72,34 +78,35 @@ public final class SourceAutoConsume {
      *
      * @param player         詠唱者（プレイヤー特定不能な経路は本メソッドを呼ばないこと）
      * @param deficitMana    現在マナだけでは賄えない不足量（&gt; 0 のみ意味を持つ）
-     * @param itemManaConfig itemId(Ars custom_item_id または TFカタログid) -&gt; 1個あたりのマナ変換量
+     * @param itemConfig     itemId(Ars custom_item_id または TFカタログid) -&gt; マナ変換量とCT
      *                       (ManaConfig#sourceAutoConsumeItems() 由来)
-     * @param cooldownSeconds 変換のクールタイム(秒)。0以下でCT無し
+     * @param defaultCooldownSeconds アイテム側にCTが書かれていない場合の既定CT(秒)。0以下でCT無し
      *                       (ManaConfig#sourceAutoConsumeCooldownSeconds() 由来)
      * @return 実際に変換されたマナ量。0なら未変換（呼び出し元は従来どおりマナ不足として扱う）。
      *         成功時は常に {@code deficitMana} と一致する（過剰変換分は破棄し、ちょうど賄う）。
      */
-    public static int tryConvert(Player player, int deficitMana, Map<String, Integer> itemManaConfig,
-                                 int cooldownSeconds) {
+    public static int tryConvert(Player player, int deficitMana,
+                                 Map<String, ManaConfig.SourceAutoConsumeItem> itemConfig,
+                                 int defaultCooldownSeconds) {
         if (player == null || deficitMana <= 0) {
             return 0;
         }
         if (!TrinityForgeBridge.tfEffectActive(player, TrinityForgeBridge.EFFECT_SOURCE_AUTO_CONSUME)) {
             return 0;
         }
-        if (itemManaConfig == null || itemManaConfig.isEmpty()) {
+        if (itemConfig == null || itemConfig.isEmpty()) {
             return 0;
         }
-        // CT判定はインベントリ走査より前に置く。ここを後ろに置くと、CT中でも走査コストを毎回払う。
+
         long now = System.currentTimeMillis();
-        if (isOnCooldown(LAST_CONVERT_MILLIS.get(player.getUniqueId()), now, cooldownSeconds)) {
-            return 0;
-        }
+        Map<String, Long> lastByItem = LAST_CONVERT_MILLIS.get(player.getUniqueId());
 
         PlayerInventory inventory = player.getInventory();
         ItemStack[] contents = inventory.getStorageContents();
 
         List<MatchedStack> matches = new ArrayList<>();
+        // 消費計画は「スロット番号→個数」しか持たないので、CT開始のために別途 slot→itemId を控える。
+        Map<Integer, String> slotItemIds = new java.util.HashMap<>();
         for (int slot = 0; slot < contents.length; slot++) {
             ItemStack stack = contents[slot];
             if (stack == null || stack.getType().isAir()) {
@@ -109,11 +116,18 @@ public final class SourceAutoConsume {
             if (id == null) {
                 continue;
             }
-            Integer manaPerItem = itemManaConfig.get(id);
-            if (manaPerItem == null || manaPerItem <= 0) {
+            ManaConfig.SourceAutoConsumeItem entry = itemConfig.get(id);
+            if (entry == null || entry.manaPerItem() <= 0) {
                 continue;
             }
-            matches.add(new MatchedStack(slot, manaPerItem, stack.getAmount()));
+            // CT中のアイテムは候補から外す(全体を止めない)。CTはアイテムごとに独立して進むので、
+            // 片方がCT中でももう片方は使える。
+            if (isOnCooldown(lastByItem == null ? null : lastByItem.get(id), now,
+                    entry.effectiveCooldownSeconds(defaultCooldownSeconds))) {
+                continue;
+            }
+            matches.add(new MatchedStack(slot, entry.manaPerItem(), stack.getAmount()));
+            slotItemIds.put(slot, id);
         }
 
         List<ConsumeEntry> plan = computeConsumptionPlan(matches, deficitMana);
@@ -134,7 +148,17 @@ public final class SourceAutoConsume {
         }
 
         // 変換が成立した時だけCTを開始する(不発でCTを開始しないのは上のコメントの理由)。
-        LAST_CONVERT_MILLIS.put(player.getUniqueId(), now);
+        // 開始するのは<b>実際に消費したアイテムのCTだけ</b> ── 候補に挙がっただけの別アイテムまで
+        // 縛ると、1回の変換で無関係なアイテムがCTに入る。
+        Map<String, Long> playerState =
+            LAST_CONVERT_MILLIS.computeIfAbsent(player.getUniqueId(),
+                k -> new java.util.concurrent.ConcurrentHashMap<>());
+        for (ConsumeEntry entry : plan) {
+            String id = slotItemIds.get(entry.slotIndex());
+            if (id != null) {
+                playerState.put(id, now);
+            }
+        }
         return deficitMana;
     }
 

@@ -1,5 +1,6 @@
 package com.arspaper.integration;
 
+import com.arspaper.mana.ManaConfig;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -82,17 +83,21 @@ class SourceAutoConsumeTest {
         assertEquals(1, plan.get(1).consumeCount());
     }
 
+    private static java.util.Map<String, ManaConfig.SourceAutoConsumeItem> itemConfig(int mana, Integer cooldown) {
+        return java.util.Map.of("source_berry", new ManaConfig.SourceAutoConsumeItem(mana, cooldown));
+    }
+
     @Test
     void tryConvert_nullPlayer_returnsZeroWithoutSideEffects() {
         // player==nullガード(要件①): Playerが特定できない経路は常に0(未変換)を返す。
-        int converted = SourceAutoConsume.tryConvert(null, 25, java.util.Map.of("source_berry", 25), 10);
+        int converted = SourceAutoConsume.tryConvert(null, 25, itemConfig(25, null), 10);
         assertEquals(0, converted);
     }
 
     @Test
     void tryConvert_nonPositiveDeficit_returnsZero() {
         // deficitMana<=0ガード: 不足が無ければ変換不要で常に0。
-        int converted = SourceAutoConsume.tryConvert(null, 0, java.util.Map.of("source_berry", 25), 10);
+        int converted = SourceAutoConsume.tryConvert(null, 0, itemConfig(25, null), 10);
         assertEquals(0, converted);
     }
 
@@ -127,5 +132,52 @@ class SourceAutoConsumeTest {
         // now < last(時刻巻き戻し)で経過時間が負になる。ここを「経過が大きい」と誤読すると
         // CTが無制限に素通りするので、CT中へ倒す方が安全。
         assertTrue(SourceAutoConsume.isOnCooldown(1_000_000L, 900_000L, 10));
+    }
+
+    // ---- 2026-08-14 追加: CTをアイテム単位にした ----
+    // ユーザー指示「マナ回復量とCTがそれぞれ設定できるべき」。行ごとに CT を持てるようにし、
+    // 書かなければ全体既定へ落ちる。0 と「未設定」は別の意味なので混同しない。
+
+    @Test
+    void effectiveCooldown_nullMeansGlobalDefault() {
+        var item = new ManaConfig.SourceAutoConsumeItem(100, null);
+        assertEquals(10, item.effectiveCooldownSeconds(10), "CT未設定は全体既定へ落ちる");
+        assertEquals(0, item.effectiveCooldownSeconds(0), "全体既定が0(CT無し)ならそれに従う");
+    }
+
+    @Test
+    void effectiveCooldown_perItemValueWinsOverGlobalDefault() {
+        assertEquals(5, new ManaConfig.SourceAutoConsumeItem(100, 5).effectiveCooldownSeconds(10));
+        // 0 は「このアイテムだけCT無し」。全体既定10があっても0が勝つ
+        // (ここを「未設定と同じ」と扱うと、CT無しにしたつもりが既定10で縛られる)。
+        assertEquals(0, new ManaConfig.SourceAutoConsumeItem(100, 0).effectiveCooldownSeconds(10));
+    }
+
+    @Test
+    void effectiveCooldown_negativeIsClampedToNoCooldown() {
+        assertEquals(0, new ManaConfig.SourceAutoConsumeItem(100, -3).effectiveCooldownSeconds(10));
+        assertEquals(0, new ManaConfig.SourceAutoConsumeItem(100, null).effectiveCooldownSeconds(-3));
+    }
+
+    // ---- 2026-08-14 バグ修正: config の "custom:" 付きidが一度も一致していなかった ----
+    // 出荷 config.yml は custom:source_berry と書かれていたが、照合側(PdcHelper#getCrossPluginItemId)は
+    // PDC の素のid(source_berry)を返すため、ソース自動消費は一度も発動していなかった。
+    // 設定エディタのアイテム選択UIがカスタム品を custom: 付きで書き出すので、読み込み側で落とす。
+
+    @Test
+    void normalizeItemId_stripsCustomPrefix() {
+        assertEquals("source_berry", ManaConfig.normalizeItemId("custom:source_berry"));
+        assertEquals("source_berry", ManaConfig.normalizeItemId("CUSTOM:source_berry"));
+        assertEquals("source_berry", ManaConfig.normalizeItemId("  custom:source_berry  "));
+    }
+
+    @Test
+    void normalizeItemId_leavesPlainAndOtherPrefixesAlone() {
+        assertEquals("source_berry", ManaConfig.normalizeItemId("source_berry"));
+        // list: は互換リスト(レシピ素材の語彙)で、1個のアイテムidではない。
+        // 落とすと存在しないidに化けるので、そのまま残して「一致しないid」にする。
+        assertEquals("list:logs", ManaConfig.normalizeItemId("list:logs"));
+        assertEquals("", ManaConfig.normalizeItemId(null));
+        assertEquals("", ManaConfig.normalizeItemId("custom:"));
     }
 }
