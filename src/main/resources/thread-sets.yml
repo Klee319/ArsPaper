@@ -11,14 +11,34 @@
 #     damage_mana_recovery -> WILD_ARMOR_TRIM_SMITHING_TEMPLATE#300013
 #   (全40種の material#cmd は ThreadType enum 参照)
 #
-# ⚠⚠ スレッド単体のステを【TrinityForge の stats/item-stats.yml】に MATERIAL#CMD で書いてはいけない ⚠⚠
-#   (2026-08-02 訂正。それ以前このファイルはそう書いていたが、実際には穴が開く)
-#   ArmorManaListener はソケット済みスレッドについて item-stats.yml を読むが、【同じエントリ】を
-#   TrinityForge の PlayerStatAggregator#aggregate が材質フィルタ無しでメインハンド寄与としても読む。
-#   つまりそこへ書くと「装備に挿さず、スレッドを手に持つだけで効果が乗る」。
-#   出荷 item-stats.yml に thread の行が0件なのは意図的で、開けてはいけない。
-#   スレッド1個分の効果を出したいときは、このファイルで【thresholds の1段目を 1 にする】。
-#   個数集計はソケット済みのスレッドしか数えないので、手持ちでは絶対に発動しない。
+# ■ スレッド単体のステは【TrinityForge の stats/item-stats.yml】へ書く (2026-08-14 更新)
+#   ⚠ 2026-08-02〜2026-08-13 のこの位置には「item-stats.yml へ書いてはいけない/行が0件なのは意図的」
+#     という警告が載っていたが、【もう正しくない】。現在の出荷 item-stats.yml にはスレッド45種
+#     (CMD 300001-300045)のエントリが実在し、厳選(per-quality / random / grant-chances)もそこにある。
+#
+#   ・当時あった穴: ArmorManaListener はソケット済みスレッドの item-stats.yml を読むが、
+#     【同じエントリ】を TrinityForge の PlayerStatAggregator#aggregate が材質フィルタ無しで
+#     メインハンド/オフハンド/防具スロットの寄与としても読んでいた。
+#     つまり「装備に挿さず、スレッドを手に持つだけで全ステが乗る」。
+#   ・穴を塞いだもの: item-stats.yml のエントリ側フラグ【socketed-only-stats: true】。
+#     これが立っているエントリは PlayerStatAggregator が装備寄与として合算しない。
+#     装着済みスレッドの寄与は ArmorManaListener -> WeaponAttackStatResolver#resolveItemStats
+#     という別経路なので、このフラグでは止まらない(=挿せば今までどおり効く)。ロア表示も止まらない。
+#
+#   ・今後スレッドのステをどこに書くか:
+#       スレッド1個ごとの厳選ステ  -> TrinityForge stats/item-stats.yml の MATERIAL#CMD エントリ。
+#                                   【必ず socketed-only-stats: true を付ける】。付け忘れると穴が再発する。
+#       同種を複数集めたご褒美      -> このファイル(thresholds)。個数集計はソケット済みしか数えないので
+#                                   手持ちでは絶対に発動しない。1個から効かせたいなら 1段目を "1" にする。
+#
+#   ⚠ 帯バランス上の注意(2026-08-14): thresholds に percent-bonus-damage を足すと、
+#     TF 側 ShippedThreadBandIndependenceTest の帯目標(+39%/+49%/+59%)に直接効く。
+#     このガードは threads.yml の stackable/max とこのファイルの累積規則を読んで
+#     「最良編成の合計」を解いているので、ここを触ったら必ず TF のテストを回すこと。
+#     【現在の規約】percent-bonus-damage を配るセットは hero_of_the_village の1本だけ。
+#     案Eで3本(村の英雄/マナ回復速度上昇/暗視)に増やしたところ、累積しきい値と stackable の
+#     相乗で Lv60/Lv100 が +13.0pt 超過した。2本目を足すと同じことが起きるので、
+#     ダメージ系のセット効果を増やしたいときは既存分を減らして総量を保つこと。
 #
 # ■ セット効果の加算モデル = 累積しきい値式
 #   同種スレッドの合計装備個数 N に対し、N 以上の全しきい値のボーナスを【合算】します。
@@ -41,507 +61,368 @@
 #   thread-sets:
 #     mana_regen:
 #       thresholds:
-#         3: { percent-bonus-damage: 0.05, flat-defense: 1.0 }   # 3個以上で発動
-#         5: { percent-bonus-damage: 0.10 }                       # 5個以上で更に加算(=合計0.15)
+#         3: { magic-resistance: 0.05, flat-defense: 1.0 }   # 3個以上で発動
+#         5: { magic-resistance: 0.10 }                       # 5個以上で更に加算(=合計0.15)
+#   (例に percent-bonus-damage を使っていない理由は上の【現在の規約】を参照)
 #
 # 下は全スレッド種の雛形(thresholds 空 = セット効果なし)。必要なものにしきい値を書き足してください。
 
 # 設定リファレンス(本文コメント移設先): docs/config-reference/arspaper/thread-sets.md
-thread-sets:
-  # ------------------------------------------------------------------
-  # 2026-07-31 設定。ここが全種 thresholds: {} だったため、
-  # 「セット効果」という仕組みが実装済みなのに 1 個も存在しない状態だった。
-  #
-  # ■ しきい値の到達可能性(これを外すと永久に発動しないティアになる)
-  #   threads.yml の max は【装備1点あたり】の上限。スレッドを載せられる装備は
-  #     着用防具4部位 + メインハンド + オフハンド(item-stats の offhand-stats-apply: true の品だけ)
-  #   オフハンドは現状キャリアにならない。offhand-stats-apply: true は AMETHYST_SHARD#5760 / #5761 の
-  #   2件あるが、どちらも thread-slots を持たないためスレッドを挿せないからで、
-  #   「該当品が0件だから」ではない(2026-08-02 訂正。以前ここは0件と書いていた)。
-  #   なので、同種スレッドの到達可能な合計個数 = max x キャリア数(=現状5)、
-  #   かつ item-stats.yml の thread-slots 合計(最上位で 19)が実際の天井になる。
-  #     max 3 (mana_regen / mana_boost / health_boost)   -> 上限 15
-  #     max 2 (hit_mana_recovery / damage_mana_recovery) -> 上限 10
-  #     stackable 未指定 = 1点に1個まで(speed 以下の常時効果系 + spell_cost_down)
-  #                                                      -> 上限 5(キャリア数そのもの)
-  #   ※ セット効果の個数集計は ThreadApplicationPolicy#appliesNumericStats が
-  #     【全スロット】を true にしているので、常時効果が防具限定でも「個数」は武器の枠でも増える。
-  #     ThreadSetThresholdReachabilityTest がこの上限を機械で固定している。
-  #
-  # ■ 2026-08-01 (A-5) しきい値の引き上げ —— 枠が 9 -> 19 に増えた時代へ合わせる。
-  #   旧値(3/6 段・2/4 段)は【枠合計9】の時代に置いた数字で、天井 19 枠の今は
-  #   6+6+4=16 枠で 3 系統をフル発動できてしまい、「1種に寄せるほどその系統のビルドになる」
-  #   という設計意図が機能していなかった。投資量を天井に比例させて引き上げる:
-  #     max 3 / max 2 の系統 -> 4 / 8 段  (上限 15・10 なので到達可能)
-  #     1点1個の系統         -> 3 / 5 段  (上限 5 ちょうど = 5キャリア全部に載せて初めて最終段)
-  #   1点1個の系統を 3/6 にしない理由は上限が 5 だから ── 6 段は【物理的に到達不能】で、
-  #   書いた瞬間に死にティアになる(設計書 §3-A-5 の「2/4 -> 3/6」はこの上限を見落としている)。
-  #   最終段 5 が「メインハンドに thread-slots を持つ武器」を要求する件は、item-stats.yml の
-  #   thread-slots 保有 128 件のうち剣/斧/槍/鎌/弓/クロスボウ/トライデント/メイス/触媒が
-  #   大半を占めるため、装備選択で到達できる = 永久に発動しないティアにはならない。
-  #
-  # ■ 方針: 1種に寄せるほど「その系統のビルド」になるよう、種ごとに伸びる軸を変えている。
-  #   縦(単純な火力の総和)を伸ばすのではなく、横(会心型/回避型/受け型/出血型)を分ける。
-  #
-  # ■ armor-defense-rate は意図的に使っていない。
-  #   これはバニラ防具の防御率(上限0.8)へ加算されるので、セット効果で盛ると貫通0の相手からの
-  #   物理を実質無効化できてしまう。受け系は damage-reduction / phys-flat-defense /
-  #   magic-flat-defense / armor-strength で表現する。
-  # ------------------------------------------------------------------
 
-  # 詠唱を回し続ける型。継戦の見返りとして与ダメの割合追加。
+thread-sets:
   mana_regen:
     thresholds:
-      4:
-        percent-bonus-damage: 0.04
-      8:
-        percent-bonus-damage: 0.06
+      # 2026-08-14: percent-bonus-damage を外した。理由は「割合ダメージを配るセットが3つ(村の英雄/
+      # マナ回復速度上昇/暗視)あり、累積規則と stackable の相乗で帯目標(+39/+49/+59%)を突き抜けたため」。
+      # このスレッドは threads.yml で stackable: true / max: 3 = 防具4部位だけで12本挿さるので、
+      # ここに割合ダメージを置くと最良編成が必ず上限側に張り付く。ダメージは村の英雄へ一本化した。
+      "3":
+        magic-resistance: 0.03
+      "5":
         magic-resistance: 0.05
-  # マナ総量に寄せる型。一発を重くする(会心ダメージ)。
   mana_boost:
     thresholds:
-      4:
-        crit-damage: 0.10
-      8:
+      "3":
+        crit-damage: 0.1
+      "5":
         crit-damage: 0.15
         crit-chance: 0.03
-
-  # 常時移動が速い型。避けて手数で押す。
   speed:
     thresholds:
-      3:
+      "3":
         dodge-chance: 0.03
-      5:
+      "5":
         dodge-chance: 0.04
         crit-chance: 0.03
-  # 空中からの一撃を狙う型。
   jump_boost:
     thresholds:
-      3:
+      "3":
         crit-damage: 0.06
-      5:
+      "5":
         crit-damage: 0.09
-  # 暗所での索敵型。固定値の追加ダメージなので低火力帯ほど効く。
-  # 2026-08-01: 2.0/3.0 は flat-bonus-damage の主ステ抽選(1.0〜3.0)1本分に届かない死に値だった。
   night_vision:
     thresholds:
-      3:
-        flat-bonus-damage: 8.0
-      5:
-        flat-bonus-damage: 18.0
-  # ネザー適性型。魔法耐性へ寄せる。
+      # 2026-08-14 案E: flat-bonus-damage(実数) -> 割合へ。実数のダメージ加算は帯非依存なので、
+      # 装備が伸びない低帯だけ極端に強くなる。
+      # ただし振替先を percent-bonus-damage にすると帯目標を超過したため(下の注記参照)、
+      # 「見えるから避けられる」= dodge-chance へ寄せた。会心系にしなかったのは意図的で、
+      # crit-chance/crit-damage は実DPSを押し上げるのに帯ガードが数えないため、
+      # 計測できない形で同じ穴を作り直すことになる。
+      "3":
+        dodge-chance: 0.02
+      "5":
+        dodge-chance: 0.03
   fire_resistance:
     thresholds:
-      3:
+      "3":
         magic-resistance: 0.04
-      5:
+      "5":
         magic-resistance: 0.06
-  # 水中適性型。物理耐性へ寄せる。
   dolphins_grace:
     thresholds:
-      3:
+      "3":
         phys-resistance: 0.04
-      5:
+      "5":
         phys-resistance: 0.06
-  # 海底神殿型。魔法守備力を積む。
-  # 2026-08-01: 2.0/3.0 は magic-flat-defense の主ステ抽選(1.5〜5.0)1本分にも満たず、
-  # 「5キャリア全部を捧げる対価」になっていなかったため 12/26 へ引き上げ。
   conduit_power:
     thresholds:
-      3:
-        magic-flat-defense: 12.0
-      5:
-        magic-flat-defense: 26.0
+      "3":
+        magic-flat-defense: 12
+      "5":
+        magic-flat-defense: 26
         damage-reduction: 0.02
-  # 支援型。attack-power は近接ベースへ加算されるので、素の武器が弱いうちほど効く。
-  # 2026-08-01: 1.0/2.0 は attack-power の主ステ抽選最小値 200 の 1/100 以下で完全な死に値だった。
-  # 累計 1300 は主ステ抽選(200〜600) 2〜3 本分に相当し、5枠を捧げる対価として釣り合う。
   hero_of_the_village:
     thresholds:
-      3:
-        attack-power: 400.0
-      5:
-        attack-power: 900.0
-  # 純粋な受け型。物理と魔法の守備力を両方積む。
-  # 2026-08-01: flat-defense 2.0 は conduit_power と同じ理由の死に値(しかも 8 枠要求)なので 12 へ。
+      # 2026-08-14 案E: attack-power(実数=武器の基本ダメージを置き換える) -> percent-bonus-damage(割合)。
+      # attack-power は帯非依存なので、Lv20 帯では最強剣(699.5)を単独で超えていた。
+      "3":
+        percent-bonus-damage: 0.05
+      "5":
+        percent-bonus-damage: 0.08
   health_boost:
     thresholds:
-      4:
+      "4":
         damage-reduction: 0.03
-        phys-flat-defense: 12.0
-      8:
+        phys-flat-defense: 12
+      "8":
         damage-reduction: 0.04
-        magic-flat-defense: 12.0
-
-  # 被弾を前提に立つ型。会心軽減(防具強度)と回避で「大きい一発」を潰す。
+        magic-flat-defense: 12
   hit_mana_recovery:
     thresholds:
-      4:
+      "3":
         armor-strength: 0.06
-      8:
+      "5":
         armor-strength: 0.08
         dodge-chance: 0.03
-  # 殴り続ける型。会心から出血へ繋ぐ。
-  # 2026-08-01: bleed-damage 2.0 は主ステ抽選(20〜80)の 1/10 未満で死に値だったため 80 へ。
   damage_mana_recovery:
     thresholds:
-      4:
+      "3":
         crit-chance: 0.04
-      8:
-        bleed-chance: 0.06
-        bleed-damage: 80.0
-
-  # 詠唱コスト型。1点1個なので到達上限は5個。貫通で硬い相手を通す。
+      # 2026-08-14 案E: bleed-damage(実数) を廃し、bleed-chance へ寄せた。
+      # 【等価にした根拠】出血は「命中時に合計 bleed-chance で判定 → 成功したら合計 bleed-damage を
+      #   damage.yml の bleed.ticks(=5) 回」なので、1撃あたりの期待出血ダメージは
+      #     E = (C + セットのchance) x (D + セットのdamage) x 5     C=他ソースのchance / D=他ソースのdamage
+      #   セットの damage を 0 にして等価にする x は  (C+0.06)(D+80) = (C+x)D  より
+      #     x = (C+0.06)(D+80)/D - C
+      #   5個しきい値に届くのは防具4部位+武器+オフハンドまで挿せる終盤なので Lv60 帯を基準にする。
+      #   Lv60 帯の代表武器(NETHERITE_HOE#52)は D=1850 / C=0.16 → x = 0.22 x 1930/1850 - 0.16 = 0.0695
+      #   → 0.07 を採用。Lv80-100 帯(D=4500)でも x=0.0639 なのでほぼ同値、Lv20 帯(D=165)の
+      #   x=0.0915 に対しては意図的な下げ(実数80が低帯だけ極端に効いていた分をここで落としている)。
+      "5":
+        bleed-chance: 0.07
   spell_cost_down:
     thresholds:
-      3:
+      "3":
         penetration: 0.04
-      5:
+      "5":
         penetration: 0.06
-  # flight / backpack は単体の利便性が既に最大級なので、
-  # セット効果は意図的に与えない(戦闘ステまで付くと他のスレッドを選ぶ理由が消える)。
   flight:
     thresholds: {}
-  backpack:
-    thresholds: {}
-
-  # ==================================================================
-  # 2026-08-02 追加分(16種 -> 40種)。
-  #
-  # ■ 1段目が 1 なのはなぜか
-  #   スレッド単体の効果を item-stats.yml に書くと「手に持つだけで乗る」穴が開く
-  #   (ファイル冒頭の ⚠⚠ 参照)。1段目を 1 にすると【ソケット済み1個で発動】するので、
-  #   同じ体験を穴無しで作れる。ここが 24 種すべてで 1/3/5 になっている理由。
-  #   例外は4種:
-  #     mana_amplify / mana_circulate ... 1個分の効果は threads.yml の mana-max-percent /
-  #       regen-percent が担当する(fork 内部のマナ計算なので item-stats を経由せず穴が無い)。
-  #       ここに重ねて書くと二重取りになるため thresholds は空。
-  #     slow_falling / luck ............. 1個分の効果は「装備中常時のバニラポーション効果」。
-  #       既存8種のポーションスレッドと横並びにするため、セット効果は 3/5 段から始める
-  #       (1段目を 1 にすると新2種だけが既存8種の上位互換になる)。
-  #
-  # ■ しきい値 5 が上限である理由
-  #   下記24種のうち【22種】は stackable を書いていない = 1装備につき1個まで。
-  #   (例外は mana_amplify と mana_circulate の2種で、threads.yml で stackable: true / max: 3 を
-  #    持つ。ただしこの2種は下で thresholds を空にしているので、5段上限の話は関係しない。)
-  #
-  #   その22種の到達可能な合計個数はキャリア数ちょうど。6段以上を書くと物理的に到達不能な
-  #   死にティアになる(ThreadSetThresholdReachabilityTest が落とす)。
-  #
-  #   ⚠ キャリア数が 5 なのは【今の出荷 yml がそうだから】であって、5 という定数ではない。
-  #     キャリアは 防具4部位 + メインハンド + オフハンド で、オフハンドは
-  #     TrinityForge の item-stats.yml で offhand-stats-apply: true が付いた品だけが数えられる。
-  #     現在その指定を持つのは AMETHYST_SHARD#5760 / #5761 の2件だが、どちらも thread-slots を
-  #     持たない = スレッドを挿せないのでキャリアにならず、結果として今は 5 になっている。
-  #     【thread-slots と offhand-stats-apply: true を両方持つ品を1件でも足した瞬間に
-  #      キャリアは 6 になり、この「5が上限」という記述は嘘になる】。
-  #     そのときは ThreadSetThresholdReachabilityTest の CARRIER_SLOTS も一緒に直すこと。
-  #
-  # ■ 入手経路でレア度差を付けている(効果値は設計基準に対する倍率)
-  #   制作     … 基準どおり(×1.0)。儀式で確定入手できるぶん一番安い。
-  #   ルート   … 約1.2倍。ワールドのルートテーブル/採取から出る。
-  #   ダンジョン … 約1.5倍。踏破報酬。一番手に入りにくいので一番強い。
-  #
-  # ■ ここに書けるキーの条件(書いても効かないキーがある)
-  #   このファイルの値は AddonCombatStats(PDC)経由で TF へ渡り、消費側が
-  #   PlayerCombatAggregate#totalOf で読むキーだけが効く。
-  #   ・max-health / move-speed / attack-reach / knockback-resistance / thread-slots などの
-  #     ATTRIBUTE チャネルのキーは PerkAttributeApplier 側で適用されるため【無言で効かない】。
-  #   ・cooldown-reduction は「アイテムの使用クールダウン」であって、
-  #     アクティブスキルCT(<skillId>-cooldown-reduction)でも Ars の詠唱コストでもない。
-  #   ・値は生の値がそのまま使われる(PercentStatNormalize を通らない)。
-  #     割合キーは必ず分数で書くこと(0.03 = 3%)。「3」と書くと 300% になる。
-  # ==================================================================
-
-  # ---------- 制作枠(儀式・生産)。基準どおり(×1.0) ----------
-
-  # 効果の実体は threads.yml の mana-max-percent: 3(1個ごとに最大マナ+3%)。
-  # ここに書くと二重取りになるので空のままにする。
   mana_amplify:
     thresholds: {}
-  # 同上。効果の実体は threads.yml の regen-percent: 4。
   mana_circulate:
     thresholds: {}
-
-  # 儀式のソース消費を割合減。spell_cost_down が削るのは「マナ」なので消費資源そのものが別。
-  # RitualManager が clampReductionFraction([0,0.95]) を掛けるので全額無料化はしない。
   source_thrift:
     thresholds:
-      1:
+      "1":
         source-cost-reduction: 0.02
-      3:
+      "3":
         source-cost-reduction: 0.03
-      5:
+      "5":
         source-cost-reduction: 0.03
-  # 作業台クラフトの品質 mode を押し上げる。CraftQualityService が int へ丸めるので
-  # 端数を書いても意味が無い(必ず整数で書く)。
   artisan:
     thresholds:
-      1:
+      "1":
         workbench-quality-bonus: 1
-      3:
+      "3":
         workbench-quality-bonus: 1
-      5:
+      "5":
         workbench-quality-bonus: 1
-  # artisan の儀式版。CraftQualityService で作業台と儀式は別キーに分割済み。
   ritualist:
     thresholds:
-      1:
+      "1":
         ritual-quality-bonus: 1
-      3:
+      "3":
         ritual-quality-bonus: 1
-      5:
+      "5":
         ritual-quality-bonus: 1
-  # 儀式の台座素材がまれに返る(RitualManager)。値が小さくても周回回数に比例して効くので、
-  # 数値を盛らずに意味が出る = 縦強化にならない。
   thrift:
     thresholds:
-      1:
+      "1":
         material-refund-chance: 0.02
-      3:
+      "3":
         material-refund-chance: 0.02
-      5:
+      "5":
         material-refund-chance: 0.03
-  # アンビル解体の戻り量倍率(DisassemblyListener が 1.0+値 を掛ける)。
-  # 「引く→捨てる」ループの捨てる側を強化する枠。
   salvage:
     thresholds:
-      1:
+      "1":
         disassembly-return-bonus: 0.05
-      3:
+      "3":
         disassembly-return-bonus: 0.05
-      5:
+      "5":
         disassembly-return-bonus: 0.05
-  # enchant-luck は確率そのものではなく「幸運の量」。実確率は
-  # stats/enchant-luck.yml の level-boost-chance-per-luck(0.02) × この値。
   scholar:
     thresholds:
-      1:
+      "1":
         enchant-luck: 0.5
-      3:
+      "3":
         enchant-cost-reduction: 0.02
-      5:
+      "5":
         enchant-luck: 0.5
-
-  # ---------- ルート枠(採取・生活)。基準の約1.2倍 ----------
-
-  # 採掘の追加ドロップ期待値へ直接加算される。採掘「速度」は統合版でゴーストブロックになるので
-  # 絶対に触らない(MINING_EFFICIENCY/BLOCK_BREAK_SPEED 属性は使用禁止)。
   miner:
     thresholds:
-      1:
+      "1":
         mining-fortune: 0.036
-      3:
+      "3":
         mining-fortune: 0.024
-      5:
+      "5":
         mining-fortune: 0.024
-  # 釣りの宝率シフト。dolphins_grace / conduit_power は「水中で動ける」だけで釣果には効かない。
   angler:
     thresholds:
-      1:
+      "1":
         fishing-luck: 0.024
-      3:
-        fishing-luck: 0.012
-      5:
-        fishing-luck: 0.012
-  # 農作物の追加ドロップ。hero_of_the_village は取引価格であって収穫ではない。
+      "3":
+        fishing-luck: 0.024
+      "5":
+        fishing-luck: 0.05
   harvest:
     thresholds:
-      1:
+      "1":
         harvest-extra-drop-chance: 0.024
-      3:
+      "3":
         harvest-extra-drop-chance: 0.012
-      5:
+      "5":
         harvest-extra-drop-chance: 0.012
-  # 伐採の追加ドロップ。採取4系統を別枠にすることで「どの職で遊ぶか」が装備選択に出る。
   timber:
     thresholds:
-      1:
+      "1":
         woodcutting-extra-drop-chance: 0.024
-      3:
+      "3":
         woodcutting-extra-drop-chance: 0.012
-      5:
+      "5":
         woodcutting-extra-drop-chance: 0.012
-  # TFスキルEXP。育成中だけ挿して育ち切ったら外す「一時的に挿す枠」= 厳選のやり直し需要も生む。
   diligence:
     thresholds:
-      1:
+      "1":
         skill-exp-bonus: 0.024
-      3:
+      "3":
         skill-exp-bonus: 0.012
-      5:
+      "5":
         skill-exp-bonus: 0.024
-  # 空腹消費の抑制。戦闘力に1も寄与しない純粋な生活枠(= 縦にならない典型)。
-  # NativeSurvivalPerkListener 側が 0.9 でクランプするので上限を超えても暴走はしない。
   endurance:
     thresholds:
-      1:
+      "1":
         hunger-save-chance: 0.036
-      3:
+      "3":
         hunger-save-chance: 0.024
-      5:
+      "5":
         hunger-save-chance: 0.024
-  # food-restore-bonus / hidden-saturation-bonus はどちらも【割合】(1.0+値 を掛ける)。
-  # 設計書の 0.5 は「食料ポイント +0.5」のつもりだったが実装は倍率なので、
-  # +50%/回 は明らかに過剰。ルート枠の 1.2 倍を掛けた上で 0.12/0.18 へ落としてある。
   gourmet:
     thresholds:
-      1:
+      "1":
         food-restore-bonus: 0.12
-      3:
+      "3":
         hidden-saturation-bonus: 0.12
-      5:
+      "5":
         food-restore-bonus: 0.18
-  # 1個分の効果は「装備中常時の落下速度低下」。既存8種のポーションスレッドと横並びにするため
-  # セット効果は 3 段から(1段目を 1 にすると新種だけが既存の上位互換になる)。
-  # 落下は物理ダメージなので phys-resistance。累計 0.048 は dolphins_grace(累計0.10)より弱く、
-  # 既存枠を食い潰さない位置に置いている。
   slow_falling:
     thresholds:
-      3:
+      "3":
         phys-resistance: 0.024
-      5:
+      "5":
         phys-resistance: 0.024
-
-  # ---------- ダンジョン枠(戦闘)。基準の約1.5倍 ----------
-
-  # モブドロップ倍率。既存16種は「倒す力」は伸ばすが「倒した後の取り分」には触れていない。
-  # 火力を上げずに周回効率だけ上げる横方向の枠。PvPでは効かない(死体複製防止のため実装側で除外)。
   spoils:
     thresholds:
-      1:
+      "1":
         mob-drop-bonus: 0.03
-      3:
+      "3":
         mob-drop-bonus: 0.015
-      5:
+      "5":
         mob-drop-bonus: 0.03
-  # バニラ経験値。PlayerExpChangeEvent 一点集約済みなので全XP源に効く。
-  # エンチャント台とのループを作る枠で、TFスキルEXP(diligence)とは別勘定。
   experience:
     thresholds:
-      1:
+      "1":
         vanilla-exp-bonus: 0.045
-      3:
+      "3":
         vanilla-exp-bonus: 0.03
-      5:
+      "5":
         vanilla-exp-bonus: 0.03
-  # 自然回復量の倍率。health_boost が「最大HPを増やす」のに対しこちらは「戻る速さ」で、
-  # 戦闘中の耐久ではなく戦闘間のダウンタイムに効く。無限リジェネ付与は縦強化なので採らない。
   mending_flesh:
     thresholds:
-      1:
+      "1":
         health-regen-bonus: 0.03
-      3:
+      "3":
         health-regen-bonus: 0.015
-      5:
+      "5":
         health-regen-bonus: 0.03
-  # 反射。厳選の抽選表にも既存16系統のセット効果にも reflect 系は無い、まだ誰も持っていない防御軸。
   thorn:
     thresholds:
-      1:
+      "1":
         reflect-percent: 0.03
-      3:
+      "3":
         reflect-percent: 0.015
-      5:
-        reflect-flat: 3.0
-  # スタン。ダメージを増やさず「通す回数」を増やすので火力インフレに寄与しない。
-  # ⚠ stun-duration-bonus の単位は【tick】(base-stats.yml の 25tick に加算、100tickでクランプ)。
-  #   0〜1未満の値は旧仕様の分数として ×25 されるので、必ず 1 以上の整数tickで書くこと。
+      "5":
+        reflect-flat: 3
   concussion:
     thresholds:
-      1:
+      "1":
         stun-chance: 0.015
-      3:
+      "3":
         stun-duration-bonus: 6
-      5:
+      "5":
         stun-chance: 0.03
-  # ⚠ cooldown-reduction は【アイテムの使用クールダウン】(item-cooldown を持つ武器)の短縮で、
-  #   アクティブスキルCT(<skillId>-cooldown-reduction)でも Ars の詠唱コストでもない。
-  #   CombatListener 側が 0.9 上限・下限係数0.05 でクランプする。
   swiftcast:
     thresholds:
-      1:
+      "1":
         cooldown-reduction: 0.03
-      3:
+      "3":
         cooldown-reduction: 0.015
-      5:
+      "5":
         cooldown-reduction: 0.03
-  # 矢の節約と命中。arrow-piercing / velocity は火力に直結するので避け、消費と精度だけを触る。
   marksman:
     thresholds:
-      1:
+      "1":
         ammo-save-chance: 0.045
-      3:
+      "3":
         bow-accuracy: 0.03
-      5:
+      "5":
         ammo-save-chance: 0.06
-  # 1個分の効果は「装備中常時の幸運」= バニラのルートテーブル(quality/bonus_rolls)へ効く唯一の手段。
-  # TF独自集計の loot 系ステとは別レイヤなので二重取りにならない。UNLUCK/BAD_OMEN 側は当然採らない。
-  # slow_falling と同じ理由でセット効果は 3 段から。spoils と同じキーだが、あちらは1個目から効く
-  # 専用枠でこちらは3個目からの上積み、という関係にしている。
   luck:
     thresholds:
-      3:
+      "3":
         mob-drop-bonus: 0.03
-      5:
+      "5":
         mob-drop-bonus: 0.045
-
-  # ==================================================================
-  # 2026-08-03 追加5種(CMD 300041-300045)。
-  #
-  # ■ 儀式レシピを持たない(TF gacha.yml の景品専用)ぶんを、効果の強さではなく
-  #   「触っている軸が他と被らない」ことで価値にしている。5種とも既存40種が
-  #   誰も触っていないステを1段目に置いてある。
-  # ■ しきい値は追加24種と同じ 1/3/5。1段目が 1 なのは、スレッド単体の効果を
-  #   item-stats.yml だけで出すと「手に持つだけで乗る」穴が開くため
-  #   (ファイル冒頭の ⚠⚠ 参照)。個数集計はソケット済みしか数えない。
-  # ■ 5 が上限なのはキャリア数(防具4部位 + メインハンド + オフハンド枠)が今 5 だから。
-  #   6段以上は到達不能な死にティアになる(ThreadSetThresholdReachabilityTest が落とす)。
-  # ==================================================================
-  # 醸造の品質。potion-quality-bonus は「品質modeへの加点」なので整数刻みで意味が出る。
   perfumer:
     thresholds:
-      1:
-        potion-quality-bonus: 1.0
-      3:
+      "1":
+        potion-quality-bonus: 1
+      "3":
         brew-speed-bonus: 0.06
-      5:
-        potion-quality-bonus: 1.0
-  # 蜂の巣の採取量。hive-harvest-fortune は BeekeepingListener 専用で他と重ならない。
+      "5":
+        potion-quality-bonus: 1
   apiarist:
     thresholds:
-      1:
+      "1":
         hive-harvest-fortune: 0.024
-      3:
+      "3":
         hive-harvest-fortune: 0.012
-      5:
+      "5":
         hive-harvest-fortune: 0.012
-  # 繁殖。追加産仔と成長速度で分けているのは、同じキーを3段重ねると
-  # 「増えるだけで育たない」偏りが出るため。
   herder:
     thresholds:
-      1:
+      "1":
         breeding-extra-child-chance: 0.024
-      3:
+      "3":
         bred-animal-growth-bonus: 0.06
-      5:
+      "5":
         breeding-extra-child-chance: 0.024
-  # モブから得る品の品質。spoils(量)とは別軸なので、両方挿す価値がある。
   appraiser:
     thresholds:
-      1:
-        mob-drop-quality: 1.0
-      3:
+      "1":
+        mob-drop-quality: 1
+      "3":
         mob-drop-bonus: 0.03
-      5:
-        mob-drop-quality: 1.0
-  # 採取速度。gathering-efficiency は「効率強化エンチャントのレベル」として反映されるため
-  # 整数刻み。バニラの採掘速度は level^2+1 で伸びるので、累計3までに抑えている。
+      "5":
+        mob-drop-quality: 1
   excavation:
     thresholds:
-      1:
-        gathering-efficiency: 1.0
-      3:
-        gathering-efficiency: 1.0
-      5:
-        gathering-efficiency: 1.0
+      "1":
+        gathering-efficiency: 1
+      "3":
+        gathering-efficiency: 1
+      "5":
+        gathering-efficiency: 1
+  gacha:
+    thresholds:
+      "2":
+        gacha-rate-bonus: 0.01
+      "4":
+        gacha-rate-bonus: 0.01
+      "5":
+        gacha-rate-bonus: 0.01
+  role_luck:
+    thresholds:
+      "2":
+        craft-roll-up-bonus: 2
+      "3":
+        craft-roll-up-bonus: 2
+      "4":
+        craft-roll-up-bonus: 2
+      "5":
+        craft-roll-up-bonus: 2
+      "6":
+        craft-roll-up-bonus: 2
+  role_effeciency:
+    thresholds:
+      "2":
+        craft-roll-down-reduction: 2
+      "3":
+        craft-roll-down-reduction: 1
+      "4":
+        craft-roll-down-reduction: 5
+      "5":
+        craft-roll-down-reduction: 5
+      "6":
+        craft-roll-down-reduction: 10

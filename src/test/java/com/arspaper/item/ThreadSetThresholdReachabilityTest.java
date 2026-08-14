@@ -208,16 +208,29 @@ class ThreadSetThresholdReachabilityTest {
         ConfigurationSection sets = threadSets();
 
         // 1点1個の系統 = 上限5。3/5 段(=5キャリア全部に載せて初めて最終段)。
-        assertEquals(400.0, sets.getDouble("hero_of_the_village.thresholds.3.attack-power"));
-        assertEquals(900.0, sets.getDouble("hero_of_the_village.thresholds.5.attack-power"));
-        assertEquals(8.0, sets.getDouble("night_vision.thresholds.3.flat-bonus-damage"));
-        assertEquals(18.0, sets.getDouble("night_vision.thresholds.5.flat-bonus-damage"));
+        //
+        // 2026-08-14: 実数ダメージ系(attack-power / flat-bonus-damage / bleed-damage)を
+        // 割合系へ全面振替したので、ここで固定する値も差し替えた。実数のダメージ加算は
+        // 帯非依存なので、装備が伸びない低帯だけ極端に強くなる(hero_of_the_village の
+        // attack-power 400 は Lv20 帯の最強剣 699.5 に単独で匹敵していた)。
+        //
+        // さらに【割合ダメージを配るセットは hero_of_the_village の1本だけ】に集約してある。
+        // 案Eで3本(村の英雄/マナ回復速度上昇/暗視)に増やしたところ、ThreadSetConfig#cumulativeBonus
+        // の累積規則と threads.yml の stackable/max の相乗で、TF 側 ShippedThreadBandIndependenceTest
+        // の帯目標(+39%/+49%/+59%)を Lv60/Lv100 で +13.0pt 超過した。
+        // night_vision を dodge-chance にしたのはその是正。会心系へ逃がさなかったのは意図的で、
+        // crit は実DPSを押し上げるのに帯ガードが数えないため、計測できない形で穴を作り直すことになる。
+        assertEquals(0.05, sets.getDouble("hero_of_the_village.thresholds.3.percent-bonus-damage"));
+        assertEquals(0.08, sets.getDouble("hero_of_the_village.thresholds.5.percent-bonus-damage"));
+        assertEquals(0.02, sets.getDouble("night_vision.thresholds.3.dodge-chance"));
+        assertEquals(0.03, sets.getDouble("night_vision.thresholds.5.dodge-chance"));
         assertEquals(12.0, sets.getDouble("conduit_power.thresholds.3.magic-flat-defense"));
         assertEquals(26.0, sets.getDouble("conduit_power.thresholds.5.magic-flat-defense"));
         assertEquals(0.02, sets.getDouble("conduit_power.thresholds.5.damage-reduction"));
 
         // 設計書が挙げていないが同じ死に値だった2件。
-        assertEquals(80.0, sets.getDouble("damage_mana_recovery.thresholds.8.bleed-damage"));
+        // damage_mana_recovery は bleed-damage(実数) を落として bleed-chance 一本にした。
+        assertEquals(0.07, sets.getDouble("damage_mana_recovery.thresholds.5.bleed-chance"));
         assertEquals(12.0, sets.getDouble("health_boost.thresholds.4.phys-flat-defense"));
         assertEquals(12.0, sets.getDouble("health_boost.thresholds.8.magic-flat-defense"));
 
