@@ -1948,15 +1948,9 @@ public final class TrinityForgeBridge {
      * 2026-07-23 正準スケール分数統一により、値は百分点(10)ではなく分数(0.10)。
      */
     public static final String STAT_SOURCE_COST_REDUCTION = "source_cost_reduction";
-    /**
-     * stat語彙キー: エンチャント台ラピス消費の軽減個数(FLAT整数、例 1.0 = 1個軽減)。
-     * 旧 dedicated-effect {@code lapis-cost-reduction} から移行。
-     * 2026-07-23 追加確定仕様により、他stat(source_cost_reduction等)と異なり分数[0,1]ではなく
-     * 「軽減するラピス個数」のFLAT値。TF側 enchanting.yml は {@code lapis_cost_reduction: 1} で
-     * 定義され、PercentStatNormalizeのRATE_KEYSから除外されているため {@link #tfStatTotal} は
-     * そのまま個数を返す。
-     */
-    public static final String STAT_LAPIS_COST_REDUCTION = "lapis_cost_reduction";
+    // 2026-08-14: STAT_LAPIS_COST_REDUCTION("lapis_cost_reduction")は廃止した。
+    // TF 側の stat 語彙から消えているので tfStatTotal は常に 0 を返す ── 定数だけ残すと
+    // 「効くように見えて何も起きない」配線を再び書ける状態になるため、定数ごと削除している。
     /**
      * stat語彙キー: 儀式のペデスタル素材消費時に1個返却する確率(分数[0,1]、例 0.10 = 10%)。
      * 旧 dedicated-effect {@code material-refund-chance} から移行。
@@ -2083,7 +2077,7 @@ public final class TrinityForgeBridge {
     }
 
     /**
-     * 割合(分数[0,1])のコスト削減系効果(source_cost_reduction / lapis_cost_reduction等)を
+     * 割合(分数[0,1])のコスト削減系効果(source_cost_reduction 等)を
      * 消費計算に使える範囲[0,0.95]へクランプする。NaN / 負値 / TF未ロード由来の0.0は0(削減なし)に、
      * 0.95超は0.95(コストが全額無料化しない安全上限)にクランプする。
      * 2026-07-23 stat-gate-overhaul: TFの正準スケールが分数[0,1]に統一されたことに伴い、

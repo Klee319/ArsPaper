@@ -725,8 +725,10 @@ public class ArsPaper extends JavaPlugin {
         pluginManager.registerEvents(new SummonedMobListener(this), this);
         pluginManager.registerEvents(new com.arspaper.enchant.EnchantBookListener(), this);
         pluginManager.registerEvents(new com.arspaper.enchant.SoulboundListener(), this);
-        // 要件⑥ lapis-cost-reduction: skilltree由来のperkでエンチャント台のラピス消費を割合減する。
-        pluginManager.registerEvents(new com.arspaper.enchant.LapisCostReductionListener(), this);
+        // 2026-08-14: lapis-cost-reduction(LapisCostReductionListener)はユーザー判断
+        // 「ラピス効率は使わない」で機構ごと廃止した。TF 側の stat 語彙・lore・base-stats・
+        // skilltree/enchanting.yml のノードBも同時に削除済み(ノードBの効果は
+        // enchant-cost-reduction へ差し替え)。
         pluginManager.registerEvents(new com.arspaper.spell.SpellBindListener(), this);
         lootTableListener = new com.arspaper.loot.LootTableListener(this);
         pluginManager.registerEvents(lootTableListener, this);
