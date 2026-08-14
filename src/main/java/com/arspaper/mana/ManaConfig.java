@@ -24,14 +24,24 @@ public record ManaConfig(
     int maxPercentCap,
     // 要件⑥ source-auto-consume: マナ不足時にインベントリから消費してマナへ変換するアイテム。
     // itemId(Arsカスタムid または TFカタログid) -> 1個あたりのマナ変換量。
-    Map<String, Integer> sourceAutoConsumeItems
+    Map<String, Integer> sourceAutoConsumeItems,
+    // 2026-08-14 追加: 自動消費のクールタイム(秒)。0以下でCT無し(従来挙動)。
+    // スキルツリー ars_smithing.yml A-2「ソースベリー活用」の説明文は当初から「100マナ/10CT」と
+    // 書いてあったが、CT判定は一度も実装されておらずマナ不足のたびに無制限に変換できていた。
+    int sourceAutoConsumeCooldownSeconds
 ) {
+    /** CT未設定時の既定値(秒)。ノード説明「100マナ/10CT」の 10 をそのまま秒として採る。 */
+    public static final int DEFAULT_SOURCE_AUTO_CONSUME_COOLDOWN_SECONDS = 10;
+
     public static ManaConfig fromConfig(FileConfiguration config) {
         return new ManaConfig(
             config.getInt("mana.per-glyph-unlock-bonus", 5),
             // 既存挙動を変えない安全デフォルト（上昇上限100%）。
             clampPercent(config.getInt("mana.max-percent-cap", 100)),
-            parseSourceAutoConsumeItems(config)
+            parseSourceAutoConsumeItems(config),
+            // 負値は0(CT無し)として扱う。上限は設けない(運用で長いCTを置きたい場合がある)。
+            Math.max(0, config.getInt("mana.source-auto-consume.cooldown-seconds",
+                DEFAULT_SOURCE_AUTO_CONSUME_COOLDOWN_SECONDS))
         );
     }
 

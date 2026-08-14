@@ -29,7 +29,40 @@ import java.util.Map;
  */
 public final class SourceAutoConsume {
 
+    /**
+     * 2026-08-14 追加: プレイヤーごとの「最後に変換が成立した時刻(ms)」。
+     * <b>成立した時だけ</b>記録する ── 変換不発(perk未所持/アイテム不足)でCTを開始してしまうと、
+     * アイテムを持っていないだけの人がCTで縛られる。退出時は {@link #forget} でクリアする
+     * (ManaManager#onPlayerQuit から呼ぶ。呼ばないとUUIDが溜まり続ける)。
+     */
+    private static final Map<java.util.UUID, Long> LAST_CONVERT_MILLIS = new java.util.concurrent.ConcurrentHashMap<>();
+
     private SourceAutoConsume() {
+    }
+
+    /** 退出したプレイヤーのCT状態を破棄する。 */
+    public static void forget(java.util.UUID playerId) {
+        if (playerId != null) {
+            LAST_CONVERT_MILLIS.remove(playerId);
+        }
+    }
+
+    /**
+     * CT判定の純粋関数部（Bukkit非依存でテストできるよう分離）。
+     *
+     * @param lastMillis      最後に変換が成立した時刻(ms)。未変換なら {@code null}
+     * @param nowMillis       現在時刻(ms)
+     * @param cooldownSeconds CT(秒)。0以下ならCT無し
+     * @return CT中で変換できないなら {@code true}
+     */
+    static boolean isOnCooldown(Long lastMillis, long nowMillis, int cooldownSeconds) {
+        if (cooldownSeconds <= 0 || lastMillis == null) {
+            return false;
+        }
+        // 時刻巻き戻し(nowMillis < lastMillis)でも「CT中」に倒す。差が負のときに
+        // 経過時間を大きいと誤読して無制限変換になる方が危険。
+        long elapsed = nowMillis - lastMillis;
+        return elapsed < cooldownSeconds * 1000L;
     }
 
     /**
@@ -41,10 +74,13 @@ public final class SourceAutoConsume {
      * @param deficitMana    現在マナだけでは賄えない不足量（&gt; 0 のみ意味を持つ）
      * @param itemManaConfig itemId(Ars custom_item_id または TFカタログid) -&gt; 1個あたりのマナ変換量
      *                       (ManaConfig#sourceAutoConsumeItems() 由来)
+     * @param cooldownSeconds 変換のクールタイム(秒)。0以下でCT無し
+     *                       (ManaConfig#sourceAutoConsumeCooldownSeconds() 由来)
      * @return 実際に変換されたマナ量。0なら未変換（呼び出し元は従来どおりマナ不足として扱う）。
      *         成功時は常に {@code deficitMana} と一致する（過剰変換分は破棄し、ちょうど賄う）。
      */
-    public static int tryConvert(Player player, int deficitMana, Map<String, Integer> itemManaConfig) {
+    public static int tryConvert(Player player, int deficitMana, Map<String, Integer> itemManaConfig,
+                                 int cooldownSeconds) {
         if (player == null || deficitMana <= 0) {
             return 0;
         }
@@ -52,6 +88,11 @@ public final class SourceAutoConsume {
             return 0;
         }
         if (itemManaConfig == null || itemManaConfig.isEmpty()) {
+            return 0;
+        }
+        // CT判定はインベントリ走査より前に置く。ここを後ろに置くと、CT中でも走査コストを毎回払う。
+        long now = System.currentTimeMillis();
+        if (isOnCooldown(LAST_CONVERT_MILLIS.get(player.getUniqueId()), now, cooldownSeconds)) {
             return 0;
         }
 
@@ -92,6 +133,8 @@ public final class SourceAutoConsume {
             }
         }
 
+        // 変換が成立した時だけCTを開始する(不発でCTを開始しないのは上のコメントの理由)。
+        LAST_CONVERT_MILLIS.put(player.getUniqueId(), now);
         return deficitMana;
     }
 

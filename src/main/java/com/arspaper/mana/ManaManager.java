@@ -185,8 +185,11 @@ public class ManaManager implements Listener {
             // 補填する。perk未所持/TF未ロード/対象アイテム不足時はconvertedが0のまま返り、従来どおり
             // マナ不足として不発になる(fail-open)。
             int deficit = amount - current;
+            // 2026-08-14: CT(秒)を追加。CT中は converted=0 で返るので、従来の「アイテム不足」と
+            // 同じ扱い(=マナ不足で不発)になる。
             int converted = com.arspaper.integration.SourceAutoConsume.tryConvert(
-                player, deficit, config.sourceAutoConsumeItems());
+                player, deficit, config.sourceAutoConsumeItems(),
+                config.sourceAutoConsumeCooldownSeconds());
             if (converted < deficit) return false;
             current += converted;
             lastSourceConvertedAmount.set(converted);
@@ -485,6 +488,9 @@ public class ManaManager implements Listener {
 
         // SpellCasterのクールダウンをクリーンアップ
         ArsPaper.getInstance().getSpellCaster().clearCooldown(player.getUniqueId());
+
+        // ソース自動消費のCT状態をクリーンアップ(2026-08-14 追加。消さないとUUIDが溜まり続ける)
+        com.arspaper.integration.SourceAutoConsume.forget(player.getUniqueId());
 
         // 滑空状態をクリーンアップ（防具復元）
         com.arspaper.spell.effect.GlideEffect.cancelGlide(player.getUniqueId());

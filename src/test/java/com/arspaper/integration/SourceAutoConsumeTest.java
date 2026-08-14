@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -84,14 +85,47 @@ class SourceAutoConsumeTest {
     @Test
     void tryConvert_nullPlayer_returnsZeroWithoutSideEffects() {
         // player==nullガード(要件①): Playerが特定できない経路は常に0(未変換)を返す。
-        int converted = SourceAutoConsume.tryConvert(null, 25, java.util.Map.of("source_berry", 25));
+        int converted = SourceAutoConsume.tryConvert(null, 25, java.util.Map.of("source_berry", 25), 10);
         assertEquals(0, converted);
     }
 
     @Test
     void tryConvert_nonPositiveDeficit_returnsZero() {
         // deficitMana<=0ガード: 不足が無ければ変換不要で常に0。
-        int converted = SourceAutoConsume.tryConvert(null, 0, java.util.Map.of("source_berry", 25));
+        int converted = SourceAutoConsume.tryConvert(null, 0, java.util.Map.of("source_berry", 25), 10);
         assertEquals(0, converted);
+    }
+
+    // ---- 2026-08-14 追加: 自動消費のクールタイム(秒) ----
+    // ノード説明「100マナ/10CT」は当初からあったのにCT判定が一度も実装されておらず、
+    // マナ不足のたびに無制限で変換できていた。判定は純粋関数へ切り出してここで固定する。
+
+    @Test
+    void isOnCooldown_neverConverted_isNotOnCooldown() {
+        // 一度も変換していない(lastMillis==null)なら、CTがいくつでも即使える。
+        assertFalse(SourceAutoConsume.isOnCooldown(null, 1_000_000L, 10));
+    }
+
+    @Test
+    void isOnCooldown_zeroOrNegativeCooldown_isNeverOnCooldown() {
+        // CT=0(および負値)は従来挙動(CT無し)。config で 0 を書いた運用を壊さない。
+        assertFalse(SourceAutoConsume.isOnCooldown(1_000_000L, 1_000_000L, 0));
+        assertFalse(SourceAutoConsume.isOnCooldown(1_000_000L, 1_000_000L, -5));
+    }
+
+    @Test
+    void isOnCooldown_withinCooldown_blocksAndBoundaryIsInclusiveOfElapsed() {
+        long last = 1_000_000L;
+        assertTrue(SourceAutoConsume.isOnCooldown(last, last, 10), "同一時刻はCT中");
+        assertTrue(SourceAutoConsume.isOnCooldown(last, last + 9_999L, 10), "9.999秒はまだCT中");
+        assertFalse(SourceAutoConsume.isOnCooldown(last, last + 10_000L, 10), "ちょうど10秒で解ける");
+        assertFalse(SourceAutoConsume.isOnCooldown(last, last + 60_000L, 10));
+    }
+
+    @Test
+    void isOnCooldown_clockWentBackwards_staysOnCooldown() {
+        // now < last(時刻巻き戻し)で経過時間が負になる。ここを「経過が大きい」と誤読すると
+        // CTが無制限に素通りするので、CT中へ倒す方が安全。
+        assertTrue(SourceAutoConsume.isOnCooldown(1_000_000L, 900_000L, 10));
     }
 }

@@ -28,6 +28,7 @@
 # form別クールダウン(秒)。プレイヤー × form 単位で独立して管理される。
 # 0 または未定義 = 従来の計算クールダウン(連射増強で短縮される)にフォールバック。
 # キーは form の NamespacedKey のキー部分。語彙は spell-form-vocabulary と同じ全10種。
+
 form-cooldowns:
   projectile: 0
   beam: 0
@@ -39,55 +40,36 @@ form-cooldowns:
   orbit: 0
   linger: 0
   wall: 0
-
 mana:
-  # グリフ1つ解放ごとのマナ上限ボーナス
   per-glyph-unlock-bonus: 5
-  # マナ最大値%上昇の上限(%)。装備由来の%上昇(threads.yml の mana-max-percent)をここでクランプする
   max-percent-cap: 100
-  # マナ不足時にインベントリから消費してマナへ変換するアイテム。
-  # Ars鍛冶 A-2 の perk (mana-unlock-effect) を持っている間だけ働く。
-  # キー = アイテムID(Arsカスタムid または TFカタログid) / 値 = 1個あたりのマナ変換量(1以上の整数)。
-  # 空にすると perk を取っても何も起きない(機構は生きているが変換対象が無い状態)。
   source-auto-consume:
+    # 自動消費のクールタイム(秒)。0以下でCT無し(2026-08-14 追加)。
+    # スキルツリー ars_smithing の A-2「ソースベリー活用」の説明は当初から「100マナ/10CT」だったが、
+    # CT判定は実装されておらずマナ不足のたびに無制限に変換できていた。既定の10はその説明に合わせた値。
+    # CT中は変換が起きないので、従来の「対象アイテム不足」と同じくマナ不足で詠唱が不発になる。
+    cooldown-seconds: 10
     items:
-      source_gem: 100
-
-# カスタムエンチャント(マナ回復/マナ増強/共有)のレベル別効果量。
-# 配列の添字がレベルで、先頭(Lv0)は未使用のプレースホルダ。
+      custom:source_berry: 100
 enchantments:
-  mana-regen-per-level: [0, 1, 3, 6]
-  mana-boost-per-level: [0, 15, 30, 50]
+  mana-regen-per-level:
+    - 0
+    - 1
+    - 3
+    - 6
+  mana-boost-per-level:
+    - 0
+    - 15
+    - 30
+    - 50
   max-level: 3
-
-# モブ討伐時の追加ドロップ。
 mob-drops:
-  # ウォーデン討伐で残響の欠片を落とすか(ドロップ増加エンチャントで個数が増える)
   warden-echo-shard: false
   warden-echo-shard-min: 0
   warden-echo-shard-max: 2
-
-# 構造物ルートチェストへの追加抽選は loot-tables.yml へ移した(2026-07-31)。
-# データパック(Dungeons and Taverns 等)の構造物を対象に足せるようにするため、
-# 対象テーブルと中身をまとめて設定へ出してある。ここの loot: は読まれない。
-
-# 魔法によるプレイヤー間ダメージを許可するか。/ars pvp で実行時に切り替えると
-# このキーへ書き戻される。
 pvp:
   enabled: true
-
-# 詠唱1回あたりの杖の耐久消費(2026-08-08 M-5)。
-# 杖はもともと素材が BLAZE_ROD(最大耐久0)で耐久という状態を持てなかった。素材を剣系へ移して
-# 耐久バーを持たせたが、それだけでは「近接で殴ったときしか減らない」ので、詠唱側でも消費させる。
-#
-# 減るのは【実際に手に持って詠唱したアイテム】だけ。最大耐久0の素材(魔導書の BOOK、
-# 配布済みの旧杖の BLAZE_ROD)は自動的に対象外になるので、手持ちの旧杖が壊れることはない。
-# クリエイティブ/スペクテイターと、壊れない(unbreakable)アイテムも対象外。
 cast-durability:
-  # false にすると耐久を一切消費しない(素材変更前と同じ挙動)。
   enabled: true
-  # 1詠唱で減らす耐久値。ネザライトの杖は最大耐久2031なので、1なら約2031回で壊れる。
   amount: 1
-  # 耐久力(Unbreaking)エンチャントを効かせるか。true ならバニラの道具と同じく
-  # レベル L のとき確率 1/(L+1) でのみ消費する(Lv3 なら4回に1回)。
   respect-unbreaking: true
