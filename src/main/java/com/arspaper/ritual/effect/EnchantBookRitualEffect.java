@@ -16,7 +16,6 @@ import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.EnchantmentStorageMeta;
 import org.bukkit.persistence.PersistentDataType;
@@ -110,6 +109,14 @@ public class EnchantBookRitualEffect implements RitualEffect {
 
         String displayName = ArsEnchantments.getDisplayName(enchantId);
         String roman = ArsEnchantments.toRoman(level);
+        // 適用先の案内文はエンチャントごとに違う(EnchantBookListener の適用対象フィルタと対応):
+        //   共有 → spell_book_* 限定 / 回生 → 耐久を持つアイテム全般 / それ以外 → メイジアーマー。
+        // 全部「メイジアーマーに適用」と書いていたため、共有を防具に付けようとして無反応になる案内だった。
+        String applyHint = switch (enchantId) {
+            case "share" -> "金床で魔導書に適用";
+            case "soulbound" -> "金床で耐久のある装備・道具に適用";
+            default -> "金床でメイジアーマーに適用";
+        };
 
         // functional-items.yml の上書き (無ければハードコード表示)
         String nameOverride = displayNameOverride(recipe.id());
@@ -141,16 +148,20 @@ public class EnchantBookRitualEffect implements RitualEffect {
                     Component.text(displayName + " " + roman, NamedTextColor.GRAY)
                         .decoration(TextDecoration.ITALIC, false),
                     Component.empty(),
-                    Component.text("金床でメイジアーマーに適用", NamedTextColor.DARK_GRAY)
+                    Component.text(applyHint, NamedTextColor.DARK_GRAY)
                         .decoration(TextDecoration.ITALIC, false)
                 ));
             }
 
             // エンチャント本は格納エンチャントで既に光るので、既定では何も足さない。
             // enchant-glow: true を明示したときだけ他のカスタムアイテムと同じ光沢処理を行う。
+            // 以前はダミーの Enchantment.UNBREAKING を meta.addEnchant() で足していたが、
+            // EnchantmentStorageMeta では addEnchant() が格納エンチャント側に混入し、
+            // ItemFlag.HIDE_ENCHANTS が付いた本物の格納エンチャント（共有 等）まで
+            // ツールチップから消してしまっていた。BaseCustomItem と同じく
+            // ItemMeta#setEnchantmentGlintOverride(true) へ移行し、格納エンチャントには触れない。
             if (Boolean.TRUE.equals(glow)) {
-                meta.addEnchant(Enchantment.UNBREAKING, 1, true);
-                meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+                meta.setEnchantmentGlintOverride(true);
             }
         });
 

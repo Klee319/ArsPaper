@@ -284,7 +284,9 @@ items:
     lore:
       - "<gray>共有 I</gray>"
       - ""
-      - "<dark_gray>金床でメイジアーマーに適用</dark_gray>"
+      # 共有は EnchantBookListener で spell_book_* 限定(!isSpellBook → continue)。
+      # メイジアーマーには乗らないので案内文も魔導書に合わせる。
+      - "<dark_gray>金床で魔導書に適用</dark_gray>"
     recipe:
       method: ritual
       name: 共有
@@ -305,7 +307,8 @@ items:
     lore:
       - "<gray>回生 I</gray>"
       - ""
-      - "<dark_gray>金床でメイジアーマーに適用</dark_gray>"
+      # 回生は耐久を持つアイテム全般が対象(!isDamageable → continue)。防具限定ではない。
+      - "<dark_gray>金床で耐久のある装備・道具に適用</dark_gray>"
     recipe:
       method: ritual
       name: 回生

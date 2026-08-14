@@ -7,7 +7,6 @@ import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
-import org.bukkit.enchantments.Enchantment;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemFlag;
@@ -52,8 +51,13 @@ public abstract class BaseCustomItem {
     /** CustomModelData値（リソースパック連携用） */
     public abstract int getCustomModelData();
 
-    /** エンチャントオーラを表示するかどうか（防具はfalseにオーバーライド） */
-    public boolean hasEnchantGlow() { return true; }
+    /**
+     * エンチャントオーラを表示するかどうか。既定は false。
+     * functional-items.yml / materials.yml で {@code enchant-glow: true} を明示したものだけ光る
+     * (2026-08-14: ツールチップ非表示バグの修正で既定を true→false へ反転。理由は
+     * {@link #createItemStack()} 内コメント参照)。
+     */
+    public boolean hasEnchantGlow() { return false; }
 
     /**
      * 既定のlore(ハードコード)。表示名と同様、サブクラスがオーバーライドする。
@@ -94,10 +98,15 @@ public abstract class BaseCustomItem {
             // CraftQualityListener がスキル駆動で刻印し、儀式クラフトは RitualManager が
             // TrinityForgeBridge.stampCraftedQuality で刻印する(craft-quality一本化)。コマンド付与等の
             // 非クラフト生成は品質0のまま(生成者スキルが無いため baseline)。
-            // エンチャントオーラ（防具以外のカスタムアイテムに光沢を付与）
+            // エンチャントオーラ（config で enchant-glow: true を明示したカスタムアイテムに光沢を付与）
+            // 以前はダミーの Enchantment.UNBREAKING レベル1を付けて ItemFlag.HIDE_ENCHANTS で隠す方式
+            // だったが、(a) HIDE_ENCHANTS は all-or-nothing なので、後から金床で付けた本物のカスタム
+            // エンチャント（共有／マナ再生／マナ上昇／回生）までツールチップから消えてしまう、
+            // (b) SpellCaster の詠唱耐久判定(damageFor)が Enchantment.UNBREAKING のレベルを機能的に
+            // 読むため、ダミー付与が機能マーカーと衝突しうる、の2点から Paper 1.20.5+ の
+            // ItemMeta#setEnchantmentGlintOverride(true) へ移行した。同じダミー方式に戻さないこと。
             if (glow) {
-                meta.addEnchant(Enchantment.UNBREAKING, 1, true);
-                meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+                meta.setEnchantmentGlintOverride(true);
             }
             // 鍛冶型等のバニラデフォルトテキストを非表示
             meta.addItemFlags(ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
