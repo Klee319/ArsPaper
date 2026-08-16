@@ -54,7 +54,6 @@ items:
         - NETHERITE_INGOT x2
       source: 3000
       result: ENCHANTED_GOLDEN_APPLE
-
 ritual_effects:
   weather_clear:
     name: 晴天の儀式
@@ -182,60 +181,45 @@ ritual_effects:
       - PRISMARINE_SHARD x2
       - custom:source_gem x3
     source: 1200
-  # 2026-07-31 追加: スレッド厳選の振り直し。
-  # コアに効果付きスレッドを1個だけ置いて回すと、主ステ/サブステが再抽選される
-  # (抽選内容は TF stats/item-stats.yml の random-roll-pools: 側。コアのスレッドは消費されない)。
-  # core-item を書いていないのは意図的 ── 振り直す対象は「プレイヤーが持ってきたスレッド」で、
-  # レシピ側で固定できないため。RitualRecipe は core-item が null なら任意のコアを許す。
-  # 費用はペデスタルの素材とソースだけ。厳選は「沼」なので回数を回せる価格に置いてある
-  # (ソースを消費先として使うことで、1億ソースの強化ループにもシンクを作っている)。
-  #
-  # 2026-08-01 (A-2 / K-20): 触媒に custom:reality_thread_core(現実の芯) を1個要求するよう変更。
-  # それまでこの儀式は汎用の source_gem / AMETHYST_SHARD しか要求しておらず、
-  # 「現実の芯」の説明文(&3スレッド再抽選の触媒)・ドロップ配線(要塞/洋館 2%・バスティオン/
-  # 古代都市/エンドシティ 6%・デタパ 3%・束縛者ミニボス 25%)・専用テクスチャのすべてが
-  # 【どこにも繋がっていない嘘】になっていた。1個だけ要求することで、深部ダンジョン周回が
-  # そのまま厳選の回転数になる(汎用素材だけで無限に回せる状態も同時に塞ぐ)。
-  thread_reroll:
-    name: スレッド厳選の振り直し
-    effect-type: thread_reroll
-    effect-params: {}
-    pedestal-items:
-      - custom:reality_thread_core x1
-      - custom:source_gem x4
-      - AMETHYST_SHARD x4
-    source: 2000
-
-  # 2026-08-01 追加 (A-1): スレッド枠の拡張。
-  # コアに拡張したい装備を置いて回すと、その装備の TrinityForge thread-slots が +1 される。
-  # ThreadSlotExpandRitualEffect / ArsPaper.java の登録 / TF 側 API(expandRitualThreadSlot) /
-  # RitualManager のコア非消費登録は【すべて実装済み】で、items.yml に
-  # effect-type: thread_slot_expand のエントリが 0 件だったため、
-  # 「装備を育てる」軸だけがフルスタック実装済みのまま到達不能だった(0-2 / K-18)。
-  #
-  # core-item を書いていないのは意図的 ── 拡張対象は「プレイヤーが持ってきた装備」で
-  # レシピ側で固定できない。RitualRecipe は core-item が null なら任意のコアを許し、
-  # 効果側の validate() が「枠を増やせない装備」を素材消費前に弾く。
-  # コアの装備は消費されず、その場で書き換えて同じコアへ戻る
-  # (RitualManager の CORE_PRESERVING_EFFECT_TYPES に thread_slot_expand が入っている)。
-  #
-  # max-slots: 2 = この儀式で【1つの装備に累計で付与できる】枠数の上限。
-  #   スレッド枠の天井は最上位防具1式(4x4=16) + 最上位武器(3) = 19 枠。
-  #   1点あたり +2 までなら、キャリア5点フル拡張でも 19 -> 29 枠に留まり、
-  #   thread-sets.yml のしきい値(4/8 段・3/5 段)の投資量の意味が壊れない。
-  #
-  # 素材: ソース設備側(ソース機関)と深部ダンジョン周回側(現実の芯・深淵の合金)の両方を要求する。
-  #   どちらか片方だけを回しても枠は伸びない = 「育てる」軸が両方の周回に依存する。
-  #   入手経路: source_engine = materials.yml のソース階梯レシピ(source_condenser x8 + 1,000,000 ソース)、
-  #             reality_thread_core = 構造物ルート + 束縛者ミニボス、
-  #             abyssal_ingot = 束縛者最終フェーズ 1.0(2-4個) + 各ダンジョン最終ボス 10%。
+  # スレッド枠拡張の儀式(Ⅰ→Ⅲ)。
+  # max-slots は「この儀式1回で足す枠数」ではなく、装備に刻まれた儀式由来の累計付与カウンタ
+  # (TrinityForge の PDC `ritual_thread_slot_bonus`)に対する上限値である。3本の儀式は
+  # 同じ1個のカウンタを共有し、ItemFactory#expandRitualThreadSlot が
+  # 「現在の累計 >= その儀式の max-slots なら失敗(素材もソースも消費しない)」と判定して +1 する。
+  # したがって上位の儀式ほど max-slots を大きくしないと、下位で累計が埋まった時点で
+  # 上位が永久に失敗する「死に儀式」になる(Ⅱ が Ⅰ と同じ 1 だった状態がこれ)。
+  # 実際の上限は別途 TrinityForge の progression/crafting-features.yml
+  # `thread-slots.max-by-category`(現在 armor/weapon/tool/other すべて 5)でも頭打ちになる。
+  # 装備の基礎 thread-slots が 2〜3 なので、Ⅲ の 5 は「カテゴリ上限まで解放」を意味する。
   thread_slot_expand_ritual:
-    name: スレッド枠拡張の儀式
+    name: スレッド枠拡張の儀式Ⅰ
     effect-type: thread_slot_expand
     effect-params:
+      # 儀式由来の累計枠が 1 に達するまで(=1回だけ)成功する。
+      max-slots: 1
+    pedestal-items:
+      - custom:source_gem_block x3
+      - DIAMOND x4
+    source: 5000
+  thread_slot_expand_ritual_2:
+    name: スレッド枠拡張の儀式Ⅱ
+    effect-type: thread_slot_expand
+    effect-params:
+      # 累計 2 まで解放。Ⅰ の後(累計1)から更に +1 できる。
       max-slots: 2
     pedestal-items:
-      - custom:source_engine x1
-      - custom:reality_thread_core x2
-      - custom:abyssal_ingot x1
+      - custom:source_gem_block_1x x3
+      - DIAMOND_BLOCK x4
+      - NETHER_STAR
     source: 25000
+  thread_slot_expand_ritual_3:
+    name: スレッド枠拡張の儀式Ⅲ
+    effect-type: thread_slot_expand
+    effect-params:
+      # 累計 5(=カテゴリ上限と同値)まで解放。実際にはカテゴリ上限に当たった時点で止まる。
+      max-slots: 5
+    pedestal-items:
+      - custom:source_engine x4
+      - custom:reality_thread_core x4
+      - custom:abyssal_ingot
+    source: 100000

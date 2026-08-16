@@ -171,29 +171,163 @@ class LootTableConfigTest {
         assertTrue(warnings.get(0).contains("tables"), warnings.get(0));
     }
 
-    @Test
-    @DisplayName("出荷 yml が警告ゼロでパースでき、全プールに対象テーブルと候補がある")
-    void shippedYamlParsesCleanly() {
+    /** 出荷 yml を読んでプールにする。複数のテストから使う。 */
+    private static Map<String, LootTableConfig.Pool> shippedPools(List<String> warnings) {
         File shipped = new File("src/main/resources/" + LootTableConfig.FILE_NAME);
         assertTrue(shipped.isFile(), "出荷 yml が見つからない: " + shipped.getAbsolutePath());
         YamlConfiguration config = YamlConfiguration.loadConfiguration(shipped);
+        return LootTableConfig.parsePools(config.getConfigurationSection("pools"), warnings::add);
+    }
+
+    /** 出荷 yml のどこかに、その custom:<ID>（またはバニラ Material 名）の候補があるか。 */
+    private static boolean offersSomewhere(Map<String, LootTableConfig.Pool> pools, String item) {
+        return pools.values().stream()
+                .flatMap(p -> p.entries().stream())
+                .anyMatch(e -> e.item().equalsIgnoreCase(item));
+    }
+
+    @Test
+    @DisplayName("出荷 yml が警告ゼロでパースでき、5ティア全部に対象テーブルと候補と倍率がある")
+    void shippedYamlParsesCleanly() {
         List<String> warnings = new ArrayList<>();
-        Map<String, LootTableConfig.Pool> pools =
-                LootTableConfig.parsePools(config.getConfigurationSection("pools"), warnings::add);
+        Map<String, LootTableConfig.Pool> pools = shippedPools(warnings);
         assertTrue(warnings.isEmpty(), "出荷 yml が警告を出している: " + warnings);
-        assertFalse(pools.isEmpty(), "出荷 yml にプールが1つも無い");
-        for (LootTableConfig.Pool pool : pools.values()) {
-            assertFalse(pool.tables().isEmpty(), pool.id() + " に tables: が無い");
-            assertFalse(pool.entries().isEmpty(), pool.id() + " に entries: が無い");
+        for (String id : List.of("t5_structures", "t4_structures", "t3_structures",
+                "t2_structures", "t1_structures")) {
+            LootTableConfig.Pool pool = pools.get(id);
+            assertTrue(pool != null, "ティアプール " + id + " が無い");
+            assertFalse(pool.tables().isEmpty(), id + " に tables: が無い");
+            assertFalse(pool.entries().isEmpty(), id + " に entries: が無い");
+            // 「既存戦利品も少し盛る」がこのファイルの半分の目的なので、倍率 1.0 は設定漏れ。
+            assertTrue(pool.scalesQuantity(), id + " の quantity-multiplier が 1.0（＝既存戦利品を盛っていない）");
+            assertTrue(pool.quantityMultiplier() <= 2.0,
+                    id + " の quantity-multiplier が 2.0 を超えている: " + pool.quantityMultiplier());
         }
-        // 移行前のハードコード挙動（対象15件にエンチャント本とエンチャント金リンゴ）が
-        // 残っていることを確認する。ここが落ちたら既存プレイヤーの入手経路を消している。
-        LootTableConfig.Pool legacy = pools.get("vanilla_structure_extras");
-        assertTrue(legacy != null && legacy.tables().size() == 15,
-                "従来の対象15件プールが失われている");
-        assertTrue(legacy.entries().stream().anyMatch(LootTableConfig.Entry::enchantBook),
-                "カスタムエンチャント本の候補が失われている");
-        assertTrue(legacy.entries().stream().anyMatch(e -> e.item().equals("ENCHANTED_GOLDEN_APPLE")),
+    }
+
+    @Test
+    @DisplayName("データパックの実名前空間 nova_structures が対象に入っている")
+    void shippedYamlTargetsTheRealDatapackNamespace() {
+        Map<String, LootTableConfig.Pool> pools = shippedPools(new ArrayList<>());
+        // 旧版は実在しない `dungeons_and_taverns:` を対象にしていて、1度も発火していなかった。
+        // 例外もログも出ないので、当たり判定そのものをここで固定する。
+        // 案1 に入れるデータパック 6 種すべてから、実在する表 ID を1件ずつ当てる。
+        // 1 つの名前空間がまるごと抜けても yml は正常にパースできてしまうので、ここで縛る。
+        for (String key : List.of(
+                "nova_structures:chests/mansion_overhaul/mansion_overhaul_generic",
+                "incendium:castle/barrel/blacksmith",
+                "structory:ruin/swamp/loot",
+                "structory_towers:end_tower",
+                "terralith:spire/treasure",
+                "kaisyn:outpost/common/food")) {
+            assertTrue(pools.values().stream().anyMatch(p -> p.matches(key)),
+                    "データパックの表 " + key + " に当たるプールが無い");
+        }
+        assertTrue(pools.values().stream().anyMatch(p -> p.matches("minecraft:chests/ancient_city")),
+                "バニラのチェストに当たるプールが無い");
+    }
+
+    @Test
+    @DisplayName("旧ハードコード15表と旧2品の入手経路が残っている")
+    void shippedYamlKeepsLegacyAcquisitionPaths() {
+        Map<String, LootTableConfig.Pool> pools = shippedPools(new ArrayList<>());
+        // 移行前は「この15表にエンチャント本とエンチャント金リンゴ」をJavaで直書きしていた。
+        // ティア制に組み替えたときに黙って落ちると、既存プレイヤーの入手経路が1本消える。
+        for (String leaf : List.of("abandoned_mineshaft", "desert_pyramid", "jungle_temple",
+                "simple_dungeon", "stronghold_corridor", "stronghold_crossing", "stronghold_library",
+                "woodland_mansion", "end_city_treasure", "bastion_treasure", "bastion_other",
+                "bastion_hoglin_stable", "bastion_bridge", "ancient_city", "buried_treasure")) {
+            assertTrue(pools.values().stream().anyMatch(p -> p.matches("minecraft:chests/" + leaf)),
+                    "旧版が対象にしていた " + leaf + " がどのプールにも入っていない");
+        }
+        assertTrue(pools.values().stream().flatMap(p -> p.entries().stream())
+                        .anyMatch(LootTableConfig.Entry::enchantBook),
+                "ArsPaper 自前のエンチャント本の候補が失われている");
+        assertTrue(offersSomewhere(pools, "ENCHANTED_GOLDEN_APPLE"),
                 "エンチャント金リンゴの候補が失われている");
+    }
+
+    @Test
+    @DisplayName("ユーザー指定の報酬5分類がすべて配られている")
+    void shippedYamlOffersEveryRewardClass() {
+        Map<String, LootTableConfig.Pool> pools = shippedPools(new ArrayList<>());
+        // 2026-08-16 の指示: 現実の芯 / 品質系スレッド / カスタムモブ素材 / レシピの無い鍵 /
+        // 極低確率のリセット系。どれか1分類まるごと落ちても yml は正常にパースできてしまうので、
+        // 代表IDを1件ずつ固定する。
+        assertTrue(offersSomewhere(pools, "custom:reality_thread_core"), "現実の芯が配られていない");
+        assertTrue(offersSomewhere(pools, "custom:thread_artisan"), "品質系スレッドが配られていない");
+        assertTrue(offersSomewhere(pools, "custom:ravager_hide"), "カスタムモブ素材が配られていない");
+        assertTrue(offersSomewhere(pools, "custom:key_bridge"), "レシピの無い鍵が配られていない");
+        assertTrue(offersSomewhere(pools, "custom:skill_tree_reset"), "リセット系スクロールが配られていない");
+    }
+
+    @Test
+    @DisplayName("除外すると決めたものは出荷 yml のどこにも無い")
+    void shippedYamlExcludesForbiddenRewards() {
+        Map<String, LootTableConfig.Pool> pools = shippedPools(new ArrayList<>());
+        // 深淵素材2種はダンジョン主の独占素材（ユーザー判断で構造物からは出さない）。
+        assertFalse(offersSomewhere(pools, "custom:abyssal_ingot"), "深淵の合金が構造物から出ている");
+        assertFalse(offersSomewhere(pools, "custom:binder_fragment"), "束縛者の欠片が構造物から出ている");
+        // 村・トライアルチャンバー・壺/発掘は無限湧き or 大量にあるので対象外。
+        for (String key : List.of("minecraft:chests/village/village_armorer",
+                "minecraft:chests/trial_chambers/reward", "minecraft:chests/trial_chambers/reward_ominous",
+                "minecraft:archaeology/desert_pyramid")) {
+            assertFalse(pools.values().stream().anyMatch(p -> p.matches(key)),
+                    "対象外にしたはずの " + key + " に当たるプールがある");
+        }
+    }
+
+    @Test
+    @DisplayName("quantity-multiplier は 1.0-3.0 に丸められる")
+    void quantityMultiplierIsClamped() {
+        var pools = parse("""
+                pools:
+                  low:
+                    tables: [a]
+                    quantity-multiplier: 0.1
+                    entries: [{item: DIAMOND}]
+                  huge:
+                    tables: [a]
+                    quantity-multiplier: 999.0
+                    entries: [{item: DIAMOND}]
+                  ok:
+                    tables: [a]
+                    quantity-multiplier: 1.5
+                    entries: [{item: DIAMOND}]
+                """, new ArrayList<>());
+        // 1.0 未満は「減らす」になってしまうので 1.0 へ。桁を間違えた大きな値も 3.0 で止める。
+        assertEquals(1.0, pools.get("low").quantityMultiplier());
+        assertFalse(pools.get("low").scalesQuantity());
+        assertEquals(3.0, pools.get("huge").quantityMultiplier());
+        assertEquals(1.5, pools.get("ok").quantityMultiplier());
+        assertTrue(pools.get("ok").scalesQuantity());
+    }
+
+    @Test
+    @DisplayName("entries も quantity-multiplier も無いプールは警告される")
+    void poolWithNeitherEntriesNorMultiplierWarns() {
+        List<String> warnings = new ArrayList<>();
+        parse("""
+                pools:
+                  p:
+                    tables: [a]
+                """, warnings);
+        assertEquals(1, warnings.size(), warnings.toString());
+        assertTrue(warnings.get(0).contains("quantity-multiplier"), warnings.get(0));
+    }
+
+    @Test
+    @DisplayName("quantity-multiplier だけのプールは entries が無くても警告されない")
+    void multiplierOnlyPoolIsValid() {
+        List<String> warnings = new ArrayList<>();
+        var pools = parse("""
+                pools:
+                  p:
+                    tables: [a]
+                    quantity-multiplier: 2.0
+                """, warnings);
+        assertTrue(warnings.isEmpty(), warnings.toString());
+        assertTrue(pools.get("p").entries().isEmpty());
+        assertTrue(pools.get("p").scalesQuantity());
     }
 }

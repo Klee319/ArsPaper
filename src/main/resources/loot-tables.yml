@@ -2,230 +2,759 @@
 # ArsPaper 構造物ルートチェストへの追加抽選 (loot-tables.yml)
 # ============================================================
 # 「構造物を漁る旨み」を作るファイル。バニラのルートテーブルが生成される瞬間
-# (LootGenerateEvent) に割り込んで、ここに書いたアイテムを確率で足す。
+# (LootGenerateEvent) に割り込んで、(1) 既存の戦利品の個数を増やし、
+# (2) ここに書いたアイテムを確率で足す。
 #
-# 【なぜ yml になったか】以前は対象構造物 15 件と追加する 2 品が Java 側の
-# ハードコードだった。本番の資源サーバには構造物生成のデータパック
-# (Dungeons and Taverns 等) を入れる予定で、そのチェストは
-# `<データパックのnamespace>:chests/...` という別 namespace のルートテーブルを使う。
-# ハードコードのままだとデータパックのチェストには何も入らないので、
-# 対象と中身を丸ごと設定へ出した。
+# 【2026-08-16 全面改訂】資源サーバへ入れるデータパック(案1)の構造物を実際に
+# ダウンロードして全ルートテーブルを読み、**既存の戦利品の豪華さ順** に 5 ティアへ
+# 割り直した。ユーザー方針は「デフォルトの戦利品が豪華なところには豪華な報酬を、
+# 微妙なところには微妙な報酬を。ベースのルートがバニラであっても同じ」。
+#
+# ⚠ このファイルの pools は **tmp/worldgen/gen_loot_yml.py の生成物** である。
+#   手で表を足し引きすると次の再生成で消える。方針を変えるときはスクリプト側を直すこと。
+#   根拠(どの表がどのスコアで何ティアになったか)は tmp/worldgen/report/loot-tiers.csv。
+#
+# ⚠ 旧版は対象を `dungeons_and_taverns:*` と書いていたが、**その名前空間は実在しない**
+#   (Dungeons and Taverns の実際の名前空間は `nova_structures`)。つまり旧版の
+#   データパック向けプールは 1 度も発火していなかった。
 #
 # ------------------------------------------------------------
 # enabled: 全体スイッチ。false でこのファイルの抽選を止める
 #          (ウォーデンの残響の欠片は config.yml の mob-drops 側なので影響しない)
 #
+# block-datapack-enchant-books:
+#   データパックが独自に足したエンチャント(nova_structures:* など)を持つ
+#   エンチャント本を、ルート生成時に取り除く。TF 側のエンチャント体系と
+#   整合しないため既定 true。バニラの修繕は TF の removed-vanilla-items が別途消す。
+#   ⚠ 除去は「ArsPaper が自前の本を足す前」に走るので、type: enchant-book で
+#     足したマナ系の本は巻き込まれない。
+#
 # pools.<プールID>:
 #   tables:  対象ルートテーブル。書き方は3通りで、どれを混ぜてもよい
-#     - simple_dungeon                      … パスの最後の要素と一致(バニラはこれで十分)
+#     - simple_dungeon                      … パスの最後の要素と一致
 #     - minecraft:chests/simple_dungeon     … 完全一致
-#     - dungeons_and_taverns:*              … その namespace のルートテーブル全部
+#     - nova_structures:*                   … その namespace のルートテーブル全部
+#   quantity-multiplier:
+#     既存の戦利品(バニラ/データパックが生成した分)の個数に掛ける倍率。
+#     端数は確率で +1 する(1.5 なら 50% で切り上げ)。省略/1.0 で無効。
+#     ⚠ 追加抽選で足したアイテムには掛からない(二重に増えるため)。
 #   rolls:   抽選回数(1-16)。各候補について rolls 回だけ独立に確率判定する。
-#            1 なら「候補ごとに1回ずつ判定」＝従来と同じ挙動。
 #   entries: 候補
 #     - type:  item(既定) / enchant-book
-#              enchant-book はマナ回復速度・マナ最大値・共有のどれかを
-#              ランダムなレベルで持つカスタムエンチャント本を手続き生成する
-#       item:  バニラ Material 名 (DIAMOND) または custom:<ID>。
-#              custom: は ArsPaper の登録アイテム(materials.yml / thread_*)と
-#              TrinityForge の catalog.yml を両方引く。
-#              thread_* を指定するとスレッド生成時の厳選(個体差)がそのまま乗る。
+#       item:  バニラ Material 名 (DIAMOND) または custom:<ID>
 #       chance: 0.0-1.0。1判定あたりの確率
 #       min / max: 個数の範囲(省略時 1)
 #
 # 【バランスの考え方】
-# ・構造物は「厳選スレッドの入手経路」として設計している。ステータスの上限を
-#   上げる縦強化はここに置かない(縦は世界を繋ぐ者だけ)。増えるのは横の選択肢。
-# ・作業厨が同じ構造物を再訪して稼ぐ経路にならないよう、構造物チェストは
-#   1ワールドにつき有限。数値インフレを起こす素材(ソース結晶など)は低確率に留める。
-# ・村・トライアルチャンバー・難破船のような「大量にあるチェスト」は
-#   意図的に対象外。無限湧きの構造物を入れると経済が壊れる。
+# ・構造物は「厳選スレッドと、作れない鍵の入手経路」。ステ上限を上げる縦強化は置かない。
+# ・村・トライアルチャンバー・壺/発掘は **意図的に対象外**(無限湧き・大量にあるので
+#   経済が壊れる)。除外した表は 117 本。
+# ・深淵の合金 / 束縛者の欠片は構造物から出さない(ダンジョン主の独占素材という設定を守る)。
 # ============================================================
 
 # 設定リファレンス(本文コメント移設先): docs/config-reference/arspaper/loot-tables.md
 enabled: true
+block-datapack-enchant-books: true
 
 pools:
 
-  # --- 従来の挙動(ハードコード時代と同一の確率) --------------------------
-  # 対象15件はバニラの「有限で、探索の目的地になる」構造物だけを選んである。
-  vanilla_structure_extras:
-    tables:
-      - abandoned_mineshaft
-      - desert_pyramid
-      - jungle_temple
-      - simple_dungeon
-      - stronghold_corridor
-      - stronghold_crossing
-      - stronghold_library
-      - woodland_mansion
-      - end_city_treasure
-      - bastion_treasure
-      - bastion_other
-      - bastion_hoglin_stable
-      - bastion_bridge
-      - ancient_city
-      - buried_treasure
-    rolls: 1
-    entries:
-      - type: enchant-book
-        chance: 0.05
-      - item: ENCHANTED_GOLDEN_APPLE
-        chance: 0.01
 
-  # --- 浅い構造物: 厳選スレッドの入口 -----------------------------------
-  # 序盤に出会う構造物。スレッドの「数値が振れる」体験を早い段階で見せる役。
-  # ここで出るのはマナ系の基礎3種で、上位効果のスレッドは儀式側に残してある。
-  shallow_structure_threads:
-    tables:
-      - abandoned_mineshaft
-      - desert_pyramid
-      - jungle_temple
-      - simple_dungeon
-      - buried_treasure
+  # ----------------------------------------------------------------------
+  # T5_最上位 — 28 本 (既存戦利品スコア 31.5〜84.1)
+  # 既存の中身が最も豪華な帯。要塞跡の宝物庫・洋館・エンドの塔など。現実の芯とリセット系がまとまって出る唯一の場所。
+  # ----------------------------------------------------------------------
+  t5_structures:
+    quantity-multiplier: 1.2
     rolls: 1
+    tables:
+      - minecraft:chests/bastion_treasure
+      - nova_structures:chests/mansion_overhaul/mansion_overhaul_generic
+      - minecraft:chests/bastion_other
+      - structory_towers:end_tower
+      - minecraft:chests/bastion_hoglin_stable
+      - structory_towers:top/warped_top
+      - nova_structures:chests/piglin_outstation/outstation_treasure
+      - structory_towers:top/strange_top
+      - structory_towers:top/lighthouse_top
+      - incendium:castle/barrel/blacksmith
+      - nova_structures:chests/pale_residence/residence_generic
+      - minecraft:chests/end_city_treasure
+      - nova_structures:chests/undead_crypts_grave
+      - structory_towers:top/sacred_temple_top
+      - structory_towers:top/pillager_top
+      - incendium:castle/barrel/random
+      - nova_structures:chests/hamlet/hamlet
+      - structory_towers:top/farm_top
+      - incendium:sanctum/lower_loot
+      - nova_structures:chests/ruin_loot_master
+      - nova_structures:chests/pale_residence/residence_evoker
+      - minecraft:chests/ancient_city
+      - nova_structures:chests/dungeon_7
+      - nova_structures:chests/desert_ruins/desert_ruin_lesser_treasure
+      - incendium:castle/barrel/generic
+      - incendium:castle/king_statue
+      - nova_structures:chests/dungeon_3
+      - nova_structures:chests/dungeon_1
     entries:
-      - item: custom:thread_mana_regen
-        chance: 0.04
-      - item: custom:thread_mana_boost
-        chance: 0.04
-      - item: custom:thread_health_boost
-        chance: 0.03
-      # 【採取・生活系スレッド】 2026-08-02 追加。スレッド40種のうち「入手経路=ルート」に
-      # 割り当てた8種のうち、序盤に触れてほしい採取3種をここに置く。
-      # 儀式(catalog.yml)にもモブドロップ(mob-level-table.yml)にも載せていないので、
-      # この抽選が唯一の入手経路 = 構造物を探す動機そのものになる。
-      # 廃坑は掘る場所・砂漠/ジャングルの寺院は開拓の目的地なので、採掘/農耕/伐採の
-      # 3種はここが一番テーマに合う。
-      - item: custom:thread_miner
-        chance: 0.04
-      - item: custom:thread_harvest
-        chance: 0.03
-      - item: custom:thread_timber
-        chance: 0.03
-      - item: custom:source_shard
-        chance: 0.10
+      # --- 厳選の触媒(この帯が主経路)
+      - item: custom:reality_thread_core
+        chance: 0.08
         min: 1
         max: 2
-
-  # --- 中位構造物: 厳選の本番 -------------------------------------------
-  # 要塞と森の洋館。到達に手間がかかる分、被弾/攻撃マナ回復とコスト軽減
-  # (ビルドの方向性が分かれるスレッド)を出す。
-  mid_structure_threads:
-    tables:
-      - stronghold_corridor
-      - stronghold_crossing
-      - stronghold_library
-      - woodland_mansion
-    rolls: 1
-    entries:
-      - item: custom:thread_hit_mana_recovery
-        chance: 0.05
-      - item: custom:thread_damage_mana_recovery
-        chance: 0.05
-      - item: custom:thread_spell_cost_down
-        chance: 0.05
-      # 【採取・生活系スレッド】 2026-08-02 追加。到達に手間がかかる帯なので、
-      # 「効率を上げる」側(釣り運/スキルEXP/空腹節約)の3種をここに置く。
-      # 序盤の採取3種(shallow)より一段上のレイヤという位置付け。
+      # --- 品質系スレッド 10 種
+      - item: custom:thread_artisan
+        chance: 0.03
+      - item: custom:thread_ritualist
+        chance: 0.03
       - item: custom:thread_angler
+        chance: 0.03
+      - item: custom:thread_perfumer
+        chance: 0.03
+      - item: custom:thread_appraiser
+        chance: 0.03
+      - item: custom:thread_scholar
+        chance: 0.03
+      - item: custom:thread_better_fortune
+        chance: 0.03
+      - item: custom:thread_gacha
+        chance: 0.03
+      - item: custom:thread_role_luck
+        chance: 0.03
+      - item: custom:thread_role_effeciency
+        chance: 0.03
+      # --- レシピの無い鍵(深部)
+      - item: custom:key_dark_cathedral
+        chance: 0.02
+      - item: custom:key_nether_bell
+        chance: 0.02
+      - item: custom:key_nether_wastes
+        chance: 0.02
+      # --- リセット系(極低確率)
+      - item: custom:skill_node_lock
+        chance: 0.006
+      - item: custom:skill_tree_reset
+        chance: 0.006
+      - item: custom:stat_reroll_ticket
+        chance: 0.006
+      # --- 素材・圧縮ブロック
+      - item: custom:source_crystal
+        chance: 0.05
+      - item: custom:source_shard
+        chance: 0.16
+        min: 2
+        max: 4
+      # --- 旧版から引き継ぐ枠(消すと入手経路が1本減るので残す)
+      - item: ENCHANTED_GOLDEN_APPLE
+        chance: 0.015
+      # --- 圧縮ブロック(たまに大口の資源が出る枠)
+      - item: custom:diamond_block_1x
+        chance: 0.01
+      - item: custom:gold_block_1x
+        chance: 0.02
+      # ArsPaper 自前のマナ系エンチャント本(体系が整合しているので残す)
+      - type: enchant-book
+        chance: 0.05
+
+  # ----------------------------------------------------------------------
+  # T4_上位 — 52 本 (既存戦利品スコア 15.7〜31.5)
+  # ダンジョン main チェスト帯。品質系スレッドの本命。
+  # ----------------------------------------------------------------------
+  t4_structures:
+    quantity-multiplier: 1.3
+    rolls: 1
+    tables:
+      - nova_structures:chests/dungeon_2
+      - nova_structures:chests/dungeon_4
+      - nova_structures:chests/dungeon_5
+      - nova_structures:chests/dungeon_6
+      - minecraft:chests/simple_dungeon
+      - nova_structures:chests/illager_hideout_random
+      - structory_towers:top/fortress_top
+      - nova_structures:chests/jungle_temple_treasure
+      - minecraft:chests/stronghold/jail
+      - minecraft:chests/stronghold/generic
+      - minecraft:chests/stronghold/jail_cell
+      - nova_structures:chests/mansion_overhaul/supply
+      - nova_structures:chests/piglin_outstation/outstation_tower
+      - minecraft:chests/woodland_mansion
+      - minecraft:chests/desert_pyramid
+      - structory_towers:top/dark_top
+      - nova_structures:chests/lone_citadel/c_forge_chest
+      - structory_towers:sword_portal
+      - minecraft:chests/abandoned_mineshaft
+      - terralith:spire/treasure
+      - structory:ruin/swamp/loot
+      - minecraft:archaelogy/ancient_city
+      - structory_towers:top/wizard_top
+      - incendium:sanctum/tax_collector
+      - structory:ruin/taiga/loot
+      - nova_structures:chests/desert_ruins/desert_ruin_main_temple
+      - structory_towers:top/forager_top
+      - minecraft:chests/ruined_portal
+      - structory_towers:top/mangrove_top
+      - minecraft:chests/nether_fortress/fort_inside_generic
+      - nova_structures:chests/nether_fortress_overhaul/fortress_overhaul
+      - minecraft:chests/stronghold/sewer
+      - nova_structures:chests/bunker_altar
+      - minecraft:chests/illager_mansion/evoker_chest
+      - incendium:quartz_flats/kitchen_treasure
+      - structory_towers:top/paranoid_top
+      - structory_towers:toadstool
+      - structory_towers:top/small_firetower_top
+      - structory_towers:top/ocean_pillar_top
+      - minecraft:chests/stronghold/nether_portal
+      - structory_towers:basic/wizard_basic
+      - structory_towers:top/workshop_top
+      - nova_structures:chests/lone_citadel/c_supply
+      - structory_towers:top/trader_top
+      - nova_structures:chests/nether_port/nether_port_chest
+      - minecraft:chests/buried_treasure
+      - structory_towers:top/desert_top
+      - nova_structures:chests/cave_chambers/cave_chamber_camp
+      - minecraft:chests/bastion_bridge
+      - nova_structures:chests/end_castle/supply
+      - nova_structures:chests/pale_residence/residence_kitchen
+      - minecraft:chests/nether_bridge
+    entries:
+      # --- 厳選の触媒
+      - item: custom:reality_thread_core
         chance: 0.04
-      - item: custom:thread_diligence
-        chance: 0.04
-      - item: custom:thread_endurance
-        chance: 0.04
+      # --- 品質系スレッド 10 種
+      - item: custom:thread_artisan
+        chance: 0.02
+      - item: custom:thread_ritualist
+        chance: 0.02
+      - item: custom:thread_angler
+        chance: 0.02
+      - item: custom:thread_perfumer
+        chance: 0.02
+      - item: custom:thread_appraiser
+        chance: 0.02
+      - item: custom:thread_scholar
+        chance: 0.02
+      - item: custom:thread_better_fortune
+        chance: 0.02
+      - item: custom:thread_gacha
+        chance: 0.02
+      - item: custom:thread_role_luck
+        chance: 0.02
+      - item: custom:thread_role_effeciency
+        chance: 0.02
+      # --- レシピの無い鍵(中位)
+      - item: custom:key_climb
+        chance: 0.018
+      - item: custom:key_palace
+        chance: 0.018
+      - item: custom:key_knight_castle
+        chance: 0.018
+      - item: custom:key_fireworks
+        chance: 0.018
+      # --- リセット系(極低確率)
+      - item: custom:skill_node_lock
+        chance: 0.003
+      - item: custom:skill_tree_reset
+        chance: 0.003
+      - item: custom:stat_reroll_ticket
+        chance: 0.003
+      # --- モブ素材(上位ほど厚い)
+      - item: custom:ravager_hide
+        chance: 0.02
+      - item: custom:piglin_brute_plate
+        chance: 0.02
+      - item: custom:pillager_plate
+        chance: 0.02
+      - item: custom:witch_elixir
+        chance: 0.02
+      - item: custom:piglin_ear
+        chance: 0.02
+      - item: custom:stray_cloth
+        chance: 0.02
+      - item: custom:skeleton_horse_bone
+        chance: 0.02
+      - item: custom:endermite_soot
+        chance: 0.02
+      - item: custom:guardian_spine
+        chance: 0.02
+      - item: custom:husk_cloth
+        chance: 0.02
+      - item: custom:bogged_mossy_bone
+        chance: 0.02
+      - item: custom:parched_sandy_bone
+        chance: 0.02
+      - item: custom:hoglin_fang
+        chance: 0.02
       - item: custom:source_shard
         chance: 0.14
         min: 1
         max: 3
-      - item: custom:reality_thread_core
+      # --- 旧版から引き継ぐ枠(消すと入手経路が1本減るので残す)
+      - item: ENCHANTED_GOLDEN_APPLE
+        chance: 0.008
+      # --- 圧縮ブロック(たまに大口の資源が出る枠)
+      - item: custom:gold_block_1x
         chance: 0.02
-
-  # --- 深部構造物: 再抽選触媒がまとまって出る唯一の場所 ------------------
-  # ネザー要塞跡・古代都市・エンドシティ。厳選を回すための「現実の芯」は
-  # こことダンジョン主のドロップが主経路。
-  deep_structure_threads:
-    tables:
-      - bastion_treasure
-      - bastion_other
-      - bastion_hoglin_stable
-      - bastion_bridge
-      - ancient_city
-      - end_city_treasure
-    rolls: 1
-    entries:
-      - item: custom:thread_mana_regen
-        chance: 0.07
-      - item: custom:thread_mana_boost
-        chance: 0.07
-      - item: custom:thread_health_boost
-        chance: 0.06
-      - item: custom:thread_spell_cost_down
-        chance: 0.06
-      # 【採取・生活系スレッド】 2026-08-02 追加。ネザー要塞跡・古代都市・エンドシティは
-      # 「落ちたら死ぬ / 補給が効かない」場所なので、低速落下と食事回復の2種をここに置く。
-      # 残り6種は shallow / mid 側にあるので、ここでしか手に入らないのはこの2種だけ。
-      - item: custom:thread_slow_falling
-        chance: 0.06
-      - item: custom:thread_gourmet
-        chance: 0.06
-      - item: custom:reality_thread_core
-        chance: 0.06
-      - item: custom:source_crystal
+      - item: custom:emerald_block_1x
+        chance: 0.012
+      - item: custom:amethyst_block_1x
+        chance: 0.012
+      # ArsPaper 自前のマナ系エンチャント本(体系が整合しているので残す)
+      - type: enchant-book
         chance: 0.03
 
-  # --- データパック構造物 (後日追加) --------------------------------------
-  # Dungeons and Taverns を資源サーバへ入れたら、ここが自動で効き始める。
-  # namespace ワイルドカードなので、個々のルートテーブル名を調べる必要はない。
-  # 導入前は該当テーブルが生成されないだけで、警告も副作用も出ない。
-  #
-  # 【namespace の確認方法】データパックを入れたサーバで
-  #   /data get entity @s  ではなく、チェストを開いた時のログ、または
-  #   datapacks/<pack>/data/<namespace>/loot_table/... のディレクトリ名を見る。
-  # 別名だった場合はこの tables: を書き換えるだけでよい。
-  datapack_structure_threads:
-    tables:
-      - dungeons_and_taverns:*
-      - dungeons_and_taverns_stronghold_overhaul:*
+  # ----------------------------------------------------------------------
+  # T3_中位 — 86 本 (既存戦利品スコア 4.5〜15.7)
+  # 神殿・図書館・野営地の主チェスト帯。素材と浅い鍵。
+  # ----------------------------------------------------------------------
+  t3_structures:
+    quantity-multiplier: 1.5
     rolls: 1
+    tables:
+      - nova_structures:chests/desert_temple/desert_temple_lesser
+      - nova_structures:chests/ocean_monument/trident_treasure
+      - minecraft:chests/stronghold/library
+      - structory_towers:top/nomad_top
+      - nova_structures:chests/jungle_ruins/jungle_ruins_main_temple
+      - nova_structures:chests/cave_chambers/apple_shrine
+      - minecraft:archaelogy/jungle_ruins
+      - terralith:underground/chest
+      - minecraft:chests/jungle_temple
+      - incendium:castle/barrel/food
+      - nova_structures:chests/ocean_monument/greater_treasure
+      - nova_structures:chests/sealing_halls/chest_generic
+      - incendium:castle/barrel/food_low
+      - nova_structures:chests/illager_hideout_heart_loot
+      - incendium:castle/tower_barrel
+      - incendium:castle/barrel/library
+      - nova_structures:chests/conduit_ruin/conduit_ruin_big
+      - nova_structures:chests/pillager_outpost_small_treasure
+      - incendium:castle/barrel/ice
+      - incendium:sanctum/brewery
+      - structory_towers:basic/pillager_basic
+      - incendium:sanctum/common_loot
+      - minecraft:archaelogy/ruins
+      - minecraft:chests/shipwreck_treasure
+      - minecraft:chests/illager_mansion/generic
+      - nova_structures:archaelogy/desert_ruin_inside_temple
+      - nova_structures:chests/cave_chambers/cave_chamber_grave
+      - nova_structures:chests/piglin_outstation/outstation_generic
+      - nova_structures:chests/pale_residence/residence_forge
+      - nova_structures:chests/desert_ruins/desert_ruin_house
+      - nova_structures:chests/toxic_lair/generic
+      - nova_structures:chests/desert_ruins/desert_ruin_grave
+      - minecraft:chests/illager_mansion/ancient_city_raid_chest
+      - nova_structures:chests/pale_residence/residence_grave
+      - nova_structures:chests/end_castle/lesser_loot
+      - nova_structures:chests/stray_fort_tresure
+      - nova_structures:chests/shrine/tier_6/pots
+      - incendium:sanctum/coffin
+      - structory:ruin/taiga/illager_treasure
+      - terralith:spire/common
+      - incendium:sanctum/banners
+      - nova_structures:archaelogy/crypt
+      - nova_structures:chests/witch_villa/lab
+      - nova_structures:chests/pale_residence/pale_cleric
+      - incendium:reactor/treasure
+      - nova_structures:chests/shrine/combat_pot
+      - structory:ruin/taiga/illager_high
+      - nova_structures:chests/mineshaft_overhaul/barrel
+      - structory:outcast/boat/loot
+      - nova_structures:chests/lone_citadel/c_forge
+      - nova_structures:chests/nether_port/nether_port_supplies
+      - structory_towers:basic/warped_basic
+      - nova_structures:chests/pillager_outpost_treasure
+      - terralith:spire/rare
+      - nova_structures:chests/badland_miner_outpost
+      - nova_structures:chests/illager_hideout_utility
+      - nova_structures:chests/lone_citadel/c_library
+      - nova_structures:chests/pale_residence/pale_smith
+      - nova_structures:chests/witch_villa/dirty_clothes
+      - minecraft:chests/illager_mansion/vindicator_chest
+      - nova_structures:chests/pale_residence/residence_basement
+      - incendium:castle/treasure/quartz
+      - minecraft:chests/illager_mansion/secret_room
+      - nova_structures:chests/badland_miner_outpost_towers
+      - nova_structures:chests/illager_camp
+      - nova_structures:chests/ocean_monument/lesser_treasure
+      - nova_structures:chests/lone_citadel/c_grave
+      - nova_structures:chests/shrine/tier_6/supply_barrel
+      - incendium:quartz_flats/kitchen_extra_treasure
+      - incendium:castle/barrel/monument
+      - minecraft:chests/illager_mansion/ravager_chest
+      - nova_structures:archaelogy/archeology_toxic
+      - nova_structures:chests/conduit_ruin/conduit_ruin_main
+      - nova_structures:chests/stray_fort/stray_fort_generic
+      - structory_towers:basic/sacred_temple_basic
+      - minecraft:chests/underwater_ruin_big
+      - structory_towers:basic/strange_basic
+      - terralith:desert_outpost
+      - terralith:mage/treasure
+      - minecraft:chests/pillager_outpost
+      - structory:harvest/manor2/loot
+      - structory:harvest/manor2/treasure
+      - incendium:castle/barrel/barracks
+      - minecraft:chests/stronghold/library_bookshelf
+      - structory_towers:basic/dark_basic
+      - incendium:quartz_flats/kitchen_basic
+      # データパック無し構成のための保険(structures.json には現れない表)
+      - minecraft:chests/stronghold_corridor
     entries:
-      - type: enchant-book
-        chance: 0.05
-      - item: custom:thread_mana_regen
-        chance: 0.04
-      - item: custom:thread_mana_boost
-        chance: 0.04
-      - item: custom:thread_hit_mana_recovery
-        chance: 0.04
-      - item: custom:thread_damage_mana_recovery
-        chance: 0.04
-      - item: custom:thread_spell_cost_down
-        chance: 0.04
-      # 【採取・生活系スレッド】 2026-08-02 追加。バニラ側の3プール(shallow/mid/deep)に
-      # 分散させた8種を、ここでは一括で薄く(各2%)出す。データパックの構造物は
-      # 「どれが浅くてどれが深いか」を namespace ワイルドカードでは判別できないため、
-      # テーマ分けはせず全種を等確率に落としてある。
-      # 確率を 2% に抑えているのは、データパック構造物は生成数が読めず、バニラ側と
-      # 同じ4-6%にすると実効入手率がバニラの数倍に化けかねないため。
-      - item: custom:thread_miner
-        chance: 0.02
+      - item: custom:reality_thread_core
+        chance: 0.015
+      # --- 品質系スレッド 10 種(薄め)
+      - item: custom:thread_artisan
+        chance: 0.01
+      - item: custom:thread_ritualist
+        chance: 0.01
       - item: custom:thread_angler
-        chance: 0.02
-      - item: custom:thread_harvest
-        chance: 0.02
-      - item: custom:thread_timber
-        chance: 0.02
-      - item: custom:thread_diligence
-        chance: 0.02
-      - item: custom:thread_endurance
-        chance: 0.02
-      - item: custom:thread_gourmet
-        chance: 0.02
-      - item: custom:thread_slow_falling
-        chance: 0.02
+        chance: 0.01
+      - item: custom:thread_perfumer
+        chance: 0.01
+      - item: custom:thread_appraiser
+        chance: 0.01
+      - item: custom:thread_scholar
+        chance: 0.01
+      - item: custom:thread_better_fortune
+        chance: 0.01
+      - item: custom:thread_gacha
+        chance: 0.01
+      - item: custom:thread_role_luck
+        chance: 0.01
+      - item: custom:thread_role_effeciency
+        chance: 0.01
+      # --- レシピの無い鍵(浅め)
+      - item: custom:key_bridge
+        chance: 0.015
+      - item: custom:key_city
+        chance: 0.015
+      - item: custom:key_sewer_maze
+        chance: 0.015
+      - item: custom:key_steamworks
+        chance: 0.015
+      # --- モブ素材
+      - item: custom:ravager_hide
+        chance: 0.015
+      - item: custom:piglin_brute_plate
+        chance: 0.015
+      - item: custom:pillager_plate
+        chance: 0.015
+      - item: custom:witch_elixir
+        chance: 0.015
+      - item: custom:piglin_ear
+        chance: 0.015
+      - item: custom:stray_cloth
+        chance: 0.015
+      - item: custom:skeleton_horse_bone
+        chance: 0.015
+      - item: custom:endermite_soot
+        chance: 0.015
+      - item: custom:guardian_spine
+        chance: 0.015
+      - item: custom:husk_cloth
+        chance: 0.015
+      - item: custom:bogged_mossy_bone
+        chance: 0.015
+      - item: custom:parched_sandy_bone
+        chance: 0.015
+      - item: custom:hoglin_fang
+        chance: 0.015
       - item: custom:source_shard
         chance: 0.12
         min: 1
         max: 3
-      - item: custom:reality_thread_core
-        chance: 0.03
+      # --- 圧縮ブロック(たまに大口の資源が出る枠)
+      - item: custom:iron_block_1x
+        chance: 0.02
+      - item: custom:lapis_block_1x
+        chance: 0.015
+      - item: custom:redstone_block_1x
+        chance: 0.015
+
+  # ----------------------------------------------------------------------
+  # T2_下位 — 94 本 (既存戦利品スコア 1.0〜4.4)
+  # サブチェスト帯。素材と圧縮ブロックが中心で、スレッドは薄く。
+  # ----------------------------------------------------------------------
+  t2_structures:
+    quantity-multiplier: 1.8
+    rolls: 1
+    tables:
+      - minecraft:chests/igloo_chest
+      - nova_structures:chests/cave_chambers/farmer
+      - nova_structures:chests/stray_fort_loot_generic
+      - nova_structures:chests/stray_fort/stray_fort_citadel_lead
+      - structory:outcast/bandit/desert_copper
+      - structory:outcast/bandit/desert
+      - structory:outcast/farm_ruin
+      - nova_structures:chests/cave_chambers/cave_chamber_tree
+      - structory:outcast/settlement
+      - structory:harvest/graveyard
+      - structory:harvest/graveyard2
+      - nova_structures:chests/end_lighthouse/supply_lighthouse
+      - nova_structures:chests/witch_villa/general_storage
+      - structory:outcast/generic/bandit
+      - structory:outcast/mine/loot
+      - nova_structures:chests/end_castle/castle_bar
+      - terralith:igloo
+      - terralith:witch_hut
+      - kaisyn:outpost/common/food
+      - minecraft:chests/stronghold_crossing
+      - nova_structures:chests/tavern/tavern_quest_chest
+      - nova_structures:chests/food_supply
+      - nova_structures:chests/witch_villa/music_room
+      - incendium:reactor/waste
+      - nova_structures:chests/piglin_camp/piglin_camp_chart
+      - structory_towers:basic/workshop_basic
+      - nova_structures:chests/nether_tower/nether_tower_chart_chest
+      - structory:library/high
+      - nova_structures:chests/pale_residence/town_chest
+      - nova_structures:chests/pillager_outpost_storage
+      - terralith:mage/extras
+      - structory:outcast/ruin/ruin
+      - structory:ruin/ruin
+      - incendium:pipeline/common
+      - incendium:pipeline/junk
+      - incendium:pipeline/rare
+      - incendium:pipeline/uncommon
+      - nova_structures:chests/nether_tower/nether_crimson_tower_chart_lesser
+      - nova_structures:chests/nether_tower/nether_fort_tower_chart_lesser
+      - nova_structures:chests/nether_tower/nether_soul_tower_chart_lesser
+      - nova_structures:chests/nether_tower/nether_warped_tower_chart_lesser
+      - nova_structures:chests/nether_tower/nether_tower_lesser
+      - minecraft:chests/illager_mansion/library_chest
+      - nova_structures:chests/badland_miner_outpost_forge
+      - nova_structures:chests/witch_villa/bedroom
+      - terralith:mage/barracks
+      - nova_structures:archaelogy/desert_ruin_ruins
+      - nova_structures:chests/piglin_camp/piglin_camp_supply
+      - nova_structures:chests/conduit_ruin/conduit_ruin_small
+      - structory_towers:basic/forager_basic
+      - nova_structures:chests/witch_villa/potion_brewing
+      - nova_structures:chests/creeping_crypt/crypt_grave
+      - nova_structures:chests/illager_hideout_weaponry
+      - structory_towers:basic/farm_basic
+      - nova_structures:chests/end_castle/castle_brewing
+      - nova_structures:chests/lone_citadel/c_banner
+      - minecraft:chests/underwater_ruin_small
+      - nova_structures:chests/pale_residence/pale_mason
+      - structory:ruin/taiga/illager_low
+      - structory_towers:basic/trader_basic
+      - incendium:sanctum/junk_loot
+      - nova_structures:chests/pale_residence/pale_fisher
+      - nova_structures:chests/pale_residence/pale_library
+      - structory_towers:basic/small_firetower_basic
+      - nova_structures:chests/creeping_crypt/crypt_hallway
+      - nova_structures:chests/mangrove_witchhud
+      - nova_structures:chests/mansion_overhaul/mansion_overhaul_library
+      - nova_structures:chests/pale_residence/pale_butcher
+      - nova_structures:chests/pale_residence/pale_fletcher
+      - structory_towers:basic/nomad_basic
+      - nova_structures:chests/pale_residence/pale_shepherd
+      - nova_structures:chests/pillager_outpost_library
+      - nova_structures:chests/toxic_lair/brewing
+      - structory_towers:basic/paranoid_basic
+      - minecraft:chests/illager_mansion/witch_chest
+      - nova_structures:chests/lone_citadel/c_cold_barrel
+      - structory_towers:basic/mangrove_basic
+      - minecraft:chests/illager_mansion/pillager_chest
+      - nova_structures:chests/cave_chambers/iron_miner
+      - nova_structures:chests/stray_fort_archer
+      - structory_towers:basic/desert_basic
+      - structory_towers:basic/ocean_pillar_basic
+      - nova_structures:chests/catacomb/catacomb_generic
+      - nova_structures:chests/catacomb/catacomb_grave
+      - nova_structures:chests/stray_fort/stray_fort_forge
+      - nova_structures:chests/illager_hideout_brewing
+      - incendium:cvill/blacksmith
+      - terralith:ruin/glacial/junk
+      - incendium:cvill/medium
+      - minecraft:chests/shipwreck_supply
+      - incendium:castle/barrel/lumber_big
+      - terralith:ruin/glacial/main_cs
+      - nova_structures:chests/remnant_bundle_tent
+      - terralith:spire/junk
+    entries:
+      # --- モブ素材が主。スレッドは当たり枠として薄く残す
+      - item: custom:ravager_hide
+        chance: 0.01
+      - item: custom:piglin_brute_plate
+        chance: 0.01
+      - item: custom:pillager_plate
+        chance: 0.01
+      - item: custom:witch_elixir
+        chance: 0.01
+      - item: custom:piglin_ear
+        chance: 0.01
+      - item: custom:stray_cloth
+        chance: 0.01
+      - item: custom:skeleton_horse_bone
+        chance: 0.01
+      - item: custom:endermite_soot
+        chance: 0.01
+      - item: custom:guardian_spine
+        chance: 0.01
+      - item: custom:husk_cloth
+        chance: 0.01
+      - item: custom:bogged_mossy_bone
+        chance: 0.01
+      - item: custom:parched_sandy_bone
+        chance: 0.01
+      - item: custom:hoglin_fang
+        chance: 0.01
+      - item: custom:thread_artisan
+        chance: 0.004
+      - item: custom:thread_ritualist
+        chance: 0.004
+      - item: custom:thread_angler
+        chance: 0.004
+      - item: custom:thread_perfumer
+        chance: 0.004
+      - item: custom:thread_appraiser
+        chance: 0.004
+      - item: custom:thread_scholar
+        chance: 0.004
+      - item: custom:thread_better_fortune
+        chance: 0.004
+      - item: custom:thread_gacha
+        chance: 0.004
+      - item: custom:thread_role_luck
+        chance: 0.004
+      - item: custom:thread_role_effeciency
+        chance: 0.004
+      - item: custom:source_shard
+        chance: 0.1
+        min: 1
+        max: 2
+      # --- 圧縮ブロック(たまに大口の資源が出る枠)
+      - item: custom:copper_block_1x
+        chance: 0.02
+      - item: custom:coal_block_1x
+        chance: 0.02
+
+  # ----------------------------------------------------------------------
+  # T1_最下位 — 86 本 (既存戦利品スコア 0.1〜1.0)
+  # 食料箱・樽などの端物。追加報酬はほぼ無く、既存戦利品の量だけ倍にする。
+  # ----------------------------------------------------------------------
+  t1_structures:
+    quantity-multiplier: 2.0
+    rolls: 1
+    tables:
+      - nova_structures:chests/stray_fort/stray_fort_food
+      - nova_structures:chests/witch_villa/gardening
+      - structory_towers:basic/lighthouse_basic
+      - incendium:castle/barrel/greenhouse_secret
+      - incendium:cvill/low
+      - incendium:cvill/lumberjack
+      - incendium:pipeline/treasure
+      - kaisyn:outpost/common/armory
+      - minecraft:chests/illager_mansion/kitchen
+      - minecraft:chests/illager_mansion/wool
+      - nova_structures:chests/stray_fort/stray_fort_library
+      - nova_structures:chests/stray_fort/stray_fort_fishing
+      - nova_structures:chests/stray_fort/stray_fort_fletcher
+      - nova_structures:chests/witch_villa/kitchen
+      - incendium:lab/treasure
+      - incendium:reactor/office_treasure
+      - nova_structures:chests/cave_chambers/crop_random
+      - nova_structures:chests/illager_hideout_vegitarian
+      - nova_structures:chests/pale_residence/residence_library
+      - structory:library/junk
+      - structory:library/low
+      - incendium:castle/barrel/lumber
+      - incendium:cvill/farmer
+      - nova_structures:chests/pillager_outpost_kitchen
+      - incendium:reactor/junk
+      - minecraft:chests/shipwreck_map
+      - nova_structures:chests/cave_chambers/fisher
+      - nova_structures:chests/pale_residence/pale_farmer
+      - structory:mood/fisherman
+      - nova_structures:chests/illager_hideout_meat
+      - minecraft:chests/illager_mansion/map_chest
+      - minecraft:chests/illager_mansion/smithing_room
+      - nova_structures:chests/cave_chambers/copper_minner
+      - nova_structures:chests/pale_residence/pale_cartographer
+      - nova_structures:chests/shrine/tier_6/dispenser
+      - nova_structures:chests/toxic_lair/kitchen
+      - nova_structures:chests/witch_villa/library
+      - incendium:cvill/butcher
+      - nova_structures:chests/witch_villa/slime_room
+      - incendium:lab/junk
+      - incendium:lab/rare
+      - incendium:reactor/office
+      - kaisyn:outpost/exclusives/outpost_rustic_barrel
+      - nova_structures:chests/illager_hideout_fishing
+      - nova_structures:chests/illager_hideout_trash
+      - nova_structures:chests/water_supply
+      - structory:mood/farmer
+      - structory:mood/miner
+      - incendium:castle/barrel/alchemist
+      - incendium:castle/barrel/generic_big
+      - incendium:lab/piglin_loot
+      - nova_structures:chests/firewatch_tower
+      - nova_structures:chests/lone_citadel/c_dispenser
+      - nova_structures:chests/mining_supply
+      - nova_structures:chests/witch_villa/pumpkin_room
+      - structory:mood/desert
+      - structory:mood/grassy
+      - incendium:quartz_flats/ghastling_food
+      - incendium:quartz_flats/kitchen_junk
+      - minecraft:chests/ancient_city_ice_box
+      - minecraft:chests/stronghold_library
+      - nova_structures:chests/cave_chambers/crop_mushroom
+      - nova_structures:chests/nether_tower/nether_tower_supply
+      - terralith:lodge_drinkables
+      - kaisyn:outpost/exclusives/outpost_beach_barrel
+      - kaisyn:outpost/exclusives/outpost_mediterranean_barrel
+      - nova_structures:chests/cave_chambers/crop_beetroot
+      - nova_structures:chests/end_castle/rocket_barrel
+      - nova_structures:chests/illager_hideout_library
+      - incendium:castle/barrel/library_low
+      - incendium:lab/basalt
+      - nova_structures:chests/cave_chambers/crop_potato
+      - nova_structures:chests/illager_hideout_raw_ores
+      - nova_structures:chests/nether_fortress_overhaul/skeleton_supply
+      - terralith:underground/giant_bee_hive
+      - incendium:entity/sentry
+      - nova_structures:chests/cave_chambers/crop_carrots
+      - incendium:castle/base/blackstone
+      - nova_structures:mob/blaze_fireball
+      - nova_structures:mob/piglin_brute_donjon
+      - nova_structures:mob/piglin_brute_hamlet
+      - nova_structures:mob/piglin_brute_outstation
+      - nova_structures:mob/piglin_donjon
+      - nova_structures:mob/piglin_donjon_netherite
+      - nova_structures:mob/piglin_hamlet
+      - nova_structures:mob/piglin_outstation
+    entries:
+      # --- 端物。追加はモブ素材とソースの欠片だけ
+      - item: custom:ravager_hide
+        chance: 0.005
+      - item: custom:piglin_brute_plate
+        chance: 0.005
+      - item: custom:pillager_plate
+        chance: 0.005
+      - item: custom:witch_elixir
+        chance: 0.005
+      - item: custom:piglin_ear
+        chance: 0.005
+      - item: custom:stray_cloth
+        chance: 0.005
+      - item: custom:skeleton_horse_bone
+        chance: 0.005
+      - item: custom:endermite_soot
+        chance: 0.005
+      - item: custom:guardian_spine
+        chance: 0.005
+      - item: custom:husk_cloth
+        chance: 0.005
+      - item: custom:bogged_mossy_bone
+        chance: 0.005
+      - item: custom:parched_sandy_bone
+        chance: 0.005
+      - item: custom:hoglin_fang
+        chance: 0.005
+      - item: custom:source_shard
+        chance: 0.06
+        min: 1
+        max: 2
+      # --- 圧縮ブロック(たまに大口の資源が出る枠)
+      - item: custom:coal_block_1x
+        chance: 0.02

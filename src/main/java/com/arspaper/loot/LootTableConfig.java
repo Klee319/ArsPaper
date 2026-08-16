@@ -46,18 +46,33 @@ public class LootTableConfig {
     /**
      * 1つのプール。
      *
-     * @param id      プールID（yml のキー）
-     * @param tables  対象ルートテーブルの指定（上の3通り）
-     * @param rolls   このプールから抽選する回数。1 なら「各候補を1回ずつ判定」
-     * @param entries 候補
+     * @param id                 プールID（yml のキー）
+     * @param tables             対象ルートテーブルの指定（上の3通り）
+     * @param rolls              このプールから抽選する回数。1 なら「各候補を1回ずつ判定」
+     * @param quantityMultiplier 既存の戦利品（バニラ/データパックが生成した分）の個数に掛ける倍率
+     * @param entries            候補
      */
-    public record Pool(String id, List<String> tables, int rolls, List<Entry> entries) {
+    public record Pool(String id, List<String> tables, int rolls, double quantityMultiplier,
+                       List<Entry> entries) {
+
+        /**
+         * 個数倍率の上限。ここを超える値は書き間違い（桁ずれ）とみなして丸める。
+         * 3.0 でもダイヤ 3 個が 9 個になるので、探索の底上げとしては十分に大きい。
+         */
+        public static final double MAX_QUANTITY_MULTIPLIER = 3.0;
 
         public Pool {
             tables = tables == null ? List.of() : List.copyOf(tables);
             // 上限を置くのは、桁を間違えた rolls でチェストが埋まる（＝経済が壊れる）のを防ぐため。
             rolls = Math.max(1, Math.min(16, rolls));
+            quantityMultiplier = !Double.isFinite(quantityMultiplier) ? 1.0
+                    : Math.max(1.0, Math.min(MAX_QUANTITY_MULTIPLIER, quantityMultiplier));
             entries = entries == null ? List.of() : List.copyOf(entries);
+        }
+
+        /** 既存の戦利品を増やす設定になっているか（1.0 は「増やさない」）。 */
+        public boolean scalesQuantity() {
+            return quantityMultiplier > 1.0;
         }
 
         /** このプールが {@code lootTableKey}（{@code namespace:path} 形式）に当たるか。 */
@@ -85,6 +100,7 @@ public class LootTableConfig {
 
     private final JavaPlugin plugin;
     private boolean enabled;
+    private boolean blockDatapackEnchantBooks;
     private final Map<String, Pool> pools = new LinkedHashMap<>();
 
     public LootTableConfig(JavaPlugin plugin) {
@@ -99,6 +115,19 @@ public class LootTableConfig {
 
     public boolean isEnabled() {
         return enabled;
+    }
+
+    /**
+     * データパックが独自に足したエンチャントを持つ本を、ルート生成時に取り除くか（既定 true）。
+     *
+     * <p>案1 のデータパック（Dungeons and Taverns）は {@code nova_structures:} 名前空間で
+     * 32 種のエンチャントを追加し、その一部をチェストのエンチャント本として配る。TF 側は
+     * 独自のエンチャント体系とオーバーエンチャント機構を持っているので、混ざると
+     * 「金床で付くのに TF のステ表には無い」不整合になる。バニラの修繕は TF 側の
+     * {@code removed-vanilla-items} が別経路で消すので、ここでは扱わない。
+     */
+    public boolean blocksDatapackEnchantBooks() {
+        return blockDatapackEnchantBooks;
     }
 
     /** そのルートテーブルに当たるプール（定義順）。 */
@@ -124,6 +153,7 @@ public class LootTableConfig {
         }
         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
         enabled = config.getBoolean("enabled", true);
+        blockDatapackEnchantBooks = config.getBoolean("block-datapack-enchant-books", true);
         pools.putAll(parsePools(config.getConfigurationSection("pools"),
                 message -> plugin.getLogger().warning("[" + FILE_NAME + "] " + message)));
         plugin.getLogger().info("[" + FILE_NAME + "] " + pools.size() + " 件のルートプールを読み込みました");
@@ -163,10 +193,13 @@ public class LootTableConfig {
                     entries.add(entry);
                 }
             }
-            if (entries.isEmpty()) {
-                warn.accept("pools." + id + " に有効な entries: が無いため、このプールは何も追加しません");
+            double multiplier = section.getDouble("quantity-multiplier", 1.0);
+            if (entries.isEmpty() && multiplier <= 1.0) {
+                // entries も倍率も無いプールは完全な no-op。書いたのに効かないので気づけるよう警告する。
+                warn.accept("pools." + id
+                        + " に有効な entries: も quantity-multiplier: も無いため、このプールは何もしません");
             }
-            out.put(id, new Pool(id, tables, section.getInt("rolls", 1), entries));
+            out.put(id, new Pool(id, tables, section.getInt("rolls", 1), multiplier, entries));
         }
         return out;
     }

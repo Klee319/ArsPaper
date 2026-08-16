@@ -18,6 +18,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -35,6 +36,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *       = アイテムの説明文が嘘になっていた。</li>
  * </ul>
  *
+ * <p><b>2026-08-16 ユーザー決定による再仕様化:</b>
+ * <ul>
+ *   <li>振り直し儀式({@code thread_reroll})は<b>内部実装(効果クラス {@code ThreadRerollRitualEffect} と
+ *       {@code ArsPaper} への登録)は残すが、今回のサーバではゲーム内に出さない</b>。
+ *       よって {@code items.yml} に儀式エントリが<b>無いこと</b>が正であり、A-2 はその不在を固定する
+ *       (かつての「存在すること」を固定する試験から反転させた)。</li>
+ *   <li>スレッド枠拡張は Ⅰ/Ⅱ/Ⅲ の3段構成が正。{@code max-slots} は「1回で足す枠数」ではなく
+ *       <b>装備1個あたりの累計付与上限</b>(TF の PDC {@code ritual_thread_slot_bonus} に対する上限。
+ *       {@code com.trinityforge.stats.ItemFactory#expandRitualThreadSlot} が
+ *       {@code ritualBonus >= maxSlots} で失敗させる)なので、3段の値は<b>単調増加</b>でなければ
+ *       上位段が永久に失敗する死に儀式になる。</li>
+ * </ul>
+ *
  * <p>加えて素材表記の罠を1本で潰す: {@code UnifiedRecipeLoader#parseSingleIngredient} は
  * <b>半角スペース + 半角 x</b>({@code " x"})でしか個数を切り出さない。全角の「×」や
  * {@code "x4"}(スペース無し)で書くと、素材名側に個数の文字が残ったまま
@@ -48,6 +62,15 @@ class ThreadRitualRecipeConfigTest {
 
     /** 台座はコアから max(|x|,|z|)==2 のリング上にしか置けない = 16 マスが物理的な上限。 */
     private static final int PEDESTAL_RING_CAPACITY = 16;
+
+    /**
+     * スレッド枠拡張の儀式Ⅰ/Ⅱ/Ⅲ(2026-08-16 ユーザー決定の3段構成)。
+     * 並び順が段位順であることを前提に {@link #slotExpandMaxSlotsAreStrictlyIncreasing} が使う。
+     */
+    private static final List<String> SLOT_EXPAND_RITUALS = List.of(
+            "thread_slot_expand_ritual",
+            "thread_slot_expand_ritual_2",
+            "thread_slot_expand_ritual_3");
 
     private static YamlConfiguration load(Path path) {
         File file = path.toFile();
@@ -89,41 +112,78 @@ class ThreadRitualRecipeConfigTest {
     }
 
     @Test
-    @DisplayName("A-1: スレッド枠拡張の儀式が items.yml に存在し、コア非消費・累計上限2で書かれている")
-    void slotExpandRitualIsReachable() {
+    @DisplayName("A-1: スレッド枠拡張の儀式3段が items.yml に存在し、コア非消費・累計上限が正の値で書かれている")
+    void slotExpandRitualsAreReachable() {
         ConfigurationSection effects = ritualEffects();
-        ConfigurationSection expand = effects.getConfigurationSection("thread_slot_expand_ritual");
-        assertNotNull(expand, "thread_slot_expand の儀式レシピが1本も無い(効果クラスだけ実装済みで到達不能)");
-        assertEquals("thread_slot_expand", expand.getString("effect-type"));
+        for (String id : SLOT_EXPAND_RITUALS) {
+            ConfigurationSection expand = effects.getConfigurationSection(id);
+            assertNotNull(expand, id + " が items.yml に無い"
+                    + "(効果クラスだけ実装済みでレシピが無いと、儀式は到達不能なまま無言で死ぬ)");
+            assertEquals("thread_slot_expand", expand.getString("effect-type"),
+                    id + " の effect-type が thread_slot_expand でない");
 
-        // core-item を書くと「その素材の装備しか拡張できない」になる。任意の装備を置けるのが仕様。
-        assertFalse(expand.contains("core-item"),
-                "core-item を書くと拡張対象が1素材に固定され、任意の装備を置けなくなる");
+            // core-item を書くと「その素材の装備しか拡張できない」になる。任意の装備を置けるのが仕様。
+            assertFalse(expand.contains("core-item"),
+                    id + ": core-item を書くと拡張対象が1素材に固定され、任意の装備を置けなくなる");
 
-        // max-slots は「1装備あたりの累計付与上限」。effect-params の外に書くと
-        // ThreadSlotExpandRitualEffect が読めず、既定値 1 に落ちて +1 しか伸びない。
-        ConfigurationSection params = expand.getConfigurationSection("effect-params");
-        assertNotNull(params, "effect-params が無い(max-slots が既定値 1 に落ちる)");
-        assertEquals(2, params.getInt("max-slots", -1),
-                "effect-params.max-slots が 2 でない(枠の伸び代が設計と食い違う)");
+            // max-slots は「1装備あたりの累計付与上限」。effect-params の外に書くと
+            // ThreadSlotExpandRitualEffect#resolveMaxSlots が読めず、既定値 1 に落ちる。
+            ConfigurationSection params = expand.getConfigurationSection("effect-params");
+            assertNotNull(params, id + ": effect-params が無い(max-slots が既定値 1 に落ちる)");
+            assertTrue(params.getInt("max-slots", -1) > 0,
+                    id + ": effect-params.max-slots が正の値でない(累計上限として成立しない)");
 
-        List<String> pedestals = expand.getStringList("pedestal-items");
-        assertFalse(pedestals.isEmpty(), "台座素材が空だと『何も置かずに回せる無料の儀式』になる");
-        assertTrue(expand.getInt("source", 0) > 0, "ソース消費が 0 だとソースのシンクにならない");
+            List<String> pedestals = expand.getStringList("pedestal-items");
+            assertFalse(pedestals.isEmpty(),
+                    id + ": 台座素材が空だと『何も置かずに回せる無料の儀式』になる");
+            assertTrue(expand.getInt("source", 0) > 0,
+                    id + ": ソース消費が 0 だとソースのシンクにならない");
+        }
     }
 
     @Test
-    @DisplayName("A-2/K-20: 振り直し儀式が『現実の芯』を要求する(説明文と実配線が一致する)")
-    void rerollRitualConsumesRealityThreadCore() {
-        ConfigurationSection reroll = ritualEffects().getConfigurationSection("thread_reroll");
-        assertNotNull(reroll, "thread_reroll の儀式が消えている");
-        List<String> materials = new ArrayList<>();
-        for (String token : reroll.getStringList("pedestal-items")) {
-            materials.add(materialPartOf(token));
+    @DisplayName("A-1b: 3段の max-slots は単調増加(同値だと上位段が永久に失敗する死に儀式になる)")
+    void slotExpandMaxSlotsAreStrictlyIncreasing() {
+        ConfigurationSection effects = ritualEffects();
+        int previous = 0;
+        String previousId = null;
+        for (String id : SLOT_EXPAND_RITUALS) {
+            ConfigurationSection params = effects.getConfigurationSection(id + ".effect-params");
+            assertNotNull(params, id + " の effect-params が無い");
+            int maxSlots = params.getInt("max-slots", -1);
+            // max-slots は儀式ごとの加算量ではなく、装備に刻まれた累計カウンタ
+            // (TF PDC `ritual_thread_slot_bonus`)の上限。3段は同じカウンタを共有するので、
+            // 下位段と同値以下だと下位段を回した時点で上位段が必ず失敗するようになる。
+            assertTrue(maxSlots > previous,
+                    id + " の max-slots(" + maxSlots + ") が "
+                            + (previousId == null ? "0" : previousId + "(" + previous + ")")
+                            + " を超えていない。max-slots は累計付与上限なので、"
+                            + "下位段で累計が埋まると上位段が永久に失敗する死に儀式になる");
+            previous = maxSlots;
+            previousId = id;
         }
-        assertTrue(materials.contains("custom:reality_thread_core"),
-                "reality_thread_core は lore もドロップ表も『スレッド再抽選の触媒』と書いているのに、"
-                        + "振り直し儀式が要求していない: " + materials);
+    }
+
+    @Test
+    @DisplayName("A-2/K-20: 振り直し儀式はゲーム内に出さない(items.yml に儀式エントリが無い)")
+    void rerollRitualIsNotPublished() {
+        // 2026-08-16 ユーザー決定: 振り直し儀式は「内部実装(ThreadRerollRitualEffect と
+        // ArsPaper への effect-type 登録)は残してよいが、今回のサーバではゲーム内に出さない」。
+        // よって items.yml に儀式エントリが無い現状が正であり、ここでは復活を検知する。
+        // Java 側に効果クラスが残っていること自体は意図どおりなので検査しない。
+        ConfigurationSection effects = ritualEffects();
+        assertNull(effects.getConfigurationSection("thread_reroll"),
+                "thread_reroll の儀式が items.yml に復活している"
+                        + "(2026-08-16 決定: 内部実装は残すがゲーム内非公開)");
+        for (String id : effects.getKeys(false)) {
+            ConfigurationSection entry = effects.getConfigurationSection(id);
+            if (entry == null) {
+                continue;
+            }
+            assertFalse("thread_reroll".equals(entry.getString("effect-type")),
+                    id + " が effect-type: thread_reroll を使っている"
+                            + "(別 id でも振り直し儀式をゲーム内に出さないのが 2026-08-16 の決定)");
+        }
     }
 
     @Test
