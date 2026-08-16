@@ -416,8 +416,8 @@ items:
       method: ritual
       core-item: custom:volcanic_sourcelink_iv
       pedestal-items:
-        - MAGMA_BLOCK x8
-        - BLAZE_POWDER x8
+        - MAGMA_BLOCK x7
+        - BLAZE_POWDER x7
         - custom:source_engine x2
       source: 3000000
       result: custom:volcanic_sourcelink_v
@@ -485,8 +485,8 @@ items:
       method: ritual
       core-item: custom:mycelial_sourcelink_iv
       pedestal-items:
-        - MYCELIUM x8
-        - BONE_MEAL x8
+        - MYCELIUM x7
+        - BONE_MEAL x7
         - custom:source_engine x2
       source: 3000000
       result: custom:mycelial_sourcelink_v
@@ -554,8 +554,8 @@ items:
       method: ritual
       core-item: custom:alchemical_sourcelink_iv
       pedestal-items:
-        - NETHER_WART x8
-        - BLAZE_POWDER x8
+        - NETHER_WART x7
+        - BLAZE_POWDER x7
         - custom:source_engine x2
       source: 3000000
       result: custom:alchemical_sourcelink_v
@@ -623,8 +623,8 @@ items:
       method: ritual
       core-item: custom:vitalic_sourcelink_iv
       pedestal-items:
-        - GOLDEN_APPLE x8
-        - ROTTEN_FLESH x8
+        - GOLDEN_APPLE x7
+        - ROTTEN_FLESH x7
         - custom:source_engine x2
       source: 3000000
       result: custom:vitalic_sourcelink_v
@@ -692,8 +692,8 @@ items:
       method: ritual
       core-item: custom:botanical_sourcelink_iv
       pedestal-items:
-        - WHEAT x8
-        - GOLD_INGOT x8
+        - WHEAT x7
+        - GOLD_INGOT x7
         - custom:source_engine x2
       source: 3000000
       result: custom:botanical_sourcelink_v

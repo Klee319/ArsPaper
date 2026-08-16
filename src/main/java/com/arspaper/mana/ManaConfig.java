@@ -11,14 +11,37 @@ import java.util.Map;
  * マナシステムの設定値。
  * config.ymlから読み込む。
  *
- * <p>2026-07-25 (config editor T2): {@code default-max} / {@code default-regen-rate} /
- * {@code regen-interval-ticks} / {@code recovery.*}(on-hit/on-attack/idle 系7項目)は
- * {@code config.yml} から削除し、TrinityForge の「プレイヤー基礎ステータス」
- * ({@code combat/base-stats.yml})へ移設した。読み出しは {@link ManaManager}/
- * {@link ManaRecoveryListener} が {@link ManaBaseStats} 経由で都度取得する
- * (TF側の {@code /trinityforge reload} に即追随させるため、この record には焼き込まない)。
+ * <h2>マナ基礎値3項目の所在(2026-07-25 → 2026-08-16 で往復している)</h2>
+ * <ul>
+ *   <li>2026-07-25 (config editor T2): {@code default-max} / {@code default-regen-rate} /
+ *       {@code regen-interval-ticks} / {@code recovery.*}(on-hit/on-attack/idle 系7項目)を
+ *       {@code config.yml} から削除し、TrinityForge の「プレイヤー基礎ステータス」
+ *       ({@code combat/base-stats.yml})へ移設した。</li>
+ *   <li><b>2026-08-16(今回)</b>: このうち<b>3項目だけ</b>
+ *       ({@code mana.default-max} / {@code mana.default-regen-rate} /
+ *       {@code mana.regen-interval-ticks})を config.yml へ戻した。TF 側の
+ *       {@code combat/base-stats.yml} は {@code stats/lore.yml} に登録が無いキーを
+ *       設定エディタのどの画面にも出さないため、この3項目だけが
+ *       <b>手編集でしか変えられない設定</b>として取り残されていたのが理由
+ *       (エディタの「ArsPaper 全体設定 (config)」画面から編集できるようにした)。</li>
+ * </ul>
+ *
+ * <p>⚠ <b>残り5項目({@code mana-onhit-percent} / {@code mana-onattack-percent} /
+ * {@code mana-idle-seconds} / {@code mana-idle-bonus-percent} / {@code mana-idle-bonus-flat})は
+ * 今も TrinityForge 側が真源</b>で、{@link ManaRecoveryListener} / {@link ManaManager} が
+ * {@link ManaBaseStats} 経由で都度取得する(TF側の {@code /trinityforge reload} に即追随する)。
+ * 「マナ関連はすべて config.yml にある」と誤読しないこと。
  */
 public record ManaConfig(
+    // ---- マナ基礎値(2026-08-16 に TF combat/base-stats.yml から出戻り) ----
+    // 最大マナの土台。グリフ/防具/スレッド/エンチャント/スキルの加算はこの上に乗る。
+    int defaultMax,
+    // 1インターバルあたりの自然回復量。
+    int defaultRegenRate,
+    // 自然回復の周期(tick)。20 = 1秒。
+    // ※ 実際にスケジュールされる周期は ManaManager の生成時に焼き込まれるので、
+    //   この値を変えても /ars reload では反映されずサーバ再起動が要る。
+    int regenIntervalTicks,
     int manaPerGlyphUnlock,
     // マナ最大値%上昇の上限（%）
     int maxPercentCap,
@@ -33,6 +56,18 @@ public record ManaConfig(
 ) {
     /** CT未設定時の既定値(秒)。ノード説明「100マナ/10CT」の 10 をそのまま秒として採る。 */
     public static final int DEFAULT_SOURCE_AUTO_CONSUME_COOLDOWN_SECONDS = 10;
+
+    // マナ基礎値の既定。稼働中サーバの plugins/ArsPaper/config.yml には
+    // ArsPaper#updateResourceFiles が config.yml を再抽出しない都合で新キーが降ってこないため、
+    // 「キーが1行も無いサーバでの実効値」がそのままこの3定数になる。
+    // 移設前(TF combat/base-stats.yml の mana-max-base / mana-regen-base /
+    // mana-regen-interval-ticks)と同値にしてバランスを動かさないこと。
+    /** 最大マナの土台の既定値。 */
+    public static final int DEFAULT_MAX_MANA = 100;
+    /** 1インターバルあたりの自然回復量の既定値。 */
+    public static final int DEFAULT_REGEN_RATE = 5;
+    /** 自然回復の周期(tick)の既定値。20 = 1秒。 */
+    public static final int DEFAULT_REGEN_INTERVAL_TICKS = 20;
 
     /**
      * 自動消費アイテム1件分の設定。
@@ -53,8 +88,28 @@ public record ManaConfig(
         }
     }
 
+    /**
+     * config.yml からマナ設定を読む。
+     *
+     * <p>マナ基礎値3項目のガード方針(2026-08-16 移設時に決めたもの)。移設前は TF 側が
+     * 「0 のキーはロード時に捨てる」規約だったため<b>0 は原理的に届かなかった</b>が、
+     * ここは {@code getInt} なので<b>設定エディタから 0 を保存できてしまう</b>。
+     * 数値以外を書いた場合は {@code getInt} が既定値を返す(Bukkit の仕様)。
+     * <ul>
+     *   <li>{@code default-max}: 1以上へクランプ。0 だと魔法が一切撃てず、
+     *       マナバーの割合表示も意味を失う。「土台0＋グリフ加算だけで伸ばす」構成を潰さないよう、
+     *       既定値100へ戻すのではなく 1 で止める。</li>
+     *   <li>{@code default-regen-rate}: 0 は「自然回復なし」という正当な設定なので許可し、
+     *       負値だけ 0 へ寄せる(負の回復＝毎周期マナが減る、は事故しか生まない)。</li>
+     *   <li>{@code regen-interval-ticks}: <b>1以上へクランプ必須</b>。0 以下を
+     *       {@code runTaskTimer} の period に渡すと周期タスクが壊れる。</li>
+     * </ul>
+     */
     public static ManaConfig fromConfig(FileConfiguration config) {
         return new ManaConfig(
+            Math.max(1, config.getInt("mana.default-max", DEFAULT_MAX_MANA)),
+            Math.max(0, config.getInt("mana.default-regen-rate", DEFAULT_REGEN_RATE)),
+            Math.max(1, config.getInt("mana.regen-interval-ticks", DEFAULT_REGEN_INTERVAL_TICKS)),
             config.getInt("mana.per-glyph-unlock-bonus", 5),
             // 既存挙動を変えない安全デフォルト（上昇上限100%）。
             clampPercent(config.getInt("mana.max-percent-cap", 100)),

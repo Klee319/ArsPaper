@@ -440,10 +440,37 @@ public class SpellCaster {
                 caster, effectiveCastItem, 0.0);
         }
 
+        // 2026-08-16: TF の「魔導士への道」アチーブメントが読む累計カウンタ。
+        // **キャンセル判定より後に置くこと** ── 上の isCancelled ブロックはマナを返す＝
+        // 「詠唱しなかった」扱いなので、そこより前に積むと自己キャンセルの連打で回数を稼げる。
+        recordCastCounters(caster, recipe, catalystData != null, sharedSpell);
+
         // アクションバーにスペル名を表示
         caster.sendActionBar(Component.text("§d" + recipe.getName()));
 
         return true;
+    }
+
+    /**
+     * 詠唱1回ぶんのアチーブメント用カウンタを積む。
+     *
+     * <p>修飾グリフ(augment)は<b>回数ではなく種類数</b>で数える。回数にすると同じ修飾を連打するだけで
+     * 「いろいろな修飾を試した」実績が取れてしまい、チュートリアルとして機能しない。
+     */
+    private static void recordCastCounters(Player caster, SpellRecipe recipe,
+                                           boolean usedCatalyst, boolean sharedSpell) {
+        if (usedCatalyst) {
+            com.arspaper.integration.TrinityForgeBridge.addCounter(caster, "catalyst_cast", 1);
+        }
+        if (sharedSpell) {
+            com.arspaper.integration.TrinityForgeBridge.addCounter(caster, "enchant_book_shared", 1);
+        }
+        for (SpellComponent comp : recipe.getComponents()) {
+            if (comp instanceof SpellAugment) {
+                com.arspaper.integration.TrinityForgeBridge.recordDistinctCounter(
+                    caster, "spell_augment_used", comp.getId().toString());
+            }
+        }
     }
 
     /**

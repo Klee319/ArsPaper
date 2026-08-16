@@ -61,7 +61,26 @@ public class MaterialConfigManager {
                 List<String> pedestalItems = Collections.emptyList();
                 int source = 0;
 
+                // 2026-08-13: レシピが2件以上ある素材は recipe:(単数)が無く recipes:(配列)だけになる
+                // (設定エディタが catalog.yml と同じ正規形へ書き戻すため)。ここが見ているのは
+                // 「作り方の表示用フィールド」1件ぶんなので、単数が無ければ配列の1件目で代用する。
                 ConfigurationSection recipeSection = matSection.getConfigurationSection("recipe");
+                if (recipeSection == null && matSection.isList("recipes")) {
+                    List<?> rawRecipes = matSection.getList("recipes", Collections.emptyList());
+                    for (Object entry : rawRecipes) {
+                        if (!(entry instanceof java.util.Map<?, ?> map)) continue;
+                        org.bukkit.configuration.file.YamlConfiguration wrap =
+                            new org.bukkit.configuration.file.YamlConfiguration();
+                        java.util.Map<String, Object> stringKeyed = new java.util.HashMap<>();
+                        for (java.util.Map.Entry<?, ?> e : map.entrySet()) {
+                            if (e.getKey() == null) continue;
+                            stringKeyed.put(String.valueOf(e.getKey()), e.getValue());
+                        }
+                        wrap.createSection("r", stringKeyed);
+                        recipeSection = wrap.getConfigurationSection("r");
+                        break;
+                    }
+                }
                 if (recipeSection != null) {
                     coreItem = recipeSection.getString("core-item", null);
                     pedestalItems = recipeSection.getStringList("pedestal-items");

@@ -72,10 +72,6 @@
 thread-sets:
   mana_regen:
     thresholds:
-      # 2026-08-14: percent-bonus-damage を外した。理由は「割合ダメージを配るセットが3つ(村の英雄/
-      # マナ回復速度上昇/暗視)あり、累積規則と stackable の相乗で帯目標(+39/+49/+59%)を突き抜けたため」。
-      # このスレッドは threads.yml で stackable: true / max: 3 = 防具4部位だけで12本挿さるので、
-      # ここに割合ダメージを置くと最良編成が必ず上限側に張り付く。ダメージは村の英雄へ一本化した。
       "3":
         magic-resistance: 0.03
       "5":
@@ -102,12 +98,6 @@ thread-sets:
         crit-damage: 0.09
   night_vision:
     thresholds:
-      # 2026-08-14 案E: flat-bonus-damage(実数) -> 割合へ。実数のダメージ加算は帯非依存なので、
-      # 装備が伸びない低帯だけ極端に強くなる。
-      # ただし振替先を percent-bonus-damage にすると帯目標を超過したため(下の注記参照)、
-      # 「見えるから避けられる」= dodge-chance へ寄せた。会心系にしなかったのは意図的で、
-      # crit-chance/crit-damage は実DPSを押し上げるのに帯ガードが数えないため、
-      # 計測できない形で同じ穴を作り直すことになる。
       "3":
         dodge-chance: 0.02
       "5":
@@ -133,8 +123,6 @@ thread-sets:
         damage-reduction: 0.02
   hero_of_the_village:
     thresholds:
-      # 2026-08-14 案E: attack-power(実数=武器の基本ダメージを置き換える) -> percent-bonus-damage(割合)。
-      # attack-power は帯非依存なので、Lv20 帯では最強剣(699.5)を単独で超えていた。
       "3":
         percent-bonus-damage: 0.05
       "5":
@@ -158,16 +146,6 @@ thread-sets:
     thresholds:
       "3":
         crit-chance: 0.04
-      # 2026-08-14 案E: bleed-damage(実数) を廃し、bleed-chance へ寄せた。
-      # 【等価にした根拠】出血は「命中時に合計 bleed-chance で判定 → 成功したら合計 bleed-damage を
-      #   damage.yml の bleed.ticks(=5) 回」なので、1撃あたりの期待出血ダメージは
-      #     E = (C + セットのchance) x (D + セットのdamage) x 5     C=他ソースのchance / D=他ソースのdamage
-      #   セットの damage を 0 にして等価にする x は  (C+0.06)(D+80) = (C+x)D  より
-      #     x = (C+0.06)(D+80)/D - C
-      #   5個しきい値に届くのは防具4部位+武器+オフハンドまで挿せる終盤なので Lv60 帯を基準にする。
-      #   Lv60 帯の代表武器(NETHERITE_HOE#52)は D=1850 / C=0.16 → x = 0.22 x 1930/1850 - 0.16 = 0.0695
-      #   → 0.07 を採用。Lv80-100 帯(D=4500)でも x=0.0639 なのでほぼ同値、Lv20 帯(D=165)の
-      #   x=0.0915 に対しては意図的な下げ(実数80が低帯だけ極端に効いていた分をここで落としている)。
       "5":
         bleed-chance: 0.07
   spell_cost_down:
@@ -426,3 +404,20 @@ thread-sets:
         craft-roll-down-reduction: 5
       "6":
         craft-roll-down-reduction: 10
+  blindness:
+    thresholds:
+      "1":
+        max-health: -4
+        attack-power: 100
+      "5":
+        max-health: -6
+        damage-modifier: 0.3
+        attack-power: 150
+  translate:
+    thresholds:
+      "2":
+        mana-bonus: -40
+        mana-regen: 5
+      "5":
+        mana-bonus: -60
+        mana-regen: 5

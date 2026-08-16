@@ -158,10 +158,45 @@ public class ScribingTableGui extends BaseGui {
                 Set<String> fresh = getUnlockedGlyphs();
                 fresh.add(component.getId().toString());
                 saveUnlockedGlyphs(fresh);
+                // 2026-08-16: TF の「魔導士への道」アチーブメントが読む累計カウンタ。
+                // 解放は取り消せないので、種類数はここで数えた値をそのまま書き写してよい。
+                recordGlyphUnlockCounters(clicker, fresh, component.getId().toString());
             }
         );
         return true;
     }
+
+    /**
+     * TF の {@code achievements.yml}({@code trigger.type: counter})が読むグリフ解放カウンタを更新する。
+     *
+     * <p>「魔導士への道」は<b>推奨順に並べた個別グリフ</b>を段として使うので、種類数(glyph_unlocked)に加えて
+     * 節目になる4種を到達フラグとして別々に持つ。
+     *
+     * <p>解放済み集合を毎回まるごと流し込んでいるのは、このカウンタを入れる前から遊んでいるプレイヤーの
+     * ぶんを次の解放時に埋め戻すため({@code recordDistinctCounter} は既知の token を無視するので、
+     * 何度呼んでも値は増えない)。
+     */
+    private static void recordGlyphUnlockCounters(Player player, Set<String> unlockedIds, String justUnlocked) {
+        for (String id : unlockedIds) {
+            com.arspaper.integration.TrinityForgeBridge.recordDistinctCounter(player, "glyph_unlocked", id);
+        }
+        String counter = GLYPH_MILESTONE_COUNTERS.get(justUnlocked);
+        if (counter != null) {
+            com.arspaper.integration.TrinityForgeBridge.recordFlagCounter(player, counter);
+        }
+    }
+
+    /**
+     * 節目のグリフID → TF 側カウンタID。ID はこのフォークの自前実装
+     * ({@code ArsPaper#registerComponents} の {@code new NamespacedKey(plugin, ...)})なので
+     * namespace は常に {@code arspaper}。
+     */
+    private static final java.util.Map<String, String> GLYPH_MILESTONE_COUNTERS = java.util.Map.of(
+        "arspaper:harm", "glyph_harm",
+        "arspaper:break", "glyph_break",
+        "arspaper:exchange", "glyph_exchange",
+        "arspaper:grow", "glyph_grow"
+    );
 
     private ItemStack createGlyphButton(SpellComponent component, boolean unlocked) {
         Material material = switch (component.getType()) {

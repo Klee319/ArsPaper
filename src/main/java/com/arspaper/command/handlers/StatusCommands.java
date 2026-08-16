@@ -2,7 +2,6 @@ package com.arspaper.command.handlers;
 
 import com.arspaper.ArsPaper;
 import com.arspaper.gui.BackpackGui;
-import com.arspaper.mana.ManaBaseStats;
 import com.arspaper.mana.ManaKeys;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonParser;
@@ -24,7 +23,8 @@ public final class StatusCommands {
         var config = plugin.getManaManager().getConfig();
 
         // === マナ上限 ===
-        int baseMana = ManaBaseStats.defaultMax();
+        // 基礎値3項目は 2026-08-16 に ArsPaper config.yml(mana.default-*)へ戻ったので config から引く。
+        int baseMana = config.defaultMax();
         int glyphBonus = pdc.getOrDefault(ManaKeys.GLYPH_MANA_BONUS, PersistentDataType.INTEGER, 0);
         int armorManaBonus = pdc.getOrDefault(ManaKeys.ARMOR_MANA_BONUS, PersistentDataType.INTEGER, 0);
         int threadManaBonus = pdc.getOrDefault(ManaKeys.THREAD_MANA_BONUS, PersistentDataType.INTEGER, 0);
@@ -43,7 +43,7 @@ public final class StatusCommands {
         int currentMana = plugin.getManaManager().getCurrentMana(player);
 
         // === マナ回復 ===
-        int baseRegen = pdc.getOrDefault(ManaKeys.REGEN_RATE, PersistentDataType.INTEGER, ManaBaseStats.defaultRegenRate());
+        int baseRegen = pdc.getOrDefault(ManaKeys.REGEN_RATE, PersistentDataType.INTEGER, config.defaultRegenRate());
         int threadRegenBonus = pdc.getOrDefault(ManaKeys.THREAD_REGEN_BONUS, PersistentDataType.INTEGER, 0);
         int enchantRegenBonus = pdc.getOrDefault(ManaKeys.ENCHANT_REGEN_BONUS, PersistentDataType.INTEGER, 0);
         int armorRegenBonus = pdc.getOrDefault(ManaKeys.ARMOR_REGEN_BONUS, PersistentDataType.INTEGER, 0);
@@ -75,7 +75,10 @@ public final class StatusCommands {
             player.sendMessage(Component.text("  ワールド: " + (worldManaBonus >= 0 ? "+" : "") + worldManaBonus, NamedTextColor.GRAY));
 
         // 回復
-        double regenInterval = ManaBaseStats.regenIntervalTicks() / 20.0;
+        // config の設定値ではなく「今スケジュールされている周期」を使う。
+        // regen-interval-ticks は /ars reload では張り替わらないので、config 値を出すと
+        // 再起動していないのに変わったように見える(表示だけが嘘をつく)。
+        double regenInterval = plugin.getManaManager().getActiveRegenIntervalTicks() / 20.0;
         double regenPerSec = totalRegen / regenInterval;
         player.sendMessage(Component.text("回復: ", NamedTextColor.GREEN)
             .append(Component.text(totalRegen + "/tick (" + String.format("%.1f", regenPerSec) + "/秒)", NamedTextColor.WHITE)));

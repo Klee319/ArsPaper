@@ -31,6 +31,13 @@ public class ManaManager implements Listener {
     private volatile ManaConfig config;
     private final ManaBarDisplay barDisplay;
     private final BukkitTask regenTask;
+    /**
+     * 実際に {@link #regenTask} へ焼き込んだ回復周期(tick)。
+     * config の {@code mana.regen-interval-ticks} を後から変えても、こちらは再起動まで変わらない
+     * ——「設定値」ではなく「今動いている値」を表示させるために保持する
+     * (両者を取り違えると /ars status だけが嘘をつく)。
+     */
+    private final int activeRegenIntervalTicks;
     private final BukkitTask statsFlushTask;
     private static final NamespacedKey DEBUG_MODE_KEY = new NamespacedKey("arspaper", "debug_mode");
     private final RankingCache rankingCache;
@@ -65,12 +72,15 @@ public class ManaManager implements Listener {
         this.barDisplay = new ManaBarDisplay();
         this.rankingCache = new RankingCache(plugin.getDataFolder(), plugin.getLogger());
 
-        // マナ回復タスク
+        // マナ回復タスク。
+        // ⚠ 周期は引数で受けた config から引く。ArsPaper#manaManager への代入はこのコンストラクタが
+        //   返った後なので、ArsPaper.getInstance().getManaManager() 経由で引くと起動時に必ずNPEになる。
+        this.activeRegenIntervalTicks = config.regenIntervalTicks();
         this.regenTask = plugin.getServer().getScheduler().runTaskTimer(
             plugin,
             this::tickRegeneration,
-            ManaBaseStats.regenIntervalTicks(),
-            ManaBaseStats.regenIntervalTicks()
+            activeRegenIntervalTicks,
+            activeRegenIntervalTicks
         );
 
         // 統計フラッシュタスク（5分ごとにバッファをPDCへ書き込み）。
@@ -89,8 +99,25 @@ public class ManaManager implements Listener {
     }
 
     /**
+     * 今スケジュールされている回復周期(tick)。config の値ではなく<b>実際に動いている値</b>。
+     *
+     * <p>{@code mana.regen-interval-ticks} を編集して {@code /ars reload} しても
+     * {@link #regenTask} は張り替えないので、config 側の値と食い違いうる。
+     * 表示(/ars status)はこちらを使うこと ── config 値を表示すると
+     * 「再起動していないのに変わったように見える」嘘になる。
+     */
+    public int getActiveRegenIntervalTicks() {
+        return activeRegenIntervalTicks;
+    }
+
+    /**
      * ManaConfigを再読み込みする。/ars reload で呼ばれる。
-     * ※ regenTaskのインターバルは変更不可（サーバ再起動が必要）。
+     *
+     * <p>※ {@code mana.regen-interval-ticks}(回復周期)だけは<b>ここでは反映されない</b>。
+     * {@link #regenTask} はコンストラクタで周期を焼き込んで登録済みで、ここで張り替えていないため。
+     * 反映にはサーバ再起動が要る(config.yml の当該キーのコメントにも同じことを書いてある)。
+     * 最大マナ({@code mana.default-max})と回復量({@code mana.default-regen-rate})は
+     * 毎回この {@link #config} から引いているので、reload で即反映される。
      */
     public void reloadConfig(ManaConfig newConfig) {
         this.config = newConfig;
@@ -98,7 +125,7 @@ public class ManaManager implements Listener {
 
     public int getCurrentMana(Player player) {
         PersistentDataContainer pdc = player.getPersistentDataContainer();
-        return pdc.getOrDefault(ManaKeys.CURRENT_MANA, PersistentDataType.INTEGER, ManaBaseStats.defaultMax());
+        return pdc.getOrDefault(ManaKeys.CURRENT_MANA, PersistentDataType.INTEGER, config.defaultMax());
     }
 
     public int getMaxMana(Player player) {
@@ -119,7 +146,7 @@ public class ManaManager implements Listener {
         int enchantBonus = pdc.getOrDefault(ManaKeys.ENCHANT_MANA_BONUS, PersistentDataType.INTEGER, 0);
         int skillManaBonus = (int) Math.round(
                 com.arspaper.integration.TrinityForgeBridge.tfNativeMaxManaBonus(player));
-        int fixedMax = ManaBaseStats.defaultMax() + glyphBonus + armorBonus + threadBonus
+        int fixedMax = config.defaultMax() + glyphBonus + armorBonus + threadBonus
                 + enchantBonus + skillManaBonus + worldMana.maxBonus();
 
         // %上昇（装備由来）を固定値合計に乗算。上限はconfigでクランプ。デフォルト0%なら従来挙動。
@@ -288,7 +315,7 @@ public class ManaManager implements Listener {
         }
 
         PersistentDataContainer pdc = player.getPersistentDataContainer();
-        int baseRate = pdc.getOrDefault(ManaKeys.REGEN_RATE, PersistentDataType.INTEGER, ManaBaseStats.defaultRegenRate());
+        int baseRate = pdc.getOrDefault(ManaKeys.REGEN_RATE, PersistentDataType.INTEGER, config.defaultRegenRate());
         int threadBonus = pdc.getOrDefault(ManaKeys.THREAD_REGEN_BONUS, PersistentDataType.INTEGER, 0);
         int enchantBonus = pdc.getOrDefault(ManaKeys.ENCHANT_REGEN_BONUS, PersistentDataType.INTEGER, 0);
         int armorBonus = pdc.getOrDefault(ManaKeys.ARMOR_REGEN_BONUS, PersistentDataType.INTEGER, 0);

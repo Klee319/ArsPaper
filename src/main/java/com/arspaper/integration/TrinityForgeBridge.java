@@ -2534,6 +2534,87 @@ public final class TrinityForgeBridge {
         }
     }
 
+    /**
+     * TF 側の累計カウンタ({@code trigger.type: counter})を +amount する(2026-08-16)。
+     *
+     * <p>{@link #recordSourceSpent(Player, int)} と同じ理由でキーは文字列で組む
+     * (TF のクラスに触れないので compileOnly jar を作り直さなくてよい)。
+     * カウンタIDは TF 側 {@code ShippedAchievementTreeTest.IMPLEMENTED_COUNTERS} と
+     * config-editor の {@code ACHIEVEMENT_COUNTER_IDS} が同じ綴りを固定している。
+     */
+    public static void addCounter(Player player, String counterId, long amount) {
+        if (player == null || counterId == null || counterId.isEmpty() || amount <= 0) {
+            return;
+        }
+        try {
+            org.bukkit.NamespacedKey key = new org.bukkit.NamespacedKey("trinityforge", "counter_" + counterId);
+            PersistentDataContainer pdc = player.getPersistentDataContainer();
+            long current = pdc.getOrDefault(key, PersistentDataType.LONG, 0L);
+            long updated = current + amount;
+            if (updated < current) {
+                updated = Long.MAX_VALUE; // 飽和
+            }
+            pdc.set(key, PersistentDataType.LONG, updated);
+        } catch (Throwable t) {
+            // 集計に失敗しても本処理は止めない(fail-open)。
+        }
+    }
+
+    /**
+     * 到達フラグ型のカウンタ(0 か 1)。「そのグリフを解放した」のように回数に意味が無いものに使う。
+     * 既に 1 以上なら何もしないので、何度呼んでも値が膨らまない。
+     */
+    public static void recordFlagCounter(Player player, String counterId) {
+        if (player == null || counterId == null || counterId.isEmpty()) {
+            return;
+        }
+        try {
+            org.bukkit.NamespacedKey key = new org.bukkit.NamespacedKey("trinityforge", "counter_" + counterId);
+            PersistentDataContainer pdc = player.getPersistentDataContainer();
+            if (pdc.getOrDefault(key, PersistentDataType.LONG, 0L) >= 1L) {
+                return;
+            }
+            pdc.set(key, PersistentDataType.LONG, 1L);
+        } catch (Throwable t) {
+            // fail-open
+        }
+    }
+
+    /**
+     * 「種類数」型のカウンタ。同じ token を何度使っても増えない。
+     *
+     * <p>加算式({@link #addCounter}) では「同じ儀式を100回」と「100種類の儀式」が区別できず、
+     * 図鑑的な実績が回数を稼ぐだけで取れてしまう。見た token の集合を
+     * {@code arspaper:seen_<counterId>} に持ち、その大きさを TF 側カウンタへ書き写す。
+     *
+     * <p>集合は改行区切りの素の文字列。token は Ars 側の登録ID(例 {@code arspaper:harm})なので
+     * 改行を含まない。
+     */
+    public static void recordDistinctCounter(Player player, String counterId, String token) {
+        if (player == null || counterId == null || counterId.isEmpty() || token == null || token.isEmpty()) {
+            return;
+        }
+        try {
+            PersistentDataContainer pdc = player.getPersistentDataContainer();
+            org.bukkit.NamespacedKey seenKey = new org.bukkit.NamespacedKey("arspaper", "seen_" + counterId);
+            String raw = pdc.getOrDefault(seenKey, PersistentDataType.STRING, "");
+            java.util.LinkedHashSet<String> seen = new java.util.LinkedHashSet<>();
+            for (String part : raw.split("\n")) {
+                if (!part.isEmpty()) {
+                    seen.add(part);
+                }
+            }
+            if (!seen.add(token)) {
+                return; // 既知の種類 ── カウンタは動かさない
+            }
+            pdc.set(seenKey, PersistentDataType.STRING, String.join("\n", seen));
+            org.bukkit.NamespacedKey key = new org.bukkit.NamespacedKey("trinityforge", "counter_" + counterId);
+            pdc.set(key, PersistentDataType.LONG, (long) seen.size());
+        } catch (Throwable t) {
+            // fail-open
+        }
+    }
+
     private static void warnUnavailableOnce() {
         if (!unavailableLogged) {
             unavailableLogged = true;

@@ -271,6 +271,9 @@ public class RitualManager {
                 // (累計カウンタは単調増加が要件で減算口を持たないので、後から引くこともできない)。
                 // ここまで来れば返還経路は全て通過済み＝ソースは本当に消えている。
                 TrinityForgeBridge.recordSourceSpent(player, reservedSource);
+                // 2026-08-16: 「魔導士への道」の儀式チュートリアル用。ソース消費と同じ地点に置くのは
+                // 同じ理由(返還経路を全部通過した後でないと、失敗を繰り返すだけで回数を稼げてしまう)。
+                TrinityForgeBridge.addCounter(player, "ritual_performed", 1);
 
                 // effectType分岐
                 if (!recipe.isCraftType()) {
@@ -285,6 +288,11 @@ public class RitualManager {
                             RitualCore.clearCoreItem(revalidateCore);
                         }
                         effectOpt.get().execute(coreLocation, player, recipe);
+                        // 2026-08-16: 「儀式エフェクトの紹介」実績用。**種類数**で数える
+                        // (回数だと同じ天候儀式を連打するだけで取れてしまい紹介にならない)。
+                        // craft タイプはこの分岐に来ないので、作成儀式は種類に数えない。
+                        TrinityForgeBridge.recordDistinctCounter(
+                            player, "ritual_effect_used", recipe.effectType());
                     }
                     playRitualCompleteEffects(coreLocation);
                     player.sendMessage(Component.text(

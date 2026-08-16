@@ -53,16 +53,10 @@
 # ============================================================
 
 # 設定リファレンス(本文コメント移設先): docs/config-reference/arspaper/loot-tables.md
+
 enabled: true
 block-datapack-enchant-books: true
-
 pools:
-
-
-  # ----------------------------------------------------------------------
-  # T5_最上位 — 28 本 (既存戦利品スコア 31.5〜84.1)
-  # 既存の中身が最も豪華な帯。要塞跡の宝物庫・洋館・エンドの塔など。現実の芯とリセット系がまとまって出る唯一の場所。
-  # ----------------------------------------------------------------------
   t5_structures:
     quantity-multiplier: 1.2
     rolls: 1
@@ -96,12 +90,10 @@ pools:
       - nova_structures:chests/dungeon_3
       - nova_structures:chests/dungeon_1
     entries:
-      # --- 厳選の触媒(この帯が主経路)
       - item: custom:reality_thread_core
         chance: 0.08
         min: 1
         max: 2
-      # --- 品質系スレッド 10 種
       - item: custom:thread_artisan
         chance: 0.03
       - item: custom:thread_ritualist
@@ -122,43 +114,32 @@ pools:
         chance: 0.03
       - item: custom:thread_role_effeciency
         chance: 0.03
-      # --- レシピの無い鍵(深部)
       - item: custom:key_dark_cathedral
         chance: 0.02
       - item: custom:key_nether_bell
         chance: 0.02
       - item: custom:key_nether_wastes
         chance: 0.02
-      # --- リセット系(極低確率)
       - item: custom:skill_node_lock
-        chance: 0.006
-      - item: custom:skill_tree_reset
-        chance: 0.006
+        chance: 0.001
+      - item: custom:quality_upgrade_ticket
+        chance: 0.003
       - item: custom:stat_reroll_ticket
-        chance: 0.006
-      # --- 素材・圧縮ブロック
+        chance: 0.005
       - item: custom:source_crystal
         chance: 0.05
       - item: custom:source_shard
         chance: 0.16
         min: 2
         max: 4
-      # --- 旧版から引き継ぐ枠(消すと入手経路が1本減るので残す)
       - item: ENCHANTED_GOLDEN_APPLE
         chance: 0.015
-      # --- 圧縮ブロック(たまに大口の資源が出る枠)
       - item: custom:diamond_block_1x
         chance: 0.01
       - item: custom:gold_block_1x
         chance: 0.02
-      # ArsPaper 自前のマナ系エンチャント本(体系が整合しているので残す)
       - type: enchant-book
         chance: 0.05
-
-  # ----------------------------------------------------------------------
-  # T4_上位 — 52 本 (既存戦利品スコア 15.7〜31.5)
-  # ダンジョン main チェスト帯。品質系スレッドの本命。
-  # ----------------------------------------------------------------------
   t4_structures:
     quantity-multiplier: 1.3
     rolls: 1
@@ -216,10 +197,8 @@ pools:
       - nova_structures:chests/pale_residence/residence_kitchen
       - minecraft:chests/nether_bridge
     entries:
-      # --- 厳選の触媒
       - item: custom:reality_thread_core
         chance: 0.04
-      # --- 品質系スレッド 10 種
       - item: custom:thread_artisan
         chance: 0.02
       - item: custom:thread_ritualist
@@ -240,7 +219,6 @@ pools:
         chance: 0.02
       - item: custom:thread_role_effeciency
         chance: 0.02
-      # --- レシピの無い鍵(中位)
       - item: custom:key_climb
         chance: 0.018
       - item: custom:key_palace
@@ -249,14 +227,10 @@ pools:
         chance: 0.018
       - item: custom:key_fireworks
         chance: 0.018
-      # --- リセット系(極低確率)
-      - item: custom:skill_node_lock
-        chance: 0.003
+      - item: custom:role_reselect_ticket
+        chance: 0.005
       - item: custom:skill_tree_reset
-        chance: 0.003
-      - item: custom:stat_reroll_ticket
-        chance: 0.003
-      # --- モブ素材(上位ほど厚い)
+        chance: 0.005
       - item: custom:ravager_hide
         chance: 0.02
       - item: custom:piglin_brute_plate
@@ -287,24 +261,16 @@ pools:
         chance: 0.14
         min: 1
         max: 3
-      # --- 旧版から引き継ぐ枠(消すと入手経路が1本減るので残す)
       - item: ENCHANTED_GOLDEN_APPLE
         chance: 0.008
-      # --- 圧縮ブロック(たまに大口の資源が出る枠)
       - item: custom:gold_block_1x
         chance: 0.02
       - item: custom:emerald_block_1x
         chance: 0.012
       - item: custom:amethyst_block_1x
         chance: 0.012
-      # ArsPaper 自前のマナ系エンチャント本(体系が整合しているので残す)
       - type: enchant-book
         chance: 0.03
-
-  # ----------------------------------------------------------------------
-  # T3_中位 — 86 本 (既存戦利品スコア 4.5〜15.7)
-  # 神殿・図書館・野営地の主チェスト帯。素材と浅い鍵。
-  # ----------------------------------------------------------------------
   t3_structures:
     quantity-multiplier: 1.5
     rolls: 1
@@ -395,12 +361,10 @@ pools:
       - minecraft:chests/stronghold/library_bookshelf
       - structory_towers:basic/dark_basic
       - incendium:quartz_flats/kitchen_basic
-      # データパック無し構成のための保険(structures.json には現れない表)
       - minecraft:chests/stronghold_corridor
     entries:
       - item: custom:reality_thread_core
         chance: 0.015
-      # --- 品質系スレッド 10 種(薄め)
       - item: custom:thread_artisan
         chance: 0.01
       - item: custom:thread_ritualist
@@ -421,7 +385,6 @@ pools:
         chance: 0.01
       - item: custom:thread_role_effeciency
         chance: 0.01
-      # --- レシピの無い鍵(浅め)
       - item: custom:key_bridge
         chance: 0.015
       - item: custom:key_city
@@ -430,7 +393,6 @@ pools:
         chance: 0.015
       - item: custom:key_steamworks
         chance: 0.015
-      # --- モブ素材
       - item: custom:ravager_hide
         chance: 0.015
       - item: custom:piglin_brute_plate
@@ -461,18 +423,12 @@ pools:
         chance: 0.12
         min: 1
         max: 3
-      # --- 圧縮ブロック(たまに大口の資源が出る枠)
       - item: custom:iron_block_1x
         chance: 0.02
       - item: custom:lapis_block_1x
         chance: 0.015
       - item: custom:redstone_block_1x
         chance: 0.015
-
-  # ----------------------------------------------------------------------
-  # T2_下位 — 94 本 (既存戦利品スコア 1.0〜4.4)
-  # サブチェスト帯。素材と圧縮ブロックが中心で、スレッドは薄く。
-  # ----------------------------------------------------------------------
   t2_structures:
     quantity-multiplier: 1.8
     rolls: 1
@@ -572,7 +528,6 @@ pools:
       - nova_structures:chests/remnant_bundle_tent
       - terralith:spire/junk
     entries:
-      # --- モブ素材が主。スレッドは当たり枠として薄く残す
       - item: custom:ravager_hide
         chance: 0.01
       - item: custom:piglin_brute_plate
@@ -623,18 +578,12 @@ pools:
         chance: 0.1
         min: 1
         max: 2
-      # --- 圧縮ブロック(たまに大口の資源が出る枠)
       - item: custom:copper_block_1x
         chance: 0.02
       - item: custom:coal_block_1x
         chance: 0.02
-
-  # ----------------------------------------------------------------------
-  # T1_最下位 — 86 本 (既存戦利品スコア 0.1〜1.0)
-  # 食料箱・樽などの端物。追加報酬はほぼ無く、既存戦利品の量だけ倍にする。
-  # ----------------------------------------------------------------------
   t1_structures:
-    quantity-multiplier: 2.0
+    quantity-multiplier: 2
     rolls: 1
     tables:
       - nova_structures:chests/stray_fort/stray_fort_food
@@ -724,7 +673,6 @@ pools:
       - nova_structures:mob/piglin_hamlet
       - nova_structures:mob/piglin_outstation
     entries:
-      # --- 端物。追加はモブ素材とソースの欠片だけ
       - item: custom:ravager_hide
         chance: 0.005
       - item: custom:piglin_brute_plate
@@ -755,6 +703,5 @@ pools:
         chance: 0.06
         min: 1
         max: 2
-      # --- 圧縮ブロック(たまに大口の資源が出る枠)
       - item: custom:coal_block_1x
         chance: 0.02

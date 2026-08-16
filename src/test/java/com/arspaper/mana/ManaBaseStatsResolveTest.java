@@ -116,10 +116,10 @@ class ManaBaseStatsResolveTest {
         // mana-idle-bonus-flat: 0 は TF がロード時に捨てるので届かない。行はあるので 0(無効)。
         assertEquals(0.0,
                 ManaBaseStats.resolve(OptionalDouble.empty(), Source.KEY_DECLARED, 0.0, true));
-        // 量的キー(HEAD: 100 / 5 / 20)はそのまま置換される。
-        assertEquals(100.0, ManaBaseStats.resolve(OptionalDouble.of(100.0), Source.KEY_DECLARED, 100.0, false));
-        assertEquals(5.0, ManaBaseStats.resolve(OptionalDouble.of(5.0), Source.KEY_DECLARED, 5.0, false));
-        assertEquals(20.0, ManaBaseStats.resolve(OptionalDouble.of(20.0), Source.KEY_DECLARED, 20.0, false));
+        // 2026-08-16: 量的キーだった mana-max-base / mana-regen-base / mana-regen-interval-ticks は
+        // ArsPaper config.yml の mana.default-max / default-regen-rate / regen-interval-ticks へ移設され、
+        // ここを通らなくなった(ManaBaseValuesConfigTest が新しい読み口を固定する)。
+        // このクラスに残る量的キーは mana-idle-seconds だけで、上の1件で固定済み。
     }
 
     @Test

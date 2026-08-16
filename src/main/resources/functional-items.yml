@@ -46,14 +46,15 @@
 # ============================================================
 
 # 設定リファレンス(本文コメント移設先): docs/config-reference/arspaper/functional-items.md
+
 items:
   dominion_wand:
-    display-name: "ドミニオンワンド"
+    display-name: ドミニオンワンド
     material: BLAZE_ROD
     enchant-glow: true
     lore:
       - ""
-      - "<color:dark_purple>ソース管理入門</color>"
+      - <color:dark_purple>ソース管理入門</color>
     recipe:
       method: workbench
       type: shaped
@@ -65,16 +66,15 @@ items:
         G: GOLD_INGOT
         B: BLAZE_ROD
       amount: 1
-
   teleport_compass:
-    display-name: "テレポートコンパス"
+    display-name: テレポートコンパス
     material: COMPASS
     enchant-glow: true
     lore:
-      - "<gray>ウェイストーンに右クリックで紐づけ</gray>"
-      - "<dark_gray>右クリックでテレポート</dark_gray>"
+      - <gray>ウェイストーンに右クリックで紐づけ</gray>
+      - <dark_gray>右クリックでテレポート</dark_gray>
       - ""
-      - "<color:dark_purple>ルーラ！</color>"
+      - <color:dark_purple>ルーラ！</color>
     recipe:
       method: ritual
       core-item: COMPASS
@@ -84,9 +84,10 @@ items:
         - CHORUS_FRUIT x2
         - LAPIS_BLOCK x2
       source: 600
-
+      type: shapeless
+      ingredients: []
   pedestal:
-    display-name: "台座"
+    display-name: 台座
     recipe:
       method: workbench
       type: shaped
@@ -98,9 +99,8 @@ items:
         G: GOLD_INGOT
         S: custom:sourcestone
       amount: 2
-
   ritual_core:
-    display-name: "儀式の核"
+    display-name: 儀式の核
     recipe:
       method: workbench
       type: shaped
@@ -112,9 +112,8 @@ items:
         O: OBSIDIAN
         D: DIAMOND
         L: LODESTONE
-
   scribing_table:
-    display-name: "筆記台"
+    display-name: 筆記台
     recipe:
       method: workbench
       type: shaped
@@ -126,9 +125,8 @@ items:
         L: LAPIS_LAZULI
         G: custom:source_gem
         B: BOOKSHELF
-
   waystone:
-    display-name: "ウェイストーン"
+    display-name: ウェイストーン
     recipe:
       method: ritual
       core-item: LODESTONE
@@ -138,9 +136,10 @@ items:
         - CHORUS_FLOWER x2
         - DIAMOND_BLOCK x2
       source: 1000
-
+      type: shapeless
+      ingredients: []
   source_berry:
-    display-name: "ソースベリー"
+    display-name: ソースベリー
     material: GLOW_BERRIES
     recipe:
       method: inventory
@@ -148,23 +147,13 @@ items:
       ingredients:
         - GLOW_BERRIES
         - AMETHYST_SHARD
-
-  # ============================================================
-  # エンチャント本 (儀式) — 2026-08-14 に items.yml から移設
-  # ============================================================
-  # 素材は本(BOOK)をコアに置き、台座の素材と Source を消費してカスタムエンチャント本になる。
-  # recipe.effect-type: enchant_book / effect-params.enchantment+level が結果を決める
-  # (この2キーはプログラムが解釈するのでリネーム不可)。
-  # display-name / lore を書くと、生成されるエンチャント本の表示がそのまま置き換わる
-  # (EnchantBookRitualEffect が FunctionalItemConfig を参照する)。
-  # 省略した場合は「<エンチャント名> <ローマ数字>」のハードコード表示へフォールバックする。
-  # material は変更できない(結果は常に ENCHANTED_BOOK。エンチャント格納メタが必須のため)。
+    enchant-glow: true
   enchant_book_mana_regen_1:
-    display-name: "<light_purple>マナ再生 I</light_purple>"
+    display-name: <light_purple>マナ再生 I</light_purple>
     lore:
-      - "<gray>マナ再生 I</gray>"
+      - <gray>マナ再生 I</gray>
       - ""
-      - "<dark_gray>金床でメイジアーマーに適用</dark_gray>"
+      - <dark_gray>金床でメイジアーマーに適用</dark_gray>
     recipe:
       method: ritual
       name: マナ再生I
@@ -178,13 +167,14 @@ items:
         - GHAST_TEAR
         - LAPIS_LAZULI x2
       source: 500
-
+      type: shapeless
+      ingredients: []
   enchant_book_mana_regen_2:
-    display-name: "<light_purple>マナ再生 II</light_purple>"
+    display-name: <light_purple>マナ再生 II</light_purple>
     lore:
-      - "<gray>マナ再生 II</gray>"
+      - <gray>マナ再生 II</gray>
       - ""
-      - "<dark_gray>金床でメイジアーマーに適用</dark_gray>"
+      - <dark_gray>金床でメイジアーマーに適用</dark_gray>
     recipe:
       method: ritual
       name: マナ再生II
@@ -198,13 +188,14 @@ items:
         - GHAST_TEAR x2
         - DIAMOND_BLOCK
       source: 1000
-
+      type: shapeless
+      ingredients: []
   enchant_book_mana_regen_3:
-    display-name: "<light_purple>マナ再生 III</light_purple>"
+    display-name: <light_purple>マナ再生 III</light_purple>
     lore:
-      - "<gray>マナ再生 III</gray>"
+      - <gray>マナ再生 III</gray>
       - ""
-      - "<dark_gray>金床でメイジアーマーに適用</dark_gray>"
+      - <dark_gray>金床でメイジアーマーに適用</dark_gray>
     recipe:
       method: ritual
       name: マナ再生III
@@ -218,13 +209,14 @@ items:
         - GHAST_TEAR x2
         - NETHER_STAR
       source: 2000
-
+      type: shapeless
+      ingredients: []
   enchant_book_mana_boost_1:
-    display-name: "<light_purple>マナ上昇 I</light_purple>"
+    display-name: <light_purple>マナ上昇 I</light_purple>
     lore:
-      - "<gray>マナ上昇 I</gray>"
+      - <gray>マナ上昇 I</gray>
       - ""
-      - "<dark_gray>金床でメイジアーマーに適用</dark_gray>"
+      - <dark_gray>金床でメイジアーマーに適用</dark_gray>
     recipe:
       method: ritual
       name: マナ上昇I
@@ -238,13 +230,14 @@ items:
         - ECHO_SHARD
         - LAPIS_LAZULI x2
       source: 500
-
+      type: shapeless
+      ingredients: []
   enchant_book_mana_boost_2:
-    display-name: "<light_purple>マナ上昇 II</light_purple>"
+    display-name: <light_purple>マナ上昇 II</light_purple>
     lore:
-      - "<gray>マナ上昇 II</gray>"
+      - <gray>マナ上昇 II</gray>
       - ""
-      - "<dark_gray>金床でメイジアーマーに適用</dark_gray>"
+      - <dark_gray>金床でメイジアーマーに適用</dark_gray>
     recipe:
       method: ritual
       name: マナ上昇II
@@ -258,13 +251,14 @@ items:
         - ECHO_SHARD
         - DIAMOND_BLOCK
       source: 1000
-
+      type: shapeless
+      ingredients: []
   enchant_book_mana_boost_3:
-    display-name: "<light_purple>マナ上昇 III</light_purple>"
+    display-name: <light_purple>マナ上昇 III</light_purple>
     lore:
-      - "<gray>マナ上昇 III</gray>"
+      - <gray>マナ上昇 III</gray>
       - ""
-      - "<dark_gray>金床でメイジアーマーに適用</dark_gray>"
+      - <dark_gray>金床でメイジアーマーに適用</dark_gray>
     recipe:
       method: ritual
       name: マナ上昇III
@@ -278,15 +272,14 @@ items:
         - ECHO_SHARD
         - NETHER_STAR
       source: 2000
-
+      type: shapeless
+      ingredients: []
   enchant_book_share:
-    display-name: "<light_purple>共有 I</light_purple>"
+    display-name: <light_purple>共有 I</light_purple>
     lore:
-      - "<gray>共有 I</gray>"
+      - <gray>共有 I</gray>
       - ""
-      # 共有は EnchantBookListener で spell_book_* 限定(!isSpellBook → continue)。
-      # メイジアーマーには乗らないので案内文も魔導書に合わせる。
-      - "<dark_gray>金床で魔導書に適用</dark_gray>"
+      - <dark_gray>金床で魔導書に適用</dark_gray>
     recipe:
       method: ritual
       name: 共有
@@ -301,14 +294,14 @@ items:
         - NETHER_STAR
         - DIAMOND_BLOCK
       source: 3000
-
+      type: shapeless
+      ingredients: []
   enchant_book_soulbound:
-    display-name: "<light_purple>回生 I</light_purple>"
+    display-name: <light_purple>回生 I</light_purple>
     lore:
-      - "<gray>回生 I</gray>"
+      - <gray>回生 I</gray>
       - ""
-      # 回生は耐久を持つアイテム全般が対象(!isDamageable → continue)。防具限定ではない。
-      - "<dark_gray>金床で耐久のある装備・道具に適用</dark_gray>"
+      - <dark_gray>金床で耐久のある装備・道具に適用</dark_gray>
     recipe:
       method: ritual
       name: 回生
@@ -323,3 +316,5 @@ items:
         - TOTEM_OF_UNDYING
         - GOLDEN_APPLE x2
       source: 2000
+      type: shapeless
+      ingredients: []

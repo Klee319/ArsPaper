@@ -81,13 +81,15 @@ public class UnifiedRecipeLoader {
         for (String id : items.getKeys(false)) {
             ConfigurationSection itemSection = items.getConfigurationSection(id);
             if (itemSection == null) continue;
-            ConfigurationSection recipeSection = itemSection.getConfigurationSection("recipe");
-            if (recipeSection == null) continue;
 
-            try {
-                loadItemRecipe(id, recipeSection, itemSection);
-            } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "Failed to load functional item recipe: " + id, e);
+            int index = 0;
+            for (ConfigurationSection recipeSection : recipeSections(itemSection)) {
+                try {
+                    loadItemRecipe(id, recipeKey(id, index), recipeSection, itemSection);
+                } catch (Exception e) {
+                    plugin.getLogger().log(Level.WARNING, "Failed to load functional item recipe: " + id, e);
+                }
+                index++;
             }
         }
     }
@@ -105,18 +107,21 @@ public class UnifiedRecipeLoader {
             for (String id : items.getKeys(false)) {
                 ConfigurationSection itemSection = items.getConfigurationSection(id);
                 if (itemSection == null) continue;
-                ConfigurationSection recipeSection = itemSection.getConfigurationSection("recipe");
-                if (recipeSection == null) continue;
 
-                try {
-                    String method = recipeSection.getString("method", "workbench");
-                    if ("workbench".equalsIgnoreCase(method) || "inventory".equalsIgnoreCase(method)) {
-                        loadWorkbenchFromSection(id, recipeSection, itemSection, method.toLowerCase());
-                    } else if ("ritual".equalsIgnoreCase(method)) {
-                        loadRitualFromSection(id, recipeSection, itemSection);
+                int index = 0;
+                for (ConfigurationSection recipeSection : recipeSections(itemSection)) {
+                    try {
+                        String method = recipeSection.getString("method", "workbench");
+                        if ("workbench".equalsIgnoreCase(method) || "inventory".equalsIgnoreCase(method)) {
+                            loadWorkbenchFromSection(id, recipeKey(id, index), recipeSection, itemSection,
+                                method.toLowerCase());
+                        } else if ("ritual".equalsIgnoreCase(method)) {
+                            loadRitualFromSection(id, recipeKey(id, index), recipeSection, itemSection);
+                        }
+                    } catch (Exception e) {
+                        plugin.getLogger().log(Level.WARNING, "Failed to load item recipe: " + id, e);
                     }
-                } catch (Exception e) {
-                    plugin.getLogger().log(Level.WARNING, "Failed to load item recipe: " + id, e);
+                    index++;
                 }
             }
         }
@@ -150,21 +155,24 @@ public class UnifiedRecipeLoader {
         for (String id : materials.getKeys(false)) {
             ConfigurationSection matSection = materials.getConfigurationSection(id);
             if (matSection == null) continue;
-            ConfigurationSection recipeSection = matSection.getConfigurationSection("recipe");
-            if (recipeSection == null) continue;
 
-            try {
-                String method = resolveMaterialRecipeMethod(recipeSection);
-                if (method == null) continue;
-                if ("workbench".equals(method) || "inventory".equals(method)) {
-                    loadWorkbenchFromSection(id, recipeSection, matSection, method);
-                } else if ("ritual".equals(method)) {
-                    loadMaterialRitualFromSection(id, recipeSection, matSection);
-                } else {
-                    plugin.getLogger().warning("Unknown material recipe method for " + id + ": " + method);
+            int index = 0;
+            for (ConfigurationSection recipeSection : recipeSections(matSection)) {
+                try {
+                    String method = resolveMaterialRecipeMethod(recipeSection);
+                    if (method == null) continue;
+                    if ("workbench".equals(method) || "inventory".equals(method)) {
+                        loadWorkbenchFromSection(id, recipeKey(id, index), recipeSection, matSection, method);
+                    } else if ("ritual".equals(method)) {
+                        loadMaterialRitualFromSection(id, recipeKey(id, index), recipeSection, matSection);
+                    } else {
+                        plugin.getLogger().warning("Unknown material recipe method for " + id + ": " + method);
+                    }
+                } catch (Exception e) {
+                    plugin.getLogger().log(Level.WARNING, "Failed to load material recipe: " + id, e);
+                } finally {
+                    index++;
                 }
-            } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "Failed to load material recipe: " + id, e);
             }
         }
     }
@@ -182,29 +190,33 @@ public class UnifiedRecipeLoader {
         for (String id : threads.getKeys(false)) {
             ConfigurationSection threadSection = threads.getConfigurationSection(id);
             if (threadSection == null) continue;
-            ConfigurationSection recipeSection = threadSection.getConfigurationSection("recipe");
-            if (recipeSection == null) continue;
 
-            try {
-                String name = displayName(threadSection.getString("display_name", id), id);
-                RitualIngredient coreItem = parseSingleIngredient(recipeSection.getString("core-item", null));
-                List<RitualIngredient> pedestalItems = parsePedestalItems(recipeSection.getStringList("pedestal-items"));
-                int source = recipeSection.getInt("source", 0);
+            int index = 0;
+            for (ConfigurationSection recipeSection : recipeSections(threadSection)) {
+                try {
+                    String name = displayName(threadSection.getString("display_name", id), id);
+                    RitualIngredient coreItem = parseSingleIngredient(recipeSection.getString("core-item", null));
+                    List<RitualIngredient> pedestalItems = parsePedestalItems(recipeSection.getStringList("pedestal-items"));
+                    int source = recipeSection.getInt("source", 0);
 
-                // 空スレッドはクラフト結果あり、効果スレッドはeffect-type: thread
-                if ("empty".equals(id)) {
-                    ritualRecipes.add(new RitualRecipe(
-                        "empty_thread", name, coreItem, pedestalItems, source,
-                        "thread_empty", null, "craft", Map.of()));
-                } else {
-                    Map<String, String> params = new HashMap<>();
-                    params.put("thread", id);
-                    ritualRecipes.add(new RitualRecipe(
-                        "thread_" + id, name, coreItem, pedestalItems, source,
-                        null, null, "thread", params));
+                    // 空スレッドはクラフト結果あり、効果スレッドはeffect-type: thread
+                    // (登録キーだけ recipeKey で一意化する。結果/効果パラメータは元の id のまま)
+                    if ("empty".equals(id)) {
+                        ritualRecipes.add(new RitualRecipe(
+                            recipeKey("empty_thread", index), name, coreItem, pedestalItems, source,
+                            "thread_empty", null, "craft", Map.of()));
+                    } else {
+                        Map<String, String> params = new HashMap<>();
+                        params.put("thread", id);
+                        ritualRecipes.add(new RitualRecipe(
+                            recipeKey("thread_" + id, index), name, coreItem, pedestalItems, source,
+                            null, null, "thread", params));
+                    }
+                } catch (Exception e) {
+                    plugin.getLogger().log(Level.WARNING, "Failed to load thread recipe: " + id, e);
+                } finally {
+                    index++;
                 }
-            } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "Failed to load thread recipe: " + id, e);
             }
         }
     }
@@ -220,12 +232,14 @@ public class UnifiedRecipeLoader {
         for (String id : jars.getKeys(false)) {
             ConfigurationSection jarSection = jars.getConfigurationSection(id);
             if (jarSection == null) continue;
-            ConfigurationSection recipeSection = jarSection.getConfigurationSection("recipe");
-            if (recipeSection == null) continue;
-            try {
-                loadItemRecipe(id, recipeSection, jarSection);
-            } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "Failed to load sourcejar recipe: " + id, e);
+            int index = 0;
+            for (ConfigurationSection recipeSection : recipeSections(jarSection)) {
+                try {
+                    loadItemRecipe(id, recipeKey(id, index), recipeSection, jarSection);
+                } catch (Exception e) {
+                    plugin.getLogger().log(Level.WARNING, "Failed to load sourcejar recipe: " + id, e);
+                }
+                index++;
             }
         }
     }
@@ -241,12 +255,14 @@ public class UnifiedRecipeLoader {
         for (String id : items.getKeys(false)) {
             ConfigurationSection itemSection = items.getConfigurationSection(id);
             if (itemSection == null) continue;
-            ConfigurationSection recipeSection = itemSection.getConfigurationSection("recipe");
-            if (recipeSection == null) continue;
-            try {
-                loadItemRecipe(id, recipeSection, itemSection);
-            } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "Failed to load sourcelink recipe: " + id, e);
+            int index = 0;
+            for (ConfigurationSection recipeSection : recipeSections(itemSection)) {
+                try {
+                    loadItemRecipe(id, recipeKey(id, index), recipeSection, itemSection);
+                } catch (Exception e) {
+                    plugin.getLogger().log(Level.WARNING, "Failed to load sourcelink recipe: " + id, e);
+                }
+                index++;
             }
         }
     }
@@ -263,34 +279,88 @@ public class UnifiedRecipeLoader {
             if (!(raw instanceof Map<?, ?> map)) continue;
             Object idObj = map.get("id");
             if (!(idObj instanceof String id) || id.isBlank()) continue;
-            Object recipeObj = map.get("recipe");
-            if (!(recipeObj instanceof Map<?, ?>)) continue;
             // Map → 一時 YamlConfiguration 経由で ConfigurationSection 化
             YamlConfiguration wrap = new YamlConfiguration();
             wrap.createSection("root", castStringKeyMap(map));
             ConfigurationSection bookSection = wrap.getConfigurationSection("root");
             if (bookSection == null) continue;
-            ConfigurationSection recipeSection = bookSection.getConfigurationSection("recipe");
-            if (recipeSection == null) continue;
-            try {
-                loadItemRecipe(id, recipeSection, bookSection);
-            } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "Failed to load spellbook recipe: " + id, e);
+            int index = 0;
+            for (ConfigurationSection recipeSection : recipeSections(bookSection)) {
+                try {
+                    loadItemRecipe(id, recipeKey(id, index), recipeSection, bookSection);
+                } catch (Exception e) {
+                    plugin.getLogger().log(Level.WARNING, "Failed to load spellbook recipe: " + id, e);
+                }
+                index++;
             }
         }
     }
 
-    /** items.yml / jars / sourcelinks / spellbooks 共通の recipe 振り分け。 */
-    private void loadItemRecipe(String id, ConfigurationSection recipeSection,
+    /**
+     * items.yml / jars / sourcelinks / spellbooks 共通の recipe 振り分け。
+     *
+     * @param id        結果アイテムのID (result 未指定時の {@code custom:<id>} はこちら)
+     * @param recipeKey レシピの登録キー (2件目以降は {@link #recipeKey} で一意化されている)
+     */
+    private void loadItemRecipe(String id, String recipeKey, ConfigurationSection recipeSection,
                                 ConfigurationSection itemSection) {
         String method = recipeSection.getString("method", "workbench");
         if ("workbench".equalsIgnoreCase(method) || "inventory".equalsIgnoreCase(method)) {
-            loadWorkbenchFromSection(id, recipeSection, itemSection, method.toLowerCase());
+            loadWorkbenchFromSection(id, recipeKey, recipeSection, itemSection, method.toLowerCase());
         } else if ("ritual".equalsIgnoreCase(method)) {
-            loadRitualFromSection(id, recipeSection, itemSection);
+            loadRitualFromSection(id, recipeKey, recipeSection, itemSection);
         } else {
             plugin.getLogger().warning("Unsupported recipe method for " + id + ": " + method);
         }
+    }
+
+    // ============================
+    // recipe: / recipes: の共通読み出し
+    // ============================
+    /**
+     * 1エントリが持つレシピを、書かれた順にすべて返す。
+     *
+     * <p>2026-08-13: それまでは全ローダーが {@code recipe:}(単数)しか見ておらず、
+     * TrinityForge の catalog.yml だけが {@code recipes:}(マップの配列)を読めた。
+     * 設定エディタのレシピ編集UIは catalog.yml の正規形
+     * (0件=キーなし / 1件={@code recipe:} / 2件以上={@code recipes:})へ書き戻す共通部品なので、
+     * Ars 側の画面で2件目を足すと <b>1件目ごと Java から見えなくなっていた</b>。
+     * 「素材だけ扱いが違う理由が無い(儀式を使うアイテムは素材以外にもある)」という指示により、
+     * 読み取り側をカタログと同じ形へ統合した。
+     *
+     * <p>{@code recipe:} と {@code recipes:} が両方あれば両方読む(片方を無視して黙って捨てない)。
+     */
+    static List<ConfigurationSection> recipeSections(ConfigurationSection parent) {
+        List<ConfigurationSection> out = new ArrayList<>();
+        if (parent == null) return out;
+        ConfigurationSection single = parent.getConfigurationSection("recipe");
+        if (single != null) out.add(single);
+        if (parent.isList("recipes")) {
+            List<?> raw = parent.getList("recipes", List.of());
+            int i = 0;
+            for (Object entry : raw) {
+                if (!(entry instanceof Map<?, ?> map)) continue;
+                // Map → 一時 YamlConfiguration 経由で ConfigurationSection 化 (spellbooks と同じ手口)。
+                String path = "r" + (i++);
+                YamlConfiguration wrap = new YamlConfiguration();
+                wrap.createSection(path, castStringKeyMap(map));
+                ConfigurationSection sec = wrap.getConfigurationSection(path);
+                if (sec != null) out.add(sec);
+            }
+        }
+        return out;
+    }
+
+    /**
+     * 2件目以降のレシピに与える登録キー。
+     *
+     * <p>作業台レシピは {@code new NamespacedKey(plugin, id)}、儀式レシピは
+     * {@code RitualRecipeRegistry} の Map キーがどちらも<b>この id そのもの</b>なので、
+     * 同じアイテムに2件登録すると後勝ちで片方が消える。**結果アイテムのIDとは別物**に
+     * しなければならない点に注意 (結果は常に元の itemId から解決する)。
+     */
+    static String recipeKey(String itemId, int index) {
+        return index == 0 ? itemId : itemId + "_r" + (index + 1);
     }
 
     @SuppressWarnings("unchecked")
@@ -323,7 +393,8 @@ public class UnifiedRecipeLoader {
         return null;
     }
 
-    private void loadMaterialRitualFromSection(String id, ConfigurationSection recipeSection,
+    private void loadMaterialRitualFromSection(String id, String recipeKey,
+                                                ConfigurationSection recipeSection,
                                                 ConfigurationSection matSection) {
         // 生の display_name を連結すると "&6&l無限ソース核精製" がそのままGUIへ出る(2026-08-03 実バグ)。
         // materials.yml はレガシー &記法なので、必ず DisplayText でプレーン化してから連結する。
@@ -332,15 +403,17 @@ public class UnifiedRecipeLoader {
         List<RitualIngredient> pedestalItems = parsePedestalItems(recipeSection.getStringList("pedestal-items"));
         int source = recipeSection.getInt("source", 0);
 
+        // 登録キーだけ一意化する。結果アイテムは常に元の素材ID。
         ritualRecipes.add(new RitualRecipe(
-            id, name, coreItem, pedestalItems, source,
+            recipeKey, name, coreItem, pedestalItems, source,
             id, null, "craft", Map.of()));
     }
 
     // ============================
     // Workbench recipe parser
     // ============================
-    private void loadWorkbenchFromSection(String id, ConfigurationSection recipeSection,
+    private void loadWorkbenchFromSection(String id, String recipeKey,
+                                           ConfigurationSection recipeSection,
                                            ConfigurationSection itemSection, String method) {
         String type = recipeSection.getString("type", "shaped");
         String result = "custom:" + id;
@@ -367,13 +440,16 @@ public class UnifiedRecipeLoader {
         }
         boolean reversible = recipeSection.getBoolean("reversible", false);
 
-        workbenchRecipes.add(new WorkbenchRecipeData(id, type, result, amount, shape, ingredients, method, reversible));
+        // WorkbenchRecipeData.id は NamespacedKey のキー部分になるので recipeKey を使う
+        // (結果アイテムは上で元の id から解決済み)。
+        workbenchRecipes.add(new WorkbenchRecipeData(recipeKey, type, result, amount, shape, ingredients, method, reversible));
     }
 
     // ============================
     // Ritual recipe parser
     // ============================
-    private void loadRitualFromSection(String id, ConfigurationSection recipeSection,
+    private void loadRitualFromSection(String id, String recipeKey,
+                                        ConfigurationSection recipeSection,
                                         ConfigurationSection itemSection) {
         String name = recipeSection.getString("name", null);
         if (name == null) {
@@ -401,7 +477,7 @@ public class UnifiedRecipeLoader {
         int resultAmount = recipeSection.getInt("result-amount", 1);
 
         ritualRecipes.add(new RitualRecipe(
-            id, name, coreItem, pedestalItems, source,
+            recipeKey, name, coreItem, pedestalItems, source,
             resultId, resultMaterial, effectType, effectParams, resultAmount));
     }
 

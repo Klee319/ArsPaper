@@ -83,48 +83,93 @@ catalysts:
           min: 0
           max: 3
 
+  # ------------------------------------------------------------
+  # 終盤(Lv100)触媒3本のステ。2026-08-14 まで全ステ0のプレースホルダで、
+  # TF item-stats.yml 側にも BLAZE_ROD#400024〜400026 のエントリが無いため
+  # 攻撃力・マナ・CTがすべて素通しの0だった(この stats: 節が唯一のステ源)。
+  #
+  # 置いた値の根拠:
+  #   同格の Lv100 杖 2本のうち、攻撃力の低い方 NETHERITE_SWORD#400013「黒淵の杖」
+  #   (item-stats.yml、ap fixed 62581 / per-quality 2607.6 / item-cooldown 2.0)へ丸ごと揃えた。
+  #   高い方の #400012「魔源の杖」(ap fixed 80965 / per-quality 3373.5)を採らないのは、
+  #   単品最大(fixed + per-quality×15 + random.max)が 131,567.5 となり
+  #   combat/stat-caps.yml の attack-power 上限(127,500)を超える既知の抵触品だから。
+  #   黒淵基準なら単品最大 101,695 で上限内に収まり、新たな抵触を1件も作らない。
+  #   3本の間に序列を付ける根拠は lore にも catalog にも無い(lore は3本とも同一の
+  #   「要調整」プレースホルダだった)ので、意図的に同値へ置いている。
+  #   attack-speed 1.6 は「CT付き武器の攻撃速度を剣と同等に」の方針に合わせた値。
+  #   item-cooldown 2.0 が振り間隔を律速する(CT×AS=3.2≥1 で常にフルチャージ)ため、
+  #   1.6 にしても1発の威力も手数も変わらない ―― 変わるのは振り戻しモーションだけ。
+  # ------------------------------------------------------------
   infinity_catalyst:
     material: BLAZE_ROD
     display-name: <color:#7df9ff>インフィニティの触媒</color>
     custom-model-data: 400024
     lore:
-      - "要調整: ステータス未設定のプレースホルダ(インフィニティ/エンドラ/ウィザー系触媒共通)"
+      - "無限の魔力を湛えた最上位の触媒"
     stats:
       fixed:
-        attack-power: 0
+        attack-power: 62581
+        attack-speed: 1.6
+        crit-chance: 0.08
+        crit-damage: 0.5
+        penetration: 0.05
+        mana-bonus: 622
+        mana-regen: 5.6
+        source-cost-reduction: 0.23
+        thread-slots: 3
+        item-cooldown: 2
       per-quality:
-        attack-power: 0
-      random:
-        attack-power:
-          min: 0
-          max: 0
+        attack-power: 2607.6
+        crit-chance: 0.003
+        crit-damage: 0.02
+        penetration: 0.004
+        mana-bonus: 62
   dragon_catalyst:
     material: BLAZE_ROD
     display-name: <color:dark_purple>エンダードラゴンの触媒</color>
     custom-model-data: 400025
     lore:
-      - "要調整: ステータス未設定のプレースホルダ(インフィニティ/エンドラ/ウィザー系触媒共通)"
+      - "終焉の竜の残滓を宿した最上位の触媒"
     stats:
       fixed:
-        attack-power: 0
+        attack-power: 62581
+        attack-speed: 1.6
+        crit-chance: 0.08
+        crit-damage: 0.5
+        penetration: 0.05
+        mana-bonus: 622
+        mana-regen: 5.6
+        source-cost-reduction: 0.23
+        thread-slots: 3
+        item-cooldown: 2
       per-quality:
-        attack-power: 0
-      random:
-        attack-power:
-          min: 0
-          max: 0
+        attack-power: 2607.6
+        crit-chance: 0.003
+        crit-damage: 0.02
+        penetration: 0.004
+        mana-bonus: 62
   wither_catalyst:
     material: BLAZE_ROD
     display-name: <color:dark_gray>ウィザーの触媒</color>
     custom-model-data: 400026
     lore:
-      - "要調整: ステータス未設定のプレースホルダ(インフィニティ/エンドラ/ウィザー系触媒共通)"
+      - "枯死の王の呪詛を封じた最上位の触媒"
     stats:
       fixed:
-        attack-power: 0
+        attack-power: 62581
+        attack-speed: 1.6
+        crit-chance: 0.08
+        crit-damage: 0.5
+        penetration: 0.05
+        mana-bonus: 622
+        mana-regen: 5.6
+        source-cost-reduction: 0.23
+        thread-slots: 3
+        item-cooldown: 2
       per-quality:
-        attack-power: 0
-      random:
-        attack-power:
-          min: 0
-          max: 0
+        attack-power: 2607.6
+        crit-chance: 0.003
+        crit-damage: 0.02
+        penetration: 0.004
+        mana-bonus: 62

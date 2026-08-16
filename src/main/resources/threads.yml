@@ -18,7 +18,10 @@
 #   mana-max-percent: 最大マナの割合上昇（%）。固定値の mana-bonus と違い、素の最大マナが
 #     大きいビルドほど効く。ThreadConfig / ManaManager とも配線済み。
 #   regen-percent: マナ回復速度の割合上昇（%）。固定値の regen-bonus の割合版。
-#   slots: バックパックスロット数
+#   slots: バックパックスロット数。⚠ これは **lore の表示専用**（ThreadConfig#getBackpackSlots を
+#     読むのは説明文の生成1箇所だけ）。実際の容量は BackpackGui が
+#     「装着しているバックパックスレッドの本数（max: 2 が上限）× 3行 × 9 = 27 or 54」で決めるので、
+#     ここには **1本あたりの枠数（=27）** を書く。0 を書くと説明文が「追加インベントリ 0スロット」と嘘をつく。
 #   potion-effect: 装備中常時付与するポーション効果（バニラ PotionEffectType 名を小文字にしたid）。
 #     省略時は ThreadType enum の既定値を使う（後方互換）。"none" と書くと明示的に無効化できる。
 #     ⚠ 指定できるのは有益効果18種のみ:
@@ -47,222 +50,137 @@
 # ============================================================
 
 # 設定リファレンス(本文コメント移設先): docs/config-reference/arspaper/threads.md
+
 threads:
-
   empty:
-    display_name: "空のスレッド"
-
-
+    display_name: 空のスレッド
   mana_regen:
-    display_name: "マナ回復速度上昇のスレッド"
-    regen-bonus: 2
+    display_name: マナ回復速度上昇のスレッド
     stackable: true
     max: 3
-
   mana_boost:
-    display_name: "マナ最大値上昇のスレッド"
-    mana-bonus: 20
+    display_name: マナ最大値上昇のスレッド
     stackable: true
     max: 3
-
   health_boost:
-    display_name: "体力増強のスレッド"
+    display_name: 体力増強のスレッド
     stackable: true
     max: 3
-
+    potion-effect: health_boost
+    potion-level: 2
   hit_mana_recovery:
-    display_name: "被弾マナ回復のスレッド"
-    recovery: 10
+    display_name: 被弾マナ回復のスレッド
     stackable: true
     max: 2
-
   damage_mana_recovery:
-    display_name: "攻撃マナ回復のスレッド"
-    recovery: 5
+    display_name: 攻撃マナ回復のスレッド
     stackable: true
     max: 2
-
   spell_cost_down:
-    display_name: "詠唱効率のスレッド"
-    cost-reduction: 8
+    display_name: 詠唱効率のスレッド
     stackable: true
     max: 1
-
   backpack:
-    display_name: "バックパックのスレッド"
-    slots: 27
+    display_name: バックパックのスレッド
     stackable: true
     max: 2
-
-
+    slots: 27
   speed:
-    display_name: "迅速のスレッド"
-
+    display_name: 迅速のスレッド
+    potion-effect: speed
+    potion-level: 2
   jump_boost:
-    display_name: "跳躍のスレッド"
-
+    display_name: 跳躍のスレッド
+    potion-effect: jump_boost
+    potion-level: 2
   night_vision:
-    display_name: "暗視のスレッド"
-
+    display_name: 暗視のスレッド
+    potion-effect: night_vision
+    potion-level: 1
   fire_resistance:
-    display_name: "耐火のスレッド"
-
+    display_name: 耐火のスレッド
+    potion-effect: fire_resistance
+    potion-level: 1
   dolphins_grace:
-    display_name: "イルカの好意のスレッド"
-
+    display_name: イルカの好意のスレッド
+    potion-effect: dolphins_grace
+    potion-level: 1
   conduit_power:
-    display_name: "コンジットパワーのスレッド"
-
+    display_name: コンジットパワーのスレッド
+    potion-effect: conduit_power
+    potion-level: 1
   hero_of_the_village:
-    display_name: "村の英雄のスレッド"
-
+    display_name: 村の英雄のスレッド
+    potion-effect: hero_of_the_village
+    potion-level: 1
   flight:
-    display_name: "飛行のスレッド"
-
-
-# ============================================================
-# 2026-08-02 追加分（16種 -> 40種）。CMD 300017〜300040 / ThreadType enum と1:1。
-#
-# ■ stackable を書いていないもの = 1装備につき1個まで（到達上限 = キャリア5個）。
-#   これは意図的: 効果を thread-sets.yml の 1/3/5 段で表現しているので、
-#   最終段の 5 が「防具4部位+メインハンド の全部に載せて初めて到達」になる。
-#   stackable: true にすると上限が跳ね上がり、5 段が「1装備に固めて即到達」に化ける。
-#
-# ■ 効果値そのものは thread-sets.yml 側に書く（このファイルには重複して書かない）。
-#   ここの lore: は「プレイヤーに見せる説明文」であって効果の定義ではない。
-#   数値を変えたら lore: も手で直すこと（自動追随はしない）。
-# ============================================================
-
-  # --- 制作(儀式・生産)枠。効果値は設計の基準どおり ---
-
+    display_name: 飛行のスレッド
+    flight: true
   mana_amplify:
-    display_name: "マナ増幅のスレッド"
-    # 割合なので「素の最大マナが大きいビルドほど効く」。固定+20 の mana_boost と伸び方が逆になる。
-    mana-max-percent: 3
+    display_name: マナ増幅のスレッド
     stackable: true
     max: 3
-
   mana_circulate:
-    display_name: "循環のスレッド"
-    # 回復基礎値を伸ばした構成でだけ意味が出る割合版。固定+2/tick の mana_regen と対になる。
-    regen-percent: 4
+    display_name: 循環のスレッド
     stackable: true
     max: 3
-
   source_thrift:
-    display_name: "源流節約のスレッド"
-    # spell_cost_down が削るのは「マナ」。こちらは儀式の「ソース」で消費資源そのものが別。
-
+    display_name: 源流節約のスレッド
   artisan:
-    display_name: "匠のスレッド"
-
+    display_name: 匠のスレッド
   ritualist:
-    display_name: "儀式師のスレッド"
-
+    display_name: 儀式師のスレッド
   thrift:
-    display_name: "倹約のスレッド"
-    # 儀式の台座素材がまれに返ってくる（RitualManager の material_refund_chance）。
-
+    display_name: 倹約のスレッド
   salvage:
-    display_name: "解体のスレッド"
-
+    display_name: 解体のスレッド
   scholar:
-    display_name: "選書のスレッド"
-
-  # --- ルート(採取・生活)枠。効果値は基準の約1.2倍 ---
-
+    display_name: 選書のスレッド
   miner:
-    display_name: "豊鉱のスレッド"
-    # 採掘「速度」は統合版でゴーストブロックになるので絶対に触らない。ドロップ量だけ。
-
+    display_name: 豊鉱のスレッド
   angler:
-    display_name: "潮読みのスレッド"
-    # fishing-luck は stats/lore.yml で format: PERCENT なので、実機の /tf stats には
-    # 「+2%」のようにパーセントで出る。ここに生の小数(0.024)を書くと
-    # 「lore は 0.024 なのにステ画面は +2%」という別物に見える表示になるため、
-    # 他23種と同じくパーセント表記で書く(値そのものは thread-sets.yml のまま)。
-
+    display_name: 潮読みのスレッド
   harvest:
-    display_name: "実りのスレッド"
-
+    display_name: 実りのスレッド
   timber:
-    display_name: "年輪のスレッド"
-
+    display_name: 年輪のスレッド
   diligence:
-    display_name: "研鑽のスレッド"
-    # 育成中だけ挿して育ち切ったら外す「一時的に挿す枠」。
-
+    display_name: 研鑽のスレッド
   endurance:
-    display_name: "持久のスレッド"
-
+    display_name: 持久のスレッド
   gourmet:
-    display_name: "美食のスレッド"
-
+    display_name: 美食のスレッド
   slow_falling:
-    display_name: "浮遊のスレッド"
-    # 滑空する flight と違い「落ちても死なない」。洞窟・建築・崖で効く。
-    # セット効果が 3 段からなのは、1個分の効果を「装備中常時の落下速度低下」が担当しているため
-    # (既存8種のポーションスレッドと横並び)。数値は累計で、catalog.yml の表記と一致させてある。
-
-  # --- ダンジョン(戦闘)枠。効果値は基準の約1.5倍 ---
-
+    display_name: 浮遊のスレッド
+    potion-effect: slow_falling
+    potion-level: 1
   spoils:
-    display_name: "戦利品のスレッド"
-    # 「倒す力」ではなく「倒した後の取り分」。火力を上げずに周回効率だけ上げる横方向の枠。
-
+    display_name: 戦利品のスレッド
   experience:
-    display_name: "経験のスレッド"
-
+    display_name: 経験のスレッド
   mending_flesh:
-    display_name: "治癒のスレッド"
-    # health_boost は「最大HPを増やす」。こちらは「戻る速さ」で戦闘間のダウンタイムに効く。
-
+    display_name: 治癒のスレッド
   thorn:
-    display_name: "棘のスレッド"
-
+    display_name: 棘のスレッド
   concussion:
-    display_name: "昏倒のスレッド"
-    # ダメージを増やさず「通す回数」を増やす状態異常軸。
-
+    display_name: 昏倒のスレッド
   swiftcast:
-    display_name: "速攻のスレッド"
-    # 短縮対象は【アイテムの使用クールダウン】(item-cooldown を持つ武器)。
-    # Ars の詠唱コストでもアクティブスキルCTでもない。
-
+    display_name: 速攻のスレッド
   marksman:
-    display_name: "射手のスレッド"
-    # 火力に直結する arrow-piercing / velocity は避け、消費と精度だけを触る。
-    # 数値は thread-sets.yml のしきい値を積んだ【累計】(他23種と同じ書式)。
-    # 5個の 10.5% は 1段目 4.5% + 5段目 6.0% の合計であって、5段目の増分 6.0% ではない。
-    # ここだけ増分で書くと、同じ書式なのに1種類だけ意味が違う = catalog.yml の
-    # 「5個で10.5%」とも食い違う(2026-08-02 訂正)。
-
+    display_name: 射手のスレッド
   luck:
-    display_name: "幸運のスレッド"
-    # バニラのルートテーブル(quality/bonus_rolls)に効く唯一の手段。TF の loot 系ステとは別レイヤ。
-    # slow_falling と同じ理由でセット効果は 3 段から。数値は累計で、catalog.yml の表記と一致させてある。
-
-  # ------------------------------------------------------------------
-  # 2026-08-03 追加5種。儀式レシピを持たず、TF の gacha.yml の景品としてしか出ない。
-  # 効果の実体は下記2箇所で、ここには数値キーを1つも書かない:
-  #   ・1個ぶんの効果 ... thread-sets.yml の【しきい値1段目=1】(ソケット済みしか数えないので
-  #     手持ちでは発動しない)。
-  #   ・厳選ぶんの効果 ... TF stats/item-stats.yml の per-quality / random / grant-chances。
-  # 数値キーが無いスレッドは lore: を書かないと説明文が0行になるので、必ず書く。
-  # ------------------------------------------------------------------
+    display_name: 幸運のスレッド
+    potion-effect: luck
+    potion-level: 1
   perfumer:
-    display_name: "調香のスレッド"
-
+    display_name: 調香のスレッド
   apiarist:
-    display_name: "養蜂のスレッド"
-
+    display_name: 養蜂のスレッド
   herder:
-    display_name: "牧人のスレッド"
-
+    display_name: 牧人のスレッド
   appraiser:
-    display_name: "鑑識のスレッド"
-
+    display_name: 鑑識のスレッド
   excavation:
-    display_name: "削岩のスレッド"
-    # gathering-efficiency は「効率強化エンチャントのレベル」として実行時に反映される
-    # (バニラ属性の採掘速度は統合版で使えないため。TF stats/gathering-efficiency.yml 参照)。
+    display_name: 削岩のスレッド
+  blindness: {}
+  translate: {}

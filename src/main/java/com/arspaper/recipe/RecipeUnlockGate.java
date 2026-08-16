@@ -42,7 +42,7 @@ public final class RecipeUnlockGate implements Listener {
             return;
         }
 
-        if (!gate.hasRecipePermission(player, recipeId)) {
+        if (!gate.hasRecipePermission(player, gateKey(recipeId))) {
             // perk 未所持 → クラフト結果を得られないようにする
             event.getInventory().setResult(null);
         }
@@ -60,7 +60,7 @@ public final class RecipeUnlockGate implements Listener {
         String recipeId = resolveRecipeId(event.getRecipe());
         if (recipeId == null) return;
 
-        if (gate.isRecipeGated(recipeId)) {
+        if (gate.isRecipeGated(gateKey(recipeId))) {
             event.setCancelled(true);
         }
     }
@@ -71,5 +71,27 @@ public final class RecipeUnlockGate implements Listener {
             return null; // レシピ未確定 or キー無しはゲート対象外
         }
         return keyed.getKey().getKey();
+    }
+
+    /**
+     * 2件目以降のレシピ（{@code <id>_r2} 形式。{@code UnifiedRecipeLoader#recipeKey}）を
+     * 基底IDのゲート設定へ寄せる。
+     *
+     * <p>2026-08-13 に Ars 側の yml も1アイテム複数レシピを持てるようにしたが、
+     * {@code unlock-gate.yml} の {@code recipe-perks} はアイテム単位で書かれているので、
+     * 接尾辞付きのキーをそのまま引くと<b>2件目だけゲートを素通りする</b>。
+     * 完全一致を先に見て、無ければ接尾辞を落とした基底IDで引き直す
+     * （{@code foo_r2} という名前のアイテムが実在しても、完全一致が勝つので誤爆しない）。
+     */
+    private String gateKey(String recipeId) {
+        if (gate.isRecipeGated(recipeId)) return recipeId;
+        int idx = recipeId.lastIndexOf("_r");
+        if (idx <= 0) return recipeId;
+        String suffix = recipeId.substring(idx + 2);
+        if (suffix.isEmpty()) return recipeId;
+        for (int i = 0; i < suffix.length(); i++) {
+            if (!Character.isDigit(suffix.charAt(i))) return recipeId;
+        }
+        return recipeId.substring(0, idx);
     }
 }

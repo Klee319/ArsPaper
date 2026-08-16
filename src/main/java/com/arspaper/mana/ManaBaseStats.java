@@ -5,13 +5,25 @@ import com.arspaper.integration.TrinityForgeBridge;
 import java.util.OptionalDouble;
 
 /**
- * マナ初期値の唯一の読み出し口(2026-07-25 config editor T2)。
+ * マナ<b>回復</b>系5項目の唯一の読み出し口(2026-07-25 config editor T2)。
  *
- * <p>従来 {@code config.yml} の {@code mana.default-max} / {@code mana.default-regen-rate} /
- * {@code mana.regen-interval-ticks} / {@code mana.recovery.*} で設定していた初期値を、
+ * <p>従来 {@code config.yml} の {@code mana.recovery.*} で設定していた値を、
  * TrinityForge の「プレイヤー基礎ステータス」({@code combat/base-stats.yml}) へ移設した。
  * ここから読む値は常に TrinityForge 側が最新の設定の権威であり、{@link TrinityForgeBridge#manaBaseStatRaw}
  * 経由でTF未ロード時にのみ下記フォールバック定数(移設前のArsPaper既定値)へ落ちる(fail-open)。
+ *
+ * <h2>⚠ 2026-08-16: マナ基礎値3項目はここから抜けて ArsPaper config.yml へ戻った</h2>
+ * {@code mana-max-base} / {@code mana-regen-base} / {@code mana-regen-interval-ticks} の3つは
+ * <b>このクラスからは読まない</b>。真源は ArsPaper の {@code config.yml} の
+ * {@code mana.default-max} / {@code mana.default-regen-rate} / {@code mana.regen-interval-ticks} で、
+ * 読み口は {@link ManaConfig}（{@link ManaManager#getConfig()} から取る）。
+ * TF の {@code combat/base-stats.yml} は {@code stats/lore.yml} 非登録のキーを
+ * 設定エディタのどの画面にも出さないため、この3項目だけが手編集専用として取り残されていたのが理由。
+ * <b>ここに3項目の読み口を足し戻さないこと</b>(二重管理になり、どちらが効くか分からなくなる)。
+ *
+ * <p>このクラスに残るのは TF 側が真源のままの5項目:
+ * {@code mana-onhit-percent} / {@code mana-onattack-percent} / {@code mana-idle-seconds} /
+ * {@code mana-idle-bonus-percent} / {@code mana-idle-bonus-flat}。
  *
  * <p>%系(on-hit / on-attack / idle-bonus)は TF 側で PERCENT stat として保存されるため、ここで返す値は
  * 既に分数(0.03 = 3%)である。旧 {@code PERCENT_DIVISOR} による /100 補正は不要になった点に注意。
@@ -45,11 +57,12 @@ import java.util.OptionalDouble;
  *
  * <p>{@code KEY_DECLARED} の扱いはキーの性質で2群に分かれる:
  * <ul>
- *   <li><b>量的キー</b>({@code mana-max-base} / {@code mana-regen-base} /
- *       {@code mana-regen-interval-ticks} / {@code mana-idle-seconds}):
+ *   <li><b>量的キー</b>(2026-08-16 の移設後は {@code mana-idle-seconds} のみ):
  *       0 と書いてもフォールバックへ落とす。0 にすると
- *       「最大マナ0」「回復間隔0tick」「idle判定の待ち時間0秒」で機構が壊れる/意味が反転するため。
- *       <b>設定で 0 を指定することはできない</b>(TF側が 0 を捨てるので原理的に不可能)。</li>
+ *       「idle判定の待ち時間0秒」で意味が反転するため。
+ *       <b>設定で 0 を指定することはできない</b>(TF側が 0 を捨てるので原理的に不可能)。
+ *       ⚠ 残り1キーになっても {@code quantity} / {@code resolve} の false 分岐は消さないこと
+ *       (消すと {@code mana-idle-seconds} が「0＝常時idle」へ転ぶ)。</li>
  *   <li><b>回復キー</b>({@code mana-onhit-percent} / {@code mana-onattack-percent} /
  *       {@code mana-idle-bonus-percent} / {@code mana-idle-bonus-flat}):
  *       0 と書いてあれば <b>0(＝無効)</b>。これが「回復量を0にして切る」唯一の手段。</li>
@@ -75,9 +88,8 @@ public final class ManaBaseStats {
     }
 
     // 移設前の ArsPaper config.yml 既定値(TF未ロード時のみ使用するフォールバック)。
-    private static final int FALLBACK_DEFAULT_MAX = 100;
-    private static final int FALLBACK_DEFAULT_REGEN_RATE = 5;
-    private static final int FALLBACK_REGEN_INTERVAL_TICKS = 20;
+    // ※ 最大マナ/回復量/回復周期の3つは 2026-08-16 に config.yml へ戻したので、
+    //   既定値は ManaConfig.DEFAULT_MAX_MANA ほかが持つ。ここには置かない。
     private static final double FALLBACK_ON_HIT_PERCENT = 0.03;
     private static final double FALLBACK_ON_ATTACK_PERCENT = 0.03;
     private static final int FALLBACK_IDLE_SECONDS = 5;
@@ -85,23 +97,6 @@ public final class ManaBaseStats {
     private static final int FALLBACK_IDLE_BONUS_FLAT = 0;
 
     private ManaBaseStats() {
-    }
-
-    public static int defaultMax() {
-        int v = round(quantity("mana-max-base", FALLBACK_DEFAULT_MAX));
-        // 0以下は「未記載＝バニラのまま」とみなす(base-stats.yml のヘッダ規約と一致させる)。
-        // 現状はTF側が0を捨てるためここへ0は届かないが、将来TFが0を保持するようになっても
-        // 「最大マナ0で魔法が一切使えない」状態へ黙って落ちないようにする保険。
-        return v > 0 ? v : FALLBACK_DEFAULT_MAX;
-    }
-
-    public static int defaultRegenRate() {
-        return round(quantity("mana-regen-base", FALLBACK_DEFAULT_REGEN_RATE));
-    }
-
-    public static int regenIntervalTicks() {
-        int v = round(quantity("mana-regen-interval-ticks", FALLBACK_REGEN_INTERVAL_TICKS));
-        return v > 0 ? v : FALLBACK_REGEN_INTERVAL_TICKS;
     }
 
     /** 分数[0,1]で返す(例 0.03 = 3%)。ymlに 0 と書いてあれば 0(無効)。 */

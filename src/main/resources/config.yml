@@ -13,13 +13,25 @@
 # form-cooldowns / mana / enchantments / mob-drops / loot が
 # 全て「既定値のまま」で動いていた。
 #
-# 復旧時に 6b9e66a 版へ単純に戻すことはしていない —— マナ基礎値
-# (default-max / default-regen-rate / regen-interval-ticks / recovery.*) と
+# 復旧時に 6b9e66a 版へ単純に戻すことはしていない —— マナ基礎値と
 # ars-magic の EXP、geyser の CMD 設定は TrinityForge 側へ移管済みで、
 # ここに書いても効かない「死にキー」になるため意図的に除外した。
-#   マナ基礎値の真源 = TrinityForge combat/base-stats.yml の
-#     mana-max-base / mana-regen-base / mana-regen-interval-ticks /
-#     mana-onhit-percent / mana-onattack-percent / mana-idle-* (ManaBaseStats 経由)
+#
+# 【2026-08-16 訂正】上のうち マナ基礎値3項目
+# (mana.default-max / mana.default-regen-rate / mana.regen-interval-ticks) は
+# このファイルへ戻した。もう死にキーではなく、ここが真源である。
+# 理由: TrinityForge の combat/base-stats.yml は stats/lore.yml に登録の無いキーを
+# 設定エディタのどの画面にも出さないため、この3項目だけが「手編集でしか変えられない設定」
+# として取り残されていた。今は設定エディタの「ArsPaper 全体設定 (config)」画面から編集できる。
+# 旧キー(TrinityForge combat/base-stats.yml の mana-max-base / mana-regen-base /
+# mana-regen-interval-ticks)は無視される。TF 側が起動時に警告を出すので、
+# 稼働中サーバの base-stats.yml に残っていたら消してよい。
+#
+#   マナ基礎値3項目の真源 = このファイルの mana: セクション(下記)
+#   マナ回復5項目の真源   = TrinityForge combat/base-stats.yml の
+#     mana-onhit-percent / mana-onattack-percent / mana-idle-seconds /
+#     mana-idle-bonus-percent / mana-idle-bonus-flat (ManaBaseStats 経由)
+#     ※ こちらは移設していない。マナ設定が2箇所に分かれている点に注意。
 #   ARS_MAGIC の EXP  = TrinityForge stats/skill-exp.yml
 #
 # 設定リファレンス(本文コメント移設先): docs/config-reference/arspaper/config.md
@@ -41,27 +53,23 @@ form-cooldowns:
   linger: 0
   wall: 0
 mana:
+  # 最大マナの土台(全プレイヤー共通)。グリフ解放・防具・スレッド・エンチャント・
+  # スキルツリー由来の加算はすべてこの値の上に乗る。/ars status の「基本」行に出る値。
+  # 0 以下を書くと 1 として扱う(最大マナ0だと魔法が一切撃てないため)。
+  default-max: 100
+  # 1インターバル(下の regen-interval-ticks)あたりの自然回復量。
+  # 0 にすると自然回復が止まる(被弾/与ダメ/非詠唱ボーナスによる回復は別枠で残る)。
+  default-regen-rate: 5
+  # 自然回復の周期(tick)。20 = 1秒。小さいほど回復が細かく速くなる。
+  # ⚠ 変更にはサーバ再起動が必要（/ars reload では変わらない）。
+  #    回復タスクは起動時にこの周期を焼き込んで登録するため。
+  #    /ars status の表示は「今動いている周期」なので、再起動するまで旧値のまま出る。
+  # 0 以下を書くと 1 として扱う(0 tick 周期はタスクが壊れるため)。
+  regen-interval-ticks: 20
   per-glyph-unlock-bonus: 5
   max-percent-cap: 100
   source-auto-consume:
-    # 自動消費のクールタイム(秒)。0以下でCT無し(2026-08-14 追加)。
-    # スキルツリー ars_smithing の A-2「ソースベリー活用」の説明は当初から「100マナ/10CT」だったが、
-    # CT判定は実装されておらずマナ不足のたびに無制限に変換できていた。既定の10はその説明に合わせた値。
-    # CT中は変換が起きないので、従来の「対象アイテム不足」と同じくマナ不足で詠唱が不発になる。
-    # ここは items の各行で cooldown-seconds を省略したときの既定値。
     cooldown-seconds: 10
-    # 変換対象アイテム。キーは Ars カスタムアイテムid または TrinityForge カタログid。
-    # 先頭の "custom:" は付けても付けなくてもよい(付いていれば読み込み時に落とす)。
-    # 設定エディタのアイテム選択UIはカスタム品を "custom:" 付きで書き出すので、
-    # 出荷値もそれに合わせておく(合わせないと editor 上で「候補外」表示になる)。
-    #
-    # 2種類の記法を書ける:
-    #   source_berry: 100          … マナ変換量のみ。CTは上の cooldown-seconds
-    #   source_berry:              … アイテムごとにCTを持たせる(2026-08-14 追加)
-    #     mana: 100
-    #     cooldown-seconds: 5      … 省略で上の既定値。0 は「このアイテムはCT無し」
-    #
-    # CTはアイテムごとに独立して進む。ソースベリーを使った直後でも別アイテムは即使える。
     items:
       custom:source_berry:
         mana: 100
@@ -79,9 +87,9 @@ enchantments:
     - 50
   max-level: 3
 mob-drops:
-  warden-echo-shard: false
+  warden-echo-shard: true
   warden-echo-shard-min: 0
-  warden-echo-shard-max: 2
+  warden-echo-shard-max: 1
 pvp:
   enabled: true
 cast-durability:

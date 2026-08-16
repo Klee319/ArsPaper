@@ -64,7 +64,8 @@ jars:
   # 【累積ソースの見立て】(儀式コスト + 素材の作成に要したソースを積み上げた概算)
   #   source_shard 100 → source_jar_ii 900 → source_crystal 3,300 → source_jar_iii 26,100
   #   → source_condenser 86,400 → source_reservoir 671,700 → source_engine 1,691,200
-  #   → source_singularity_jar 1,043万 → infinity_source_core 約1億
+  #   → source_vault 約1,000万 → source_singularity_jar 約2,300万 → infinity_source_core 約1.2億
+  #   (2026-08-16 に source_vault を挟んだぶん、最上位までの積み上げが約1,043万 → 約2,300万へ増えた)
   #   触媒側 (source_shard 等) は materials.yml に定義。燃やしたときの点数は sourcelinks.yml。
   #
   # 【バランスの調整レバー】capacity と recipe.source の2つだけ。触媒の「燃やすと何点か」は
@@ -129,6 +130,32 @@ jars:
       result: custom:source_reservoir
       type: shapeless
       ingredients: []
+  # 【source_vault を挟んだ理由 (2026-08-16)】
+  #   ここまでの段は 2.5倍 → 5倍 → 8倍 と伸びていたのに、貯水槽(2,000,000)から
+  #   特異点の壺(50,000,000)だけが<b>25倍</b>で、儀式コストも 250,000 → 2,000,000 の1段しか無かった。
+  #   つまり「貯水槽をひたすら並べる」だけで最後の壺まで届いてしまい、階梯の最後だけ
+  #   建築パズル(増やす vs 替える)が成立していなかった。5倍 x 5倍の2段に割って、
+  #   最後の1段を「材料は同じだが桁がひとつ重い」壁にする。
+  #   ⚠ 特異点の壺の core-item をここへ差し替えているので、この段を消すなら
+  #     core-item も custom:source_reservoir へ戻すこと(戻し忘れると最上位が作成不能になる)。
+  source_vault:
+    material: DECORATED_POT
+    display-name: "&1深淵の櫃"
+    custom-model-data: 200008
+    capacity: 10000000
+    lore:
+      - 底の見えない櫃。注いだ端から沈んでいく
+      - 容量 10,000,000
+    recipe:
+      method: ritual
+      core-item: custom:source_reservoir
+      pedestal-items:
+        - custom:source_engine x4
+        - custom:source_gem_block x4
+      source: 2000000
+      result: custom:source_vault
+      type: shapeless
+      ingredients: []
   source_singularity_jar:
     material: DECORATED_POT
     display-name: "&5特異点の壺"
@@ -139,11 +166,11 @@ jars:
       - 容量 50,000,000
     recipe:
       method: ritual
-      core-item: custom:source_reservoir
+      core-item: custom:source_vault
       pedestal-items:
         - custom:source_engine x4
         - custom:tf_core_jewelry
-      source: 2000000
+      source: 10000000
       result: custom:source_singularity_jar
       type: shapeless
       ingredients: []
