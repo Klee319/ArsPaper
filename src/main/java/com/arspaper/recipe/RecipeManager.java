@@ -95,17 +95,42 @@ public class RecipeManager {
 
         NamespacedKey nsKey = new NamespacedKey(plugin, data.id());
 
-        // 全素材を事前解決（1つでも失敗したらレシピ登録をスキップ）
+        // 素材を事前解決（1つでも失敗したらレシピ登録をスキップ）。
+        //
+        // ⚠ 走査するのは ingredients マップではなく<shape に実際に現れる文字>のほう(2026-08-16)。
+        // 以前は ingredients を丸ごと回していたため、shape が使っていない残骸キーが1つでもあると
+        // そのレシピが丸ごと登録されなかった。実害: ミートコア(core_meat)の shape は adb/cec/bda で
+        // a〜e しか使っていないのに、旧版の名残の f〜i が残っており、その中の
+        // custom:compressed_cooked_beef_3x(実在しないid)のせいでレシピごと消えていた
+        // ── ログには「圧縮ステーキが無い」としか出ないので、実際には使っていない素材の名前が
+        // 原因として表示され続けるという最悪の誤誘導になっていた。
+        //
+        // shape 側から引くと、未使用キーは自然に無視されつつ<typo の検出力は上がる>:
+        // ingredients 側の文字を打ち間違えれば「shape の文字に対応する素材が無い」で必ず落ちる。
+        // 同じ流儀は uniformIngredientValue(逆レシピ)が既に採用しているので、そちらへ揃える。
+        //
+        // 未使用キーを黙って無視するのは仕様: レシピの素材は shape が決めるものであって、
+        // ingredients マップに書いてあるだけの文字はどのスロットにも対応しない(=レシピの一部ではない)。
+        // なお Bukkit の ShapedRecipe#setIngredient は shape に無い文字を渡すと例外を投げるので、
+        // 未使用キーを解決できてしまった場合は旧実装だとそこで落ちていた(二重に壊れていた)。
         Map<Character, RecipeChoice> resolvedIngredients = new HashMap<>();
         boolean allResolved = true;
-        for (Map.Entry<String, String> entry : data.ingredients().entrySet()) {
-            RecipeChoice choice = resolveIngredient(entry.getValue(), data.id());
+        for (Map.Entry<Character, String> entry : shapeSymbolIngredients(data).entrySet()) {
+            char symbol = entry.getKey();
+            String ingredient = entry.getValue();
+            if (ingredient == null) {
+                plugin.getLogger().warning("Skipping shaped recipe " + data.id()
+                    + ": shape uses '" + symbol + "' but ingredients has no entry for it");
+                allResolved = false;
+                continue;
+            }
+            RecipeChoice choice = resolveIngredient(ingredient, data.id());
             if (choice == null) {
                 plugin.getLogger().warning("Skipping shaped recipe " + data.id()
-                    + ": ingredient '" + entry.getKey() + "'=" + entry.getValue() + " not found");
+                    + ": ingredient '" + symbol + "'=" + ingredient + " not found");
                 allResolved = false;
             } else {
-                resolvedIngredients.put(entry.getKey().charAt(0), choice);
+                resolvedIngredients.put(symbol, choice);
             }
         }
         if (!allResolved) return;
@@ -260,6 +285,35 @@ public class RecipeManager {
      * shaped の全非空スロット(shapeless は全ingredient値)が単一の素材文字列に揃っているときだけ
      * その値を返す。1つでも異なる/欠損があれば empty(=reversible対象外)。
      */
+    /**
+     * shaped レシピが<実際に必要とする素材>を「shape に現れる順」で symbol -&gt; 素材文字列 に写す。
+     * 値が {@code null} の項目は「shape が使っているのに ingredients に対応する項目が無い」文字。
+     *
+     * <p>ingredients マップ側を回さないのが要点(2026-08-16)。shape が使っていない残骸キーは
+     * どのスロットにも対応しない = レシピの一部ではないので、解決対象から外す。
+     * 旧実装は ingredients を丸ごと回していたため、残骸キーが1つでも壊れているとレシピが
+     * 丸ごと登録されず、しかもログには<使ってもいない素材>の名前が原因として出ていた
+     * (ミートコアが「圧縮ステーキが無い」で消えていた実例)。
+     * 逆に shape 側から引くと typo の検出力は上がる — ingredients の文字を打ち間違えれば
+     * 対応する shape の文字が null になって必ず落ちる。
+     */
+    static java.util.LinkedHashMap<Character, String> shapeSymbolIngredients(
+            UnifiedRecipeLoader.WorkbenchRecipeData data) {
+        java.util.LinkedHashMap<Character, String> map = new java.util.LinkedHashMap<>();
+        for (String row : data.shape()) {
+            if (row == null) {
+                continue;
+            }
+            for (char symbol : row.toCharArray()) {
+                if (symbol == ' ' || map.containsKey(symbol)) {
+                    continue;
+                }
+                map.put(symbol, data.ingredients().get(String.valueOf(symbol)));
+            }
+        }
+        return map;
+    }
+
     static Optional<String> uniformIngredientValue(UnifiedRecipeLoader.WorkbenchRecipeData data) {
         List<String> used = new ArrayList<>();
         if ("shaped".equalsIgnoreCase(data.type())) {

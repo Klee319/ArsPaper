@@ -2622,16 +2622,18 @@ materials:
         - adb
         - cec
         - bda
+      # shape が使うのは a〜e だけ。以前ここに旧版の名残 f〜i が残っており、その中の
+      # custom:compressed_cooked_beef_3x が実在しないidだったせいで、起動のたびに
+      # 「圧縮ステーキが見つからない」と警告が出てミートコアのレシピごと登録されていなかった
+      # (実際には使っていない素材の名前が原因として表示されるので、追いかけると必ず迷子になる)。
+      # ローダー側は 2026-08-16 に「shape に現れる文字だけを解決する」へ直したので未使用キーは
+      # 無害になったが、同じ勘違いを次の人にさせないためデータ側からも落とす。
       ingredients:
         a: custom:beef_3x
         b: custom:porkchop_3x
         c: custom:mutton_3x
         d: custom:chicken_3x
         e: custom:rabbit_3x
-        f: custom:piglin_brute_plate
-        g: custom:compressed_cooked_beef_3x
-        h: custom:ravager_hide
-        i: custom:compressed_cooked_beef_3x
   core_vegetable:
     base_material: WHEAT
     custom_model_data: 5102
