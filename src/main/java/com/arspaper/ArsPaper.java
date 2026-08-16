@@ -79,7 +79,6 @@ public class ArsPaper extends JavaPlugin {
     private GlyphConfig glyphConfig;
     private com.arspaper.item.FunctionalItemConfig functionalItemConfig;
     private SpellCaster spellCaster;
-    private com.arspaper.spell.UnlockedGlyphs unlockedGlyphs;
     private MaterialConfigManager materialConfigManager;
     private ArmorManaListener armorManaListener;
     private ThreadConfig threadConfig;
@@ -251,9 +250,10 @@ public class ArsPaper extends JavaPlugin {
         spellRegistry = new SpellRegistry();
         registerDefaultGlyphs();
 
-        // Glyph unlock is handled by glyphs.yml tier gates + TrinityForge skilltree glyph-gate perks.
-        // Keep UnlockedGlyphs for existing PDC data and UsageGate / admin command paths.
-        unlockedGlyphs = new com.arspaper.spell.UnlockedGlyphs(this);
+        // グリフ解放は glyphs.yml の tier ゲート＋TrinityForge skilltree の glyph-gate perk が担当する。
+        // 2026-08-16: UnlockedGlyphs（アイテム右クリック解放用の集合）は削除した。入口は 2026-07-23 に
+        // 撤去済みで呼び出し元がゼロだったうえ、PDC キーが筆記台の写本集合と衝突していたため。
+        // 詳細は UsageGate の javadoc。
 
         // エンチャント定数読み込み
         com.arspaper.enchant.ArsEnchantments.loadConfig(getConfig());
@@ -266,7 +266,7 @@ public class ArsPaper extends JavaPlugin {
         worldSettingsManager = new com.arspaper.world.WorldSettingsManager(this);
 
         // スペルキャスター（シングルトン）
-        spellCaster = new SpellCaster(manaManager, unlockedGlyphs);
+        spellCaster = new SpellCaster(manaManager);
 
         // 素材設定マネージャー
         materialConfigManager = new MaterialConfigManager(this);

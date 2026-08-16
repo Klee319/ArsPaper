@@ -47,9 +47,9 @@ public class SpellCaster {
     /** 使用ゲート（perk所持→glyph使用許可）。 */
     private final UsageGate usageGate;
 
-    public SpellCaster(ManaManager manaManager, UnlockedGlyphs unlockedGlyphs) {
+    public SpellCaster(ManaManager manaManager) {
         this.manaManager = manaManager;
-        this.usageGate = new UsageGate(ArsPaper.getInstance(), unlockedGlyphs);
+        this.usageGate = new UsageGate(ArsPaper.getInstance());
         reloadFormCooldowns();
     }
 

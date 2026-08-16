@@ -22,18 +22,33 @@ import java.util.Set;
  * yml/TF双方に対応perkが無い glyph はゲート無し（自由使用）。
  *
  * TrinityForge 未ロード時は安全側に倒し、常に使用可とする。
+ *
+ * <p><b>「アイテム右クリックによる恒久解放」の OR ルートは存在しない（2026-08-16 撤去）。</b>
+ * かつて UnlockedGlyphs クラスを OR 参照していたが、次の理由で丸ごと削除した。
+ * <ul>
+ *   <li>その入口である glyph-unlock-items.yml の右クリック解放は 2026-07-23 に削除済みで、
+ *       {@code UnlockedGlyphs#add} の呼び出し元は fork の全 git 履歴でゼロだった。</li>
+ *   <li>UnlockedGlyphs は自前構築した PDC キーが結果的に {@code arspaper:unlocked_glyphs}
+ *       ＝<b>筆記台の写本集合と同一キー</b>になっており、しかも 0x1F 区切りという
+ *       筆記台側(JSON)と非互換な形式で書いていた。呼び出し元が無いので実害は出ていなかったが、
+ *       誰かが add() を配線した瞬間に全プレイヤーの写本集合を壊す装填済みの罠だった。</li>
+ *   <li>そのうえ OR 判定は<b>復活させてはいけない</b>。このメソッドへ到達する経路
+ *       （SpellCaster#castSpell / SpellCraftingGui の描画・クリック・保存）は、いずれも
+ *       <b>写本解放済みであることを先に確定させてから</b>ここへ入る。つまり写本集合を
+ *       OR 参照すると常に true になり、UNLOCK Model Y（入手は自由・使用に perk が必要）が
+ *       全経路で無効化される。「形式を揃えて直す」は修正ではなく権限バイパスの混入だった。</li>
+ * </ul>
+ * 恒久解放を将来復活させるなら、{@code arspaper:unlocked_glyphs} は<b>絶対に再利用せず</b>、
+ * 専用キーに裸グリフキーで保存して、このクラスだけが読む直交した集合にすること。
  */
 public final class UsageGate {
 
     private final JavaPlugin plugin;
-    /** アイテム右クリックによる恒久解放グリフ集合（perkゲートとは独立したORルート）。 */
-    private final UnlockedGlyphs unlockedGlyphs;
     /** glyphキー → 使用に必要なperk ID（不変・volatileでアトミック差し替え）。 */
     private volatile Map<String, String> glyphPerks = Map.of();
 
-    public UsageGate(JavaPlugin plugin, UnlockedGlyphs unlockedGlyphs) {
+    public UsageGate(JavaPlugin plugin) {
         this.plugin = plugin;
-        this.unlockedGlyphs = unlockedGlyphs;
         reload();
     }
 
@@ -67,7 +82,7 @@ public final class UsageGate {
      * - yml(usage-gate.yml)由来perk ∪ TF(skilltree dedicated-effect)由来perk集合が
      *   両方とも空: ゲート無し → true
      * - 上記union集合とプレイヤーのheldPerksが交わる: true
-     * - 交わらない場合でもアイテム解放(UnlockedGlyphs)済みなら true
+     * - 交わらない: false（写本済みかどうかは見ない。見ると全経路で素通りになる。クラスjavadoc参照）
      * - TrinityForge 未ロード等で確認できない場合: 安全側に倒し true
      *
      * @param player   対象プレイヤー
@@ -96,8 +111,9 @@ public final class UsageGate {
                     }
                 }
             }
-            // perkゲート(yml∪TF)を満たさない場合でも、アイテム解放による恒久解放(OR)を確認する。
-            return unlockedGlyphs != null && unlockedGlyphs.contains(player, glyphKey);
+            // perkゲート(yml∪TF)を満たさないので不許可。
+            // ここへ「写本済みなら許可」を足してはいけない(クラスjavadoc参照)。
+            return false;
         } catch (Throwable t) {
             // TrinityForge 未ロード/参照不可時、または本fork独自PDC参照不可時も
             // 使用を妨げない（LinkageError 等も安全側に倒す）
