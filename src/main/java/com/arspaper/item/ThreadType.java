@@ -163,7 +163,55 @@ public enum ThreadType {
     APPRAISER("appraiser", "鑑識のスレッド", 300044, NamedTextColor.GOLD,
         0, 0, null, 0, 0, 0, 0, Material.PRIZE_POTTERY_SHERD),
     EXCAVATION("excavation", "削岩のスレッド", 300045, NamedTextColor.DARK_GRAY,
-        0, 0, null, 0, 0, 0, 0, Material.NETHERITE_UPGRADE_SMITHING_TEMPLATE);
+        0, 0, null, 0, 0, 0, 0, Material.NETHERITE_UPGRADE_SMITHING_TEMPLATE),
+
+    // ================================================================
+    // 【TFステ専用スレッド 6種】(2026-08-18 追加)
+    //
+    // ■ なぜ後から足したのか
+    //   この6種は TrinityForge の catalog.yml に CMD 100023〜100028 で前から存在し、
+    //   Ars の loot-tables.yml(4ダンジョン)と TF の gacha.yml から実際に配られていたが、
+    //   **ThreadType にも threads.yml にも定義が無かった**。
+    //   ThreadGui#isEffectThread は arspaper:thread_item_type PDC → ThreadType.fromId で
+    //   装着可否を決めるので、この6種は「ドロップするのに防具へ永久に挿せない」状態だった
+    //   (装着できない=効果は装着時にしか乗らないので、実質死んでいた)。
+    //   ログにも何も出ないので、ShippedCatalogExternalSourceDriftTest が赤いことでしか
+    //   気づけなかった。
+    //
+    // ■ 効果の実体はここには無い
+    //   上の45種と違い、効果は TF 側 stats/item-stats.yml の STRING#1000xx が持つ
+    //   (loot-luck / gacha-rate-bonus / craft-roll-up-bonus / craft-roll-down-reduction /
+    //   move-speed / hidden-saturation-bonus)。ArmorManaListener が
+    //   TrinityForgeBridge.resolveThreadStats(baseMaterial, cmd, ...) で引くため、
+    //   **baseMaterial と customModelData が item-stats のキーと一致していることが唯一の要件**。
+    //   マナ/ポーション/飛行の数値は全部0で正しい。
+    //   数値キーを持たないので getEffectLore() は0行になる ──
+    //   threads.yml 側に必ず lore: を書くこと(thread-sets 系スレッドと同じ扱い)。
+    //
+    // ■ baseMaterial が STRING で揃っているのは意図的
+    //   catalog.yml / item-stats.yml / resourcepack の cmd-registry.json が既に
+    //   STRING#1000xx で登録済みなので、見た目を変えないためにそのまま合わせる。
+    //   CMD が別なのでモデルは6種それぞれ別に解決される。
+    //
+    // ■ id の禁止事項は上の45種と同じ
+    //   "hit" を含む id を作らない(ThreadConfig の recovery 振り分けが文字列判定)。
+    //   better_fortune / gacha / role_luck / role_effeciency / blindness / translate は
+    //   いずれも該当しない。role_effeciency の綴りは catalog.yml 側の既存IDに合わせている
+    //   (typo だが配布済みなので直せない)。
+    // ================================================================
+    BETTER_FORTUNE("better_fortune", "開運のスレッド", 100023, NamedTextColor.RED,
+        0, 0, null, 0, 0, 0, 0, Material.STRING),
+    // catalog.yml の表示名は1文字ずつ虹色だが enum は単色しか持てないので GOLD で代表する。
+    GACHA("gacha", "ガチャスレッド", 100024, NamedTextColor.GOLD,
+        0, 0, null, 0, 0, 0, 0, Material.STRING),
+    ROLE_LUCK("role_luck", "ロール運のスレッド", 100025, NamedTextColor.WHITE,
+        0, 0, null, 0, 0, 0, 0, Material.STRING),
+    ROLE_EFFECIENCY("role_effeciency", "ロール効率のスレッド", 100026, NamedTextColor.WHITE,
+        0, 0, null, 0, 0, 0, 0, Material.STRING),
+    BLINDNESS("blindness", "崩命のスレッド", 100027, NamedTextColor.WHITE,
+        0, 0, null, 0, 0, 0, 0, Material.STRING),
+    TRANSLATE("translate", "流転のスレッド", 100028, NamedTextColor.WHITE,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
 
     private final String id;
     private final String displayName;

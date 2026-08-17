@@ -182,5 +182,44 @@ threads:
     display_name: 鑑識のスレッド
   excavation:
     display_name: 削岩のスレッド
-  blindness: {}
-  translate: {}
+
+  # ============================================================
+  # TFステ専用スレッド 6種 (2026-08-18)
+  # ============================================================
+  # 効果の実体は TrinityForge 側 stats/item-stats.yml の STRING#100023〜100028 にある。
+  # ここには数値キーを1つも書かない(書くと Ars 側とTF側で二重に効く)。
+  # そのため getEffectLore() は0行になるので、説明文は必ず lore: で書く。
+  #
+  # ⚠ blindness / translate は以前ここに `{}` だけで置かれていたが、ThreadType に定数が
+  #   無かったため ThreadGui#isEffectThread の ThreadType.fromId が null を返し、
+  #   防具に挿せないままだった。定数を足したので今回から機能する。
+  better_fortune:
+    display_name: 開運のスレッド
+    lore:
+      - <gold>幸運が上がる</gold>
+      - <color:dark_purple>いいことがおきますように</color>
+  gacha:
+    display_name: ガチャスレッド
+    lore:
+      - <gold>ガチャの当たり確率が上がる</gold>
+      - <color:dark_purple>7777777</color>
+  role_luck:
+    display_name: ロール運のスレッド
+    lore:
+      - <gold>クラフト時のステータス上振れが増える</gold>
+      - <color:dark_purple>レッツ上振れ！</color>
+  role_effeciency:
+    display_name: ロール効率のスレッド
+    lore:
+      - <gold>クラフト時のステータス下振れが減る</gold>
+      - <color:dark_purple>効率よく生きよう</color>
+  blindness:
+    display_name: 崩命のスレッド
+    lore:
+      - <gold>移動速度が上がる</gold>
+      - <color:dark_purple>虫の息の君は何を望む？</color>
+  translate:
+    display_name: 流転のスレッド
+    lore:
+      - <gold>隠し満腹度の回復が増える</gold>
+      - <color:dark_purple>直りやすくなっただろう？</color>
