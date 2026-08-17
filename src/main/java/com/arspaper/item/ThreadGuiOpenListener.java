@@ -100,8 +100,14 @@ public final class ThreadGuiOpenListener implements Listener {
     /** 「直近にジャンプ」と認める猶予。ジャンプ→着地→スニーク→右クリックが無理なく入る幅。 */
     private static final long JUMP_WINDOW_MS = 1_500L;
 
-    /** プレイヤーごとの最終ジャンプ時刻(ms)。{@link #jumpedRecently} が読む。 */
-    private final Map<UUID, Long> lastJumpAt = new ConcurrentHashMap<>();
+    /**
+     * プレイヤーごとの最終ジャンプ時刻(ms)。{@link #jumpedRecently} が読む。
+     *
+     * <p>static なのは {@link com.arspaper.spell.SpellBindListener} から
+     * {@link #wantsThreadGui} を引くため(2026-08-17)。プラグイン内でこのリスナーは1つだけなので
+     * インスタンス状態と意味は変わらない。
+     */
+    private static final Map<UUID, Long> LAST_JUMP_AT = new ConcurrentHashMap<>();
 
     public ThreadGuiOpenListener(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -204,7 +210,7 @@ public final class ThreadGuiOpenListener implements Listener {
     public void onQuit(PlayerQuitEvent event) {
         hintPolicy.forget(event.getPlayer().getUniqueId());
         pendingSelectHint.remove(event.getPlayer().getUniqueId());
-        lastJumpAt.remove(event.getPlayer().getUniqueId());
+        LAST_JUMP_AT.remove(event.getPlayer().getUniqueId());
     }
 
     /**
@@ -276,11 +282,33 @@ public final class ThreadGuiOpenListener implements Listener {
      *   <li><b>それ以外のスレッド枠付き装備</b>: <b>下を向いている + 直近にジャンプした</b>の両方。</li>
      * </ul>
      */
-    private boolean isOpenGesture(Player player, ItemStack item) {
+    private static boolean isOpenGesture(Player player, ItemStack item) {
         if (isArmorPiece(item)) {
             return true;
         }
         return isLookingDown(player) && jumpedRecently(player);
+    }
+
+    /**
+     * <b>この右クリックはスレッド GUI を開くための操作か</b>(2026-08-17、
+     * ユーザー報告「崩命スレッドが杖につけられない」)。
+     *
+     * <p><b>なぜ要るか</b>: バインド済みの杖・武器では {@link com.arspaper.spell.SpellBindListener}
+     * (NORMAL 優先度)がスニークも視線も見ずに<b>無条件で右クリックをキャンセルして詠唱する</b>。
+     * このリスナーは HIGH で走り「キャンセル済み = 呪文が出た」を見て降りるので、
+     * <b>バインド済みの杖ではジェスチャーが一度も成立しなかった</b>。杖はバインドして使うものなので、
+     * 実質「杖にはスレッドを装着できない」状態だった(スレッドの種類とは無関係で、
+     * バインド済みの剣・弓でも同じ)。
+     *
+     * <p>そこで詠唱側にこの判定を渡し、<b>ジェスチャーが完全に成立しているときだけ</b>詠唱を見送らせる。
+     * 条件は「下向き + 直近ジャンプ + スニーク + スレッド枠が正」の全部なので、
+     * 通常の詠唱操作(前を向いて右クリック)は一切奪わない。
+     */
+    public static boolean wantsThreadGui(Player player, ItemStack item) {
+        if (player == null || item == null || item.getType().isAir() || !player.isSneaking()) {
+            return false;
+        }
+        return isOpenGesture(player, item) && effectiveThreadSlots(item, player) > 0;
     }
 
     /**
@@ -306,8 +334,8 @@ public final class ThreadGuiOpenListener implements Listener {
      * 奪ってしまう。<b>直前にジャンプを挟む</b>のは意図しないと成立しない組み合わせで、かつ
      * Bedrock/Geyser でも確実に入力できる(スラッシュコマンドや視点の微調整より易しい)。
      */
-    private boolean jumpedRecently(Player player) {
-        Long at = lastJumpAt.get(player.getUniqueId());
+    private static boolean jumpedRecently(Player player) {
+        Long at = LAST_JUMP_AT.get(player.getUniqueId());
         return at != null && System.currentTimeMillis() - at <= JUMP_WINDOW_MS;
     }
 
@@ -317,7 +345,7 @@ public final class ThreadGuiOpenListener implements Listener {
      */
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onJump(com.destroystokyo.paper.event.player.PlayerJumpEvent event) {
-        lastJumpAt.put(event.getPlayer().getUniqueId(), System.currentTimeMillis());
+        LAST_JUMP_AT.put(event.getPlayer().getUniqueId(), System.currentTimeMillis());
     }
 
     private static int effectiveThreadSlots(ItemStack item, Player player) {

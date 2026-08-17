@@ -52,9 +52,21 @@ public class SpellBindListener implements Listener {
         Integer spellSlot = pdc.get(ItemKeys.BOUND_SPELL_SLOT, PersistentDataType.INTEGER);
         if (bookUuid == null || spellSlot == null) return;
 
-        event.setCancelled(true);
-
         Player player = event.getPlayer();
+
+        // ⚠️ 2026-08-17 修正 (ユーザー報告「崩命スレッドが杖につけられない」):
+        // ここは【スニークも視線も見ずに】無条件でキャンセルして詠唱していた。
+        // スレッド GUI の入口(ThreadGuiOpenListener)は HIGH で走り「キャンセル済み = 呪文が出た」を
+        // 見て降りるので、バインド済みの杖ではジェスチャーが一度も成立しない
+        // = 杖にスレッドを装着する手段が実質なかった(スレッドの種類とは無関係で、
+        // バインド済みの剣・弓でも同じ)。GUI を開くジェスチャーが【完全に成立している】ときだけ
+        // 詠唱を見送る。条件は「下向き + 直近ジャンプ + スニーク + スレッド枠が正」の全部なので、
+        // 前を向いて右クリックする通常の詠唱は一切奪わない。
+        if (com.arspaper.item.ThreadGuiOpenListener.wantsThreadGui(player, item)) {
+            return;
+        }
+
+        event.setCancelled(true);
 
         // プレイヤーのインベントリから該当UUIDのスペルブックを検索
         ItemStack bookItem = findBookByUuid(player, bookUuid);
