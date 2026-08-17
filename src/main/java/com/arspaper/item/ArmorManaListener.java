@@ -547,10 +547,16 @@ public class ArmorManaListener implements Listener {
                 ));
                 // 所有権台帳を更新: このタイプは今回スレッドが実際に付与したと記録する。
                 owned.put(type, desiredAmplifier);
-            } else if (owned.remove(type) != null && isThreadGranted(existing)) {
-                // 台帳に記録があった(=過去に自分が付与した)場合に限り、かつ現在も無期限のまま
-                // (=他ソースに上書きされていない)場合だけ剥がす。台帳に記録が無い無期限効果
-                // (再起動を跨いだ/プレイヤー自身・他プラグインが付けた)は絶対に剥がさない(W-54)。
+            } else if (ThreadPotionOwnership.mayRemoveGrantedPotion(
+                    owned.remove(type), existing != null,
+                    existing != null && isThreadGranted(existing),
+                    existing == null ? Integer.MIN_VALUE : existing.getAmplifier())) {
+                // 剥がす条件は {@link ThreadPotionOwnership#mayRemoveGrantedPotion} が正本:
+                // 台帳に付与記録があり、現在も無期限で、かつ amplifier が記録と一致する場合だけ。
+                // 台帳に記録が無い無期限効果(再起動を跨いだ/プレイヤー自身・他プラグインが付けた)は
+                // 絶対に剥がさない(W-54 第1波)。amplifier が違うものも剥がさない ──
+                // 同じ型・無期限のまま他ソースに上書きされた効果を消していたのが第2波の実害
+                // (「幸運のエフェクトが消える」)。
                 player.removePotionEffect(type);
             }
         }

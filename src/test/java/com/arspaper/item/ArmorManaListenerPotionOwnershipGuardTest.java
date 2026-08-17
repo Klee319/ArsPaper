@@ -10,18 +10,20 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * W-54(2026-08-18)の回帰ガード: 無期限LUCK等プレイヤー自身/管理コマンドが付けた効果が、
- * スレッドの再計算(装備変更のたびに走る{@code recalculateArmorBonus})で誤って剥がされないこと。
+ * W-54 の回帰ガード: プレイヤー自身/管理コマンドが付けた効果が、スレッドの再計算
+ * (装備変更のたびに走る {@code recalculateArmorBonus})で誤って剥がされないこと。
  *
- * <p><b>直っていたバグ</b>: 旧実装の {@code isThreadGranted}(無期限かどうかだけを見る)は
+ * <p><b>第1波(2026-08-18)</b>: 旧実装の {@code isThreadGranted}(無期限かどうかだけを見る)は
  * 「自分が付けたか」を判定できず、{@code /effect give @s luck infinite} のようなプレイヤー起因の
  * 無期限効果まで「スレッドが付けたもの」と誤認して {@code removePotionEffect} していた。
- * 修正は「実際に自分(スレッド)がそのタイプへ付与したという記録」をプレイヤーごとの所有権台帳
- * ({@code threadGrantedPotions})へ持ち、除去は「台帳に記録があり、かつ現在も無期限のまま」の
- * 場合だけに限定する。
+ * 修正は付与記録を持つ所有権台帳({@code threadGrantedPotions})。
  *
- * <p>このフォークのテスト基盤は Bukkit ランタイム/MockBukkit を持たないため、
- * {@link ArmorManaListenerThreadPotionGuardTest} と同じくソースの静的走査でガード条件を固定する。
+ * <p><b>第2波(同日、ユーザー報告「幸運のエフェクトが消える不具合直ってなくない？」)</b>:
+ * 台帳の照合が<b>型だけ</b>で amplifier を見ていなかったため、スレッドで LUCK が付いている状態で
+ * プレイヤーが同じ型の無期限効果を上書きすると、その後の再計算で<b>プレイヤーの効果</b>を剥がしていた。
+ * 判定は {@link ThreadPotionOwnership#mayRemoveGrantedPotion} へ切り出し、
+ * <b>挙動そのもの</b>をここで固定する(ソース文字列の一致で縛ると実装差し替えで誤検知するため、
+ * 静的走査は「台帳がある/付与時に記録している」の構造チェックだけに残す)。
  */
 class ArmorManaListenerPotionOwnershipGuardTest {
 
@@ -54,25 +56,52 @@ class ArmorManaListenerPotionOwnershipGuardTest {
     }
 
     @Test
-    void removalRequiresBothOwnershipRecordAndStillInfinite() throws IOException {
+    void removalGoesThroughTheOwnershipPolicy() throws IOException {
         String source = readSource();
 
-        // 除去分岐は「台帳から記録を取り除けた(=自分が付与した記録がある)」かつ
-        // 「isThreadGranted(現在も無期限)」の両方を要求すること。
-        assertTrue(source.contains("owned.remove(type) != null && isThreadGranted(existing)"),
-                "除去条件が『台帳の記録』と『現在も無期限』の両方を見ていない。"
-                        + "isThreadGranted(無期限判定)だけで剥がすと、他人が付けた無期限効果"
-                        + "(例: /effect give @s luck infinite)まで誤って剥がしてしまう。");
+        assertTrue(source.contains("ThreadPotionOwnership.mayRemoveGrantedPotion"),
+                "除去判定が ThreadPotionOwnership を通っていない。判定を分岐へ直書きすると"
+                        + "挙動をテストで固定できず、W-54 の再発を検知できない。");
+        assertFalse(source.contains("} else if (isThreadGranted(existing)) {"),
+                "isThreadGranted 単独での除去条件が復活している(W-54 第1波の再発)。");
     }
 
     @Test
-    void doesNotRestoreTheOldSoleInfiniteRemovalCondition() throws IOException {
-        String source = readSource();
+    void unrecordedInfiniteEffectIsNeverRemoved() {
+        // /effect give @s luck infinite → 台帳に記録なし。再起動を跨いだ場合も同じ形。
+        assertFalse(ThreadPotionOwnership.mayRemoveGrantedPotion(null, true, true, 0),
+                "付与記録が無い無期限効果を剥がしている(W-54 第1波そのもの)。");
+    }
 
-        // 旧実装(無期限判定だけで剥がす)への先祖返りを検知する。
-        assertFalse(source.contains("} else if (isThreadGranted(existing)) {"),
-                "isThreadGranted 単独での除去条件が復活している(W-54の再発)。"
-                        + "所有権台帳との併用に戻さないと『自分が付けたか』を判定できない。");
+    @Test
+    void overwrittenAmplifierIsNeverRemoved() {
+        // スレッドが LUCK Lv1(amplifier 0)を付けている状態で、プレイヤーが
+        // /effect give @s luck infinite 5 (amplifier 5)で上書きしたケース。
+        assertFalse(ThreadPotionOwnership.mayRemoveGrantedPotion(0, true, true, 5),
+                "同じ型・無期限のまま他ソースに上書きされた効果を剥がしている"
+                        + "(ユーザー報告『幸運のエフェクトが消える』の真因)。");
+    }
+
+    @Test
+    void finiteEffectIsNeverRemoved() {
+        // 通常ポーションで上書きされた(=有限になった)ものは自分の効果ではない。
+        assertFalse(ThreadPotionOwnership.mayRemoveGrantedPotion(0, true, false, 0),
+                "有限持続に上書きされた効果を剥がしている(飲んだポーションを消す)。");
+    }
+
+    @Test
+    void absentEffectIsNotTouched() {
+        assertFalse(ThreadPotionOwnership.mayRemoveGrantedPotion(0, false, false, Integer.MIN_VALUE),
+                "そもそも付いていない効果に対して除去へ進んでいる。");
+    }
+
+    @Test
+    void ownEffectIsStillRemovedWhenTheThreadComesOff() {
+        // ここが false に化けると「スレッドを外しても効果が剥がれない」再発になる。
+        assertTrue(ThreadPotionOwnership.mayRemoveGrantedPotion(0, true, true, 0),
+                "自分が付けた無期限効果(amplifier一致)を外したのに剥がせていない。");
+        assertTrue(ThreadPotionOwnership.mayRemoveGrantedPotion(2, true, true, 2),
+                "amplifier 1以上(potion-level 3 等)のスレッド効果を剥がせていない。");
     }
 
     @Test
