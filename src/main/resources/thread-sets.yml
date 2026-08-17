@@ -380,11 +380,13 @@ thread-sets:
         gacha-rate-bonus: 0.01
       "5":
         gacha-rate-bonus: 0.01
-  # 2026-08-18: "6" 段は物理的に発動しない。role_luck / role_effeciency は threads.yml で
-  # stackable を持たない(=1装備あたり1個)ので、キャリアは防具4部位+メインハンドの5個が上限
-  # (オフハンドは offhand-stats-apply: true の品が出荷 item-stats.yml に0件なので数えない)。
-  # 設計書 §3-A-5 が上限5を見落として6段を書いた分で、mana_regen の 6→5 と同じ取りこぼし。
-  # 最終ティアの累計を変えないよう、6段ぶんの値は5段へ畳んである。
+  # 2026-08-18: "6" 段は【重複セットを既定で許可したことで到達可能になった】。
+  # 経緯: 旧既定(threads.yml の stackable 未記載 = 重複不可)だと1装備あたり1個 ×
+  # キャリア5個(防具4部位+メインハンド。オフハンドは offhand-stats-apply: true の品が
+  # 出荷 item-stats.yml に0件なので数えない)で上限5本、6段は永久に発動しなかった。
+  # 一度は6段ぶんの値を5段へ畳んだが、ユーザー確定要件「同一のスレッドを重複で入れられる
+  # ようにしてほしい」により既定を重複可(1装備あたり max 既定2本)へ反転したので、
+  # 上限は 2 × 5 = 10本。設計書 §3-A-5 どおりの6段構成へ戻してある。
   role_luck:
     thresholds:
       "2":
@@ -394,7 +396,9 @@ thread-sets:
       "4":
         craft-roll-up-bonus: 2
       "5":
-        craft-roll-up-bonus: 4
+        craft-roll-up-bonus: 2
+      "6":
+        craft-roll-up-bonus: 2
   role_effeciency:
     thresholds:
       "2":
@@ -403,9 +407,10 @@ thread-sets:
         craft-roll-down-reduction: 1
       "4":
         craft-roll-down-reduction: 5
-      # 6段は到達不能なので値を5段へ畳んだ(5 + 10 = 15)。理由は role_luck 側のコメント参照。
       "5":
-        craft-roll-down-reduction: 15
+        craft-roll-down-reduction: 5
+      "6":
+        craft-roll-down-reduction: 10
   blindness:
     thresholds:
       "1":

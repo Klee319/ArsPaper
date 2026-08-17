@@ -21,12 +21,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>縛っている失敗は2種類ある(どちらも例外もログも出ないので、実機で気づけない):
  * <ol>
  *   <li><b>到達不能なしきい値</b>。同種スレッドの合計個数は
- *       {@code threads.yml} の {@code max}(= 装備1点あたりの上限。{@code stackable} 未指定なら1)
+ *       {@code threads.yml} の {@code max}(= 装備1点あたりの上限。{@code stackable}/{@code max}
+ *       未指定なら {@link ThreadApplicationPolicy#DEFAULT_MAX_STACK}。2026-08-18 に既定が
+ *       「重複不可(=1本)」から「重複可」へ反転した)
  *       × キャリア数で頭打ちになる。キャリアは<b>着用防具4部位 + メインハンド + オフハンド</b>だが、
  *       オフハンドは TrinityForge {@code item-stats.yml} の {@code offhand-stats-apply: true} の品だけで、
  *       出荷 yml には該当が0件 → <b>実キャリア数は 5</b>。
  *       上限を超えるしきい値を書くと、そのティアは物理的に発動しない。
- *       (設計書 §3-A-5 の「2/4 段 → 3/6 段」はこの上限 5 を見落としていた。)</li>
+ *       (設計書 §3-A-5 の「2/4 段 → 3/6 段」は旧既定での上限 5 を見落としていた。
+ *       2026-08-18 に重複セットを既定で許可したので上限は 2 × 5 = 10 になり、
+ *       {@code role_luck} / {@code role_effeciency} の6段は到達可能な形へ戻してある。)</li>
  *   <li><b>死に値</b>。セット効果は「同種を N 枠捧げる」対価なので、最終ティアまでの累計が
  *       そのキーの<b>スレッド1本の抽選最小値</b>(TrinityForge {@code item-stats.yml} のスレッド項目
  *       (CMD帯 300000-300099、items.<MATERIAL#CMD>.random.<key>.min)が持つ値のうち、全スレッド中の
@@ -65,7 +69,22 @@ class ThreadSetThresholdReachabilityTest {
         return out;
     }
 
-    /** スレッド種別 → 1装備あたりの装着上限({@code stackable} 未指定 = 1個まで)。 */
+    /**
+     * 1装備あたりのスレッド枠数(安全側=厳しめの値)。
+     * 出荷 TrinityForge {@code item-stats.yml} の {@code thread-slots} は 1が52件 / 2が82件 /
+     * 3が52件 / 4が4件で、防具は帯ごとに 2/3/4 枠(TF 側 {@code ShippedThreadBandIndependenceTest}
+     * の {@code BAND_SLOTS} = 8/12/16 ÷ 4部位)。ここでは最頻値かつ最低帯の値である 2 を使う
+     * ── 大きく取ると「到達可能」と誤判定してしまうため。
+     */
+    private static final int SLOTS_PER_ITEM = 2;
+
+    /**
+     * スレッド種別 → 1装備あたりの装着上限。
+     *
+     * <p>2026-08-18: 既定が {@link ThreadApplicationPolicy#DEFAULT_STACKABLE}(=重複可)へ
+     * 反転したので、未記載は「1個まで」ではなく {@link ThreadApplicationPolicy#DEFAULT_MAX_STACK}
+     * になる。さらに1装備に挿せるのはスレッド枠の数までなので {@link #SLOTS_PER_ITEM} で押さえる。
+     */
     private static Map<String, Integer> perItemLimits() {
         ConfigurationSection threads = section(load("threads.yml"), "threads", "threads.yml の threads:");
         Map<String, Integer> limits = new LinkedHashMap<>();
@@ -74,11 +93,11 @@ class ThreadSetThresholdReachabilityTest {
             if (entry == null) {
                 continue;
             }
-            if (!entry.getBoolean("stackable", false)) {
+            if (!entry.getBoolean("stackable", ThreadApplicationPolicy.DEFAULT_STACKABLE)) {
                 limits.put(id, 1);
             } else {
-                // max 未指定 = 無制限。その場合はキャリア数で頭打ちになるので上限扱いにする。
-                limits.put(id, entry.getInt("max", CARRIER_SLOTS));
+                int max = entry.getInt("max", ThreadApplicationPolicy.DEFAULT_MAX_STACK);
+                limits.put(id, Math.min(max, SLOTS_PER_ITEM));
             }
         }
         return limits;

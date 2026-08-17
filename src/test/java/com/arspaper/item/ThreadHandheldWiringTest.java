@@ -99,6 +99,24 @@ class ThreadHandheldWiringTest {
     }
 
     @Test
+    @DisplayName("重複セットの可否は policy の純関数で判定し、既定を『重複不可』へ戻していない")
+    void duplicatePolicyIsWiredAndDefaultsToAllowed() throws IOException {
+        assertTrue(readSource("gui", "ThreadGui.java")
+                        .contains("ThreadApplicationPolicy.canSocketAnother("),
+                "装着経路が重複/最大積載の判定を自前で持っている。判定は policy の純関数に集約する"
+                        + "(ThreadApplicationPolicyTest が挙動を固定しているのはそちら側)");
+
+        // 否定形で縛るのは「旧既定だけに存在する形」に限る(ソースの綴りを固定すると
+        // 実装を書き換えただけで誤検知する — allowlist-tests の教訓)。
+        String config = readSource("item", "ThreadConfig.java");
+        assertFalse(config.replace(" ", "").contains("getBoolean(\"stackable\",false)"),
+                "threads.yml の stackable 未記載を false(重複不可)に戻している。"
+                        + "既定は ThreadApplicationPolicy.DEFAULT_STACKABLE を読むこと");
+        assertFalse(config.replace(" ", "").contains("maxStack.getOrDefault(threadId,Integer.MAX_VALUE)"),
+                "max 未記載を無制限に戻している。1種へ全枠集中できると TF の帯目標が壊れる");
+    }
+
+    @Test
     @DisplayName("集計結果は writeAddonCombatStats でTFの戦闘パイプラインへ渡している")
     void collectedStatsReachTheCombatPipeline() throws IOException {
         String source = readSource("item", "ArmorManaListener.java");

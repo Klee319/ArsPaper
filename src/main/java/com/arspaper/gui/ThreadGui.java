@@ -309,27 +309,20 @@ public class ThreadGui extends BaseGui {
                 return;
             }
 
-            // 重複チェック + 最大積載量チェック
+            // 重複チェック + 最大積載量チェック。判定本体は ThreadApplicationPolicy の純関数
+            // (2026-08-18 に既定を「重複可」へ反転したので、既定値もそちら側に集約してある)。
             ThreadConfig threadCfg = ArsPaper.getInstance().getThreadConfig();
-            if (!threadCfg.isStackable(threadType.getId())) {
-                boolean alreadyExists = threadSlots.stream()
-                    .anyMatch(id -> threadType.getId().equals(id));
-                if (alreadyExists) {
-                    player.sendMessage(Component.text("このスレッドは重複セットできません！", NamedTextColor.RED));
-                    player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
-                    return;
-                }
-            } else {
-                // スタック可能でもmax上限チェック
-                int maxCount = threadCfg.getMaxStack(threadType.getId());
-                long currentCount = threadSlots.stream()
-                    .filter(id -> threadType.getId().equals(id))
-                    .count();
-                if (currentCount >= maxCount) {
-                    player.sendMessage(Component.text("このスレッドの最大積載量に達しています！(最大" + maxCount + "個)", NamedTextColor.RED));
-                    player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
-                    return;
-                }
+            boolean stackable = threadCfg.isStackable(threadType.getId());
+            int maxCount = threadCfg.getMaxStack(threadType.getId());
+            int currentCount = (int) threadSlots.stream()
+                .filter(id -> threadType.getId().equals(id))
+                .count();
+            if (!ThreadApplicationPolicy.canSocketAnother(stackable, maxCount, currentCount)) {
+                player.sendMessage(Component.text(stackable
+                    ? "このスレッドの最大積載量に達しています！(最大" + maxCount + "個)"
+                    : "このスレッドは重複セットできません！", NamedTextColor.RED));
+                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
+                return;
             }
 
             if (threadType.isBackpackThread()) {

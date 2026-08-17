@@ -37,6 +37,49 @@ import org.bukkit.Material;
  */
 public final class ThreadApplicationPolicy {
 
+    /**
+     * {@code threads.yml} で {@code stackable:} を書かなかったときの既定
+     * (2026-08-18 ユーザー確定要件「同一のスレッドを重複で入れられるようにしてほしい」)。
+     *
+     * <p><b>旧既定は {@code false}(=1装備に1本まで)で、これが {@code thread-sets.yml} の
+     * 上位ティアを到達不能にする原因だった</b>: キャリアは着用防具4部位 + メインハンドの5個
+     * (オフハンドは {@code offhand-stats-apply: true} の品が出荷 item-stats.yml に0件)なので、
+     * 1装備1本なら同種は最大5本 ── 6段のしきい値は永久に発動しない
+     * ({@code role_luck} / {@code role_effeciency} が実際にその状態だった)。
+     */
+    public static final boolean DEFAULT_STACKABLE = true;
+
+    /**
+     * {@code max:} を書かなかったときの1装備あたりの上限。
+     *
+     * <p><b>「無制限」にはしない</b>。防具のスレッド枠は帯ごとに 2/3/4 枠(合計 8/12/16)で、
+     * TrinityForge {@code ShippedThreadBandIndependenceTest} の帯目標(+39%/+49%/+59%)は
+     * 「1種に全枠を集中できない」ことを前提に較正されている。無制限にすると最良編成が
+     * 最強の1種へ全振りする形に化けて、割合ダメージ寄与が設計目標を超える。
+     *
+     * <p>2 にしたのは、セット効果の最上位ティア(現行最大 6)を
+     * {@code 2 × キャリア5 = 10} で確実に到達可能にしつつ、集中を抑える最小値だから。
+     * それ以上に積ませたい種は {@code threads.yml} に {@code max:} を明示する。
+     */
+    public static final int DEFAULT_MAX_STACK = 2;
+
+    /**
+     * 同じ装備へ同じスレッドをもう1本挿せるか(純関数)。
+     *
+     * <p>{@code ThreadGui} の装着経路が唯一の呼び出し元。{@code stackable: false} を
+     * 明示した種だけが「1本まで」で、既定({@link #DEFAULT_STACKABLE})は重複可。
+     *
+     * @param stackable    {@code ThreadConfig#isStackable}(未記載は {@link #DEFAULT_STACKABLE})
+     * @param maxStack     {@code ThreadConfig#getMaxStack}(未記載は {@link #DEFAULT_MAX_STACK})
+     * @param currentCount その装備に既に挿さっている同種の本数
+     */
+    public static boolean canSocketAnother(boolean stackable, int maxStack, int currentCount) {
+        if (!stackable) {
+            return currentCount <= 0;
+        }
+        return currentCount < maxStack;
+    }
+
     /** スレッドを保持している装備が置かれているスロットの区分。 */
     public enum SlotOrigin {
         /** 着用中の防具4部位。 */

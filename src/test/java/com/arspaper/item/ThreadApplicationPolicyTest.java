@@ -101,6 +101,37 @@ class ThreadApplicationPolicyTest {
     }
 
     @Test
+    @DisplayName("同一スレッドの重複セットは既定で許可される(2026-08-18 ユーザー確定要件)")
+    void duplicateSocketingIsAllowedByDefault() {
+        assertTrue(ThreadApplicationPolicy.DEFAULT_STACKABLE,
+                "既定が重複不可に戻ると thread-sets.yml の6段が『1装備1本 × キャリア5 = 上限5』で"
+                        + "また到達不能になる(role_luck / role_effeciency が実際にその状態だった)");
+
+        // 既定の上限は DEFAULT_MAX_STACK。ここまでは挿せて、そこから先は挿せない。
+        for (int already = 0; already < ThreadApplicationPolicy.DEFAULT_MAX_STACK; already++) {
+            assertTrue(ThreadApplicationPolicy.canSocketAnother(
+                            true, ThreadApplicationPolicy.DEFAULT_MAX_STACK, already),
+                    already + "本目まで挿せるはず");
+        }
+        assertFalse(ThreadApplicationPolicy.canSocketAnother(
+                        true, ThreadApplicationPolicy.DEFAULT_MAX_STACK,
+                        ThreadApplicationPolicy.DEFAULT_MAX_STACK),
+                "max に達したら止める(無制限にすると1種へ全枠集中でき、TF の帯目標が壊れる)");
+
+        // 既定の上限 × キャリア5 が、現行 thread-sets.yml の最上位ティア6 を超えていること。
+        assertTrue(ThreadApplicationPolicy.DEFAULT_MAX_STACK * 5 >= 6,
+                "既定の上限 × キャリア5 が6未満だと role_luck の6段がまた死ぬ");
+    }
+
+    @Test
+    @DisplayName("stackable: false を明示した種だけは1本まで")
+    void explicitNonStackableStillBlocksTheSecondCopy() {
+        assertTrue(ThreadApplicationPolicy.canSocketAnother(false, 99, 0));
+        assertFalse(ThreadApplicationPolicy.canSocketAnother(false, 99, 1),
+                "stackable: false は max を無視して1本で打ち止め");
+    }
+
+    @Test
     @DisplayName("材質名フォールバックは EquipmentSlotResolver と同じ接尾辞規則を使う")
     void nameFallbackMatchesTheResolverRules() {
         assertTrue(ThreadApplicationPolicy.isArmorSlotMaterialName("NETHERITE_HELMET"));

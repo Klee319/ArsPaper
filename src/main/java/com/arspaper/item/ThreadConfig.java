@@ -158,10 +158,10 @@ public class ThreadConfig {
             ConfigurationSection section = threads.getConfigurationSection(key);
             if (section == null) continue;
 
-            // stackable設定（未記載 = false: 重複不可）
-            stackable.put(key, section.getBoolean("stackable", false));
+            // stackable設定（未記載 = ThreadApplicationPolicy.DEFAULT_STACKABLE: 2026-08-18 から重複可）
+            stackable.put(key, section.getBoolean("stackable", ThreadApplicationPolicy.DEFAULT_STACKABLE));
 
-            // max設定（stackable: trueの場合のみ有効、未設定 = 無制限）
+            // max設定（stackable: trueの場合のみ有効、未設定 = DEFAULT_MAX_STACK）
             if (section.contains("max")) {
                 maxStack.put(key, section.getInt("max"));
             }
@@ -237,14 +237,21 @@ public class ThreadConfig {
         }
     }
 
-    /** 同じ防具にスタック可能かどうか */
+    /**
+     * 同じ装備にスタック可能かどうか（threads.yml に未記載なら
+     * {@link ThreadApplicationPolicy#DEFAULT_STACKABLE} = 重複可）。
+     */
     public boolean isStackable(String threadId) {
-        return stackable.getOrDefault(threadId, false);
+        return stackable.getOrDefault(threadId, ThreadApplicationPolicy.DEFAULT_STACKABLE);
     }
 
-    /** 1つの防具にセットできる最大数（未設定 = Integer.MAX_VALUE） */
+    /**
+     * 1つの装備にセットできる最大数（未設定 = {@link ThreadApplicationPolicy#DEFAULT_MAX_STACK}）。
+     * かつては未設定を {@code Integer.MAX_VALUE}(無制限)としていたが、既定が重複可になった以降は
+     * 「未設定 = 無制限」だと1種へ全枠集中できてしまい帯目標を壊すため、既定値を持たせている。
+     */
     public int getMaxStack(String threadId) {
-        return maxStack.getOrDefault(threadId, Integer.MAX_VALUE);
+        return maxStack.getOrDefault(threadId, ThreadApplicationPolicy.DEFAULT_MAX_STACK);
     }
 
     /** マナリジェンボーナス */
