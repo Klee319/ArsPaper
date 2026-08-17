@@ -4,6 +4,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.Locale;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -227,8 +228,13 @@ class ThreadHandheldWiringTest {
         assertTrue(source.contains("PlayerJumpEvent event"),
                 "ジャンプを拾っていない。jumpedRecently が永久に false を返し、"
                         + "非防具装備の GUI 入口が丸ごと死ぬ(=/ars thread しか残らない)。");
-        assertTrue(source.contains("lastJumpAt.put("), "ジャンプ時刻を記録していない");
-        assertTrue(source.contains("lastJumpAt.remove("),
+        // 2026-08-18: ここは `lastJumpAt.put(` という**識別子の綴りそのもの**を固定していたため、
+        // フィールドが定数命名(LAST_JUMP_AT)へ直された時点で、配線は正しいのに赤くなっていた
+        // (=直っているものを壊れていると報告する誤検知)。綴りではなく「記録している/捨てている」
+        // という配線の有無で見るために、大文字小文字と下線を落として突き合わせる。
+        String normalized = source.toLowerCase(Locale.ROOT).replace("_", "");
+        assertTrue(normalized.contains("lastjumpat.put("), "ジャンプ時刻を記録していない");
+        assertTrue(normalized.contains("lastjumpat.remove("),
                 "退出時にジャンプ時刻を捨てていない(常駐マップにオフラインプレイヤーが溜まる)");
     }
 

@@ -190,7 +190,22 @@ class ThreadSetThresholdReachabilityTest {
                     cumulative.merge(stat, stats.getDouble(stat), Double::sum);
                 }
             }
+            // 2026-08-18: 負の累計は「意図した代償」で、死に値ではない。
+            // translate(mana-bonus -100 と引き換えに mana-regen +10)や
+            // blindness(max-health -10 と引き換えに attack-power +250)のような
+            // ハイリスク・ハイリターン型のセットがあるため、抽選最小値との比較を
+            // そのまま当てると**設計どおりの代償を不具合として報告してしまう**。
+            // 代わりに「代償があるなら見返りもあること」を縛る(純粋な下方修正セットは通さない)。
+            boolean hasDrawback = cumulative.values().stream().anyMatch(v -> v < 0);
+            if (hasDrawback) {
+                assertTrue(cumulative.values().stream().anyMatch(v -> v > 0),
+                        threadId + " は負の効果しか持たない(代償だけで見返りが無いセットは成立しない): "
+                                + cumulative);
+            }
             cumulative.forEach((stat, total) -> {
+                if (total <= 0) {
+                    return; // 意図した代償(上の hasDrawback で見返りの有無を担保している)。
+                }
                 Double rollMin = mainMinimums.get(stat);
                 if (rollMin == null) {
                     return; // 厳選の抽選候補に無いキー(比較対象が無い)は対象外。
@@ -235,8 +250,18 @@ class ThreadSetThresholdReachabilityTest {
         assertEquals(12.0, sets.getDouble("health_boost.thresholds.8.magic-flat-defense"));
 
         // 旧しきい値(枠合計9の時代の値)が残っていないこと。
-        assertFalse(sets.contains("mana_regen.thresholds.3"), "mana_regen が旧 3 段のまま");
+        // 2026-08-18 訂正: ここは「旧 3/6 段」を否定するつもりで
+        // assertFalse(contains("mana_regen.thresholds.3")) と書かれていたが、
+        // 引き上げ後の規約は 3/5 段(この同じテストが hero_of_the_village / night_vision /
+        // conduit_power を 3/5 で固定しているのと同じ)なので、"3" 段は**あるのが正しい**。
+        // 旧実装と新実装を区別できるのは 6 段の有無だけ。yml は正しく直っていたのに
+        // このアサートだけが赤かった(=直っているものを壊れていると報告する誤検知)。
+        // 否定形は「旧しきい値だけに存在する段」に限り、新しい形は値で固定する。
+        assertEquals(0.03, sets.getDouble("mana_regen.thresholds.3.magic-resistance"));
+        assertEquals(0.05, sets.getDouble("mana_regen.thresholds.5.magic-resistance"));
         assertFalse(sets.contains("mana_regen.thresholds.6"), "mana_regen が旧 6 段のまま");
+        assertEquals(0.04, sets.getDouble("spell_cost_down.thresholds.3.penetration"));
+        assertEquals(0.06, sets.getDouble("spell_cost_down.thresholds.5.penetration"));
         assertFalse(sets.contains("spell_cost_down.thresholds.2"), "spell_cost_down が旧 2 段のまま");
         assertFalse(sets.contains("spell_cost_down.thresholds.4"), "spell_cost_down が旧 4 段のまま");
     }

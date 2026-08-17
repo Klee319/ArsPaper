@@ -9,6 +9,10 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Set;
+import java.util.Locale;
+import java.util.LinkedHashSet;
+import java.util.Arrays;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -24,10 +28,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * ランタイム無し・MockBukkit無し)では {@code ThreadConfig} クラスをロードした瞬間に
  * {@code ExceptionInInitializerError} で落ちる(2026-08-08 実機確認: {@code PotionEffectType.SPEED}
  * を1行参照するだけの最小テストで再現した)。したがって縛れるのは
- * (1)「出荷 threads.yml が新キーを1つも使っていないこと」(=そのままロードすれば全スレッドが
- * enum 既定値へフォールバックすることが構造的に保証される)と、
- * (2)「フォールバック経路がソース上に実在すること」の2点で、他のスレッド系テスト
- * ({@link ArmorManaListenerThreadPotionGuardTest} 等)と同じ静的検査の流儀に揃えてある。
+ * (1)「出荷 threads.yml に書かれた新キーの値が実際に効く形をしていること」と、
+ * (2)「未記載スレッドが enum 既定値へ落ちるフォールバック経路がソース上に実在すること」の
+ * 2点で、他のスレッド系テスト({@link ArmorManaListenerThreadPotionGuardTest} 等)と同じ
+ * 静的検査の流儀に揃えてある。
+ *
+ * <p>(1) は 2026-08-18 に「新キーを1つも使っていないこと」から差し替えた。経緯は
+ * {@link #shippedThreadsYamlOnlyUsesEffectivePotionOverrides()} の javadoc を参照。
  */
 class ThreadConfigPotionOverrideBackCompatTest {
 
@@ -43,27 +50,51 @@ class ThreadConfigPotionOverrideBackCompatTest {
         return Files.readString(path);
     }
 
+    /** 常時付与を許す有益効果18種。{@code ThreadConfig.ALLOWED_POTION_EFFECTS} と対。 */
+    private static final String[] ALLOWED_POTION_IDS = {
+            "speed", "haste", "strength", "jump_boost", "regeneration", "resistance",
+            "fire_resistance", "water_breathing", "invisibility", "night_vision",
+            "health_boost", "absorption", "saturation", "luck", "slow_falling",
+            "conduit_power", "dolphins_grace", "hero_of_the_village"
+    };
+
+    /**
+     * 2026-08-18 に前提を差し替えた。元は「出荷 threads.yml は新キーを1つも使っていない」を
+     * 固定していたが、{@code potion-effect}/{@code potion-level} は 2026-08-08 以降
+     * 実際に使われ始めた({@code health_boost} / {@code luck} など)。
+     * <b>テストのメッセージ自身が「新キーを実際に使い始めたら、このテストの前提そのものを
+     * 見直すこと」と書いていたのに、見直されないまま赤で放置されていた</b>
+     * (=直っているものを壊れていると報告する誤検知)。
+     *
+     * <p>いま縛るべき不変条件は「0件であること」ではなく「書いた値が実際に効くこと」:
+     * 許可18種の外の値を書くと {@code ThreadConfig} は起動時に警告ログを出して enum 既定値へ
+     * 黙って戻す(起動は止まらない)ので、<b>設定したつもりで効かない</b>状態になる。
+     * 未記載スレッドが enum 既定値へ落ちる後方互換のほうは、下の
+     * {@link #configAccessorsFallBackToEnumDefaultsWhenKeysAreAbsent()} が引き続き縛る。
+     */
     @Test
-    @DisplayName("出荷threads.ymlは新キー(potion-effect/potion-level/flight)を1つも使っていない"
-            + "(=既存45スレッドは全部enum既定値のまま)")
-    void shippedThreadsYamlUsesNoneOfTheNewKeysYet() {
+    @DisplayName("出荷threads.ymlの potion-effect は許可18種のみ / potion-level は1以上")
+    void shippedThreadsYamlOnlyUsesEffectivePotionOverrides() {
         YamlConfiguration config = loadShippedThreadsYaml();
         ConfigurationSection threads = config.getConfigurationSection("threads");
         assertNotNull(threads, "threads.yml の threads: セクションが見つからない");
+        Set<String> allowed = new LinkedHashSet<>(Arrays.asList(ALLOWED_POTION_IDS));
 
         for (String id : threads.getKeys(false)) {
             ConfigurationSection section = threads.getConfigurationSection(id);
             if (section == null) {
                 continue;
             }
-            assertFalse(section.contains("potion-effect"),
-                    "スレッド '" + id + "' に potion-effect が書かれている。"
-                            + "既存スレッドの後方互換テストの前提(新キー0件)が崩れている。"
-                            + "新キーを実際に使い始めたら、このテストの前提そのものを見直すこと。");
-            assertFalse(section.contains("potion-level"),
-                    "スレッド '" + id + "' に potion-level が書かれている(前提が崩れている)");
-            assertFalse(section.contains("flight"),
-                    "スレッド '" + id + "' に flight が書かれている(前提が崩れている)");
+            String potion = section.getString("potion-effect");
+            if (potion != null && !potion.equalsIgnoreCase("none")) {
+                assertTrue(allowed.contains(potion.toLowerCase(Locale.ROOT)),
+                        "スレッド '" + id + "' の potion-effect '" + potion + "' は許可18種の外。"
+                                + "起動時に警告を出して enum 既定値へ戻されるので、設定したつもりで効かない");
+            }
+            if (section.contains("potion-level")) {
+                assertTrue(section.getInt("potion-level", 0) >= 1,
+                        "スレッド '" + id + "' の potion-level が1未満(amplifier が負になる)");
+            }
         }
     }
 
@@ -91,13 +122,7 @@ class ThreadConfigPotionOverrideBackCompatTest {
     @DisplayName("許可される有益効果18種が仕様どおりに定義されている(有害/即時系を含まない)")
     void allowedPotionEffectsMatchTheSpecifiedEighteen() throws IOException {
         String source = readThreadConfigSource();
-        String[] expectedIds = {
-                "speed", "haste", "strength", "jump_boost", "regeneration", "resistance",
-                "fire_resistance", "water_breathing", "invisibility", "night_vision",
-                "health_boost", "absorption", "saturation", "luck", "slow_falling",
-                "conduit_power", "dolphins_grace", "hero_of_the_village"
-        };
-        for (String id : expectedIds) {
+        for (String id : ALLOWED_POTION_IDS) {
             assertTrue(source.contains("map.put(\"" + id + "\","),
                     "許可リストに '" + id + "' が無い(仕様の有益効果18種と食い違う)");
         }
