@@ -17,6 +17,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * スレッドアイテム。防具のスレッドスロットにセットして使う。
@@ -50,15 +51,26 @@ public class ThreadItem extends BaseCustomItem {
     @Override
     public ItemStack createItemStack() {
         // 生成者（誰が作ったか）が分からない経路（ルートチェスト/ダンジョンドロップ/管理コマンド
-        // 付与等）のフォールバック。品質は0扱いになり、従来どおりの幅でロールする
-        // （TrinityForgeBridge#stampThreadIdentity 参照）。
+        // 付与等）のフォールバック。PDC は意図的に未刻印のまま返す(下の createItemStack(Player) の
+        // javadoc「W-53」節参照)。
         return createItemStack(null);
     }
 
     /**
      * 生成者（儀式クラフトの実行者）が分かる版。TF のクラフト品質を厳選のロール幅へ反映する
-     * （{@link TrinityForgeBridge#stampThreadIdentity(ItemStack, Player)} 参照）。{@code crafter} が
-     * {@code null} のときは {@link #createItemStack()} と同じ（quality=0 扱い）。
+     * （{@link TrinityForgeBridge#stampThreadIdentity(ItemStack, Player)} 参照）。
+     *
+     * <p><b>⚠️ 2026-08-18 (W-53) crafter が {@code null} のとき、PDC は意図的に未刻印のまま返す。</b>
+     * 以前は {@code crafter == null} でも {@link TrinityForgeBridge#stampThreadIdentity} を呼び、
+     * rollSeed を新規発番しつつ quality=0 固定で刻んでいた。しかし TF の
+     * {@code ItemData#hasRollSeed()} は PDC キーの<b>有無</b>だけを見る(値が0でも「刻印済み」扱い)ため、
+     * この時点で刻んでしまうと TF {@code PickupQualityListener#stampIfEligible} の
+     * {@code data.hasRollSeed()} ガードに永久に引っかかり、開運(loot-luck)ベースの品質ロールに
+     * 二度と到達できなくなっていた(ルートチェスト/ダンジョンドロップ経由のスレッドが恒久的に
+     * 品質0で固定される実害)。crafter が判明する経路(儀式クラフト)だけ即時に刻印し、それ以外は
+     * {@link ThreadIdentity#NONE} 相当(未刻印)のまま返す ── 品質決定は TF 側の通常ドロップ品経路
+     * ({@code PickupQualityListener})、または管理者が明示指定した場合は {@link #restampWithQuality}
+     * (TF {@code GiveItemCommand} が reflection 経由で呼ぶ)に委ねる。
      */
     public ItemStack createItemStack(Player crafter) {
         ItemStack item = super.createItemStack();
@@ -69,7 +81,8 @@ public class ThreadItem extends BaseCustomItem {
         // stamp は lore/属性も再組み立てするが、スレッドのステキーは AttributeProjection に
         // 一切マップされていない(TrinityForgeBridge#stampThreadIdentity のjavadoc参照)ので実害は無く、
         // lore はこの直後の editMeta で必ず上書きする。
-        ThreadIdentity identity = threadType.hasEffect()
+        // crafter == null(生成者不明経路)ではあえて刻まない ── 上のメソッドjavadoc「W-53」参照。
+        ThreadIdentity identity = (threadType.hasEffect() && crafter != null)
                 ? TrinityForgeBridge.stampThreadIdentity(item, crafter).orElse(ThreadIdentity.NONE)
                 : ThreadIdentity.NONE;
         item.editMeta(meta -> {
@@ -79,6 +92,38 @@ public class ThreadItem extends BaseCustomItem {
             meta.lore(fullLore(meta, threadType, identity));
         });
         return item;
+    }
+
+    /**
+     * 生成者不明(crafter==null)で PDC 未刻印のまま作られたスレッドへ、後から品質を割り当て直す。
+     * 呼び出し元は2つ: (1) TF {@code GiveItemCommand}(管理者が {@code /tf give} で明示指定した
+     * quality)、(2) TF {@code PickupQualityListener}(開運(loot-luck)ベースでロールした quality)。
+     * どちらも TF 側は ArsPaper へコンパイル依存を持てないため reflection 経由でこのメソッドへ
+     * 委譲する(メソッド名/シグネチャは TF 側 reflection 呼び出しとの契約 ── 変更する場合は
+     * 両方の呼び出し元を合わせて直すこと)。
+     *
+     * <p>{@link TrinityForgeBridge#writeItemRoll}(PDC のみ書く軽量経路)で新規 rollSeed + 指定
+     * quality を書き込み、lore は必ず {@link #fullLore} で組み直す。TF の汎用装備 lore 経路
+     * ({@code ItemFactory#stamp} → {@code ItemAssembler#assemble})をスレッドへそのまま適用すると、
+     * 効果説明/スロット案内/バックパック行を含む専用 lore が上書きされてしまうため、この専用経路が
+     * 必要(上の {@link #createItemStack(Player)} javadoc、および呼び出し元の TF 側実装コメント参照)。
+     *
+     * <p>効果を持たないスレッド(EMPTY 等、儀式の中間素材)は品質という概念自体が無いので対象外。
+     *
+     * @return 刻印を実際に行ったら {@code true}。{@code item} が null/メタ無し、または
+     *         このスレッド種別が効果を持たない場合は {@code false}(何もしない、fail-open)。
+     */
+    public boolean restampWithQuality(ItemStack item, int quality) {
+        if (item == null || !item.hasItemMeta() || !threadType.hasEffect()) {
+            return false;
+        }
+        long rollSeed = ThreadLocalRandom.current().nextLong();
+        ThreadIdentity identity = new ThreadIdentity(rollSeed, quality);
+        item.editMeta(meta -> {
+            TrinityForgeBridge.writeItemRoll(meta, rollSeed, quality);
+            meta.lore(fullLore(meta, threadType, identity));
+        });
+        return true;
     }
 
     /**

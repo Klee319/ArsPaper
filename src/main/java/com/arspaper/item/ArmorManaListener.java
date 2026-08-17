@@ -32,6 +32,8 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * プレイヤーの装備状態を監視し、マナボーナスを計算・更新する。
@@ -470,7 +472,7 @@ public class ArmorManaListener implements Listener {
     }
 
     /**
-     * スレッド由来の効果は「無期限(isInfinite)」を自前の署名とみなす。
+     * スレッド由来の効果の「見た目上の」目印(無期限=isInfinite)。
      *
      * <p>2026-07-26: 以前は付与側が無条件 {@code addPotionEffect} で、Bukkit の仕様上これは
      * 同種の既存効果を**上書き**する。そのため HEALTH_BOOST スレッドを装備したまま
@@ -483,14 +485,52 @@ public class ArmorManaListener implements Listener {
      * レベル2以上のスレッドを外したときに解除できなくなる(【外しても剥がれない】の再発)。
      * 無期限(isInfinite)であることが唯一の識別子で、バニラの通常ポーションは必ず有限期間なので
      * amplifierを見なくても誤検出しない。
+     *
+     * <p><b>⚠️ 2026-08-18 (W-54)</b>: この判定<b>単独</b>を「自分が付けたか」の判定に使ってはいけない。
+     * プレイヤーが管理コマンド等で付けた無期限効果(例: {@code /effect give @s luck infinite})も
+     * {@code isInfinite()} を満たすため、無条件にこれだけで剥がすと他人の無期限効果まで誤爆で消す
+     * (実サーバ報告: 無期限LUCKを付けた直後にスレッド再計算で消える)。この形状チェックは
+     * 「まだ他ソースに上書きされていないか」の確認にのみ使い、「そもそも自分が付けたものか」の
+     * 判定は {@link #threadGrantedPotions} の所有権台帳に一元化した。
      */
     private static boolean isThreadGranted(PotionEffect effect) {
         if (effect == null) return false;
         return effect.isInfinite() || effect.getDuration() >= Integer.MAX_VALUE - 100;
     }
 
+    /**
+     * プレイヤーごとに「今スレッドが実際に付与している(と自分で記録した)ポーション型→amplifier」を
+     * 持つ所有権台帳(2026-08-18, W-54)。
+     *
+     * <p><b>直した問題</b>: 旧実装は {@link #isThreadGranted(PotionEffect)}(無期限かどうか)だけで
+     * 「この効果はスレッドが付けたものか」を判定していた。プレイヤーが無期限 LUCK を手動/管理コマンドで
+     * 付けても同じ条件に一致するため、次の再計算(装備変更のたびに走る)で
+     * {@code player.removePotionEffect(type)} により無条件に剥がされていた。
+     *
+     * <p><b>直し方</b>: 「無期限か」ではなく「実際に自分(スレッド)がこのプレイヤー・このタイプへ
+     * 付与した記録が残っているか」で所有権を判定する。付与するたびに必ずこの台帳へ記録し
+     * ({@link #updatePotionEffects} の付与分岐)、除去は「台帳に記録があり(=自分が付けた)、かつ
+     * 現在も無期限のまま(=他ソースに上書きされていない)」の両方を満たす場合だけ行う。
+     *
+     * <p><b>再起動/再ログインを跨いだ場合の挙動(明示的な設計選択)</b>: この台帳はプロセス内メモリのみ
+     * (サーバ再起動で必ず失われる)。再起動直後、台帳に記録が無い状態で無期限効果が残っていた場合は
+     * <b>「自分のものではない(=他人/他プラグイン起因)」として扱い、絶対に剥がさない</b>
+     * ── 安全側(消さない方向)へ倒す設計判断であり、「台帳が無ければ自分のものとみなして消す」
+     * 側は選ばない(まさにこの誤爆がW-54の実害そのものだったため)。
+     * 一方でスレッド自身が本来付与すべき効果は自己修復する: {@code onPlayerJoin} が必ず
+     * {@link #recalculateArmorBonus} を呼ぶため、対象スレッドをまだ装着していれば同じtickで
+     * この台帳が再構築され、以後は通常どおり除去対象になる(装着中のスレッドの状態は毎回PDCから
+     * 導出し直すため、台帳の有無に依存しない)。
+     */
+    private static final Map<UUID, Map<PotionEffectType, Integer>> threadGrantedPotions =
+            new ConcurrentHashMap<>();
+
     private static void updatePotionEffects(Player player, Map<PotionEffectType, Integer> activeThreadPotions,
                                              ThreadConfig threadConfig) {
+        Map<PotionEffectType, Integer> owned = threadGrantedPotions.computeIfAbsent(
+                // PotionEffectType は Paper 1.21 では enum ではない(Registry 化された Keyed)ので
+                // EnumMap は使えない。ここは装備変更のたびに走るがキー数はスレッド種別ぶんしか無い。
+                player.getUniqueId(), id -> new ConcurrentHashMap<>());
         for (PotionEffectType type : threadConfig.allPotionTypes()) {
             PotionEffect existing = player.getPotionEffect(type);
             Integer desiredAmplifier = activeThreadPotions.get(type);
@@ -505,9 +545,17 @@ public class ArmorManaListener implements Listener {
                 player.addPotionEffect(new PotionEffect(
                     type, POTION_DURATION, desiredAmplifier, true, false, true
                 ));
-            } else if (isThreadGranted(existing)) {
+                // 所有権台帳を更新: このタイプは今回スレッドが実際に付与したと記録する。
+                owned.put(type, desiredAmplifier);
+            } else if (owned.remove(type) != null && isThreadGranted(existing)) {
+                // 台帳に記録があった(=過去に自分が付与した)場合に限り、かつ現在も無期限のまま
+                // (=他ソースに上書きされていない)場合だけ剥がす。台帳に記録が無い無期限効果
+                // (再起動を跨いだ/プレイヤー自身・他プラグインが付けた)は絶対に剥がさない(W-54)。
                 player.removePotionEffect(type);
             }
+        }
+        if (owned.isEmpty()) {
+            threadGrantedPotions.remove(player.getUniqueId());
         }
     }
 
