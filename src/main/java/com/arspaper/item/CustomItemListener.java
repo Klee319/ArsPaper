@@ -307,10 +307,26 @@ public class CustomItemListener implements Listener {
 
     /**
      * 食べ物ベースの materials.yml 素材の直接消費を禁止する。
+     *
+     * <p><b>2026-08-19 W-131/W-149: {@code edible: true} の素材は除外する。</b>
+     * ここは以前「materials.yml 由来 かつ base_material が食べ物」なら無条件でキャンセルしていたので、
+     * <b>圧縮食料(圧縮ステーキ = base_material: COOKED_BEEF など)も丸ごと巻き込んで食べられなくしていた</b>。
+     * 症状は「食事モーションだけ再生され、アイテムは減らず満腹度も戻らず、メッセージも出ない」。
+     * TF 本体の {@code stats/food-gimmick.yml} の {@code custom-foods} へ登録しても直らなかったのは、
+     * ここでキャンセルされた時点で TF の {@code FoodGimmickListener}({@code ignoreCancelled = true})が
+     * 一切呼ばれないため ── 同じ報告が W-131 → W-149 と繰り返された理由がこれ。
+     *
+     * <p>判定順は「食用の旗が立っているなら素通し」→「それ以外の食べ物ベース素材は従来どおり遮断」。
+     * 旗が立っていても<b>回復量は TF の {@code custom-foods} が決める</b>ので、TF 側に登録が無ければ
+     * TF の {@code unregistered-custom-food-ban} が代わりに塞ぐ(＝二重の門のどちらかが開いていれば
+     * 食べられる、ではなく<b>両方通らないと食べられない</b>)。
      */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onConsumeMaterial(PlayerItemConsumeEvent event) {
         ItemStack item = event.getItem();
+        if (isMaterialFlaggedEdible(item)) {
+            return;
+        }
         if (isConfigurableMaterial(item) && isMaterialEdibleBase(item)) {
             event.setCancelled(true);
         }
@@ -528,6 +544,26 @@ public class CustomItemListener implements Listener {
             return customItem.get() instanceof ConfigurableMaterial;
         }
         return ArsPaper.getInstance().getMaterialConfigManager().get(customId.get()).isPresent();
+    }
+
+    /**
+     * materials.yml 素材に {@code edible: true} が立っているか(＝食料として食べてよい素材か)。
+     *
+     * <p>{@link #isMaterialEdibleBase} とは別物。あちらは「base_material がバニラの食べ物か」という
+     * <b>素材の形</b>の判定で、こちらは「食べさせてよいか」という<b>運用上の許可</b>。圧縮食料は両方 true、
+     * 食べ物ベースなのに素材として使うもの(将来足す場合)は前者だけ true になる。
+     */
+    private boolean isMaterialFlaggedEdible(ItemStack item) {
+        if (item == null || item.getType().isAir()) {
+            return false;
+        }
+        Optional<String> customId = PdcHelper.getCustomItemId(item);
+        if (customId.isEmpty()) {
+            return false;
+        }
+        return ArsPaper.getInstance().getMaterialConfigManager().get(customId.get())
+            .map(MaterialConfig::edible)
+            .orElse(false);
     }
 
     /** materials.yml 素材の base_material が食べ物か。 */

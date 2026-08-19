@@ -1700,6 +1700,12 @@ materials:
         - ii
   compressed_bread_1x:
     base_material: BREAD
+    # 2026-08-19 W-131/W-149: 食料として食べてよい素材(既定 false)。この旗が無いと
+    # CustomItemListener#onConsumeMaterial が食事そのものをキャンセルし、【モーションだけ再生されて
+    # アイテムが減らず満腹度も戻らない】(メッセージも出ない)状態になる。
+    # 満腹度の回復量は TF 本体の stats/food-gimmick.yml の custom-foods が決めるので、
+    # 【この旗と TF 側の登録は両方必要】。81倍(_2x)/729倍(_3x)には意図的に立てない(解凍して食べる)。
+    edible: true
     custom_model_data: 5202
     display_name: 圧縮パン
     enchant_glow: true
@@ -1717,6 +1723,7 @@ materials:
         - iii
   compressed_cooked_beef_1x:
     base_material: COOKED_BEEF
+    edible: true
     custom_model_data: 5203
     display_name: 圧縮ステーキ
     enchant_glow: true
@@ -1734,6 +1741,7 @@ materials:
         - iii
   baked_potato_1x:
     base_material: BAKED_POTATO
+    edible: true
     custom_model_data: 252
     display_name: 圧縮ベイクドポテト
     enchant_glow: true
@@ -1751,6 +1759,7 @@ materials:
         - iii
   cooked_porkchop_1x:
     base_material: COOKED_PORKCHOP
+    edible: true
     custom_model_data: 253
     display_name: 圧縮焼き豚
     enchant_glow: true
@@ -1768,6 +1777,7 @@ materials:
         - iii
   cooked_mutton_1x:
     base_material: COOKED_MUTTON
+    edible: true
     custom_model_data: 254
     display_name: 圧縮焼き羊肉
     enchant_glow: true
@@ -1785,6 +1795,7 @@ materials:
         - iii
   cooked_chicken_1x:
     base_material: COOKED_CHICKEN
+    edible: true
     custom_model_data: 255
     display_name: 圧縮焼き鳥
     enchant_glow: true
@@ -1802,6 +1813,7 @@ materials:
         - iii
   cookie_1x:
     base_material: COOKIE
+    edible: true
     custom_model_data: 256
     display_name: 圧縮クッキー
     enchant_glow: true
@@ -1819,6 +1831,7 @@ materials:
         - iii
   baked_salon_1x:
     base_material: COOKED_COD
+    edible: true
     display_name: 圧縮焼き鮭
     lore: []
     recipe:
@@ -1834,6 +1847,7 @@ materials:
     enchant_glow: true
   baked_cod_1x:
     base_material: COOKED_COD
+    edible: true
     display_name: 圧縮焼き鱈
     lore: []
     recipe:
@@ -1849,6 +1863,7 @@ materials:
     enchant_glow: true
   pumpkin_pie_1x:
     base_material: PUMPKIN_PIE
+    edible: true
     custom_model_data: 257
     display_name: 圧縮パンプキンパイ
     enchant_glow: true
@@ -1866,6 +1881,7 @@ materials:
         - iii
   carrot_1x:
     base_material: CARROT
+    edible: true
     custom_model_data: 184
     display_name: "&69倍圧縮ニンジン"
     enchant_glow: true
@@ -1914,6 +1930,7 @@ materials:
         - iii
   potato_1x:
     base_material: POTATO
+    edible: true
     custom_model_data: 189
     display_name: "&e9倍圧縮ジャガイモ"
     enchant_glow: true
@@ -1962,6 +1979,7 @@ materials:
         - iii
   beetroot_1x:
     base_material: BEETROOT
+    edible: true
     custom_model_data: 193
     display_name: "&49倍圧縮ビートルート"
     enchant_glow: true
@@ -2010,6 +2028,7 @@ materials:
         - iii
   beef_1x:
     base_material: BEEF
+    edible: true
     custom_model_data: 197
     display_name: "&c9倍圧縮生の牛肉"
     enchant_glow: true
@@ -2058,6 +2077,7 @@ materials:
         - iii
   porkchop_1x:
     base_material: PORKCHOP
+    edible: true
     custom_model_data: 200
     display_name: "&d9倍圧縮生の豚肉"
     enchant_glow: true
@@ -2106,6 +2126,7 @@ materials:
         - iii
   chicken_1x:
     base_material: CHICKEN
+    edible: true
     custom_model_data: 203
     display_name: "&f9倍圧縮生の鶏肉"
     enchant_glow: true
@@ -2154,6 +2175,7 @@ materials:
         - iii
   mutton_1x:
     base_material: MUTTON
+    edible: true
     custom_model_data: 206
     display_name: "&79倍圧縮生の羊肉"
     enchant_glow: true
@@ -2202,6 +2224,7 @@ materials:
         - iii
   rabbit_1x:
     base_material: RABBIT
+    edible: true
     custom_model_data: 209
     display_name: "&69倍圧縮生の兎肉"
     enchant_glow: true
@@ -2250,6 +2273,7 @@ materials:
         - iii
   cod_1x:
     base_material: COD
+    edible: true
     custom_model_data: 212
     display_name: "&b9倍圧縮生鱈"
     enchant_glow: true
@@ -2298,6 +2322,7 @@ materials:
         - iii
   salmon_1x:
     base_material: SALMON
+    edible: true
     custom_model_data: 215
     display_name: "&d9倍圧縮生鮭"
     enchant_glow: true
@@ -2490,6 +2515,7 @@ materials:
         - iii
   glow_berries_1x:
     base_material: GLOW_BERRIES
+    edible: true
     custom_model_data: 227
     display_name: "&d9倍圧縮グロウベリー"
     enchant_glow: true
@@ -2538,6 +2564,7 @@ materials:
         - iii
   sweet_berries_1x:
     base_material: SWEET_BERRIES
+    edible: true
     custom_model_data: 230
     display_name: "&49倍圧縮スイートベリー"
     enchant_glow: true
@@ -2586,6 +2613,7 @@ materials:
         - iii
   apple_1x:
     base_material: APPLE
+    edible: true
     custom_model_data: 233
     display_name: "&c9倍圧縮リンゴ"
     enchant_glow: true
@@ -2634,6 +2662,8 @@ materials:
         - iii
   tf_crystal_apple:
     base_material: ENCHANTED_GOLDEN_APPLE
+    # クリスタルリンゴもベースが食べ物(ENCHANTED_GOLDEN_APPLE)なので旗が要る。
+    edible: true
     custom_model_data: 5201
     display_name: クリスタルリンゴ
     enchant_glow: false
