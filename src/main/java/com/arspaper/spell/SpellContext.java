@@ -93,6 +93,34 @@ public class SpellContext {
     public org.bukkit.block.BlockFace getHitFace() { return hitFace; }
     public void setHitFace(org.bukkit.block.BlockFace hitFace) { this.hitFace = hitFace; }
 
+    /**
+     * <b>1回の詠唱で共有される状態</b>（2026-08-19）。{@link #copy()} は<b>参照をそのまま渡す</b>ので、
+     * 同じ詠唱から生まれたコンテキストのコピーは全て同じインスタンスを見る。
+     *
+     * <p><b>なぜ要るか</b>: 伝播チェーンの除外集合はこれまで {@code resolveGroupsOnEntity} の
+     * ローカル変数で、その回の対象と術者しか入っていなかった。炸裂のように<b>フォームが複数の対象へ
+     * 独立に resolve する</b>と、A のチェーンが B・C（＝炸裂が直撃させる相手）を選んでしまい、
+     * 実際のダメージはバニラの無敵時間に吸われて<b>伝播ぶんのマナが丸ごと無駄になっていた</b>。
+     * ヒット済みを詠唱単位で共有すると、チェーンは代わりに<b>まだ当たっていない相手</b>を選ぶので、
+     * 同じマナが「重複」ではなく「到達範囲」に変わる。
+     */
+    private static final class CastState {
+        /** この詠唱で既に効果を与えた（または与えることが確定した）エンティティ。 */
+        private final java.util.Set<java.util.UUID> hitEntities = new java.util.HashSet<>();
+        /** この詠唱で消費したチェーン数。上限は propagate.params.max-chains-per-cast。 */
+        private int chainsUsed = 0;
+    }
+
+    /** 詠唱1回で共有する状態（コピー間で参照を共有する）。 */
+    private final CastState castState;
+
+    /**
+     * 伝播チェーン先に掛ける威力倍率（1.0 = 減衰なし）。
+     * 近い順に {@code propagate.params.damage-falloff-per-hop} ずつ引き、
+     * {@code min-damage-rate} で下げ止まる。{@link #dealSpellDamage} が最終ダメージへ掛ける。
+     */
+    private double propagateDamageRate = 1.0;
+
     public SpellContext(Player caster, SpellRecipe recipe) {
         this(caster, recipe, null);
     }
@@ -120,6 +148,7 @@ public class SpellContext {
         // 生成毎に呼び出し側スタックへ影響しないよう防御的コピー（不変扱い）。
         this.catalyst = (catalyst != null) ? catalyst.clone() : null;
         this.castItem = (castItem != null) ? castItem.clone() : null;
+        this.castState = new CastState();
     }
 
     private SpellContext(SpellContext other) {
@@ -128,6 +157,8 @@ public class SpellContext {
         this.components = other.components;
         this.catalyst = other.catalyst;
         this.castItem = other.castItem;
+        // ★参照を共有する（値コピーにすると伝播の重複排除が詠唱単位で効かなくなる）。
+        this.castState = other.castState;
     }
 
     /**
@@ -322,6 +353,12 @@ public class SpellContext {
         // ステ供給元が特定できない（儀式/タレット等の非プレイヤー詠唱）場合は plain(0) フォールバック。
         double finalDamage = com.arspaper.integration.TrinityForgeBridge
             .magicalFinalDamage(casterUuid, target, spellBase, catalyst, castItem, glyphId, amplifyForDamage);
+        // 伝播チェーン先の威力減衰(2026-08-19)。【最終ダメージ】に掛ける ── spellBase 側に掛けると
+        // TF の守備力が引き算で効くため、0.4 倍のつもりが min-component-damage(1) まで落ちて
+        // 減衰率と実ダメージが桁で食い違う。回復(負値)にも同じ倍率を掛けて向きを揃える。
+        if (propagateDamageRate != 1.0) {
+            finalDamage *= propagateDamageRate;
+        }
         // #6: 負の最終魔法ダメージは対象を回復させる(TF物理側 CombatListener と対称。負クランプ設定時のみ発生)。
         // 0 は何もしない。正のときのみ MAGIC ダメージソースで適用する。
         if (finalDamage < 0) {
@@ -483,6 +520,7 @@ public class SpellContext {
         copy.dampenAccum = this.dampenAccum;
         copy.durationDownAccum = this.durationDownAccum;
         copy.secondaryInvocation = this.secondaryInvocation;
+        copy.propagateDamageRate = this.propagateDamageRate;
         return copy;
     }
 
@@ -570,6 +608,7 @@ public class SpellContext {
     public void resolveOnEntityNoAoe(LivingEntity target) {
         Player caster = getCaster();
         if (caster == null) return;
+        markCastHit(target);
 
         List<EffectGroup> groups = buildEffectGroups();
         resolveGroupsOnEntityNoAoe(groups, 0, target);
@@ -628,6 +667,7 @@ public class SpellContext {
     public void resolveOnEntity(LivingEntity target) {
         Player caster = getCaster();
         if (caster == null) return;
+        markCastHit(target);
 
         // PVPチェックはisValidAoeTarget()とEntityDamageEvent(WorldGuard等)で処理。
         // ここではブロックしない（回復スペルが味方に効かなくなるため）。
@@ -714,45 +754,122 @@ public class SpellContext {
                     center.getNearbyLivingEntities(radius).stream()
                         .filter(e -> !e.equals(target) && !e.equals(caster))
                         .filter(e -> isValidAoeTarget(e, caster))
-                        .forEach(e -> group.effect.applyToEntity(this, e));
+                        .forEach(e -> {
+                            markCastHit(e);
+                            group.effect.applyToEntity(this, e);
+                        });
                 }
             }
 
-            // === 伝播チェーン: ヒットしたエンティティの周囲の敵にエフェクトを連鎖 ===
+            // === 伝播チェーン: ヒット地点の周囲の【この詠唱でまだ当てていない】敵へ連鎖 ===
             if (propagateChainCount > 0 && !inPropagateChain) {
-                double chainRadius = 8.0; // チェーン検索範囲（固定）
-                java.util.Set<LivingEntity> alreadyHit = new java.util.HashSet<>();
-                alreadyHit.add(target);
-                if (caster != null) alreadyHit.add(caster);
+                schedulePropagateChain(target.getLocation(), group.effect, caster);
+            }
+        }
+        resetAugmentState();
+    }
 
-                java.util.List<LivingEntity> chainTargets = target.getLocation()
-                    .getNearbyLivingEntities(chainRadius).stream()
-                    .filter(e -> !alreadyHit.contains(e))
-                    .filter(e -> isValidAoeTarget(e, caster))
-                    .sorted(java.util.Comparator.comparingDouble(
-                        e -> e.getLocation().distanceSquared(target.getLocation())))
-                    .limit(propagateChainCount)
-                    .toList();
+    /**
+     * この詠唱で「もう当てた」ことにする。以後、伝播チェーンの候補から外れる。
+     *
+     * <p>炸裂のように<b>フォーム側が複数の対象を自前で拾う</b>場合は、1体目を resolve する前に
+     * {@link #markCastHits} で対象全員を登録しておくこと。登録が後になると、1体目のチェーンが
+     * 「これから直撃させる相手」を選んでしまい、バニラの無敵時間に吸われてチェーン枠を捨てる。
+     */
+    public void markCastHit(LivingEntity entity) {
+        if (entity != null) {
+            castState.hitEntities.add(entity.getUniqueId());
+        }
+    }
 
-                // 遅延実行: 各チェーン対象を2tick間隔でずらしてスパイク軽減
-                final SpellEffect chainEffect = group.effect;
-                for (int ci = 0; ci < chainTargets.size(); ci++) {
-                    final LivingEntity chainTarget = chainTargets.get(ci);
-                    final int delay = (ci + 1) * 2; // 2, 4, 6, ... tick後
-                    final Location targetLocSnapshot = target.getLocation().add(0, 1, 0);
-                    new org.bukkit.scheduler.BukkitRunnable() {
-                        @Override
-                        public void run() {
-                            if (chainTarget.isDead() || !chainTarget.isValid()) return;
-                            SpellContext chainCtx = SpellContext.this.copy();
-                            chainCtx.setInPropagateChain(true);
-                            chainCtx.setSecondaryInvocation(true); // パーティクル削減
-                            chainEffect.applyToEntity(chainCtx, chainTarget);
-                            SpellFxUtil.spawnChainFx(targetLocSnapshot,
-                                chainTarget.getLocation().add(0, 1, 0));
-                        }
-                    }.runTaskLater(ArsPaper.getInstance(), delay);
+    /** {@link #markCastHit} の一括版。 */
+    public void markCastHits(java.util.Collection<? extends LivingEntity> entities) {
+        if (entities == null) return;
+        for (LivingEntity e : entities) {
+            markCastHit(e);
+        }
+    }
+
+    /**
+     * {@code origin} を起点に伝播チェーンを張る。
+     *
+     * <p>候補は「この詠唱でまだ当てていない」エンティティだけ。近い順に取り、1 ホップごとに
+     * {@code damage-falloff-per-hop} ずつ威力を落とす（{@code min-damage-rate} で下げ止まり）。
+     * 選んだ時点で即ヒット済みへ登録するので、同じ詠唱の別の対象から張られたチェーンと衝突しない。
+     *
+     * <p><b>上限が要る理由</b>: 除外して探し直す方式は、密集地では候補が尽きるまで外へ伸びる。
+     * 対象ごとに {@code getNearbyLivingEntities} を呼ぶので、TT やスポナー前では
+     * 対象数 × 検索回数が跳ね上がる。{@code max-chains-per-cast} は詠唱 1 回の総チェーン数の天井。
+     */
+    private void schedulePropagateChain(Location origin, SpellEffect chainEffect, Player caster) {
+        if (origin == null || chainEffect == null) return;
+        GlyphConfig cfg = ArsPaper.getInstance().getGlyphConfig();
+        double chainRadius = cfg.getParam("propagate", "chain-radius", 8.0);
+        int maxPerCast = (int) cfg.getParam("propagate", "max-chains-per-cast", 20.0);
+        int budget = SpellPropagateMath.budget(propagateChainCount, maxPerCast, castState.chainsUsed);
+        if (budget <= 0 || chainRadius <= 0) return;
+
+        final Location originSnapshot = origin.clone();
+        java.util.List<LivingEntity> chainTargets = originSnapshot.getNearbyLivingEntities(chainRadius).stream()
+            .filter(e -> !e.equals(caster))
+            .filter(e -> !castState.hitEntities.contains(e.getUniqueId()))
+            .filter(e -> isValidAoeTarget(e, caster))
+            .sorted(java.util.Comparator.comparingDouble(
+                e -> e.getLocation().distanceSquared(originSnapshot)))
+            .limit(budget)
+            .toList();
+        if (chainTargets.isEmpty()) return;
+
+        double falloff = cfg.getParam("propagate", "damage-falloff-per-hop", 0.15);
+        double minRate = cfg.getParam("propagate", "min-damage-rate", 0.4);
+        final Location fxOrigin = originSnapshot.clone().add(0, 1, 0);
+
+        // 遅延実行: 各チェーン対象を2tick間隔でずらしてスパイク軽減
+        for (int ci = 0; ci < chainTargets.size(); ci++) {
+            final LivingEntity chainTarget = chainTargets.get(ci);
+            // 【選んだ時点で登録する】。適用は遅延なので、ここで入れないと同じ詠唱の
+            // 別の対象から張られたチェーンが同じ相手を二重に選ぶ。
+            markCastHit(chainTarget);
+            castState.chainsUsed++;
+            final int delay = (ci + 1) * 2; // 2, 4, 6, ... tick後
+            final double hopRate = SpellPropagateMath.hopRate(ci, falloff, minRate);
+            final double chainRate = this.propagateDamageRate * hopRate;
+            new org.bukkit.scheduler.BukkitRunnable() {
+                @Override
+                public void run() {
+                    if (chainTarget.isDead() || !chainTarget.isValid()) return;
+                    SpellContext chainCtx = SpellContext.this.copy();
+                    chainCtx.setInPropagateChain(true);
+                    chainCtx.setSecondaryInvocation(true); // パーティクル削減
+                    chainCtx.propagateDamageRate = chainRate;
+                    chainEffect.applyToEntity(chainCtx, chainTarget);
+                    SpellFxUtil.spawnChainFx(fxOrigin, chainTarget.getLocation().add(0, 1, 0));
                 }
+            }.runTaskLater(ArsPaper.getInstance(), delay);
+        }
+    }
+
+    /**
+     * <b>エンティティに当たらなかった炸裂</b>から伝播チェーンを張る（2026-08-19）。
+     *
+     * <p>伝播は本来「エンティティヒット」が起点なので、空中で信管が切れて誰にも当たらなかった
+     * 炸裂では<b>一度も発動しなかった</b>。炸裂地点そのものを起点にできると「外しても芋づる式に当たる」が
+     * 成立し、これが炸裂に伝播を合わせる固有の利点になる（投射は外した弾から連鎖しない）。
+     *
+     * <p>直撃対象が 1 体でもあるときは呼ばないこと ── その対象から通常どおりチェーンが張られるので、
+     * ここから重ねると同じ詠唱で二重に枠を使う（ヒット済み集合のおかげでダメージは重複しないが、
+     * {@code max-chains-per-cast} を無駄に消費する）。
+     */
+    public void resolvePropagateFromLocation(Location origin) {
+        Player caster = getCaster();
+        if (caster == null || origin == null) return;
+        for (EffectGroup group : buildEffectGroups()) {
+            resetAugmentState();
+            for (SpellAugment aug : group.augments) {
+                aug.modify(this);
+            }
+            if (propagateChainCount > 0 && !inPropagateChain) {
+                schedulePropagateChain(origin, group.effect, caster);
             }
         }
         resetAugmentState();

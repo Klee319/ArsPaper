@@ -154,10 +154,29 @@ public class BurstForm implements SpellForm {
         // 範囲内エンティティ
         Collection<LivingEntity> nearby = center.getWorld().getNearbyEntitiesByType(
             LivingEntity.class, center, radius);
-        for (LivingEntity entity : nearby) {
-            if (entity == caster) continue; // 術者は除外
+        java.util.List<LivingEntity> targets = nearby.stream()
+            .filter(e -> e != caster) // 術者は除外
+            .toList();
+
+        // 【resolve より先に全員をヒット済みへ登録する】(2026-08-19)
+        // 炸裂は1体ずつ resolveOnEntity するので、登録が後回しだと 1 体目の伝播チェーンが
+        // 「これから直撃させる 2 体目・3 体目」を選んでしまう。実ダメージはバニラの無敵時間に
+        // 吸われるため、伝播に払ったマナが丸ごと消える。先に登録すれば、チェーンは代わりに
+        // 【炸裂半径の外にいる敵】を掴みに行く ── これが炸裂 + 伝播の固有の強みになる。
+        context.markCastHits(targets);
+
+        for (LivingEntity entity : targets) {
             SpellContext entityCtx = context.copy();
             entityCtx.resolveOnEntity(entity);
+        }
+
+        // 誰にも当たらなかった炸裂は、炸裂地点そのものを伝播の起点にする（2026-08-19）。
+        // これが無いと、空中で信管切れした炸裂では伝播が一度も発動しない。
+        // 1 体でも直撃していれば、その対象から通常どおりチェーンが張られるのでここは呼ばない
+        // （呼ぶと同じ詠唱で max-chains-per-cast を二重に消費する）。
+        if (targets.isEmpty()) {
+            SpellContext missCtx = context.copy();
+            missCtx.resolvePropagateFromLocation(center);
         }
     }
 
