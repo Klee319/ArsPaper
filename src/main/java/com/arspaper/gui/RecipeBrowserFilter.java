@@ -77,7 +77,11 @@ final class RecipeBrowserFilter {
     enum KindMode {
         ALL("すべて"),
         WORKBENCH("作業台レシピ"),
-        RITUAL("儀式レシピ");
+        RITUAL("儀式レシピ"),
+        // 2026-08-19 W-123 実サーバ報告「日の出の儀式やスレッド枠付与の儀式まで儀式レシピに
+        // 混ざっている」。これらは【アイテムを作らない儀式】で、探す動機も探し方も
+        // 「何が作れるか」とは別物なので、儀式レシピから外して独立の絞り込みにする。
+        RITUAL_EFFECT("儀式エフェクト");
 
         private final String label;
 
@@ -99,25 +103,57 @@ final class RecipeBrowserFilter {
             return switch (this) {
                 case ALL -> true;
                 case WORKBENCH -> !entry.isRitual;
-                case RITUAL -> entry.isRitual;
+                case RITUAL -> entry.isRitual && !isEffectRitual(entry);
+                case RITUAL_EFFECT -> entry.isRitual && isEffectRitual(entry);
             };
         }
     }
 
     /**
-     * 絞り込み → 並べ替えを適用した新しいリストを返す(引数のリストは変更しない)。
+     * 「アイテムを作らない儀式」か。
      *
-     * @param kind   表示するレシピ種別(作業台/儀式/すべて)。
-     * @param search ワイルドカード検索語。null/空なら検索なし。
+     * <p>判定は {@code RitualRecipe#isCraft()}(= {@code "craft".equals(effectType)})の裏返しで、
+     * <b>この GUI が独自に線を引いているのではなく、儀式の実行側が既に使っている区分をそのまま
+     * 借りている</b>。ここで独自の一覧(sunrise / thread_slot_expand / …)を持つと、
+     * 新しい effect-type を足したときに絞り込みだけが無言で取りこぼす。
+     *
+     * <p>対象は 日の出 / 月の出 / 天候 / 飛行 / 修復 / 召喚 / エンチャント本化 / スレッド付与 /
+     * スレッド枠拡張 など、{@code effect-type} が {@code craft} 以外の全部。
+     * {@code effectType} が null の儀式(旧経路で作られた行)は、結果アイテムを持つ従来の儀式として扱う。
+     */
+    static boolean isEffectRitual(RecipeEntry entry) {
+        return entry.effectType != null && !"craft".equals(entry.effectType);
+    }
+
+    /**
+     * 圧縮の中間段階と解凍を隠した既定の絞り込み。
+     *
+     * @see #arrange(List, SortMode, KindMode, String, boolean)
      */
     static List<RecipeEntry> arrange(List<RecipeEntry> source, SortMode sort, KindMode kind,
                                      String search) {
+        return arrange(source, sort, kind, search, false);
+    }
+
+    /**
+     * 絞り込み → 並べ替えを適用した新しいリストを返す(引数のリストは変更しない)。
+     *
+     * @param kind   表示するレシピ種別(作業台/儀式/儀式エフェクト/すべて)。
+     * @param search ワイルドカード検索語。null/空なら検索なし。
+     * @param showCompressionDetails 圧縮の中間段階と解凍レシピも出すか(既定 false)。
+     */
+    static List<RecipeEntry> arrange(List<RecipeEntry> source, SortMode sort, KindMode kind,
+                                     String search, boolean showCompressionDetails) {
         List<RecipeEntry> result = new ArrayList<>();
         Pattern pattern = compileGlob(search);
+        // 「その連鎖の最大段」は検索語や種別で変わってはいけない(検索するたびに出る段が
+        // 変わると、同じアイテムが有ったり無かったりするように見える)。母集団全体で1度だけ決める。
+        Map<String, Integer> topStages = showCompressionDetails ? Map.of() : topCompressionStages(source);
         for (RecipeEntry entry : source) {
             if (entry == null) continue;
             if (pattern != null && !pattern.matcher(entry.sortName()).matches()) continue;
             if (kind != null && !kind.accepts(entry)) continue;
+            if (!showCompressionDetails && isHiddenCompressionStep(entry, topStages)) continue;
             result.add(entry);
         }
         Comparator<RecipeEntry> comparator = comparatorFor(sort);
@@ -125,6 +161,73 @@ final class RecipeBrowserFilter {
             result.sort(comparator);
         }
         return result;
+    }
+
+    // ------------------------------------------------------------------
+    // 圧縮レシピの間引き (2026-08-19 W-122 / W-99)
+    //
+    // 圧縮素材は materials.yml だけで 171 件・62 連鎖あり、1連鎖が最大5段ある。
+    // 全部並べるとレシピ一覧が圧縮素材で埋まって他が探せない。
+    // 既定では【各連鎖の最大段だけ】を出し、中間段と解凍(reversible の裏レシピ)は隠す。
+    //
+    // 判定はレシピキー(RecipeEntry#id)から行う。キーは Ars が materials.yml のエントリ id を
+    // そのまま使い(`stone_3x`)、逆レシピは `_decompress` を足す(RecipeManager)。
+    // TF カタログ由来は `catalog_` 接頭辞が付くのでそこだけ落とす。
+    // ★ 表示名で判定しない: 「81倍圧縮石」のような表示名は yml の自由記述で、
+    //   倍率の書き方が揺れた瞬間に間引きが無言で効かなくなる。
+    // ------------------------------------------------------------------
+
+    /** TrinityForge カタログレシピのキー接頭辞({@code CatalogRecipeRegistrar} と対)。 */
+    private static final String CATALOG_KEY_PREFIX = "catalog_";
+    /** {@code reversible: true} が自動登録する解凍レシピのキー接尾辞({@code RecipeManager})。 */
+    private static final String DECOMPRESS_SUFFIX = "_decompress";
+    /** {@code <base>_<段>x} 形式の圧縮アイテム id。 */
+    private static final Pattern COMPRESSION_ID = Pattern.compile("^(.+)_(\\d{1,2})x$");
+
+    /** 解凍(圧縮を戻す)レシピか。 */
+    static boolean isDecompression(RecipeEntry entry) {
+        return entry != null && entry.id != null && entry.id.endsWith(DECOMPRESS_SUFFIX);
+    }
+
+    /** 圧縮連鎖の基底 id。圧縮レシピでなければ null。解凍レシピも同じ連鎖として扱う。 */
+    static String compressionBase(RecipeEntry entry) {
+        var m = compressionMatcher(entry);
+        return m == null ? null : m.group(1);
+    }
+
+    /** 圧縮連鎖の段数(1 始まり)。圧縮レシピでなければ 0。 */
+    static int compressionStage(RecipeEntry entry) {
+        var m = compressionMatcher(entry);
+        return m == null ? 0 : Integer.parseInt(m.group(2));
+    }
+
+    private static java.util.regex.Matcher compressionMatcher(RecipeEntry entry) {
+        if (entry == null || entry.id == null) return null;
+        String id = entry.id;
+        if (id.startsWith(CATALOG_KEY_PREFIX)) id = id.substring(CATALOG_KEY_PREFIX.length());
+        if (id.endsWith(DECOMPRESS_SUFFIX)) id = id.substring(0, id.length() - DECOMPRESS_SUFFIX.length());
+        var m = COMPRESSION_ID.matcher(id);
+        return m.matches() ? m : null;
+    }
+
+    /** 基底 id -> その連鎖に実在する最大段。 */
+    private static Map<String, Integer> topCompressionStages(List<RecipeEntry> source) {
+        Map<String, Integer> top = new java.util.HashMap<>();
+        for (RecipeEntry entry : source) {
+            String base = compressionBase(entry);
+            if (base == null) continue;
+            top.merge(base, compressionStage(entry), Math::max);
+        }
+        return top;
+    }
+
+    /** 既定表示で隠すレシピか(中間段の圧縮 / すべての解凍)。 */
+    private static boolean isHiddenCompressionStep(RecipeEntry entry, Map<String, Integer> topStages) {
+        String base = compressionBase(entry);
+        if (base == null) return false;
+        if (isDecompression(entry)) return true;
+        Integer top = topStages.get(base);
+        return top != null && compressionStage(entry) < top;
     }
 
     private static Comparator<RecipeEntry> comparatorFor(SortMode sort) {

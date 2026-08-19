@@ -61,6 +61,8 @@ public class RecipeBrowserGui extends BaseGui {
     private static final int BTN_SEARCH = 48;
     private static final int BTN_CLOSE = 49;
     private static final int BTN_RELATED_CLEAR = 50;
+    /** 圧縮の中間段階・解凍レシピを出すかのトグル (2026-08-19 W-122 / W-99)。 */
+    private static final int BTN_COMPRESSION = 51;
     private static final int BTN_NEXT = 53;
     /** 詳細画面: 完成品スロット（ここをクリックすると「これを使うレシピ」一覧へ）。 */
     private static final int DETAIL_RESULT_SLOT = 15;
@@ -92,6 +94,12 @@ public class RecipeBrowserGui extends BaseGui {
     private String searchTerm = "";
 
     /**
+     * 圧縮の中間段階と解凍レシピを表示するか (2026-08-19 W-122 / W-99 ユーザー確定「最大倍率の
+     * 1つだけを出し、中間レシピと解凍レシピはオプションで on/off、既定 off」)。
+     */
+    private boolean showCompressionDetails = false;
+
+    /**
      * 関連レシピ表示（素材/完成品クリック由来の絞り込み）。null なら通常の全件一覧。
      *
      * @param token   突き合わせに使う素材トークン({@code custom:<id>} / Material名)
@@ -113,18 +121,81 @@ public class RecipeBrowserGui extends BaseGui {
      */
     private final Map<Integer, String> detailSlotTokens = new HashMap<>();
 
+    /**
+     * 並べ替え/絞り込みをプレイヤーへ保存する PDC キー(2026-08-18 W-97 実サーバ報告
+     * 「以前設定していたレシピ・図鑑のソートの記憶保持をするようにしてほしい」)。
+     *
+     * <p><b>enum の {@code name()} で保存する</b>(ordinal ではない)。ordinal だと
+     * {@code SortMode}/{@code KindMode} に定数を1つ挿しただけで、保存済みの全プレイヤーの設定が
+     * 無言で別の並び順に化ける。
+     */
+    private static final String PREF_SORT = "recipe_browser_sort";
+    private static final String PREF_KIND = "recipe_browser_kind";
+    /** 圧縮の中間段階トグル。未設定 = 既定(隠す)。 */
+    private static final String PREF_COMPRESSION = "recipe_browser_compression";
+
     public RecipeBrowserGui(Player viewer) {
         super(viewer, 6, Component.text("レシピ一覧", NamedTextColor.DARK_PURPLE)
             .decoration(TextDecoration.ITALIC, false));
         this.allRecipes = collectAllRecipes();
         this.visible = this.allRecipes;
+        // 前回の並べ替え/絞り込みを引き継ぐ。検索語は持ち越さない ——
+        // 開くたびに前回の検索で絞られていると「レシピが消えた」ようにしか見えないため。
+        this.sortMode = readPreference(viewer, PREF_SORT,
+            RecipeBrowserFilter.SortMode.class, RecipeBrowserFilter.SortMode.NAME);
+        this.kindMode = readPreference(viewer, PREF_KIND,
+            RecipeBrowserFilter.KindMode.class, RecipeBrowserFilter.KindMode.ALL);
+        this.showCompressionDetails = readFlag(viewer, PREF_COMPRESSION);
         refresh();
+    }
+
+    private static org.bukkit.NamespacedKey prefKey(String name) {
+        return new org.bukkit.NamespacedKey(com.arspaper.ArsPaper.getInstance(), name);
+    }
+
+    /** 保存済みの設定。未設定 / 削除された定数が残っていた場合は {@code fallback}。 */
+    private static <E extends Enum<E>> E readPreference(Player viewer, String name,
+                                                        Class<E> type, E fallback) {
+        try {
+            String stored = viewer.getPersistentDataContainer()
+                .get(prefKey(name), org.bukkit.persistence.PersistentDataType.STRING);
+            return stored == null ? fallback : Enum.valueOf(type, stored);
+        } catch (RuntimeException ex) {
+            return fallback; // 削除された定数が残っていた / PDC を読めなかった
+        }
+    }
+
+    /** 保存済みの真偽トグル。未設定 / 読めなかった場合は false(＝既定)。 */
+    private static boolean readFlag(Player viewer, String name) {
+        try {
+            String stored = viewer.getPersistentDataContainer()
+                .get(prefKey(name), org.bukkit.persistence.PersistentDataType.STRING);
+            return "true".equals(stored);
+        } catch (RuntimeException ex) {
+            return false;
+        }
+    }
+
+    /** 現在の並べ替え/絞り込みを保存する。次に開いたときの初期値になる。 */
+    private void rememberPreferences() {
+        try {
+            var pdc = viewer.getPersistentDataContainer();
+            pdc.set(prefKey(PREF_SORT), org.bukkit.persistence.PersistentDataType.STRING,
+                sortMode.name());
+            pdc.set(prefKey(PREF_KIND), org.bukkit.persistence.PersistentDataType.STRING,
+                kindMode.name());
+            pdc.set(prefKey(PREF_COMPRESSION), org.bukkit.persistence.PersistentDataType.STRING,
+                Boolean.toString(showCompressionDetails));
+        } catch (RuntimeException ignored) {
+            // 保存できなくても一覧の表示は続ける(記憶は利便性であって機能ではない)。
+        }
     }
 
     /** 並べ替え・絞り込み・検索・関連表示を適用し直す(描画はしない)。 */
     private void refresh() {
         List<RecipeEntry> base = related == null ? allRecipes : relatedEntries(related);
-        this.visible = RecipeBrowserFilter.arrange(base, sortMode, kindMode, searchTerm);
+        this.visible = RecipeBrowserFilter.arrange(base, sortMode, kindMode, searchTerm,
+            showCompressionDetails);
         int totalPages = Math.max(1, (int) Math.ceil((double) visible.size() / ITEMS_PER_PAGE));
         if (currentPage > totalPages - 1) {
             currentPage = totalPages - 1;
@@ -168,6 +239,12 @@ public class RecipeBrowserGui extends BaseGui {
                 detailText("ワイルドカード: * と ? が使える", NamedTextColor.DARK_GRAY),
                 detailText("「" + SEARCH_CLEAR_TOKEN + "」で検索解除", NamedTextColor.DARK_GRAY))));
 
+        inventory.setItem(BTN_COMPRESSION, createButton(
+            showCompressionDetails ? Material.PISTON : Material.STICKY_PISTON,
+            Component.text(showCompressionDetails ? "圧縮: 全段を表示" : "圧縮: 最大倍率のみ",
+                NamedTextColor.AQUA),
+            compressionLore(showCompressionDetails)));
+
         if (related != null) {
             inventory.setItem(BTN_RELATED_CLEAR, createButton(Material.BARRIER,
                 Component.text("← 全レシピに戻る", NamedTextColor.YELLOW)));
@@ -197,6 +274,9 @@ public class RecipeBrowserGui extends BaseGui {
         }
         lore.add(detailText("並べ替え: " + sortMode.label(), NamedTextColor.DARK_GRAY));
         lore.add(detailText("表示: " + kindMode.label(), NamedTextColor.DARK_GRAY));
+        if (!showCompressionDetails) {
+            lore.add(detailText("圧縮: 最大倍率のみ(中間段と解凍は非表示)", NamedTextColor.DARK_GRAY));
+        }
         return createButton(Material.PAPER,
             Component.text("ページ " + (currentPage + 1) + " / " + totalPages, NamedTextColor.WHITE),
             lore);
@@ -219,6 +299,7 @@ public class RecipeBrowserGui extends BaseGui {
         if (slot == BTN_SORT) {
             sortMode = sortMode.next();
             currentPage = 0;
+            rememberPreferences();
             refresh();
             render();
             return true;
@@ -226,6 +307,15 @@ public class RecipeBrowserGui extends BaseGui {
         if (slot == BTN_FILTER) {
             kindMode = kindMode.next();
             currentPage = 0;
+            rememberPreferences();
+            refresh();
+            render();
+            return true;
+        }
+        if (slot == BTN_COMPRESSION) {
+            showCompressionDetails = !showCompressionDetails;
+            currentPage = 0;
+            rememberPreferences();
             refresh();
             render();
             return true;
@@ -1024,6 +1114,9 @@ public class RecipeBrowserGui extends BaseGui {
                         case "repair" -> Material.ANVIL;
                         case "moonfall" -> Material.CLOCK;
                         case "sunrise" -> Material.SUNFLOWER;
+                        // 2026-08-19 W-123: 既定の醸造台アイコンだと「枠拡張の儀式」だと分からない。
+                        // スレッド枠は装備を鍛冶台で強化する感覚なので鍛冶台にする。
+                        case "thread_slot_expand" -> Material.SMITHING_TABLE;
                         default -> Material.BREWING_STAND;
                     };
                 }
@@ -1380,6 +1473,13 @@ public class RecipeBrowserGui extends BaseGui {
                 yield "コア周囲に" + groupName + "モブを" + count + "体召喚";
             }
             case "enchant_book" -> "コアの本をカスタムエンチャント本に変換";
+            // 2026-08-19 W-123: 「スレッド枠付与の儀式」は説明が1行も出ていなかった
+            // (default -> null に落ちていた)。累計上限は儀式ごとの max-slots で決まる。
+            case "thread_slot_expand" -> {
+                String max = entry.effectParams != null ? entry.effectParams.get("max-slots") : null;
+                yield "コアに置いた装備のスレッド枠を +1"
+                        + (max == null ? "" : "（儀式由来の累計 " + max + " 枠まで）");
+            }
             default -> null;
         };
     }
@@ -1467,12 +1567,31 @@ public class RecipeBrowserGui extends BaseGui {
         return lore;
     }
 
+    /**
+     * 圧縮トグルの lore(純粋関数)。何が隠れているのかを必ず書く —— 「レシピが足りない」と
+     * 誤解されると、隠したこと自体がバグ報告になって返ってくる。
+     */
+    static List<Component> compressionLore(boolean showDetails) {
+        List<Component> lore = new ArrayList<>();
+        lore.add(detailText("クリックで切り替え", NamedTextColor.GRAY));
+        lore.add(detailText((showDetails ? "  " : "▶ ") + "最大倍率のみ(既定)",
+            showDetails ? NamedTextColor.DARK_GRAY : NamedTextColor.GREEN));
+        lore.add(detailText((showDetails ? "▶ " : "  ") + "全段 + 解凍レシピ",
+            showDetails ? NamedTextColor.GREEN : NamedTextColor.DARK_GRAY));
+        lore.add(detailText("圧縮素材は1系統で最大5段あるため、", NamedTextColor.DARK_GRAY));
+        lore.add(detailText("既定では中間段と解凍を隠しています", NamedTextColor.DARK_GRAY));
+        return lore;
+    }
+
     /** レシピ種別ボタンのアイコン: 作業台は作業台ブロック、儀式は儀式の核に対応する見た目。 */
     private static Material kindIcon(RecipeBrowserFilter.KindMode mode) {
         return switch (mode) {
             case ALL -> Material.LIME_DYE;
             case WORKBENCH -> Material.CRAFTING_TABLE;
             case RITUAL -> Material.AMETHYST_CLUSTER;
+            // 儀式エフェクトは「アイテムにならない儀式」。日の出/天候が代表なので日時計にした
+            // (紫水晶=儀式レシピ と一目で見分けが付く見た目にする)。
+            case RITUAL_EFFECT -> Material.DAYLIGHT_DETECTOR;
         };
     }
 
