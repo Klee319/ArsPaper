@@ -195,6 +195,7 @@ materials:
   stone_1x:
     base_material: STONE
     custom_model_data: 100041
+    enchant_glow: true
     display_name: "&f9倍圧縮石"
     lore: []
     recipe:
@@ -210,6 +211,7 @@ materials:
   stone_2x:
     base_material: STONE
     custom_model_data: 100042
+    enchant_glow: true
     display_name: "&781倍圧縮石"
     lore: []
     recipe:
@@ -225,6 +227,7 @@ materials:
   stone_3x:
     base_material: STONE
     custom_model_data: 100043
+    enchant_glow: true
     display_name: "&7729倍圧縮石"
     lore: []
     recipe:
@@ -240,6 +243,7 @@ materials:
   stone_4x:
     base_material: STONE
     custom_model_data: 100044
+    enchant_glow: true
     display_name: "&86561倍圧縮石"
     lore: []
     recipe:
@@ -255,6 +259,7 @@ materials:
   stone_5x:
     base_material: STONE
     custom_model_data: 100045
+    enchant_glow: true
     display_name: "&859049倍圧縮石"
     lore: []
     recipe:
@@ -270,6 +275,7 @@ materials:
   copper_block_1x:
     base_material: COPPER_BLOCK
     custom_model_data: 100051
+    enchant_glow: true
     display_name: "&f9倍圧縮銅ブロック"
     lore: []
     recipe:
@@ -285,6 +291,7 @@ materials:
   copper_block_2x:
     base_material: COPPER_BLOCK
     custom_model_data: 100052
+    enchant_glow: true
     display_name: "&781倍圧縮銅ブロック"
     lore: []
     recipe:
@@ -300,6 +307,7 @@ materials:
   copper_block_3x:
     base_material: COPPER_BLOCK
     custom_model_data: 100053
+    enchant_glow: true
     display_name: "&7729倍圧縮銅ブロック"
     lore: []
     recipe:
@@ -315,6 +323,7 @@ materials:
   iron_block_1x:
     base_material: IRON_BLOCK
     custom_model_data: 100061
+    enchant_glow: true
     display_name: "&f9倍圧縮鉄ブロック"
     lore: []
     recipe:
@@ -330,6 +339,7 @@ materials:
   iron_block_2x:
     base_material: IRON_BLOCK
     custom_model_data: 100062
+    enchant_glow: true
     display_name: "&781倍圧縮鉄ブロック"
     lore: []
     recipe:
@@ -345,6 +355,7 @@ materials:
   iron_block_3x:
     base_material: IRON_BLOCK
     custom_model_data: 100063
+    enchant_glow: true
     display_name: "&7729倍圧縮鉄ブロック"
     lore: []
     recipe:
@@ -360,6 +371,7 @@ materials:
   gold_block_1x:
     base_material: GOLD_BLOCK
     custom_model_data: 100071
+    enchant_glow: true
     display_name: "&f9倍圧縮金ブロック"
     lore: []
     recipe:
@@ -375,6 +387,7 @@ materials:
   gold_block_2x:
     base_material: GOLD_BLOCK
     custom_model_data: 100072
+    enchant_glow: true
     display_name: "&781倍圧縮金ブロック"
     lore: []
     recipe:
@@ -390,6 +403,7 @@ materials:
   gold_block_3x:
     base_material: GOLD_BLOCK
     custom_model_data: 100073
+    enchant_glow: true
     display_name: "&7729倍圧縮金ブロック"
     lore: []
     recipe:
@@ -405,6 +419,7 @@ materials:
   netherrack_1x:
     base_material: NETHERRACK
     custom_model_data: 1002
+    enchant_glow: true
     display_name: "&f9倍圧縮ネザーラック"
     lore: []
     recipe:
@@ -420,6 +435,7 @@ materials:
   netherrack_2x:
     base_material: NETHERRACK
     custom_model_data: 1001
+    enchant_glow: true
     display_name: "&f81倍圧縮ネザーラック"
     lore: []
     recipe:
@@ -435,6 +451,7 @@ materials:
   netherrack_3x:
     base_material: NETHERRACK
     custom_model_data: 1003
+    enchant_glow: true
     display_name: "&f729倍圧縮ネザーラック"
     lore: []
     recipe:
@@ -450,6 +467,7 @@ materials:
   netherrack_4x:
     base_material: NETHERRACK
     custom_model_data: 1004
+    enchant_glow: true
     display_name: "&f6561倍圧縮ネザーラック"
     lore: []
     recipe:
@@ -465,6 +483,7 @@ materials:
   end_stone_1x:
     base_material: END_STONE
     custom_model_data: 999
+    enchant_glow: true
     display_name: "&79倍圧縮エンドストーン"
     lore: []
     recipe:
@@ -480,6 +499,7 @@ materials:
   end_stone_2x:
     base_material: END_STONE
     custom_model_data: 1000
+    enchant_glow: true
     display_name: "&781倍圧縮エンドストーン"
     lore: []
     recipe:
@@ -495,6 +515,7 @@ materials:
   end_stone_3x:
     base_material: END_STONE
     custom_model_data: 1005
+    enchant_glow: true
     display_name: "&7729倍圧縮エンドストーン"
     lore: []
     recipe:
@@ -510,6 +531,7 @@ materials:
   end_stone_4x:
     base_material: END_STONE
     custom_model_data: 1006
+    enchant_glow: true
     display_name: "&76561倍圧縮エンドストーン"
     lore: []
     recipe:
@@ -526,7 +548,7 @@ materials:
     base_material: DEEPSLATE
     custom_model_data: 17
     display_name: "&89倍圧縮深層岩"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -542,7 +564,7 @@ materials:
     base_material: DEEPSLATE
     custom_model_data: 18
     display_name: "&881倍圧縮深層岩"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -558,7 +580,7 @@ materials:
     base_material: DEEPSLATE
     custom_model_data: 19
     display_name: "&8729倍圧縮深層岩"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -574,7 +596,7 @@ materials:
     base_material: DEEPSLATE
     custom_model_data: 20
     display_name: "&86561倍圧縮深層岩"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -590,7 +612,7 @@ materials:
     base_material: SAND
     custom_model_data: 21
     display_name: "&e9倍圧縮砂"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -606,7 +628,7 @@ materials:
     base_material: SAND
     custom_model_data: 34
     display_name: "&e81倍圧縮砂"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -622,7 +644,7 @@ materials:
     base_material: SAND
     custom_model_data: 35
     display_name: "&e729倍圧縮砂"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -638,7 +660,7 @@ materials:
     base_material: SAND
     custom_model_data: 36
     display_name: "&e6561倍圧縮砂"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -653,6 +675,7 @@ materials:
   lapis_block_1x:
     base_material: LAPIS_BLOCK
     custom_model_data: 100101
+    enchant_glow: true
     display_name: "&f9倍圧縮ラピスラズリブロック"
     lore: []
     recipe:
@@ -668,6 +691,7 @@ materials:
   lapis_block_2x:
     base_material: LAPIS_BLOCK
     custom_model_data: 100102
+    enchant_glow: true
     display_name: "&781倍圧縮ラピスラズリブロック"
     lore: []
     recipe:
@@ -683,6 +707,7 @@ materials:
   lapis_block_3x:
     base_material: LAPIS_BLOCK
     custom_model_data: 100103
+    enchant_glow: true
     display_name: "&7729倍圧縮ラピスラズリブロック"
     lore: []
     recipe:
@@ -698,6 +723,7 @@ materials:
   emerald_block_1x:
     base_material: EMERALD_BLOCK
     custom_model_data: 100111
+    enchant_glow: true
     display_name: "&f9倍圧縮エメラルドブロック"
     lore: []
     recipe:
@@ -713,6 +739,7 @@ materials:
   emerald_block_2x:
     base_material: EMERALD_BLOCK
     custom_model_data: 100112
+    enchant_glow: true
     display_name: "&781倍圧縮エメラルドブロック"
     lore: []
     recipe:
@@ -728,6 +755,7 @@ materials:
   emerald_block_3x:
     base_material: EMERALD_BLOCK
     custom_model_data: 100113
+    enchant_glow: true
     display_name: "&7729倍圧縮エメラルドブロック"
     lore: []
     recipe:
@@ -743,6 +771,7 @@ materials:
   emerald_block_4x:
     base_material: EMERALD_BLOCK
     custom_model_data: 100114
+    enchant_glow: true
     display_name: "&86561倍圧縮エメラルドブロック"
     lore: []
     recipe:
@@ -758,6 +787,7 @@ materials:
   netherite_block_1x:
     base_material: NETHERITE_BLOCK
     custom_model_data: 100121
+    enchant_glow: true
     display_name: "&f9倍圧縮ネザライトブロック"
     lore: []
     recipe:
@@ -773,6 +803,7 @@ materials:
   diamond_block_1x:
     base_material: DIAMOND_BLOCK
     custom_model_data: 100091
+    enchant_glow: true
     display_name: "&f9倍圧縮ダイヤモンドブロック"
     lore: []
     recipe:
@@ -788,6 +819,7 @@ materials:
   diamond_block_2x:
     base_material: DIAMOND_BLOCK
     custom_model_data: 100092
+    enchant_glow: true
     display_name: "&781倍圧縮ダイヤモンドブロック"
     lore: []
     recipe:
@@ -803,6 +835,7 @@ materials:
   diamond_block_3x:
     base_material: DIAMOND_BLOCK
     custom_model_data: 100093
+    enchant_glow: true
     display_name: "&7729倍圧縮ダイヤモンドブロック"
     lore: []
     recipe:
@@ -818,6 +851,7 @@ materials:
   coal_block_1x:
     base_material: COAL_BLOCK
     custom_model_data: 88
+    enchant_glow: true
     display_name: "&f9倍圧縮石炭ブロック"
     lore: []
     recipe:
@@ -833,6 +867,7 @@ materials:
   coal_block_2x:
     base_material: COAL_BLOCK
     custom_model_data: 89
+    enchant_glow: true
     display_name: "&781倍圧縮石炭ブロック"
     lore: []
     recipe:
@@ -848,6 +883,7 @@ materials:
   coal_block_3x:
     base_material: COAL_BLOCK
     custom_model_data: 90
+    enchant_glow: true
     display_name: "&7729倍圧縮石炭ブロック"
     lore: []
     recipe:
@@ -863,6 +899,7 @@ materials:
   redstone_block_1x:
     base_material: REDSTONE_BLOCK
     custom_model_data: 91
+    enchant_glow: true
     display_name: "&f9倍圧縮レッドストーンブロック"
     lore: []
     recipe:
@@ -878,6 +915,7 @@ materials:
   redstone_block_2x:
     base_material: REDSTONE_BLOCK
     custom_model_data: 92
+    enchant_glow: true
     display_name: "&781倍圧縮レッドストーンブロック"
     lore: []
     recipe:
@@ -893,6 +931,7 @@ materials:
   redstone_block_3x:
     base_material: REDSTONE_BLOCK
     custom_model_data: 93
+    enchant_glow: true
     display_name: "&7729倍圧縮レッドストーンブロック"
     lore: []
     recipe:
@@ -908,6 +947,7 @@ materials:
   quartz_block_1x:
     base_material: QUARTZ_BLOCK
     custom_model_data: 94
+    enchant_glow: true
     display_name: "&f9倍圧縮クォーツブロック"
     lore: []
     recipe:
@@ -923,6 +963,7 @@ materials:
   quartz_block_2x:
     base_material: QUARTZ_BLOCK
     custom_model_data: 95
+    enchant_glow: true
     display_name: "&781倍圧縮クォーツブロック"
     lore: []
     recipe:
@@ -938,6 +979,7 @@ materials:
   quartz_block_3x:
     base_material: QUARTZ_BLOCK
     custom_model_data: 96
+    enchant_glow: true
     display_name: "&7729倍圧縮クォーツブロック"
     lore: []
     recipe:
@@ -953,6 +995,7 @@ materials:
   amethyst_block_1x:
     base_material: AMETHYST_BLOCK
     custom_model_data: 97
+    enchant_glow: true
     display_name: "&f9倍圧縮アメジストブロック"
     lore: []
     recipe:
@@ -968,6 +1011,7 @@ materials:
   amethyst_block_2x:
     base_material: AMETHYST_BLOCK
     custom_model_data: 98
+    enchant_glow: true
     display_name: "&781倍圧縮アメジストブロック"
     lore: []
     recipe:
@@ -984,7 +1028,7 @@ materials:
     base_material: OAK_LOG
     custom_model_data: 5201
     display_name: 9倍圧縮オークの原木
-    enchant_glow: false
+    enchant_glow: true
     lore:
       - "&7&o9個分の原木を凝縮した修繕用木材。"
     recipe:
@@ -1001,7 +1045,7 @@ materials:
     base_material: OAK_LOG
     custom_model_data: 5421
     display_name: "&681倍圧縮オークの原木"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1017,7 +1061,7 @@ materials:
     base_material: OAK_LOG
     custom_model_data: 5422
     display_name: "&6729倍圧縮オークの原木"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1033,7 +1077,7 @@ materials:
     base_material: BIRCH_LOG
     custom_model_data: 37
     display_name: "&e9倍圧縮シラカバの原木"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1049,7 +1093,7 @@ materials:
     base_material: BIRCH_LOG
     custom_model_data: 38
     display_name: "&e81倍圧縮シラカバの原木"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1065,7 +1109,7 @@ materials:
     base_material: BIRCH_LOG
     custom_model_data: 39
     display_name: "&e729倍圧縮シラカバの原木"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1081,7 +1125,7 @@ materials:
     base_material: SPRUCE_LOG
     custom_model_data: 40
     display_name: "&29倍圧縮トウヒの原木"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1097,7 +1141,7 @@ materials:
     base_material: SPRUCE_LOG
     custom_model_data: 41
     display_name: "&281倍圧縮トウヒの原木"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1113,7 +1157,7 @@ materials:
     base_material: SPRUCE_LOG
     custom_model_data: 42
     display_name: "&2729倍圧縮トウヒの原木"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1129,7 +1173,7 @@ materials:
     base_material: JUNGLE_LOG
     custom_model_data: 43
     display_name: "&a9倍圧縮ジャングルの原木"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1145,7 +1189,7 @@ materials:
     base_material: JUNGLE_LOG
     custom_model_data: 44
     display_name: "&a81倍圧縮ジャングルの原木"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1161,7 +1205,7 @@ materials:
     base_material: JUNGLE_LOG
     custom_model_data: 45
     display_name: "&a729倍圧縮ジャングルの原木"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1177,7 +1221,7 @@ materials:
     base_material: ACACIA_LOG
     custom_model_data: 46
     display_name: "&69倍圧縮アカシアの原木"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1193,7 +1237,7 @@ materials:
     base_material: ACACIA_LOG
     custom_model_data: 47
     display_name: "&681倍圧縮アカシアの原木"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1209,7 +1253,7 @@ materials:
     base_material: ACACIA_LOG
     custom_model_data: 48
     display_name: "&6729倍圧縮アカシアの原木"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1225,7 +1269,7 @@ materials:
     base_material: DARK_OAK_LOG
     custom_model_data: 59
     display_name: "&89倍圧縮ダークオークの原木"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1241,7 +1285,7 @@ materials:
     base_material: DARK_OAK_LOG
     custom_model_data: 60
     display_name: "&881倍圧縮ダークオークの原木"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1257,7 +1301,7 @@ materials:
     base_material: DARK_OAK_LOG
     custom_model_data: 61
     display_name: "&8729倍圧縮ダークオークの原木"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1273,7 +1317,7 @@ materials:
     base_material: MANGROVE_LOG
     custom_model_data: 69
     display_name: "&c9倍圧縮マングローブの原木"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1289,7 +1333,7 @@ materials:
     base_material: MANGROVE_LOG
     custom_model_data: 70
     display_name: "&c81倍圧縮マングローブの原木"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1305,7 +1349,7 @@ materials:
     base_material: MANGROVE_LOG
     custom_model_data: 71
     display_name: "&c729倍圧縮マングローブの原木"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1321,7 +1365,7 @@ materials:
     base_material: PALE_OAK_LOG
     custom_model_data: 72
     display_name: "&f9倍圧縮ペールオークの原木"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1337,7 +1381,7 @@ materials:
     base_material: PALE_OAK_LOG
     custom_model_data: 131
     display_name: "&f81倍圧縮ペールオークの原木"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1353,7 +1397,7 @@ materials:
     base_material: PALE_OAK_LOG
     custom_model_data: 132
     display_name: "&f729倍圧縮ペールオークの原木"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1369,7 +1413,7 @@ materials:
     base_material: DIRT
     custom_model_data: 5427
     display_name: "&69倍圧縮土"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1385,7 +1429,7 @@ materials:
     base_material: DIRT
     custom_model_data: 5428
     display_name: "&681倍圧縮土"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1401,7 +1445,7 @@ materials:
     base_material: DIRT
     custom_model_data: 5429
     display_name: "&6729倍圧縮土"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1417,7 +1461,7 @@ materials:
     base_material: DIRT
     custom_model_data: 5431
     display_name: "&66561倍圧縮土"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1432,6 +1476,7 @@ materials:
   breeze_rod_1x:
     base_material: BREEZE_ROD
     custom_model_data: 99
+    enchant_glow: true
     display_name: "&f4倍圧縮ブリーズロッド"
     lore: []
     recipe:
@@ -1446,6 +1491,7 @@ materials:
   breeze_rod_2x:
     base_material: BREEZE_ROD
     custom_model_data: 100
+    enchant_glow: true
     display_name: "&716倍圧縮ブリーズロッド"
     lore: []
     recipe:
@@ -1460,6 +1506,7 @@ materials:
   breeze_rod_3x:
     base_material: BREEZE_ROD
     custom_model_data: 130
+    enchant_glow: true
     display_name: "&764倍圧縮ブリーズロッド"
     lore: []
     recipe:
@@ -1474,6 +1521,7 @@ materials:
   blaze_rod_1x:
     base_material: BLAZE_ROD
     custom_model_data: 400009
+    enchant_glow: true
     display_name: "&f4倍圧縮ブレイズロッド"
     lore: []
     recipe:
@@ -1488,6 +1536,7 @@ materials:
   blaze_rod_2x:
     base_material: BLAZE_ROD
     custom_model_data: 400010
+    enchant_glow: true
     display_name: "&716倍圧縮ブレイズロッド"
     lore: []
     recipe:
@@ -1502,6 +1551,7 @@ materials:
   blaze_rod_3x:
     base_material: BLAZE_ROD
     custom_model_data: 400011
+    enchant_glow: true
     display_name: "&764倍圧縮ブレイズロッド"
     lore: []
     recipe:
@@ -1516,6 +1566,7 @@ materials:
   shulker_shell_1x:
     base_material: SHULKER_SHELL
     custom_model_data: 101
+    enchant_glow: true
     display_name: "&f4倍圧縮シュルカーの殻"
     lore: []
     recipe:
@@ -1530,6 +1581,7 @@ materials:
   shulker_shell_2x:
     base_material: SHULKER_SHELL
     custom_model_data: 102
+    enchant_glow: true
     display_name: "&716倍圧縮シュルカーの殻"
     lore: []
     recipe:
@@ -1544,6 +1596,7 @@ materials:
   dragon_breath_1x:
     base_material: DRAGON_BREATH
     custom_model_data: 103
+    enchant_glow: true
     display_name: "&f4倍圧縮ドラゴンブレス"
     lore: []
     recipe:
@@ -1558,6 +1611,7 @@ materials:
   dragon_breath_2x:
     base_material: DRAGON_BREATH
     custom_model_data: 104
+    enchant_glow: true
     display_name: "&716倍圧縮ドラゴンブレス"
     lore: []
     recipe:
@@ -1572,6 +1626,7 @@ materials:
   dragon_breath_3x:
     base_material: DRAGON_BREATH
     custom_model_data: 105
+    enchant_glow: true
     display_name: "&764倍圧縮ドラゴンブレス"
     lore: []
     recipe:
@@ -1586,6 +1641,7 @@ materials:
   wither_rose_1x:
     base_material: WITHER_ROSE
     custom_model_data: 106
+    enchant_glow: true
     display_name: "&f4倍圧縮ウィザーローズ"
     lore: []
     recipe:
@@ -1600,6 +1656,7 @@ materials:
   wither_rose_2x:
     base_material: WITHER_ROSE
     custom_model_data: 5430
+    enchant_glow: true
     display_name: "&f16倍圧縮ウィザーローズ"
     lore: []
     recipe:
@@ -1614,6 +1671,7 @@ materials:
   echo_shard_1x:
     base_material: ECHO_SHARD
     custom_model_data: 100081
+    enchant_glow: true
     display_name: "&34倍圧縮残響の欠片"
     lore: []
     recipe:
@@ -1628,6 +1686,7 @@ materials:
   echo_shard_2x:
     base_material: ECHO_SHARD
     custom_model_data: 100084
+    enchant_glow: true
     display_name: "&316倍圧縮残響の欠片"
     lore: []
     recipe:
@@ -1643,7 +1702,7 @@ materials:
     base_material: BREAD
     custom_model_data: 5202
     display_name: 圧縮パン
-    enchant_glow: false
+    enchant_glow: true
     lore:
       - "&7&o9個分のパンを1個に凝縮した保存食。"
     recipe:
@@ -1660,7 +1719,7 @@ materials:
     base_material: COOKED_BEEF
     custom_model_data: 5203
     display_name: 圧縮ステーキ
-    enchant_glow: false
+    enchant_glow: true
     lore:
       - "&7&o9個分のステーキを1個に凝縮した保存食。"
     recipe:
@@ -1677,7 +1736,7 @@ materials:
     base_material: BAKED_POTATO
     custom_model_data: 252
     display_name: 圧縮ベイクドポテト
-    enchant_glow: false
+    enchant_glow: true
     lore:
       - "&7&o9個分のベイクドポテトを1個に凝縮した保存食。"
     recipe:
@@ -1694,7 +1753,7 @@ materials:
     base_material: COOKED_PORKCHOP
     custom_model_data: 253
     display_name: 圧縮焼き豚
-    enchant_glow: false
+    enchant_glow: true
     lore:
       - "&7&o9個分の焼き豚を1個に凝縮した保存食。"
     recipe:
@@ -1711,7 +1770,7 @@ materials:
     base_material: COOKED_MUTTON
     custom_model_data: 254
     display_name: 圧縮焼き羊肉
-    enchant_glow: false
+    enchant_glow: true
     lore:
       - "&7&o9個分の焼き羊肉を1個に凝縮した保存食。"
     recipe:
@@ -1728,7 +1787,7 @@ materials:
     base_material: COOKED_CHICKEN
     custom_model_data: 255
     display_name: 圧縮焼き鳥
-    enchant_glow: false
+    enchant_glow: true
     lore:
       - "&7&o9個分の焼き鳥を1個に凝縮した保存食。"
     recipe:
@@ -1745,7 +1804,7 @@ materials:
     base_material: COOKIE
     custom_model_data: 256
     display_name: 圧縮クッキー
-    enchant_glow: false
+    enchant_glow: true
     lore:
       - "&7&o9個分のクッキーを1個に凝縮した保存食。"
     recipe:
@@ -1772,6 +1831,7 @@ materials:
       ingredients:
         a: COOKED_SALMON
     custom_model_data: 258
+    enchant_glow: true
   baked_cod_1x:
     base_material: COOKED_COD
     display_name: 圧縮焼き鱈
@@ -1786,11 +1846,12 @@ materials:
       ingredients:
         a: COOKED_COD
     custom_model_data: 259
+    enchant_glow: true
   pumpkin_pie_1x:
     base_material: PUMPKIN_PIE
     custom_model_data: 257
     display_name: 圧縮パンプキンパイ
-    enchant_glow: false
+    enchant_glow: true
     lore:
       - "&7&o9個分のパンプキンパイを1個に凝縮した保存食。"
     recipe:
@@ -1807,7 +1868,7 @@ materials:
     base_material: CARROT
     custom_model_data: 184
     display_name: "&69倍圧縮ニンジン"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1823,7 +1884,7 @@ materials:
     base_material: CARROT
     custom_model_data: 186
     display_name: "&681倍圧縮ニンジン"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1839,7 +1900,7 @@ materials:
     base_material: CARROT
     custom_model_data: 187
     display_name: "&6729倍圧縮ニンジン"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1855,7 +1916,7 @@ materials:
     base_material: POTATO
     custom_model_data: 189
     display_name: "&e9倍圧縮ジャガイモ"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1871,7 +1932,7 @@ materials:
     base_material: POTATO
     custom_model_data: 190
     display_name: "&e81倍圧縮ジャガイモ"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1887,7 +1948,7 @@ materials:
     base_material: POTATO
     custom_model_data: 192
     display_name: "&e729倍圧縮ジャガイモ"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1903,7 +1964,7 @@ materials:
     base_material: BEETROOT
     custom_model_data: 193
     display_name: "&49倍圧縮ビートルート"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1919,7 +1980,7 @@ materials:
     base_material: BEETROOT
     custom_model_data: 195
     display_name: "&481倍圧縮ビートルート"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1935,7 +1996,7 @@ materials:
     base_material: BEETROOT
     custom_model_data: 196
     display_name: "&4729倍圧縮ビートルート"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1951,7 +2012,7 @@ materials:
     base_material: BEEF
     custom_model_data: 197
     display_name: "&c9倍圧縮生の牛肉"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1967,7 +2028,7 @@ materials:
     base_material: BEEF
     custom_model_data: 198
     display_name: "&c81倍圧縮生の牛肉"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1983,7 +2044,7 @@ materials:
     base_material: BEEF
     custom_model_data: 199
     display_name: "&c729倍圧縮生の牛肉"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -1999,7 +2060,7 @@ materials:
     base_material: PORKCHOP
     custom_model_data: 200
     display_name: "&d9倍圧縮生の豚肉"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2015,7 +2076,7 @@ materials:
     base_material: PORKCHOP
     custom_model_data: 201
     display_name: "&d81倍圧縮生の豚肉"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2031,7 +2092,7 @@ materials:
     base_material: PORKCHOP
     custom_model_data: 202
     display_name: "&d729倍圧縮生の豚肉"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2047,7 +2108,7 @@ materials:
     base_material: CHICKEN
     custom_model_data: 203
     display_name: "&f9倍圧縮生の鶏肉"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2063,7 +2124,7 @@ materials:
     base_material: CHICKEN
     custom_model_data: 204
     display_name: "&f81倍圧縮生の鶏肉"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2079,7 +2140,7 @@ materials:
     base_material: CHICKEN
     custom_model_data: 205
     display_name: "&f729倍圧縮生の鶏肉"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2095,7 +2156,7 @@ materials:
     base_material: MUTTON
     custom_model_data: 206
     display_name: "&79倍圧縮生の羊肉"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2111,7 +2172,7 @@ materials:
     base_material: MUTTON
     custom_model_data: 207
     display_name: "&781倍圧縮生の羊肉"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2127,7 +2188,7 @@ materials:
     base_material: MUTTON
     custom_model_data: 208
     display_name: "&7729倍圧縮生の羊肉"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2143,7 +2204,7 @@ materials:
     base_material: RABBIT
     custom_model_data: 209
     display_name: "&69倍圧縮生の兎肉"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2159,7 +2220,7 @@ materials:
     base_material: RABBIT
     custom_model_data: 210
     display_name: "&681倍圧縮生の兎肉"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2175,7 +2236,7 @@ materials:
     base_material: RABBIT
     custom_model_data: 211
     display_name: "&6729倍圧縮生の兎肉"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2191,7 +2252,7 @@ materials:
     base_material: COD
     custom_model_data: 212
     display_name: "&b9倍圧縮生鱈"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2207,7 +2268,7 @@ materials:
     base_material: COD
     custom_model_data: 213
     display_name: "&b81倍圧縮生鱈"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2223,7 +2284,7 @@ materials:
     base_material: COD
     custom_model_data: 214
     display_name: "&b729倍圧縮生鱈"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2239,7 +2300,7 @@ materials:
     base_material: SALMON
     custom_model_data: 215
     display_name: "&d9倍圧縮生鮭"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2255,7 +2316,7 @@ materials:
     base_material: SALMON
     custom_model_data: 216
     display_name: "&d81倍圧縮生鮭"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2271,7 +2332,7 @@ materials:
     base_material: SALMON
     custom_model_data: 217
     display_name: "&d729倍圧縮生鮭"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2287,7 +2348,7 @@ materials:
     base_material: HAY_BLOCK
     custom_model_data: 218
     display_name: "&e9倍圧縮小麦俵"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2303,7 +2364,7 @@ materials:
     base_material: HAY_BLOCK
     custom_model_data: 219
     display_name: "&e81倍圧縮小麦俵"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2319,7 +2380,7 @@ materials:
     base_material: HAY_BLOCK
     custom_model_data: 220
     display_name: "&e729倍圧縮小麦俵"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2335,7 +2396,7 @@ materials:
     base_material: PUMPKIN
     custom_model_data: 221
     display_name: "&69倍圧縮カボチャ"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2351,7 +2412,7 @@ materials:
     base_material: PUMPKIN
     custom_model_data: 222
     display_name: "&681倍圧縮カボチャ"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2367,7 +2428,7 @@ materials:
     base_material: PUMPKIN
     custom_model_data: 223
     display_name: "&6729倍圧縮カボチャ"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2383,7 +2444,7 @@ materials:
     base_material: MELON
     custom_model_data: 224
     display_name: "&29倍圧縮スイカ"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2399,7 +2460,7 @@ materials:
     base_material: MELON
     custom_model_data: 225
     display_name: "&281倍圧縮スイカ"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2415,7 +2476,7 @@ materials:
     base_material: MELON
     custom_model_data: 226
     display_name: "&2729倍圧縮スイカ"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2431,7 +2492,7 @@ materials:
     base_material: GLOW_BERRIES
     custom_model_data: 227
     display_name: "&d9倍圧縮グロウベリー"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2447,7 +2508,7 @@ materials:
     base_material: GLOW_BERRIES
     custom_model_data: 228
     display_name: "&d81倍圧縮グロウベリー"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2463,7 +2524,7 @@ materials:
     base_material: GLOW_BERRIES
     custom_model_data: 229
     display_name: "&d729倍圧縮グロウベリー"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2479,7 +2540,7 @@ materials:
     base_material: SWEET_BERRIES
     custom_model_data: 230
     display_name: "&49倍圧縮スイートベリー"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2495,7 +2556,7 @@ materials:
     base_material: SWEET_BERRIES
     custom_model_data: 231
     display_name: "&481倍圧縮スイートベリー"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2511,7 +2572,7 @@ materials:
     base_material: SWEET_BERRIES
     custom_model_data: 232
     display_name: "&4729倍圧縮スイートベリー"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2527,7 +2588,7 @@ materials:
     base_material: APPLE
     custom_model_data: 233
     display_name: "&c9倍圧縮リンゴ"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2543,7 +2604,7 @@ materials:
     base_material: APPLE
     custom_model_data: 234
     display_name: "&c81倍圧縮リンゴ"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -2559,7 +2620,7 @@ materials:
     base_material: APPLE
     custom_model_data: 235
     display_name: "&c729倍圧縮リンゴ"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -3334,6 +3395,7 @@ materials:
   source_gem_block_1x:
     base_material: AMETHYST_BLOCK
     custom_model_data: 100012
+    enchant_glow: true
     display_name: "&b9倍圧縮ソースジェムブロック"
     lore:
       - "&7ソースジェム81個分の結晶塊"
@@ -3352,6 +3414,7 @@ materials:
   source_gem_block_2x:
     base_material: AMETHYST_BLOCK
     custom_model_data: 100012
+    enchant_glow: true
     display_name: "&b81倍圧縮ソースジェムブロック"
     lore:
       - "&7ソースジェム729個分の結晶塊"
@@ -3386,6 +3449,7 @@ materials:
   amethyst_block_3x:
     base_material: AMETHYST_BLOCK
     custom_model_data: 251
+    enchant_glow: true
     display_name: "&7729倍圧縮アメジストブロック"
     lore: []
     recipe:
@@ -3401,6 +3465,7 @@ materials:
   cherry_blossom_wood_1x:
     base_material: CHERRY_LOG
     custom_model_data: 237
+    enchant_glow: true
     display_name: 9倍圧縮サクラの原木
     lore: []
     recipe:
@@ -3417,7 +3482,7 @@ materials:
     base_material: CHERRY_LOG
     custom_model_data: 238
     display_name: "&d81倍圧縮サクラの原木"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -3433,7 +3498,7 @@ materials:
     base_material: CHERRY_LOG
     custom_model_data: 239
     display_name: "&d729倍圧縮サクラの原木"
-    enchant_glow: false
+    enchant_glow: true
     lore: []
     recipe:
       method: workbench
@@ -3448,6 +3513,7 @@ materials:
   granite_1x:
     base_material: GRANITE
     custom_model_data: 161
+    enchant_glow: true
     display_name: "&f9倍圧縮花崗岩"
     lore: []
     recipe:
@@ -3463,6 +3529,7 @@ materials:
   granite_2x:
     base_material: GRANITE
     custom_model_data: 240
+    enchant_glow: true
     display_name: "&781倍圧縮花崗岩"
     lore: []
     recipe:
@@ -3478,6 +3545,7 @@ materials:
   granite_3x:
     base_material: GRANITE
     custom_model_data: 241
+    enchant_glow: true
     display_name: "&7729倍圧縮花崗岩"
     lore: []
     recipe:
@@ -3493,6 +3561,7 @@ materials:
   granite_4x:
     base_material: GRANITE
     custom_model_data: 242
+    enchant_glow: true
     display_name: "&86561倍圧縮花崗岩"
     lore: []
     recipe:
@@ -3508,6 +3577,7 @@ materials:
   diorite_1x:
     base_material: DIORITE
     custom_model_data: 243
+    enchant_glow: true
     display_name: "&f9倍圧縮閃緑岩"
     lore: []
     recipe:
@@ -3523,6 +3593,7 @@ materials:
   diorite_2x:
     base_material: DIORITE
     custom_model_data: 244
+    enchant_glow: true
     display_name: "&781倍圧縮閃緑岩"
     lore: []
     recipe:
@@ -3538,6 +3609,7 @@ materials:
   diorite_3x:
     base_material: DIORITE
     custom_model_data: 245
+    enchant_glow: true
     display_name: "&7729倍圧縮閃緑岩"
     lore: []
     recipe:
@@ -3553,6 +3625,7 @@ materials:
   diorite_4x:
     base_material: DIORITE
     custom_model_data: 246
+    enchant_glow: true
     display_name: "&86561倍圧縮閃緑岩"
     lore: []
     recipe:
@@ -3568,6 +3641,7 @@ materials:
   andesite_1x:
     base_material: ANDESITE
     custom_model_data: 247
+    enchant_glow: true
     display_name: "&f9倍圧縮安山岩"
     lore: []
     recipe:
@@ -3583,6 +3657,7 @@ materials:
   andesite_2x:
     base_material: ANDESITE
     custom_model_data: 248
+    enchant_glow: true
     display_name: "&781倍圧縮安山岩"
     lore: []
     recipe:
@@ -3598,6 +3673,7 @@ materials:
   andesite_3x:
     base_material: ANDESITE
     custom_model_data: 249
+    enchant_glow: true
     display_name: "&7729倍圧縮安山岩"
     lore: []
     recipe:
@@ -3613,6 +3689,7 @@ materials:
   andesite_4x:
     base_material: ANDESITE
     custom_model_data: 250
+    enchant_glow: true
     display_name: "&86561倍圧縮安山岩"
     lore: []
     recipe:
