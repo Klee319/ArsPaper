@@ -12,6 +12,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.block.BlockCookEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.inventory.BrewingStandFuelEvent;
 import org.bukkit.event.inventory.CraftItemEvent;
@@ -246,12 +247,60 @@ public class CustomItemListener implements Listener {
         }
     }
 
+    /**
+     * ユーザーを介さない搬入経路（ホッパー／ドロッパー／各種自動化）を、
+     * クリック経路と<b>同じ範囲</b>で塞ぐ。
+     *
+     * <p>2026-08-19 W-132: それまで購読していたのは COMPOSTER 行きだけで、
+     * {@link #onVanillaMachineClick} が塞いでいる かまど系／醸造台には
+     * <b>ホッパーからなら素通りで入れられた</b>（実サーバ報告「クイック移動では入らないのに
+     * ホッパーでは入る」）。単に不整合なだけでなく、圧縮素材はベース材質が精錬可能なものが多く
+     * （{@code beef_1x} のベースは {@code BEEF}）、入った先で実際に焼かれて
+     * <b>9個ぶんが1個に化けて消える</b>。
+     *
+     * <p>チェスト／樽／ホッパー同士の移送は従来どおり通す（保管の自動化まで殺さない）。
+     * 塞ぐのは「入れた素材を消費・変換してしまう装置」だけ。
+     */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
-    public void onHopperToComposter(InventoryMoveItemEvent event) {
-        if (event.getDestination().getType() != InventoryType.COMPOSTER) {
+    public void onHopperToVanillaMachine(InventoryMoveItemEvent event) {
+        if (!isConsumingMachine(event.getDestination().getType())) {
             return;
         }
         if (isConfigurableMaterial(event.getItem())) {
+            event.setCancelled(true);
+        }
+    }
+
+    /**
+     * 素材を消費・変換してしまうバニラ装置（＝搬入を止める先）。
+     *
+     * <p>定数ではなく<b>名前</b>で持っているのは、{@link InventoryType} の定数へ触れると
+     * {@code MenuType} のレジストリ初期化が走り、サーバの無いユニットテストからは
+     * 参照した瞬間に {@code ExceptionInInitializerError} になるため
+     * （このフォークには MockBukkit が入っていない）。名前集合なら本番と同じ判定を
+     * そのままテストで固定できる。
+     */
+    static final java.util.Set<String> CONSUMING_MACHINES = java.util.Set.of(
+            "FURNACE", "BLAST_FURNACE", "SMOKER", "BREWING", "COMPOSTER");
+
+    /**
+     * 素材を消費・変換してしまうバニラ装置か（{@link #onVanillaMachineClick} と同じ集合＋コンポスター）。
+     */
+    static boolean isConsumingMachine(InventoryType type) {
+        return type != null && CONSUMING_MACHINES.contains(type.name());
+    }
+
+    /**
+     * かまど系での精錬そのものを止める（2026-08-19 W-132）。
+     *
+     * <p>入口を塞いでも、<b>既にかまどの中にある個体</b>や、将来また別の搬入経路が見つかったときに
+     * 焼かれてしまう。{@link BlockCookEvent} は「焼かれる直前」の最後の一点なので、
+     * ここを押さえておけば入口の取りこぼしがあっても素材は消えない
+     * （TF 本体の {@code CatalogVanillaOperationGuardListener} も同じ二重化をしている）。
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onBlockCook(BlockCookEvent event) {
+        if (isConfigurableMaterial(event.getSource())) {
             event.setCancelled(true);
         }
     }
@@ -283,10 +332,9 @@ public class CustomItemListener implements Listener {
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onVanillaMachineClick(InventoryClickEvent event) {
         InventoryType type = event.getInventory().getType();
-        if (type != InventoryType.FURNACE
-                && type != InventoryType.BLAST_FURNACE
-                && type != InventoryType.SMOKER
-                && type != InventoryType.BREWING) {
+        // 2026-08-19 W-132: ホッパー側(onHopperToVanillaMachine)と同じ集合を見る。
+        // コンポスターはクリックで開けるインベントリを持たないので、ここでは素通りしてよい。
+        if (!isConsumingMachine(type) || type == InventoryType.COMPOSTER) {
             return;
         }
         if (isConfigurableMaterial(event.getCursor())
