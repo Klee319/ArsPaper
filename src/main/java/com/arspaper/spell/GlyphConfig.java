@@ -239,7 +239,12 @@ public class GlyphConfig {
         Map.entry("grow",            Set.of("amplify", "aoe_radius")),
         Map.entry("explosion",       Set.of("aoe_radius", "extract")),
         Map.entry("exchange",        Set.of("amplify", "aoe")),
-        Map.entry("smelt",           Set.of("aoe_radius")),
+        // 精錬: 2026-08-19 に「半径増加」から「範囲(幅/高さ/法線)」へ変更。
+        // 半径増加(aoe_radius)はエンティティAOEと内部AOE処理エフェクト専用の軸で、
+        // ブロックAOE展開(SpellContext#resolveGroupsOnBlock)は aoe/aoe_height/aoe_vertical しか見ない。
+        // つまり精錬にいくら半径増加を積んでも【ブロックは常に1個しか精錬されなかった】。
+        // aoe を入れると isAugmentCompatible の特例で aoe_height/aoe_vertical も自動的に互換になる。
+        Map.entry("smelt",           Set.of("aoe")),
         Map.entry("crush",           Set.of("aoe", "fortune")),
         Map.entry("crush_wave",      Set.of("amplify", "dampen", "linger", "propagate")),
         Map.entry("scorch",          Set.of("amplify", "dampen", "linger", "propagate")),
@@ -295,6 +300,16 @@ public class GlyphConfig {
     }
 
     public boolean isAugmentCompatible(String glyphKey, String augmentKey) {
+        return augmentCompatible(glyphKey, augmentKey);
+    }
+
+    /**
+     * {@link #isAugmentCompatible} の実体。インスタンス状態を一切見ない（判定材料は全て static）ので
+     * static として切り出してある —— こうしないと {@code JavaPlugin} と Bukkit サーバが無いと
+     * 呼べず、互換表そのものを固定する回帰テストが書けない（フォークのテストには
+     * MockBukkit も Mockito も入っていない）。
+     */
+    static boolean augmentCompatible(String glyphKey, String augmentKey) {
         String baseKey = stripSuperPrefix(augmentKey);
 
         // 汎用Augmentは常に互換

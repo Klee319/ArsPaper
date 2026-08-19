@@ -147,18 +147,40 @@ public class SmeltEffect implements SpellEffect {
     }
 
     /**
+     * 同一tick中に既に精錬したドロップアイテム。<b>範囲グリフ対応で必須になったガード</b>
+     * (2026-08-19)。
+     *
+     * <p>{@link #applyToBlock} は範囲内の全ブロックについて1回ずつ呼ばれ、その都度
+     * {@link #smeltNearbyItems} が半径2を掃くので、<b>同じアイテムが何十回も精錬対象になる</b>。
+     * {@link #SMELT_MAP} には {@code COBBLESTONE → STONE → SMOOTH_STONE} という2段の連鎖があり、
+     * ガードが無いと落ちている丸石が1回の詠唱で滑らかな石まで進んでしまう
+     * (範囲が1ブロックだった頃は掃き取りも1回だけだったので表面化しなかった)。
+     *
+     * <p>スペル解決はメインスレッド同期なので単純なフィールドで足りる。tick が変われば
+     * 別の詠唱／遅延グリフ経由の別フェーズなので捨てる。
+     */
+    private long itemSweepTick = Long.MIN_VALUE;
+    private final java.util.Set<java.util.UUID> smeltedThisTick = new java.util.HashSet<>();
+
+    /**
      * 指定位置の半径2ブロック以内にあるドロップアイテムを精錬する。
+     * 1つのアイテムは1tickにつき1回しか精錬しない（{@link #smeltedThisTick}）。
      */
     private void smeltNearbyItems(Location center) {
+        long tick = Bukkit.getCurrentTick();
+        if (tick != itemSweepTick) {
+            itemSweepTick = tick;
+            smeltedThisTick.clear();
+        }
         Collection<Item> items = center.getWorld().getNearbyEntitiesByType(
             Item.class, center, 2.0);
         for (Item item : items) {
             ItemStack stack = item.getItemStack();
             Material smelted = SMELT_MAP.get(stack.getType());
-            if (smelted != null) {
-                item.setItemStack(new ItemStack(smelted, stack.getAmount()));
-                spawnSmeltFx(item.getLocation());
-            }
+            if (smelted == null) continue;
+            if (!smeltedThisTick.add(item.getUniqueId())) continue;
+            item.setItemStack(new ItemStack(smelted, stack.getAmount()));
+            spawnSmeltFx(item.getLocation());
         }
     }
 
@@ -170,6 +192,16 @@ public class SmeltEffect implements SpellEffect {
         loc.getWorld().playSound(loc,
             org.bukkit.Sound.BLOCK_FURNACE_FIRE_CRACKLE, org.bukkit.SoundCategory.PLAYERS, 0.8f, 1.0f);
     }
+
+    /**
+     * 範囲グリフの展開はヒット面基準・法線は<b>奥へ</b>({@code BreakEffect} と同じ)。
+     *
+     * <p>既定の {@code FIXED} だと法線方向の符号が {@code +1}（＝手前＝設置系の向き）になるため、
+     * 壁を狙って「範囲[法線]」を積むと<b>壁の中ではなく自分側の空気が対象になる</b>。
+     * 精錬は破壊と同じく「狙った面から内側へ効く」操作なので INWARD が正しい。
+     */
+    @Override
+    public AoeMode getAoeMode() { return AoeMode.HIT_FACE_INWARD; }
 
     @Override
     public NamespacedKey getId() { return id; }
