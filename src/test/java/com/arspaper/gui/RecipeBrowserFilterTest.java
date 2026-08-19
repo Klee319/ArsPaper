@@ -89,6 +89,43 @@ class RecipeBrowserFilterTest {
     }
 
     @Test
+    @DisplayName("醸造レシピは独立カテゴリで、作業台にも儀式にも混ざらない (2026-08-20 W-167)")
+    void brewingIsItsOwnKind() {
+        RecipeEntry bench = entry("作業台レシピ", "", 0);
+        RecipeEntry ritual = entry("儀式レシピ", "", 0);
+        ritual.isRitual = true;
+        RecipeEntry brew = entry("幸運のポーション II", "", 0);
+        brew.isBrewing = true;
+        List<RecipeEntry> src = List.of(bench, ritual, brew);
+
+        assertEquals(List.of("幸運のポーション II"), names(RecipeBrowserFilter.arrange(src,
+            RecipeBrowserFilter.SortMode.DEFAULT, RecipeBrowserFilter.KindMode.BREWING, null)));
+        // 「儀式でない＝作業台」で書かれていた判定を直し忘れると、ここで醸造が二重に出る。
+        assertEquals(List.of("作業台レシピ"), names(RecipeBrowserFilter.arrange(src,
+            RecipeBrowserFilter.SortMode.DEFAULT, RecipeBrowserFilter.KindMode.WORKBENCH, null)),
+            "醸造レシピが作業台カテゴリにも出てはいけない");
+        assertEquals(List.of("儀式レシピ"), names(RecipeBrowserFilter.arrange(src,
+            RecipeBrowserFilter.SortMode.DEFAULT, RecipeBrowserFilter.KindMode.RITUAL, null)));
+        assertEquals(3, RecipeBrowserFilter.arrange(src,
+            RecipeBrowserFilter.SortMode.DEFAULT, RecipeBrowserFilter.KindMode.ALL, null).size(),
+            "すべて では1件も落ちない");
+    }
+
+    @Test
+    @DisplayName("種別ボタンの巡回は醸造まで回って一周する (2026-08-20 W-167)")
+    void kindCycleReachesBrewing() {
+        RecipeBrowserFilter.KindMode mode = RecipeBrowserFilter.KindMode.ALL;
+        Set<RecipeBrowserFilter.KindMode> seen = new java.util.LinkedHashSet<>();
+        for (int i = 0; i < RecipeBrowserFilter.KindMode.values().length; i++) {
+            seen.add(mode);
+            mode = mode.next();
+        }
+        assertTrue(seen.contains(RecipeBrowserFilter.KindMode.BREWING),
+            "巡回で醸造に到達できないとボタンから選べない");
+        assertEquals(RecipeBrowserFilter.KindMode.ALL, mode, "一周して すべて に戻ること");
+    }
+
+    @Test
     @DisplayName("儀式エフェクトは儀式レシピから外れ、独立して絞り込める (2026-08-19 W-123)")
     void ritualEffectsSplitOutOfRitualRecipes() {
         RecipeEntry bench = entry("作業台レシピ", "", 0);

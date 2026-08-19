@@ -495,6 +495,11 @@ public class RecipeBrowserGui extends BaseGui {
      */
     private boolean isUnlocked(RecipeEntry entry) {
         try {
+            // 醸造は Ars の UnlockGate ではなく TF のスキルツリー(brew:<groupId>)が門番。
+            if (entry.isBrewing) {
+                return com.arspaper.integration.TrinityForgeBridge
+                    .brewGroupUnlocked(viewer, entry.brewGroupId);
+            }
             com.arspaper.recipe.UnlockGate gate = ArsPaper.getInstance().getUnlockGate();
             if (gate == null) return true;
             return entry.isRitual
@@ -603,7 +608,97 @@ public class RecipeBrowserGui extends BaseGui {
             renderRitualDetail();
             return;
         }
+        if (detailEntry != null && detailEntry.isBrewing) {
+            renderBrewingDetail();
+            return;
+        }
         renderWorkbenchDetail();
+    }
+
+    /**
+     * 醸造レシピの詳細表示 (W-167, 2026-08-20)。醸造台の並びをそのまま写す:
+     * 上段に素材、下段にベースのポーション、右に完成品。
+     *
+     * <p>3×3 グリッドは使わない。醸造台は「上段1 + 下段3」で、作業台の格子に落とすと
+     * どこに何を置くのか却って読めなくなるため。
+     *
+     * レイアウト (6行):
+     *   Row 1: [_][_][素材][_][_][→][結果][_][_]
+     *   Row 3: [_][_][ベース][_][_][情報][_][_][_]
+     *   Row 5: [border...] [戻る] [border...]
+     */
+    private void renderBrewingDetail() {
+        inventory.clear();
+        fillBorder(Material.GRAY_STAINED_GLASS_PANE);
+        RecipeEntry entry = detailEntry;
+
+        inventory.setItem(4, createButton(Material.BREWING_STAND,
+            Component.text(entry.displayName, NamedTextColor.LIGHT_PURPLE)
+                .decoration(TextDecoration.ITALIC, false),
+            List.of(Component.text("§d【醸造レシピ】").decoration(TextDecoration.ITALIC, false),
+                detailText("醸造台の上段に素材、下段にベースのポーションを置く", NamedTextColor.DARK_GRAY))));
+
+        // 素材(上段スロット)
+        if (entry.brewIngredient != null && !entry.brewIngredient.isBlank()) {
+            ItemStack ingredient = createIngredientDisplay(entry.brewIngredient);
+            if (ingredient != null) {
+                ingredient.editMeta(meta -> {
+                    List<Component> lore = meta.lore() == null
+                        ? new ArrayList<>() : new ArrayList<>(meta.lore());
+                    lore.add(detailText("醸造台の上段に置く", NamedTextColor.YELLOW));
+                    meta.lore(lore);
+                });
+                inventory.setItem(11, withJumpHint(ingredient, entry.brewIngredient));
+                detailSlotTokens.put(11, entry.brewIngredient);
+            }
+        }
+
+        // ベースのポーション(下段スロット)
+        inventory.setItem(29, brewBaseDisplay(entry.brewBase));
+
+        inventory.setItem(14, createButton(Material.ARROW, Component.text("→", NamedTextColor.WHITE)));
+        inventory.setItem(DETAIL_RESULT_SLOT, resultDisplayOf(entry));
+
+        inventory.setItem(DETAIL_BACK_SLOT, createButton(Material.DARK_OAK_DOOR,
+            Component.text(detailHistory.isEmpty() ? "← 一覧に戻る" : "← 前のレシピに戻る",
+                NamedTextColor.YELLOW),
+            List.of(detailText("素材をクリックすると、その素材を作るレシピへ移動します",
+                NamedTextColor.DARK_GRAY))));
+    }
+
+    /**
+     * ベースのポーション({@code THICK} / {@code MUNDANE} 等)の表示アイテム。
+     * 名前は翻訳キーを使わず {@code PotionType} 名を日本語へ落とす
+     * ({@code item.minecraft.potion.effect.<名前>} は効果の無いベースには訳語が無い)。
+     */
+    private ItemStack brewBaseDisplay(String baseName) {
+        ItemStack bottle = new ItemStack(Material.POTION);
+        String label = brewBaseLabel(baseName);
+        bottle.editMeta(meta -> {
+            if (meta instanceof org.bukkit.inventory.meta.PotionMeta potionMeta && baseName != null) {
+                try {
+                    potionMeta.setBasePotionType(
+                        org.bukkit.potion.PotionType.valueOf(baseName.trim().toUpperCase()));
+                } catch (IllegalArgumentException ignored) {
+                    // 未知のベース名。瓶の見た目だけ出して名前で補う。
+                }
+            }
+            meta.displayName(Component.text(label, NamedTextColor.AQUA)
+                .decoration(TextDecoration.ITALIC, false));
+            meta.lore(List.of(detailText("醸造台の下段に置く", NamedTextColor.YELLOW)));
+        });
+        return bottle;
+    }
+
+    private static String brewBaseLabel(String baseName) {
+        if (baseName == null) return "ベースのポーション";
+        return switch (baseName.trim().toUpperCase()) {
+            case "WATER" -> "水入り瓶";
+            case "MUNDANE" -> "ただの水";
+            case "THICK" -> "濃厚な水";
+            case "AWKWARD" -> "奇妙なポーション";
+            default -> baseName;
+        };
     }
 
     /**
@@ -980,11 +1075,20 @@ public class RecipeBrowserGui extends BaseGui {
         Material icon = entry.icon;
         List<Component> lore = new ArrayList<>();
 
-        lore.add(Component.text(entry.isRitual ? "§6【儀式レシピ】" : "§a【作業台レシピ】")
-            .decoration(TextDecoration.ITALIC, false));
+        lore.add(Component.text(kindTag(entry)).decoration(TextDecoration.ITALIC, false));
         lore.add(Component.empty());
 
-        if (entry.isRitual) {
+        if (entry.isBrewing) {
+            lore.add(Component.text("ベース: " + brewBaseLabel(entry.brewBase), NamedTextColor.AQUA)
+                .decoration(TextDecoration.ITALIC, false));
+            if (entry.brewIngredient != null && !entry.brewIngredient.isBlank()) {
+                lore.add(Component.text("素材: " + localize(entry.brewIngredient), NamedTextColor.YELLOW)
+                    .decoration(TextDecoration.ITALIC, false));
+            }
+            lore.add(Component.empty());
+            lore.add(Component.text("クリックで配置を確認", NamedTextColor.DARK_GRAY)
+                .decoration(TextDecoration.ITALIC, false));
+        } else if (entry.isRitual) {
             if (entry.coreItem != null) {
                 lore.add(Component.text("コア: " + localize(entry.coreItem), NamedTextColor.YELLOW)
                     .decoration(TextDecoration.ITALIC, false));
@@ -1027,16 +1131,87 @@ public class RecipeBrowserGui extends BaseGui {
         if (entry.iconItem != null) {
             ItemStack button = entry.iconItem.clone();
             button.editMeta(meta -> {
-                meta.displayName(Component.text(entry.displayName,
-                    entry.isRitual ? NamedTextColor.GOLD : NamedTextColor.GREEN)
+                meta.displayName(Component.text(entry.displayName, kindColor(entry))
                     .decoration(TextDecoration.ITALIC, false));
                 meta.lore(lore);
             });
             return button;
         }
         return createButton(icon,
-            Component.text(entry.displayName, entry.isRitual ? NamedTextColor.GOLD : NamedTextColor.GREEN),
+            Component.text(entry.displayName, kindColor(entry)),
             lore);
+    }
+
+    /** 一覧 lore の先頭に出す種別の見出し。 */
+    private static String kindTag(RecipeEntry entry) {
+        if (entry.isBrewing) return "§d【醸造レシピ】";
+        return entry.isRitual ? "§6【儀式レシピ】" : "§a【作業台レシピ】";
+    }
+
+    /** 種別ごとの表示名の色。見出しの色と必ず揃える。 */
+    private static NamedTextColor kindColor(RecipeEntry entry) {
+        if (entry.isBrewing) return NamedTextColor.LIGHT_PURPLE;
+        return entry.isRitual ? NamedTextColor.GOLD : NamedTextColor.GREEN;
+    }
+
+    /**
+     * TF の醸造レシピ 1 件を一覧エントリへ落とす (W-167, 2026-08-20)。
+     *
+     * <p>表示名はバニラの翻訳キーではなく {@link com.arspaper.util.JaTranslations#translateEffect}
+     * で作る。{@code entry.displayName} は<b>検索・並べ替えに使う素の文字列</b>なので、
+     * 翻訳コンポーネントのままにすると「幸運」で検索しても引っかからない。
+     */
+    private RecipeEntry brewEntryOf(com.arspaper.integration.TrinityForgeBridge.BrewRecipeView brew) {
+        RecipeEntry entry = new RecipeEntry();
+        entry.id = brew.id();
+        entry.isBrewing = true;
+        entry.brewBase = brew.base();
+        entry.brewIngredient = brew.ingredient();
+        entry.brewGroupId = brew.groupId();
+        entry.brewDurationTicks = brew.durationTicks();
+        entry.amount = 1;
+        entry.icon = Material.POTION;
+        entry.iconItem = brew.result();
+        entry.displayName = brewDisplayName(brew);
+        // 「この素材を使うレシピ」からの逆引きに乗せるため、素材トークンを作業台と同じ語彙で持たせる。
+        entry.ingredientMap = brew.ingredient() == null || brew.ingredient().isBlank()
+            ? Map.of()
+            : Map.of("i", brew.ingredient());
+        return entry;
+    }
+
+    /** 「幸運のポーション II」の形。効果レベルは 0 始まりなので +1 してローマ数字にする(I は付けない)。 */
+    private String brewDisplayName(com.arspaper.integration.TrinityForgeBridge.BrewRecipeView brew) {
+        org.bukkit.potion.PotionEffectType type = brew.effectKey() == null
+            ? null
+            : org.bukkit.Registry.EFFECT.get(NamespacedKey.fromString(brew.effectKey()));
+        String base = com.arspaper.util.JaTranslations.translateEffect(type) + "のポーション";
+        String level = roman(brew.amplifier() + 1);
+        return level.isEmpty() ? base : base + " " + level;
+    }
+
+    /** 1..10 のローマ数字。範囲外はアラビア数字のまま返す(表示が壊れるより読めるほうがよい)。 */
+    private static String roman(int value) {
+        return switch (value) {
+            case 1 -> "";
+            case 2 -> "II";
+            case 3 -> "III";
+            case 4 -> "IV";
+            case 5 -> "V";
+            case 6 -> "VI";
+            case 7 -> "VII";
+            case 8 -> "VIII";
+            case 9 -> "IX";
+            case 10 -> "X";
+            default -> value > 0 ? String.valueOf(value) : "";
+        };
+    }
+
+    /** 効果時間を {@code m:ss} で表す。0 以下(即時回復など)は null＝行を出さない。 */
+    private static String brewDurationLabel(int durationTicks) {
+        if (durationTicks <= 0) return null;
+        int seconds = durationTicks / 20;
+        return seconds / 60 + ":" + String.format("%02d", seconds % 60);
     }
 
     private List<RecipeEntry> collectAllRecipes() {
@@ -1169,6 +1344,14 @@ public class RecipeBrowserGui extends BaseGui {
                 entry.resultToken = "custom:" + catalogId;
             }
             entries.add(entry);
+        }
+
+        // 醸造レシピ (TrinityForge brew-unlocks 登録分)。W-167(2026-08-20)。
+        // 醸造台は Bukkit の Recipe ではなく Paper の PotionMix なので recipeIterator には一切出ない。
+        // TF が「実際に登録できた」計画だけを貰う(登録できなかった組は醸造自体が始まらない)。
+        for (var brew : com.arspaper.integration.TrinityForgeBridge.brewRecipes()) {
+            if (!seenIds.add(brew.id())) continue;
+            entries.add(brewEntryOf(brew));
         }
 
         // 並べ替えキー(使用スキル種別 / 使用可能レベル)は、表示アイテムが最終確定した後にまとめて取る。
@@ -1362,6 +1545,16 @@ public class RecipeBrowserGui extends BaseGui {
      */
     private void appendDetailLore(RecipeEntry entry, List<Component> lore) {
         ArsPaper plugin = ArsPaper.getInstance();
+
+        // === 醸造の効果時間 (W-167) ===
+        // 効果レベルは表示名のローマ数字で出しているので、ここは持続時間だけ。
+        if (entry.isBrewing) {
+            String duration = brewDurationLabel(entry.brewDurationTicks);
+            if (duration != null) {
+                lore.add(Component.empty());
+                lore.add(detailText("効果時間: " + duration, NamedTextColor.AQUA));
+            }
+        }
 
         // === カスタムアイテム結果の詳細 ===
         if (entry.resultCustomId != null) {
@@ -1592,6 +1785,7 @@ public class RecipeBrowserGui extends BaseGui {
             // 儀式エフェクトは「アイテムにならない儀式」。日の出/天候が代表なので日時計にした
             // (紫水晶=儀式レシピ と一目で見分けが付く見た目にする)。
             case RITUAL_EFFECT -> Material.DAYLIGHT_DETECTOR;
+            case BREWING -> Material.BREWING_STAND;
         };
     }
 

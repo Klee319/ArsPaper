@@ -24,6 +24,20 @@ final class RecipeEntry {
     String id;
     String displayName;
     boolean isRitual;
+    /**
+     * TF の醸造レシピ({@code brew-unlocks})か (W-167, 2026-08-20)。
+     * {@code isRitual} と排他で、どちらも false なら作業台レシピ。
+     */
+    boolean isBrewing;
+    // 醸造用
+    /** ベースのポーション名({@code THICK} / {@code MUNDANE} 等)。 */
+    String brewBase;
+    /** 上段に置く素材トークン({@code SUGAR} または {@code custom:<id>})。 */
+    String brewIngredient;
+    /** スキルツリーのゲートは {@code brew:<brewGroupId>}。 */
+    String brewGroupId;
+    /** 結果ポーションの効果時間(tick)。0 以下は即時効果。 */
+    int brewDurationTicks;
     Material icon = Material.PAPER;
     ItemStack iconItem = null;
     String resultCustomId = null; // カスタムアイテム結果ID

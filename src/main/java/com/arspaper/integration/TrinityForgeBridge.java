@@ -1168,6 +1168,87 @@ public final class TrinityForgeBridge {
     }
 
     /**
+     * TF の醸造レシピ 1 件分（{@code progression/crafting-features.yml} の {@code brew-unlocks}）。
+     * レシピ一覧 GUI の「醸造」カテゴリが表示に必要とするものだけを持つ (W-167, 2026-08-20)。
+     *
+     * @param id            GUI の一意 id（{@code brew_<groupId>_<n>}）
+     * @param groupId       スキルツリーのゲート id は {@code brew:<groupId>}
+     * @param base          ベースのポーション（{@code THICK} / {@code MUNDANE} 等）
+     * @param ingredient    上段に置く素材トークン（{@code SUGAR} または {@code custom:<id>}）
+     * @param effectKey     結果ポーションの効果キー（{@code minecraft:speed} 形式）
+     * @param durationTicks 効果時間(tick)
+     * @param amplifier     効果レベル（0 始まり＝ローマ数字の I が 0）
+     * @param result        完成品のポーション（TF が実際に配る個体と同じ組み立て。null になり得る）
+     */
+    public record BrewRecipeView(String id, String groupId, String base, String ingredient,
+                                 String effectKey, int durationTicks, int amplifier,
+                                 ItemStack result) {
+    }
+
+    /**
+     * TF が実際に醸造 customMix として<b>登録できた</b>レシピの一覧。
+     *
+     * <p>生の {@code brew-unlocks} ではなく {@code livePlans()} を見るのは TF 側の設計どおり:
+     * バニラ衝突・素材名の綴り間違い・重複の敗者は登録されず、<b>そもそも醸造が始まらない</b>ので、
+     * 一覧に出すと「載っているのに永久に作れないレシピ」を見せることになる。
+     *
+     * <p>TF 未ロード / API 不一致のときは空リスト（＝醸造カテゴリが空になるだけ）。
+     */
+    public static java.util.List<BrewRecipeView> brewRecipes() {
+        try {
+            TrinityForge tf = TrinityForge.getInstance();
+            if (tf == null || tf.brewPotionMixRegistrar() == null) {
+                return java.util.List.of();
+            }
+            java.util.List<BrewRecipeView> views = new java.util.ArrayList<>();
+            for (var plan : tf.brewPotionMixRegistrar().livePlans()) {
+                var spec = plan.spec();
+                if (spec == null || spec.type() == null) {
+                    continue;
+                }
+                ItemStack result = null;
+                try {
+                    // 完成品は TF が実際に配る個体と同じ組み立てを使う（名前の付け直しまで含む）。
+                    // ここを自前で組むと、ベースを WATER へ倒す都合で「水入り瓶」に化ける。
+                    result = com.trinityforge.stats.BrewRecipeSupport.customPotion(
+                            org.bukkit.Material.POTION, spec);
+                } catch (Throwable ignored) {
+                    // Bukkit の ItemFactory が使えない環境では結果アイテムだけ諦める。
+                }
+                views.add(new BrewRecipeView(plan.key().getKey(), plan.groupId(), spec.base(),
+                        spec.ingredient(), spec.type().getKey().toString(),
+                        spec.durationTicks(), spec.amplifier(), result));
+            }
+            return java.util.List.copyOf(views);
+        } catch (Throwable t) {
+            return java.util.List.of();
+        }
+    }
+
+    /**
+     * 醸造グループ {@code groupId} をこのプレイヤーが解放しているか（ゲートは {@code brew:<groupId>}）。
+     *
+     * <p>TF 未ロード / API 不一致のときは {@code true}（＝施錠表示を出さないだけ。判定できないことを
+     * 理由に全部を未解放扱いにすると、TF 抜き構成で一覧が施錠だらけになる）。
+     */
+    public static boolean brewGroupUnlocked(org.bukkit.entity.Player player, String groupId) {
+        try {
+            TrinityForge tf = TrinityForge.getInstance();
+            if (tf == null || player == null || groupId == null || groupId.isBlank()) {
+                return true;
+            }
+            com.trinityforge.config.domains.DedicatedEffectsConfig dedicatedEffects =
+                    tf.config().dedicatedEffects();
+            if (dedicatedEffects == null) {
+                return true;
+            }
+            return dedicatedEffects.isActive(player, "brew:" + groupId);
+        } catch (Throwable t) {
+            return true;
+        }
+    }
+
+    /**
      * TrinityForge の {@code items/catalog.yml} で {@code draft: true}(準備中)と宣言されたIDか。
      *
      * <p><b>なぜ Ars 側から問い合わせるのか</b>: 準備中アイテムは「カタログには定義があるが

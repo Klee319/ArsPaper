@@ -59,6 +59,32 @@ public final class JaTranslations {
     }
 
     /**
+     * ポーション効果名を日本語に変換する (W-167, 2026-08-20)。
+     *
+     * <p>翻訳表のキーは {@code EFFECT_<PotionEffectType 名>}。Material 名と同じ表に同居させるので
+     * 接頭辞で衝突を避けている（{@code LUCK} は Material にも Effect にも存在する）。
+     * 表に無ければ整形した英語名へ倒す（生の識別子は出さない）。
+     */
+    public static String translateEffect(org.bukkit.potion.PotionEffectType effect) {
+        if (effect == null) return "不明";
+        String name = effect.getKey().getKey().toUpperCase();
+        String ja = TRANSLATIONS.get("EFFECT_" + name);
+        if (ja != null) return ja;
+        return titleCase(name);
+    }
+
+    private static String titleCase(String upperSnake) {
+        String[] words = upperSnake.toLowerCase().split("_");
+        StringBuilder sb = new StringBuilder();
+        for (String word : words) {
+            if (word.isEmpty()) continue;
+            if (!sb.isEmpty()) sb.append(" ");
+            sb.append(word.substring(0, 1).toUpperCase()).append(word.substring(1));
+        }
+        return sb.toString();
+    }
+
+    /**
      * Material名(文字列)を日本語に変換する。
      */
     public static String translate(String materialName) {

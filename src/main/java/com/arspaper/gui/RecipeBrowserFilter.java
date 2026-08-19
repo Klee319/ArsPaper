@@ -81,7 +81,10 @@ final class RecipeBrowserFilter {
         // 2026-08-19 W-123 実サーバ報告「日の出の儀式やスレッド枠付与の儀式まで儀式レシピに
         // 混ざっている」。これらは【アイテムを作らない儀式】で、探す動機も探し方も
         // 「何が作れるか」とは別物なので、儀式レシピから外して独立の絞り込みにする。
-        RITUAL_EFFECT("儀式エフェクト");
+        RITUAL_EFFECT("儀式エフェクト"),
+        // 2026-08-20 W-167 ユーザー要望「カスタムで追加したポーションのレシピ(幸運など)が
+        // 掲載されるようにしてほしい。作業台・儀式のようにソートカテゴリに醸造を追加する」。
+        BREWING("醸造レシピ");
 
         private final String label;
 
@@ -102,9 +105,12 @@ final class RecipeBrowserFilter {
         boolean accepts(RecipeEntry entry) {
             return switch (this) {
                 case ALL -> true;
-                case WORKBENCH -> !entry.isRitual;
+                // 醸造を足したので「儀式でない＝作業台」は成り立たなくなった。
+                // ここを直し忘れると醸造レシピが作業台カテゴリにも二重に出る。
+                case WORKBENCH -> !entry.isRitual && !entry.isBrewing;
                 case RITUAL -> entry.isRitual && !isEffectRitual(entry);
                 case RITUAL_EFFECT -> entry.isRitual && isEffectRitual(entry);
+                case BREWING -> entry.isBrewing;
             };
         }
     }
