@@ -111,7 +111,10 @@ public class CrushEffect implements SpellEffect {
      */
     private void crushItemEntity(Item itemEntity, int fortuneLevel) {
         ItemStack stack = itemEntity.getItemStack();
-        Material crushedResult = getCrushMap().get(stack.getType());
+        // 2026-08-20 W-172: カスタムアイテムは Material が一致しても粉砕しない(精錬と同じ理由)。
+        // crush_map の STONE / DEEPSLATE / QUARTZ_BLOCK / MELON は
+        // stone_1x..5x / deepslate_1x..4x など圧縮素材のベース材質でもある。
+        Material crushedResult = CustomItemConversionPolicy.resultFor(getCrushMap(), stack);
         if (crushedResult == null) return;
 
         int baseAmount = stack.getAmount();

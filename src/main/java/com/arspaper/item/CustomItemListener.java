@@ -24,6 +24,10 @@ import org.bukkit.event.inventory.PrepareItemCraftEvent;
 import org.bukkit.event.inventory.PrepareSmithingEvent;
 import io.papermc.paper.event.entity.EntityCompostItemEvent;
 import io.papermc.paper.event.block.CompostItemEvent;
+import org.bukkit.event.entity.EntityPickupItemEvent;
+import io.papermc.paper.event.player.CartographyItemEvent;
+import io.papermc.paper.event.player.PlayerLoomPatternSelectEvent;
+import io.papermc.paper.event.player.PlayerStonecutterRecipeSelectEvent;
 import org.bukkit.event.inventory.FurnaceBurnEvent;
 import org.bukkit.event.inventory.InventoryMoveItemEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
@@ -281,7 +285,17 @@ public class CustomItemListener implements Listener {
      * そのままテストで固定できる。
      */
     static final java.util.Set<String> CONSUMING_MACHINES = java.util.Set.of(
-            "FURNACE", "BLAST_FURNACE", "SMOKER", "BREWING", "COMPOSTER");
+            "FURNACE", "BLAST_FURNACE", "SMOKER", "BREWING", "COMPOSTER",
+            // 2026-08-20 W-172: 石切台/製図台/機織り機も「入れた素材を消費して別 Material を出す」装置。
+            // かまど系と同じ穴が開いていた: 石切台へ stone_5x(59049倍圧縮石)を入れると
+            // 石レンガ1個になり、圧縮倍率ごと消える。製図台は base_material: PAPER の
+            // ガチャ券8種(gacha_ticket_*)を地図の拡張で食う。ビーコンは支払いスロットが Material しか
+            // 見ないので abyssal_ingot(NETHERITE_INGOT) / core_jewelry(EMERALD) /
+            // heavy_metal・pillager_plate(IRON_INGOT) / piglin_brute_plate(GOLD_INGOT) を黙って飲み込む。
+            //
+            // 金床/砥石/鍛冶台はここに入れない。専用の Prepare* ガードが「消費だけ拒否して
+            // カスタム防具のアーマートリムなど正当な用途は通す」判断をしており、ここへ足すと潰れる。
+            "STONECUTTER", "CARTOGRAPHY", "LOOM", "BEACON");
 
     /**
      * 素材を消費・変換してしまうバニラ装置か（{@link #onVanillaMachineClick} と同じ集合＋コンポスター）。
@@ -357,6 +371,69 @@ public class CustomItemListener implements Listener {
                 || isConfigurableMaterial(event.getCurrentItem())) {
             event.setCancelled(true);
         }
+    }
+
+    /**
+     * 石切台: materials.yml 素材を入力にしたレシピ選択そのものを止める(2026-08-20 W-172)。
+     *
+     * <p>{@link #onVanillaMachineClick} が搬入を塞いでいても、既に入力スロットに残っている個体や
+     * 将来また別の搬入経路が見つかったときに削られてしまう。かまど側の {@code onBlockCook} と
+     * 同じ「最後の一点」の二重化(TF 本体の {@code CatalogVanillaOperationGuardListener} も同型)。
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onStonecutterSelect(PlayerStonecutterRecipeSelectEvent event) {
+        if (isConfigurableMaterial(event.getStonecutterInventory().getInputItem())) {
+            event.setCancelled(true);
+        }
+    }
+
+    /** 製図台: materials.yml 素材(ガチャ券などの PAPER ベース品)を消費させない。 */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onCartography(CartographyItemEvent event) {
+        if (containsConfigurableMaterial(event.getInventory())) {
+            event.setCancelled(true);
+        }
+    }
+
+    /** 機織り機: materials.yml 素材(染料/羊毛ベース品)を消費させない。 */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onLoomSelect(PlayerLoomPatternSelectEvent event) {
+        if (containsConfigurableMaterial(event.getLoomInventory())) {
+            event.setCancelled(true);
+        }
+    }
+
+    /**
+     * ピグリンに materials.yml 素材を拾わせない(2026-08-20 W-172)。
+     *
+     * <p>ピグリンの物々交換は「拾ったスタックの Material が {@code GOLD_INGOT} か」しか見ないので、
+     * {@code piglin_brute_plate}(base_material: GOLD_INGOT)を地面に落とすと拾われて交換品に化け、
+     * 元のアイテムは戻らない。バニラ装置と同じ「Material だけ見た消費」。
+     *
+     * <p>止めるのはピグリン系だけにする。アレイに拾わせて運ばせる用途は正当なので、
+     * {@link EntityPickupItemEvent} を無条件に潰してはいけない。
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onPiglinPickup(EntityPickupItemEvent event) {
+        if (!(event.getEntity() instanceof org.bukkit.entity.Piglin)) {
+            return;
+        }
+        if (isConfigurableMaterial(event.getItem().getItemStack())) {
+            event.setCancelled(true);
+        }
+    }
+
+    /** インベントリ内に materials.yml 素材が1つでもあるか。 */
+    private boolean containsConfigurableMaterial(org.bukkit.inventory.Inventory inventory) {
+        if (inventory == null) {
+            return false;
+        }
+        for (ItemStack item : inventory.getContents()) {
+            if (isConfigurableMaterial(item)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

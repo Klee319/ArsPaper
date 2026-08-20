@@ -35,13 +35,35 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ConsumingMachineHopperGuardTest {
 
-    /** 入れた素材を消費・変換してしまう装置（＝止めるべき搬入先）。 */
+    /**
+     * 入れた素材を消費・変換してしまう装置（＝止めるべき搬入先）。
+     *
+     * <p>2026-08-20 W-172 で石切台／製図台／機織り機を追加した。かまど系と全く同じ穴で、
+     * 石切台へ {@code stone_5x}(59049倍圧縮石)を入れると石レンガ1個になり圧縮倍率ごと消える。
+     * 製図台は {@code base_material: PAPER} のガチャ券8種({@code gacha_ticket_*})を地図の拡張で食う。
+     */
     private static final List<String> MUST_BLOCK =
-            List.of("FURNACE", "BLAST_FURNACE", "SMOKER", "BREWING", "COMPOSTER");
+            List.of("FURNACE", "BLAST_FURNACE", "SMOKER", "BREWING", "COMPOSTER",
+                    "STONECUTTER", "CARTOGRAPHY", "LOOM", "BEACON");
 
     /** ただの保管／中継。ここを止めると自動仕分けが丸ごと死ぬ。 */
     private static final List<String> MUST_ALLOW =
             List.of("CHEST", "BARREL", "HOPPER", "DROPPER", "DISPENSER", "SHULKER_BOX", "ENDER_CHEST");
+
+    /**
+     * 消費はするが、専用の {@code Prepare*} ガードが「正当な用途だけ通す」判断をしている装置。
+     * ここへ足すとその判断ごと潰れる(カスタム防具のアーマートリムが打てなくなる等)。
+     */
+    private static final List<String> MUST_STAY_OUT =
+            List.of("ANVIL", "GRINDSTONE", "SMITHING", "MERCHANT", "CRAFTING", "WORKBENCH");
+
+    @Test
+    void dedicatedlyGuardedStationsStayOut() {
+        for (String type : MUST_STAY_OUT) {
+            assertFalse(CustomItemListener.CONSUMING_MACHINES.contains(type),
+                    type + " は専用の Prepare* ガードの担当。ここへ足すと正当な用途まで塞がる");
+        }
+    }
 
     @Test
     void consumingMachinesAreBlocked() {
@@ -67,18 +89,30 @@ class ConsumingMachineHopperGuardTest {
     }
 
     /**
-     * 3経路のハンドラが全部残っていること。どれか1本でも @EventHandler を失うと、
+     * 各経路のハンドラが全部残っていること。どれか1本でも @EventHandler を失うと、
      * 例外も警告も出ないまま<b>その経路だけ素通り</b>に戻る（今回の実バグそのもの）。
+     *
+     * <p>搬入を止める {@code onVanillaMachineClick} / {@code onHopperToVanillaMachine} に加えて、
+     * 「最後の一点」側（既に入力スロットに居る個体を守る）も本数で固定する:
+     * かまどの {@code onBlockCook} と、W-172 で足した石切台／製図台／機織り機の3本。
      */
     @Test
-    void allThreeGuardPathsStayWired() throws Exception {
+    void allGuardPathsStayWired() throws Exception {
         List<Method> guards = List.of(
                 CustomItemListener.class.getMethod("onVanillaMachineClick",
                         org.bukkit.event.inventory.InventoryClickEvent.class),
                 CustomItemListener.class.getMethod("onHopperToVanillaMachine",
                         org.bukkit.event.inventory.InventoryMoveItemEvent.class),
                 CustomItemListener.class.getMethod("onBlockCook",
-                        org.bukkit.event.block.BlockCookEvent.class));
+                        org.bukkit.event.block.BlockCookEvent.class),
+                CustomItemListener.class.getMethod("onStonecutterSelect",
+                        io.papermc.paper.event.player.PlayerStonecutterRecipeSelectEvent.class),
+                CustomItemListener.class.getMethod("onCartography",
+                        io.papermc.paper.event.player.CartographyItemEvent.class),
+                CustomItemListener.class.getMethod("onLoomSelect",
+                        io.papermc.paper.event.player.PlayerLoomPatternSelectEvent.class),
+                CustomItemListener.class.getMethod("onPiglinPickup",
+                        org.bukkit.event.entity.EntityPickupItemEvent.class));
         for (Method m : guards) {
             assertTrue(m.isAnnotationPresent(org.bukkit.event.EventHandler.class),
                     m.getName() + " が @EventHandler を失っている（購読されない＝無言で無効）");

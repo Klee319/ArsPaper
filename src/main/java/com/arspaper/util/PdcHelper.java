@@ -67,4 +67,35 @@ public final class PdcHelper {
         return getFromItem(item, com.trinityforge.pdc.PdcKeys.ITEM_CATALOG_ID, PersistentDataType.STRING)
             .filter(id -> !id.isBlank());
     }
+
+    /**
+     * 「Material だけを見て別の Material へ差し替えると、同一性ごと消えてしまうアイテム」か。
+     *
+     * <p><b>2026-08-20 W-172 で入れた。</b>精錬(smelt)魔法が
+     * {@code SMELT_MAP.get(stack.getType())} だけでドロップアイテムを差し替えていたため、
+     * {@code potato_3x}(729倍圧縮ジャガイモ, base_material: POTATO)を焼くと
+     * <b>ただのベイクドポテト1個</b>になっていた。CMD も PDC も表示名も丸ごと消えるので、
+     * 「圧縮を戻す」ことすらできない完全な喪失になる。
+     *
+     * <p>判定は以下の順。Ars の {@code materials.yml} 素材だけでなく TF カタログ品も守る
+     * (魔法は TF 側の {@code CatalogVanillaOperationGuardListener} を通らないので、
+     * TF 品はここで守らないと誰も守らない)。
+     * <ol>
+     *   <li>Ars / TF のカスタムアイテムid を持つ({@link #getCrossPluginItemId})</li>
+     *   <li>CustomModelData を持つ(id 未刻印のリソースパック品・他プラグイン品の保険)</li>
+     * </ol>
+     *
+     * <p>素の採掘ドロップやモブドロップは ItemMeta 自体を持たないので、ここでは false になる。
+     * つまり「バニラの石を焼いて滑らかな石にする」といった本来の用途は一切狭まらない。
+     */
+    public static boolean hasProtectedIdentity(ItemStack item) {
+        if (item == null || item.getType().isAir() || !item.hasItemMeta()) {
+            return false;
+        }
+        if (getCrossPluginItemId(item).isPresent()) {
+            return true;
+        }
+        ItemMeta meta = item.getItemMeta();
+        return meta != null && meta.hasCustomModelData();
+    }
 }

@@ -176,7 +176,10 @@ public class SmeltEffect implements SpellEffect {
             Item.class, center, 2.0);
         for (Item item : items) {
             ItemStack stack = item.getItemStack();
-            Material smelted = SMELT_MAP.get(stack.getType());
+            // 2026-08-20 W-172: カスタムアイテムは Material が一致しても絶対に焼かない
+            // (差し替えなので CMD/PDC/表示名が丸ごと消える)。理由は
+            // CustomItemConversionPolicy の javadoc。
+            Material smelted = CustomItemConversionPolicy.resultFor(SMELT_MAP, stack);
             if (smelted == null) continue;
             if (!smeltedThisTick.add(item.getUniqueId())) continue;
             item.setItemStack(new ItemStack(smelted, stack.getAmount()));
