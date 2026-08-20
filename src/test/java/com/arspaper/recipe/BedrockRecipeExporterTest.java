@@ -220,17 +220,20 @@ class BedrockRecipeExporterTest {
     }
 
     /**
-     * TrinityForge 側と形式バージョンが揃っていること。
+     * 受け取り側(GeyserExtra)が受理する形式バージョンの範囲に収まっていること。
      *
-     * <p>クラスを共有していない（ArsPaper のビルドを {@code libs/TrinityForge.jar} の差し替えに
-     * 縛らないため）ので、ここがずれると受け取り側が<b>片方のファイルだけ読まずに捨てる</b>。
-     * 形式を変えるときは TrinityForge の {@code BedrockRecipeTable.FORMAT_VERSION} と
-     * この値の<b>両方</b>を直すこと。
+     * <p><b>TrinityForge の値と一致している必要は無い</b>(2026-08-20 以降)。受け取り側は
+     * {@code {1, 2}} を受理し、v2 で増えたスミス台レシピは ArsPaper が登録しないので、
+     * ここを上げても出力は変わらない。<b>この値を勝手に上げ下げしないこと</b> ──
+     * 受け取り側が知らない値にすると、ArsPaper の表だけが丸ごと捨てられ、
+     * 症状は「統合版で Ars のレシピだけクラフトできない」という元の不具合と同じ見え方になる。
+     *
+     * <p>ファイル名も固定する。受け取り側はこの名前で各プラグインのデータフォルダを探すため。
      */
     @Test
-    void formatVersionIsPinnedToTheTrinityForgeSideValue() {
-        assertEquals(1, BedrockRecipeExporter.FORMAT_VERSION,
-                "TrinityForge の BedrockRecipeTable.FORMAT_VERSION と同じ値でなければならない");
+    void formatVersionStaysWithinWhatTheReaderAccepts() {
+        assertTrue(BedrockRecipeExporter.FORMAT_VERSION == 1 || BedrockRecipeExporter.FORMAT_VERSION == 2,
+                "GeyserExtra の BedrockRecipeTable.SUPPORTED_FORMAT_VERSIONS = {1, 2} の外へ出ている");
         assertEquals("bedrock-recipes.json", BedrockRecipeExporter.FILE_NAME);
     }
 }

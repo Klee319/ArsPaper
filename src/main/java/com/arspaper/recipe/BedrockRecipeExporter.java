@@ -39,13 +39,22 @@ import java.util.TreeMap;
  * material + CustomModelData の形で外へ出す。受け取った GeyserExtra が、実際に登録済みの
  * Bedrock アイテム定義を指す補正レシピをクライアントへ追送する。
  *
- * <h2>TrinityForge 側と同じ形式であること</h2>
+ * <h2>TrinityForge 側との形式の関係</h2>
  * TrinityForge も {@code plugins/TrinityForge/bedrock-recipes.json} へ<b>同じ形式</b>で書く。
  * <b>あえてクラスを共有していない</b> ── 共有すると ArsPaper のビルドが
- * {@code libs/TrinityForge.jar} の差し替え待ちになるため。代わりに {@link #FORMAT_VERSION} を
- * 揃えてあり、受け取り側はファイルごとにこの値を検査する。片方だけ形式を変えたら
- * 受け取り側が<b>そのファイルを読まずに警告する</b>（黙って半分だけ効く状態にはならない）。
- * <b>形式を変えるときは TrinityForge の {@code BedrockRecipeTable} と両方を必ず直すこと。</b>
+ * {@code libs/TrinityForge.jar} の差し替え待ちになるため。受け取り側はファイルごとに
+ * {@link #FORMAT_VERSION} を検査し、理解できない値なら<b>そのファイルを読まずに警告する</b>
+ * （黙って半分だけ効く状態にはならない）。
+ *
+ * <p><b>2 つのバージョンは一致していなくてよい（2026-08-20 以降）。</b>
+ * 受け取り側は {@code {1, 2}} の両方を受理する。v2 で増えたのは<b>スミス台レシピ</b>
+ * ({@code type: "smithing"}) だけで、これは TrinityForge の {@code items/catalog.yml} の
+ * {@code method: netherite} 専用 ── <b>ArsPaper はスミス台レシピを一切登録しない</b>ので、
+ * ここを上げても出力は 1 バイトも変わらない。上げると意味のない再ビルドと再配備を強いるだけ。
+ *
+ * <p><b>形式そのものを変える（キーを増やす・意味を変える）ときだけ</b>、TrinityForge の
+ * {@code BedrockRecipeTable}・この定数・GeyserExtra 側の
+ * {@code SUPPORTED_FORMAT_VERSIONS} を<b>3 つまとめて</b>直すこと。
  *
  * <h2>書き出す対象</h2>
  * <ul>
@@ -60,7 +69,10 @@ public final class BedrockRecipeExporter {
 
     /**
      * ファイル形式のバージョン。
-     * <b>TrinityForge の {@code BedrockRecipeTable.FORMAT_VERSION} と同じ値でなければならない。</b>
+     *
+     * <p><b>TrinityForge の {@code BedrockRecipeTable.FORMAT_VERSION} と一致している必要は無い。</b>
+     * 受け取り側(GeyserExtra)が v1 と v2 の両方を受理し、v2 の追加分（スミス台レシピ）は
+     * ArsPaper が登録しないため。詳細はクラス javadoc の「TrinityForge 側との形式の関係」。
      */
     public static final int FORMAT_VERSION = 1;
 
