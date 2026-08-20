@@ -83,6 +83,9 @@ public final class AdminCommands {
         com.arspaper.integration.TrinityForgeBridge.repushCatalogRituals();
         // TF catalog workbench recipes: rebuild so Ars-owned results stay Ars-built after item re-registration.
         com.arspaper.integration.TrinityForgeBridge.refreshCatalogRecipes();
+        // レシピが入れ替わったので統合版向けの補正レシピ表も出し直す。
+        com.arspaper.recipe.BedrockRecipeExporter.exportTo(
+            plugin.getRecipeManager(), plugin.getDataFolder(), plugin.getLogger());
 
         // スレッド設定リロード
         plugin.getThreadConfig().reload(plugin.getConfig());

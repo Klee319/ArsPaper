@@ -109,6 +109,9 @@ public class ArsPaper extends JavaPlugin {
 
         recipeManager = new RecipeManager(this);
         recipeManager.registerWorkbenchRecipes(recipeLoader.getWorkbenchRecipes());
+        // 統合版(Bedrock)向けの補正レシピ表。Geyser が素材の CustomModelData を落とすので、
+        // 「素材が本当はどのカスタムアイテムか」を GeyserExtra へ渡すために書き出す。
+        com.arspaper.recipe.BedrockRecipeExporter.exportTo(recipeManager, getDataFolder(), getLogger());
         // 作業台専用(3×3, method: workbench)レシピが2×2インベントリグリッドで成立するのを防ぐ。
         getServer().getPluginManager().registerEvents(
             new com.arspaper.recipe.WorkbenchGridGateListener(recipeManager), this);

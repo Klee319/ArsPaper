@@ -410,8 +410,11 @@ public class RecipeManager {
      * {@code custom:<id>} を ItemStack へ解決する。ArsPaper のカスタムアイテムを優先し、
      * 無ければ TrinityForge カタログの identity-only アイテムへフォールバックする。
      * どちらでも解決できなければ {@code null}。
+     *
+     * <p>package-private なのは {@link BedrockRecipeExporter} が同じ解決を使うため。
+     * 別実装で解決し直すと、登録された実物と統合版へ渡す表がずれる。
      */
-    private ItemStack resolveCustomOrCatalog(String customId) {
+    ItemStack resolveCustomOrCatalog(String customId) {
         ItemStack item = ArsPaper.getInstance().getItemRegistry()
             .get(customId)
             .map(i -> i.createItemStack())
@@ -422,7 +425,13 @@ public class RecipeManager {
         return item;
     }
 
-    private ItemStack resolveResult(String resultStr) {
+    /**
+     * 結果文字列を ItemStack へ解決する。
+     *
+     * <p>package-private なのは {@link BedrockRecipeExporter} が同じ解決を使うため。
+     * 別実装で解決し直すと、登録された実物と統合版へ渡す表がずれる。
+     */
+    ItemStack resolveResult(String resultStr) {
         if (resultStr == null) return null;
 
         if (resultStr.startsWith("custom:")) {
