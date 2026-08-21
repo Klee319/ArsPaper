@@ -16,10 +16,16 @@ import java.util.TreeMap;
  *
  * <p><b>2026-08-21 追加: 乗算モード。</b> しきい値の1ステは次の2つの書き方を取れる。
  * <pre>
- *   crit-chance: 0.03                              # 加算モード(従来): 総合値へ +0.03
- *   attack-power: { mode: multiply, value: 0.10 }  # 乗算モード: 総合値を ×1.10
+ *   crit-chance: 0.03                                              # 加算モード(従来): 総合値へ +0.03
+ *   attack-power: { mode: multiply, value: 0.10, layer: layer_1 }  # 乗算モード: 総合値を ×1.10
  * </pre>
  * 加算分は {@link #cumulativeBonus}、乗算分は {@link #cumulativeMultiplier} が返す。
+ *
+ * <p><b>2026-08-22(W-186) 追加: 乗算レイヤの指定。</b> {@code layer:} に TF の
+ * {@code stats/lore.yml} の {@code multiplier-layers}(layer_1 = 攻撃力% など)のIDを書くと、
+ * その倍率は<b>装備側の同じレイヤの中で加算合流</b>する(レイヤ内は Σ(v-1))。書かなかった場合だけ
+ * {@link #DEFAULT_LAYER} という専用レイヤに入り、装備の倍率とは<b>掛け算</b>になる。
+ * 攻撃力%のようにアイテム側にも同種の倍率があるステは、レイヤを名指ししないと二重に乗る。
  * <b>攻撃力のように帯(進行度)で桁が変わるステは必ず乗算モードで配ること</b> ——
  * 固定値で配ると装備の弱い低帯ほど相対的に巨大になり、TF 側
  * {@code ShippedThreadBandIndependenceTest} の「スレッド1本ぶんのダメージ倍率は帯に依らず一定」
@@ -44,11 +50,22 @@ public class ThreadSetConfig {
     private static final String MODE_KEY = "mode";
     private static final String VALUE_KEY = "value";
     private static final String MODE_MULTIPLY = "multiply";
+    /** 乗算モードで合流先のレイヤIDを指定する YAML キー(任意)。省略時は {@link #DEFAULT_LAYER}。 */
+    private static final String LAYER_KEY = "layer";
+    /**
+     * {@code layer:} を書かなかった乗算ステの受け皿レイヤID。
+     *
+     * <p><b>TF の {@code AddonCombatStats#MULTIPLIER_LAYER_ID} と同じ文字列でなければならない。</b>
+     * この loader は「TF 未ロードでも安全にロードできる」ため TF クラスへ依存しない方針なので、
+     * 参照ではなく文字列を複製している(TF 側を変えるならここも変える)。
+     */
+    static final String DEFAULT_LAYER = "addon";
 
     // threadId -> (個数しきい値 昇順 -> そのしきい値で付与する 生キー ステMap)
     private final Map<String, NavigableMap<Integer, Map<String, Double>>> sets = new HashMap<>();
-    // 同上の乗算モード版(値は倍率の増分。0.1 = +10%)
-    private final Map<String, NavigableMap<Integer, Map<String, Double>>> multiplierSets = new HashMap<>();
+    // 同上の乗算モード版(レイヤID -> 生キー -> 倍率の増分。0.1 = +10%)
+    private final Map<String, NavigableMap<Integer, Map<String, Map<String, Double>>>> multiplierSets =
+            new HashMap<>();
 
     public ThreadSetConfig(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -81,7 +98,7 @@ public class ThreadSetConfig {
                 continue;
             }
             NavigableMap<Integer, Map<String, Double>> tiers = new TreeMap<>();
-            NavigableMap<Integer, Map<String, Double>> multiplierTiers = new TreeMap<>();
+            NavigableMap<Integer, Map<String, Map<String, Double>>> multiplierTiers = new TreeMap<>();
             for (String countKey : thresholds.getKeys(false)) {
                 int count;
                 try {
@@ -99,29 +116,10 @@ public class ThreadSetConfig {
                     continue;
                 }
                 Map<String, Double> stats = new LinkedHashMap<>();
-                Map<String, Double> multipliers = new LinkedHashMap<>();
-                for (String stat : statSection.getKeys(false)) {
-                    double value;
-                    boolean multiply = false;
-                    if (statSection.isDouble(stat) || statSection.isInt(stat)) {
-                        value = statSection.getDouble(stat);
-                    } else {
-                        // 乗算モード: { mode: multiply, value: 0.10 }。mode 省略なら加算モード扱い。
-                        ConfigurationSection modeSection = statSection.getConfigurationSection(stat);
-                        if (modeSection == null
-                                || !(modeSection.isDouble(VALUE_KEY) || modeSection.isInt(VALUE_KEY))) {
-                            plugin.getLogger().warning("[" + FILE_NAME + "] " + threadId + "/" + count
-                                    + ": ステ '" + stat + "' が数値でも { mode, value } でもないためスキップ");
-                            continue;
-                        }
-                        value = modeSection.getDouble(VALUE_KEY);
-                        multiply = MODE_MULTIPLY.equalsIgnoreCase(modeSection.getString(MODE_KEY, ""));
-                    }
-                    if (!Double.isFinite(value) || value == 0.0) {
-                        continue;
-                    }
-                    (multiply ? multipliers : stats).put(stat, value);
-                }
+                Map<String, Map<String, Double>> multipliers = new LinkedHashMap<>();
+                readTier(statSection, stats, multipliers,
+                        why -> plugin.getLogger().warning("[" + FILE_NAME + "] " + threadId + "/" + count
+                                + ": " + why));
                 if (!stats.isEmpty()) {
                     tiers.put(count, stats);
                 }
@@ -139,6 +137,65 @@ public class ThreadSetConfig {
     }
 
     /**
+     * しきい値1段ぶんのステ節を解釈し、加算分を {@code stats}(生キー -&gt; 値)、乗算分を
+     * {@code multipliers}(<b>レイヤID</b> -&gt; 生キー -&gt; 倍率の増分)へ振り分ける。
+     *
+     * <p>1ステの書き方は3通り:
+     * <pre>
+     *   crit-chance: 0.03                                              加算
+     *   attack-power: { mode: multiply, value: 0.10, layer: layer_1 }  乗算(レイヤ指定)
+     *   attack-power: { mode: multiply, value: 0.10 }                  乗算(DEFAULT_LAYER へ)
+     * </pre>
+     * 数値でも {@code { mode, value }} でもない値、非有限値、ゼロは<b>捨てる</b>
+     * (1件の記述ミスでその段ごと落とさない)。捨てた理由は {@code onWarning} へ渡す。
+     *
+     * <p>{@code plugin} に触らない static にしてあるのは、サーバ無しのテストから
+     * {@code YamlConfiguration} 1枚で直接叩けるようにするため。
+     */
+    static void readTier(ConfigurationSection statSection, Map<String, Double> stats,
+                         Map<String, Map<String, Double>> multipliers,
+                         java.util.function.Consumer<String> onWarning) {
+        if (statSection == null) {
+            return;
+        }
+        for (String stat : statSection.getKeys(false)) {
+            double value;
+            boolean multiply = false;
+            String layer = DEFAULT_LAYER;
+            if (statSection.isDouble(stat) || statSection.isInt(stat)) {
+                value = statSection.getDouble(stat);
+            } else {
+                // 乗算モード: { mode: multiply, value: 0.10, layer: layer_1 }。
+                // mode 省略なら加算モード扱い。layer 省略なら DEFAULT_LAYER。
+                ConfigurationSection modeSection = statSection.getConfigurationSection(stat);
+                if (modeSection == null
+                        || !(modeSection.isDouble(VALUE_KEY) || modeSection.isInt(VALUE_KEY))) {
+                    if (onWarning != null) {
+                        onWarning.accept("ステ '" + stat + "' が数値でも { mode, value } でもないためスキップ");
+                    }
+                    continue;
+                }
+                value = modeSection.getDouble(VALUE_KEY);
+                multiply = MODE_MULTIPLY.equalsIgnoreCase(modeSection.getString(MODE_KEY, ""));
+                if (multiply) {
+                    String declared = modeSection.getString(LAYER_KEY, "");
+                    if (declared != null && !declared.trim().isEmpty()) {
+                        layer = declared.trim();
+                    }
+                }
+            }
+            if (!Double.isFinite(value) || value == 0.0) {
+                continue;
+            }
+            if (multiply) {
+                multipliers.computeIfAbsent(layer, k -> new LinkedHashMap<>()).put(stat, value);
+            } else {
+                stats.put(stat, value);
+            }
+        }
+    }
+
+    /**
      * 同種スレッドが {@code count} 個装備されているときの累積セット効果(生キー stat -&gt; 合計値)。
      * しきい値 &le; count の全ティアを合算する。該当なし/未設定/count&le;0 は空Map。
      */
@@ -148,12 +205,27 @@ public class ThreadSetConfig {
 
     /**
      * 同種スレッドが {@code count} 個装備されているときの累積<b>乗算</b>セット効果
-     * (生キー stat -&gt; 倍率の増分の合計。0.1 = +10%)。{@link #cumulativeBonus} と同じ
-     * 累積しきい値式で、しきい値 &le; count の全ティアを<b>加算</b>で合算する
+     * (<b>レイヤID</b> -&gt; 生キー stat -&gt; 倍率の増分の合計。0.1 = +10%)。{@link #cumulativeBonus} と
+     * 同じ累積しきい値式で、しきい値 &le; count の全ティアを<b>同じレイヤの中で加算</b>合算する
      * (レイヤ内は Σ(v-1) を足す、という TF 側 {@code PlayerCombatAggregate} の合成規則に合わせる)。
+     * 別レイヤ同士は TF 側で掛け算になる。
      */
-    public Map<String, Double> cumulativeMultiplier(String threadId, int count) {
-        return cumulative(multiplierSets, threadId, count);
+    public Map<String, Map<String, Double>> cumulativeMultiplier(String threadId, int count) {
+        Map<String, Map<String, Double>> out = new LinkedHashMap<>();
+        if (threadId == null || count <= 0) {
+            return out;
+        }
+        NavigableMap<Integer, Map<String, Map<String, Double>>> tiers = multiplierSets.get(threadId);
+        if (tiers == null) {
+            return out;
+        }
+        for (Map<String, Map<String, Double>> tier : tiers.headMap(count, true).values()) {
+            tier.forEach((layer, stats) -> {
+                Map<String, Double> into = out.computeIfAbsent(layer, k -> new LinkedHashMap<>());
+                stats.forEach((key, value) -> into.merge(key, value, Double::sum));
+            });
+        }
+        return out;
     }
 
     /**
@@ -168,7 +240,7 @@ public class ThreadSetConfig {
         if (add != null) {
             counts.addAll(add.keySet());
         }
-        NavigableMap<Integer, Map<String, Double>> mul = multiplierSets.get(threadId);
+        NavigableMap<Integer, Map<String, Map<String, Double>>> mul = multiplierSets.get(threadId);
         if (mul != null) {
             counts.addAll(mul.keySet());
         }
@@ -180,9 +252,14 @@ public class ThreadSetConfig {
         return tierAt(sets, threadId, count);
     }
 
-    /** 表示用: しきい値 {@code count} の段<b>単体</b>の乗算ステ(倍率の増分。0.1 = +10%)。 */
-    public Map<String, Double> multiplierAt(String threadId, int count) {
-        return tierAt(multiplierSets, threadId, count);
+    /** 表示用: しきい値 {@code count} の段<b>単体</b>の乗算ステ(レイヤID -&gt; 生キー -&gt; 増分)。 */
+    public Map<String, Map<String, Double>> multiplierAt(String threadId, int count) {
+        NavigableMap<Integer, Map<String, Map<String, Double>>> tiers = multiplierSets.get(threadId);
+        if (tiers == null) {
+            return Map.of();
+        }
+        Map<String, Map<String, Double>> tier = tiers.get(count);
+        return tier == null ? Map.of() : tier;
     }
 
     private static Map<String, Double> tierAt(

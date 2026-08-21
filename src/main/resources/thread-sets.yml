@@ -414,15 +414,18 @@ thread-sets:
   #   低帯だけ極端に強くなる(TF ShippedThreadBandIndependenceTest が固定している
   #   「スレッド1本ぶんのダメージ倍率は帯に依らず一定」を壊す)。
   #   乗算なら 1個で +25% / 5個でさらに +40% = 合計 +65% が全帯で同じ意味になる。
+  # 2026-08-22(W-186): layer: layer_1 を明示した。無指定だと「addon」という専用レイヤに入り、
+  #   装備側の攻撃力%(layer_1)とは【掛け算】になって二重に乗る。layer_1 を名指しすると
+  #   装備の攻撃力%と同じレイヤの中で足し算になる(TF の合成規則: レイヤ内は Σ(v-1)、レイヤ同士は積)。
   blindness:
     thresholds:
       "1":
         max-health: -4
-        attack-power: { mode: multiply, value: 0.25 }
+        attack-power: { mode: multiply, value: 0.25, layer: layer_1 }
       "5":
         max-health: -6
         damage-modifier: 0.3
-        attack-power: { mode: multiply, value: 0.40 }
+        attack-power: { mode: multiply, value: 0.40, layer: layer_1 }
   translate:
     thresholds:
       "2":
@@ -438,24 +441,26 @@ thread-sets:
   #  「スレッド1本ぶんのダメージ倍率は帯に依らず一定」を壊すため。
   #  percent-bonus-damage はセット効果側では【1件も配らない】——
   #  帯予算(防具枠16本で +59%)は item-stats 側の1本あたりの値だけで管理する。
+  #  2026-08-22(W-186): 乗算には layer: を必ず書く。攻撃力% は layer_1(TF stats/lore.yml の
+  #  multiplier-layers)。書き忘れると装備側の同種倍率と別レイヤ扱いになり掛け算で二重に乗る。
   swordsman:
     thresholds:
       "3":
         crit-chance: 0.03
       "5":
-        attack-power: { mode: multiply, value: 0.05 }
+        attack-power: { mode: multiply, value: 0.05, layer: layer_1 }
   berserker:
     thresholds:
       "3":
         crit-damage: 0.08
       "5":
-        attack-power: { mode: multiply, value: 0.06 }
+        attack-power: { mode: multiply, value: 0.06, layer: layer_1 }
   lancer:
     thresholds:
       "3":
         penetration: 0.04
       "5":
-        attack-power: { mode: multiply, value: 0.05 }
+        attack-power: { mode: multiply, value: 0.05, layer: layer_1 }
   reaper:
     thresholds:
       "3":
@@ -467,7 +472,7 @@ thread-sets:
       "3":
         armor-strength: 0.05
       "5":
-        attack-power: { mode: multiply, value: 0.05 }
+        attack-power: { mode: multiply, value: 0.05, layer: layer_1 }
   assassin:
     thresholds:
       "3":
@@ -485,13 +490,13 @@ thread-sets:
       "3":
         crit-damage: 0.08
       "5":
-        attack-power: { mode: multiply, value: 0.07 }
+        attack-power: { mode: multiply, value: 0.07, layer: layer_1 }
   greatsword:
     thresholds:
       "3":
         damage-reduction: 0.03
       "5":
-        attack-power: { mode: multiply, value: 0.05 }
+        attack-power: { mode: multiply, value: 0.05, layer: layer_1 }
   longshot:
     thresholds:
       "3":
@@ -503,13 +508,13 @@ thread-sets:
       "3":
         magic-resistance: 0.04
       "5":
-        attack-power: { mode: multiply, value: 0.05 }
+        attack-power: { mode: multiply, value: 0.05, layer: layer_1 }
   earthshaker:
     thresholds:
       "3":
         armor-strength: 0.05
       "5":
-        attack-power: { mode: multiply, value: 0.06 }
+        attack-power: { mode: multiply, value: 0.06, layer: layer_1 }
   bolter:
     thresholds:
       "3":
@@ -521,13 +526,13 @@ thread-sets:
       "3":
         magic-resistance: 0.04
       "5":
-        attack-power: { mode: multiply, value: 0.06 }
+        attack-power: { mode: multiply, value: 0.06, layer: layer_1 }
   onslaught:
     thresholds:
       "3":
-        attack-power: { mode: multiply, value: 0.04 }
+        attack-power: { mode: multiply, value: 0.04, layer: layer_1 }
       "5":
-        attack-power: { mode: multiply, value: 0.06 }
+        attack-power: { mode: multiply, value: 0.06, layer: layer_1 }
   precision:
     thresholds:
       "3":

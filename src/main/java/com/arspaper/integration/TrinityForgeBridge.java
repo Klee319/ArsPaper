@@ -1626,17 +1626,18 @@ public final class TrinityForgeBridge {
      * {@link #threadStatLore} の乗算対応版で、加算ステと乗算ステを1回の呼び出しでまとめて描く。
      *
      * @param additive        加算モードのステ(canonical/生キーどちらでも可。TF 側で正規化される)
-     * @param multiplierDelta 乗算モードのステ。<b>値は倍率の「増分」</b>(0.1 = +10%)で、
-     *                        thread-sets.yml と PDC 乗算チャネルの表現に合わせてある。
+     * @param multiplierDelta 乗算モードのステ(<b>レイヤID → ステ → 増分</b>)。<b>値は倍率の「増分」</b>
+     *                        (0.1 = +10%)で、thread-sets.yml と PDC 乗算チャネルの表現に合わせてある。
      *                        表示側(TF の {@code LoreComposer})は倍率そのものを要求するので、
      *                        ここで {@code 1 + delta} へ変換して渡す。
-     *                        レイヤIDは {@code AddonCombatStats#MULTIPLIER_LAYER_ID} を使う
-     *                        (実際に効くレイヤと表示のレイヤを一致させるため)。
+     *                        2026-08-22(W-186)からレイヤIDは thread-sets.yml の {@code layer:} が決める
+     *                        (無指定分だけが {@code AddonCombatStats#MULTIPLIER_LAYER_ID})。
+     *                        <b>実際に効くレイヤと表示のレイヤを一致させるため、ここで付け替えない。</b>
      *
      * <p>TF 未ロード / 例外時は空リスト(呼び出し側は「行が無い」として扱えばよい)。
      */
     public static java.util.List<net.kyori.adventure.text.Component> threadSetStatLore(
-            Map<String, Double> additive, Map<String, Double> multiplierDelta) {
+            Map<String, Double> additive, Map<String, Map<String, Double>> multiplierDelta) {
         boolean noAdditive = additive == null || additive.isEmpty();
         boolean noMultiplier = multiplierDelta == null || multiplierDelta.isEmpty();
         if (noAdditive && noMultiplier) {
@@ -1658,15 +1659,21 @@ public final class TrinityForgeBridge {
             }
             Map<String, Map<String, Double>> layers = new LinkedHashMap<>();
             if (!noMultiplier) {
-                Map<String, Double> ratios = new LinkedHashMap<>();
-                multiplierDelta.forEach((key, value) -> {
-                    if (key != null && value != null && Double.isFinite(value) && value != 0.0) {
-                        ratios.put(key, 1.0 + value);
+                multiplierDelta.forEach((layerId, stats) -> {
+                    if (stats == null || stats.isEmpty()) {
+                        return;
+                    }
+                    Map<String, Double> ratios = new LinkedHashMap<>();
+                    stats.forEach((key, value) -> {
+                        if (key != null && value != null && Double.isFinite(value) && value != 0.0) {
+                            ratios.put(key, 1.0 + value);
+                        }
+                    });
+                    if (!ratios.isEmpty()) {
+                        layers.put(layerId == null || layerId.isBlank()
+                                ? AddonCombatStats.MULTIPLIER_LAYER_ID : layerId, ratios);
                     }
                 });
-                if (!ratios.isEmpty()) {
-                    layers.put(AddonCombatStats.MULTIPLIER_LAYER_ID, ratios);
-                }
             }
             if (finite.isEmpty() && layers.isEmpty()) {
                 return java.util.List.of();
@@ -1851,20 +1858,24 @@ public final class TrinityForgeBridge {
 
     /**
      * スレッドのセット効果「乗算モード」の合計を、プレイヤーPDCの<b>乗算チャネル</b>へ書き込む。
-     * 値は倍率の増分(canonical key -&gt; 0.1 = +10%)で、TF 側は
-     * {@code PlayerCombatAggregate#multiplierFor} の既存の乗算レイヤへ1レイヤとして合流させる。
+     * 値は <b>レイヤID -&gt; canonical key -&gt; 倍率の増分</b>(0.1 = +10%)で、TF 側は
+     * {@code PlayerCombatAggregate#multiplierFor} の乗算レイヤへそのレイヤIDのまま合流させる。
      *
-     * <p>コーデックは加算チャネル({@link #writeAddonCombatStats})と完全に共通
-     * ({@code AddonCombatStats#encode})。空/全ゼロならキーを消す —— 消さないと外した後も
-     * 古い倍率が残り続ける。TF未ロード / API不整合時は no-op(fail-open)。
+     * <p>2026-08-22(W-186): 以前は全部を1レイヤ({@code AddonCombatStats#MULTIPLIER_LAYER_ID})へ
+     * 固定で入れていた。今は thread-sets.yml の {@code layer:} が行き先を決め、装備側の同レイヤと
+     * 同じレイヤ内で加算合流する(＝装備の攻撃力%とスレッドの攻撃力%が二重に乗らない)。
+     *
+     * <p>コーデックは {@code AddonCombatStats#encodeLayered}(加算チャネルの {@code encode} と同系)。
+     * 空/全ゼロならキーを消す —— 消さないと外した後も古い倍率が残り続ける。
+     * TF未ロード / API不整合時は no-op(fail-open)。
      */
-    public static void writeAddonCombatMultipliers(Player player, Map<String, Double> multipliers) {
+    public static void writeAddonCombatMultipliers(Player player, Map<String, Map<String, Double>> multipliers) {
         if (player == null) {
             return;
         }
         try {
             String encoded = (multipliers == null || multipliers.isEmpty())
-                    ? "" : AddonCombatStats.encode(multipliers);
+                    ? "" : AddonCombatStats.encodeLayered(multipliers);
             PersistentDataContainer pdc = player.getPersistentDataContainer();
             if (encoded.isEmpty()) {
                 pdc.remove(PdcKeys.PLAYER_ADDON_COMBAT_MULTIPLIERS);

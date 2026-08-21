@@ -285,14 +285,20 @@ public class ArmorManaListener implements Listener {
         try {
             ThreadSetConfig threadSetConfig = ArsPaper.getInstance().getThreadSetConfig();
             // 乗算モードのセット効果は加算チャネルへ混ぜてはいけない(意味が違う)。別Mapに集めて
-            // 別PDCキーへ書く。TF 側は乗算レイヤ1本として「加算合算が終わった総合値」へ掛ける。
-            Map<String, Double> threadCombatMultipliers = new LinkedHashMap<>();
+            // 別PDCキーへ書く。TF 側は「加算合算が終わった総合値」へ乗算レイヤを掛ける。
+            // 2026-08-22(W-186): レイヤID -> ステ -> 増分 の二段。同じレイヤ同士だけを足し合わせ、
+            // レイヤをまたいだ合算はしない(TF 側で別レイヤは掛け算になるため、ここで潰すと意味が変わる)。
+            Map<String, Map<String, Double>> threadCombatMultipliers = new LinkedHashMap<>();
             if (threadSetConfig != null) {
                 for (Map.Entry<ThreadType, Integer> entry : threadCounts.entrySet()) {
                     threadSetConfig.cumulativeBonus(entry.getKey().getId(), entry.getValue())
                             .forEach((key, value) -> threadCombatStats.merge(key, value, Double::sum));
                     threadSetConfig.cumulativeMultiplier(entry.getKey().getId(), entry.getValue())
-                            .forEach((key, value) -> threadCombatMultipliers.merge(key, value, Double::sum));
+                            .forEach((layer, stats) -> {
+                                Map<String, Double> into = threadCombatMultipliers
+                                        .computeIfAbsent(layer, k -> new LinkedHashMap<>());
+                                stats.forEach((key, value) -> into.merge(key, value, Double::sum));
+                            });
                 }
             }
             TrinityForgeBridge.writeAddonCombatStats(player, threadCombatStats);
