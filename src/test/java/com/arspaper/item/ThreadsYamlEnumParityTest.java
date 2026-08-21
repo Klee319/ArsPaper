@@ -42,29 +42,57 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ThreadsYamlEnumParityTest {
 
-    /** {@code NAME("id", "表示名", 300001, ...)} の id を拾う。 */
-    private static final Pattern ENUM_CONSTANT =
-            Pattern.compile("^\\s{4}[A-Z][A-Z0-9_]*\\(\"([a-z0-9_]+)\"", Pattern.MULTILINE);
+    /** {@code public static final ThreadType NAME = new ThreadType("id", ...)} の id を拾う。 */
+    private static final Pattern ENUM_CONSTANT = Pattern.compile(
+            "^\\s{4}public static final ThreadType [A-Z][A-Z0-9_]* = new ThreadType\\(\"([a-z0-9_]+)\"",
+            Pattern.MULTILINE);
 
+    /**
+     * <b>2026-08-18(W-102)で片方向だけの検査に変えた。</b>
+     * {@code ThreadType} が実行時登録を受け付けるようになったので、
+     * <b>「threads.yml にあるが組み込み定数に無い」は正常</b>（{@code ThreadConfig#registerIfUnknown}
+     * が起動時に登録する。これが「エディタで設定したらスレッドになる」の実装）。
+     * 逆向き（組み込み定数にあるのに yml に無い）だけは今も静かな劣化なので落とす。
+     * 実行時登録の配線そのものは {@link #configRegistersUnknownThreadIds()} が縛る。
+     */
     @Test
-    @DisplayName("threads.yml のキーと ThreadType の id が完全一致する")
-    void shippedThreadsYamlMatchesEnumIds() throws IOException {
-        Set<String> enumIds = enumIds();
+    @DisplayName("組み込み定数はすべて threads.yml にも書かれている")
+    void everyBuiltInThreadHasAYamlEntry() throws IOException {
+        Set<String> builtInIds = enumIds();
         Set<String> yamlKeys = yamlKeys();
 
-        assertTrue(enumIds.size() > 40,
-                "ThreadType.java から id を " + enumIds.size() + " 件しか読めていない(空振りしている)");
+        assertTrue(builtInIds.size() > 40,
+                "ThreadType.java から id を " + builtInIds.size() + " 件しか読めていない(空振りしている)");
 
-        List<String> yamlOnly = new ArrayList<>(yamlKeys);
-        yamlOnly.removeAll(enumIds);
-        assertEquals(List.of(), yamlOnly,
-                "threads.yml にあるが ThreadType 定数が無い ── ThreadType.fromId が null を返すので"
-                        + "そのスレッドは防具に挿せない(ログにも何も出ない)");
-
-        List<String> enumOnly = new ArrayList<>(enumIds);
-        enumOnly.removeAll(yamlKeys);
-        assertEquals(List.of(), enumOnly,
+        List<String> builtInOnly = new ArrayList<>(builtInIds);
+        builtInOnly.removeAll(yamlKeys);
+        assertEquals(List.of(), builtInOnly,
                 "ThreadType にあるが threads.yml に無い ── display_name / lore が既定値だけになる");
+    }
+
+    @Test
+    @DisplayName("組み込み定数に無い threads.yml の id は実行時登録される(W-102 の配線)")
+    void configRegistersUnknownThreadIds() throws IOException {
+        // ThreadConfig は Bukkit の設定APIを直接触るのでこの基盤では動かせない(このクラスの
+        // javadoc と同じ制約)。したがって縛れるのは「登録経路が読み込みループ内に実在すること」まで。
+        Path path = Path.of("src", "main", "java", "com", "arspaper", "item", "ThreadConfig.java");
+        assertTrue(Files.exists(path), "ThreadConfig.java が見つからない: " + path.toAbsolutePath());
+        String source = Files.readString(path);
+
+        assertTrue(source.contains("registerIfUnknown(key, section)"),
+                "threads.yml の読み込みループが未知idの登録を呼んでいない。"
+                        + "エディタで足したスレッドが ThreadType.fromId で null になり、"
+                        + "防具に挿せず品質も乗らない状態へ逆戻りする(W-102)");
+        assertTrue(source.contains("ThreadType.register("),
+                "ThreadType.register を一度も呼んでいない(W-102)");
+
+        String threadType = Files.readString(
+                Path.of("src", "main", "java", "com", "arspaper", "item", "ThreadType.java"));
+        assertTrue(threadType.contains("public static ThreadType register("),
+                "ThreadType に実行時登録の入口が無い(W-102)");
+        assertTrue(threadType.contains("BY_ID.put(id, this)"),
+                "組み込み定数と実行時登録が同じ台帳に載っていない。"
+                        + "台帳が分かれると fromId がどちらか片方しか見なくなる(W-102)");
     }
 
     @Test

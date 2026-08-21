@@ -13,50 +13,75 @@ import java.util.List;
  * 防具スレッドのタイプ。
  * スレッドアイテムおよび防具PDCのスロットデータとして使用。
  * 効果量と重複設定はconfig.ymlのthreadsセクションで上書き可能。
+ *
+ * <p><b>2026-08-18(W-102): enum をやめて「組み込み定数 + 実行時登録」の最終クラスにした。</b>
+ * 以前はここが enum だったため、<b>「スレッドかどうか」の判定がコンパイル時に閉じていた</b>。
+ * {@code ThreadGui#isEffectThread} は PDC の {@code arspaper:thread_item_type} を
+ * {@link #fromId} に通して装着可否を決めるので、<b>enum に定数が無い id は
+ * 「スレッドではない」と判定される</b> —— 設定エディタからスレッドを足しても、
+ * jar を作り直すまで防具に挿せず、品質も乗らなかった
+ * (品質側の再刻印は {@code hasEffect()} を条件にしているため、
+ * 定数が無い＝品質が常に無視される、という形で同じ根から3つの症状が出ていた)。
+ *
+ * <p>そこで {@link #BY_ID} を唯一の台帳にし、{@code threads.yml} に書かれた
+ * 未知の id は {@link #register} で実行時に足せるようにした。
+ * <b>enum ではなくなったが、定数は今までどおり1 id につき1インスタンスなので
+ * {@code ==} 比較も従来のまま通る。</b>
+ * ただし {@code EnumMap}/{@code EnumSet}/{@code switch} は使えない
+ * ({@code ArmorManaListener} の {@code EnumMap} は {@code HashMap} へ置き換え済み)。
+ * 永続化は {@link #getId()} の文字列なので、この変更でセーブデータは一切影響を受けない
+ * ({@code name()}/{@code ordinal()} は元々どこからも使われていない)。
  */
-public enum ThreadType {
+public final class ThreadType {
+
+    /**
+     * id → 定義の唯一の台帳。<b>定数より前に初期化されている必要がある</b> ——
+     * 各定数のコンストラクタがここへ自分を登録するため、宣言順を入れ替えると
+     * 静的初期化中に NPE で全スレッドが死ぬ。
+     */
+    private static final java.util.Map<String, ThreadType> BY_ID = new java.util.LinkedHashMap<>();
 
     // === 空スレッド ===
-    EMPTY("empty", "空のスレッド", 300001, NamedTextColor.GRAY,
-        0, 0, null, 0, 0, 0, 0, Material.WAYFINDER_ARMOR_TRIM_SMITHING_TEMPLATE),
+    public static final ThreadType EMPTY = new ThreadType("empty", "空のスレッド", 300001, NamedTextColor.GRAY,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
 
     // === マナ系 ===
-    MANA_REGEN("mana_regen", "マナ回復速度上昇のスレッド", 300002, NamedTextColor.AQUA,
-        1, 0, null, 0, 0, 0, 0, Material.TIDE_ARMOR_TRIM_SMITHING_TEMPLATE),
-    MANA_BOOST("mana_boost", "マナ最大値上昇のスレッド", 300003, NamedTextColor.BLUE,
-        0, 20, null, 0, 0, 0, 0, Material.WARD_ARMOR_TRIM_SMITHING_TEMPLATE),
+    public static final ThreadType MANA_REGEN = new ThreadType("mana_regen", "マナ回復速度上昇のスレッド", 300002, NamedTextColor.AQUA,
+        1, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType MANA_BOOST = new ThreadType("mana_boost", "マナ最大値上昇のスレッド", 300003, NamedTextColor.BLUE,
+        0, 20, null, 0, 0, 0, 0, Material.STRING);
 
     // === ポーション効果系 ===
-    SPEED("speed", "迅速のスレッド", 300004, NamedTextColor.WHITE,
-        0, 0, PotionEffectType.SPEED, 0, 0, 0, 0, Material.RAISER_ARMOR_TRIM_SMITHING_TEMPLATE),
-    JUMP_BOOST("jump_boost", "跳躍のスレッド", 300005, NamedTextColor.GREEN,
-        0, 0, PotionEffectType.JUMP_BOOST, 0, 0, 0, 0, Material.SHAPER_ARMOR_TRIM_SMITHING_TEMPLATE),
-    NIGHT_VISION("night_vision", "暗視のスレッド", 300006, NamedTextColor.DARK_AQUA,
-        0, 0, PotionEffectType.NIGHT_VISION, 0, 0, 0, 0, Material.DUNE_ARMOR_TRIM_SMITHING_TEMPLATE),
-    FIRE_RESISTANCE("fire_resistance", "耐火のスレッド", 300007, NamedTextColor.RED,
-        0, 0, PotionEffectType.FIRE_RESISTANCE, 0, 0, 0, 0, Material.SENTRY_ARMOR_TRIM_SMITHING_TEMPLATE),
-    DOLPHINS_GRACE("dolphins_grace", "イルカの好意のスレッド", 300008, NamedTextColor.DARK_AQUA,
-        0, 0, PotionEffectType.DOLPHINS_GRACE, 0, 0, 0, 0, Material.COAST_ARMOR_TRIM_SMITHING_TEMPLATE),
-    CONDUIT_POWER("conduit_power", "コンジットパワーのスレッド", 300009, NamedTextColor.AQUA,
-        0, 0, PotionEffectType.CONDUIT_POWER, 0, 0, 0, 0, Material.EYE_ARMOR_TRIM_SMITHING_TEMPLATE),
-    HERO_OF_THE_VILLAGE("hero_of_the_village", "村の英雄のスレッド", 300010, NamedTextColor.GREEN,
-        0, 0, PotionEffectType.HERO_OF_THE_VILLAGE, 0, 0, 0, 0, Material.HOST_ARMOR_TRIM_SMITHING_TEMPLATE),
-    HEALTH_BOOST("health_boost", "体力増強のスレッド", 300011, NamedTextColor.RED,
-        0, 0, PotionEffectType.HEALTH_BOOST, 0, 0, 0, 0, Material.RIB_ARMOR_TRIM_SMITHING_TEMPLATE),
+    public static final ThreadType SPEED = new ThreadType("speed", "迅速のスレッド", 300004, NamedTextColor.WHITE,
+        0, 0, PotionEffectType.SPEED, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType JUMP_BOOST = new ThreadType("jump_boost", "跳躍のスレッド", 300005, NamedTextColor.GREEN,
+        0, 0, PotionEffectType.JUMP_BOOST, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType NIGHT_VISION = new ThreadType("night_vision", "暗視のスレッド", 300006, NamedTextColor.DARK_AQUA,
+        0, 0, PotionEffectType.NIGHT_VISION, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType FIRE_RESISTANCE = new ThreadType("fire_resistance", "耐火のスレッド", 300007, NamedTextColor.RED,
+        0, 0, PotionEffectType.FIRE_RESISTANCE, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType DOLPHINS_GRACE = new ThreadType("dolphins_grace", "イルカの好意のスレッド", 300008, NamedTextColor.DARK_AQUA,
+        0, 0, PotionEffectType.DOLPHINS_GRACE, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType CONDUIT_POWER = new ThreadType("conduit_power", "コンジットパワーのスレッド", 300009, NamedTextColor.AQUA,
+        0, 0, PotionEffectType.CONDUIT_POWER, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType HERO_OF_THE_VILLAGE = new ThreadType("hero_of_the_village", "村の英雄のスレッド", 300010, NamedTextColor.GREEN,
+        0, 0, PotionEffectType.HERO_OF_THE_VILLAGE, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType HEALTH_BOOST = new ThreadType("health_boost", "体力増強のスレッド", 300011, NamedTextColor.RED,
+        0, 0, PotionEffectType.HEALTH_BOOST, 0, 0, 0, 0, Material.STRING);
 
     // === マナ回復系 ===
-    HIT_MANA_RECOVERY("hit_mana_recovery", "被弾マナ回復のスレッド", 300012, NamedTextColor.GOLD,
-        0, 0, null, 0, 0, 3, 0, Material.SNOUT_ARMOR_TRIM_SMITHING_TEMPLATE),
-    DAMAGE_MANA_RECOVERY("damage_mana_recovery", "攻撃マナ回復のスレッド", 300013, NamedTextColor.DARK_RED,
-        0, 0, null, 0, 0, 0, 2, Material.WILD_ARMOR_TRIM_SMITHING_TEMPLATE),
+    public static final ThreadType HIT_MANA_RECOVERY = new ThreadType("hit_mana_recovery", "被弾マナ回復のスレッド", 300012, NamedTextColor.GOLD,
+        0, 0, null, 0, 0, 3, 0, Material.STRING);
+    public static final ThreadType DAMAGE_MANA_RECOVERY = new ThreadType("damage_mana_recovery", "攻撃マナ回復のスレッド", 300013, NamedTextColor.DARK_RED,
+        0, 0, null, 0, 0, 0, 2, Material.STRING);
 
     // === 特殊系 ===
-    SPELL_COST_DOWN("spell_cost_down", "詠唱効率のスレッド", 300014, NamedTextColor.YELLOW,
-        0, 0, null, 0, 10, 0, 0, Material.VEX_ARMOR_TRIM_SMITHING_TEMPLATE),
-    FLIGHT("flight", "飛行のスレッド", 300015, NamedTextColor.WHITE,
-        0, 0, null, 0, 0, 0, 0, Material.SPIRE_ARMOR_TRIM_SMITHING_TEMPLATE),
-    BACKPACK("backpack", "バックパックのスレッド", 300016, NamedTextColor.DARK_GREEN,
-        0, 0, null, 0, 0, 0, 0, Material.SILENCE_ARMOR_TRIM_SMITHING_TEMPLATE),
+    public static final ThreadType SPELL_COST_DOWN = new ThreadType("spell_cost_down", "詠唱効率のスレッド", 300014, NamedTextColor.YELLOW,
+        0, 0, null, 0, 10, 0, 0, Material.STRING);
+    public static final ThreadType FLIGHT = new ThreadType("flight", "飛行のスレッド", 300015, NamedTextColor.WHITE,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType BACKPACK = new ThreadType("backpack", "バックパックのスレッド", 300016, NamedTextColor.DARK_GREEN,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
 
     // ================================================================
     // 2026-08-02 スレッド 16 -> 40 種への拡張 (CMD 300017-300040)。
@@ -81,58 +106,58 @@ public enum ThreadType {
     // ================================================================
 
     // --- 制作(儀式・生産)系: 入手経路=制作。効果値は設計書の基準どおり ---
-    MANA_AMPLIFY("mana_amplify", "マナ増幅のスレッド", 300017, NamedTextColor.BLUE,
-        0, 0, null, 0, 0, 0, 0, Material.FLOW_ARMOR_TRIM_SMITHING_TEMPLATE),
-    MANA_CIRCULATE("mana_circulate", "循環のスレッド", 300018, NamedTextColor.AQUA,
-        0, 0, null, 0, 0, 0, 0, Material.BOLT_ARMOR_TRIM_SMITHING_TEMPLATE),
-    SOURCE_THRIFT("source_thrift", "源流節約のスレッド", 300019, NamedTextColor.DARK_AQUA,
-        0, 0, null, 0, 0, 0, 0, Material.FLOW_POTTERY_SHERD),
-    ARTISAN("artisan", "匠のスレッド", 300020, NamedTextColor.GOLD,
-        0, 0, null, 0, 0, 0, 0, Material.ARMS_UP_POTTERY_SHERD),
-    RITUALIST("ritualist", "儀式師のスレッド", 300021, NamedTextColor.LIGHT_PURPLE,
-        0, 0, null, 0, 0, 0, 0, Material.BREWER_POTTERY_SHERD),
-    THRIFT("thrift", "倹約のスレッド", 300022, NamedTextColor.YELLOW,
-        0, 0, null, 0, 0, 0, 0, Material.PLENTY_POTTERY_SHERD),
-    SALVAGE("salvage", "解体のスレッド", 300023, NamedTextColor.GRAY,
-        0, 0, null, 0, 0, 0, 0, Material.SCRAPE_POTTERY_SHERD),
-    SCHOLAR("scholar", "選書のスレッド", 300031, NamedTextColor.DARK_PURPLE,
-        0, 0, null, 0, 0, 0, 0, Material.BURN_POTTERY_SHERD),
+    public static final ThreadType MANA_AMPLIFY = new ThreadType("mana_amplify", "マナ増幅のスレッド", 300017, NamedTextColor.BLUE,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType MANA_CIRCULATE = new ThreadType("mana_circulate", "循環のスレッド", 300018, NamedTextColor.AQUA,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType SOURCE_THRIFT = new ThreadType("source_thrift", "源流節約のスレッド", 300019, NamedTextColor.DARK_AQUA,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType ARTISAN = new ThreadType("artisan", "匠のスレッド", 300020, NamedTextColor.GOLD,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType RITUALIST = new ThreadType("ritualist", "儀式師のスレッド", 300021, NamedTextColor.LIGHT_PURPLE,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType THRIFT = new ThreadType("thrift", "倹約のスレッド", 300022, NamedTextColor.YELLOW,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType SALVAGE = new ThreadType("salvage", "解体のスレッド", 300023, NamedTextColor.GRAY,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType SCHOLAR = new ThreadType("scholar", "選書のスレッド", 300031, NamedTextColor.DARK_PURPLE,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
 
     // --- 採取・生活系: 入手経路=ルート。効果値は基準の約1.2倍 ---
-    MINER("miner", "豊鉱のスレッド", 300024, NamedTextColor.DARK_GRAY,
-        0, 0, null, 0, 0, 0, 0, Material.MINER_POTTERY_SHERD),
-    ANGLER("angler", "潮読みのスレッド", 300025, NamedTextColor.BLUE,
-        0, 0, null, 0, 0, 0, 0, Material.ANGLER_POTTERY_SHERD),
-    HARVEST("harvest", "実りのスレッド", 300026, NamedTextColor.YELLOW,
-        0, 0, null, 0, 0, 0, 0, Material.SHEAF_POTTERY_SHERD),
-    TIMBER("timber", "年輪のスレッド", 300027, NamedTextColor.DARK_GREEN,
-        0, 0, null, 0, 0, 0, 0, Material.SNORT_POTTERY_SHERD),
-    DILIGENCE("diligence", "研鑽のスレッド", 300029, NamedTextColor.GREEN,
-        0, 0, null, 0, 0, 0, 0, Material.FRIEND_POTTERY_SHERD),
-    ENDURANCE("endurance", "持久のスレッド", 300033, NamedTextColor.GOLD,
-        0, 0, null, 0, 0, 0, 0, Material.SHELTER_POTTERY_SHERD),
-    GOURMET("gourmet", "美食のスレッド", 300034, NamedTextColor.RED,
-        0, 0, null, 0, 0, 0, 0, Material.HEARTBREAK_POTTERY_SHERD),
-    SLOW_FALLING("slow_falling", "浮遊のスレッド", 300039, NamedTextColor.WHITE,
-        0, 0, PotionEffectType.SLOW_FALLING, 0, 0, 0, 0, Material.GUSTER_POTTERY_SHERD),
+    public static final ThreadType MINER = new ThreadType("miner", "豊鉱のスレッド", 300024, NamedTextColor.DARK_GRAY,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType ANGLER = new ThreadType("angler", "潮読みのスレッド", 300025, NamedTextColor.BLUE,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType HARVEST = new ThreadType("harvest", "実りのスレッド", 300026, NamedTextColor.YELLOW,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType TIMBER = new ThreadType("timber", "年輪のスレッド", 300027, NamedTextColor.DARK_GREEN,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType DILIGENCE = new ThreadType("diligence", "研鑽のスレッド", 300029, NamedTextColor.GREEN,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType ENDURANCE = new ThreadType("endurance", "持久のスレッド", 300033, NamedTextColor.GOLD,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType GOURMET = new ThreadType("gourmet", "美食のスレッド", 300034, NamedTextColor.RED,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType SLOW_FALLING = new ThreadType("slow_falling", "浮遊のスレッド", 300039, NamedTextColor.WHITE,
+        0, 0, PotionEffectType.SLOW_FALLING, 0, 0, 0, 0, Material.STRING);
 
     // --- 戦闘系: 入手経路=ダンジョン。効果値は基準の約1.5倍 ---
-    SPOILS("spoils", "戦利品のスレッド", 300028, NamedTextColor.GOLD,
-        0, 0, null, 0, 0, 0, 0, Material.SKULL_POTTERY_SHERD),
-    EXPERIENCE("experience", "経験のスレッド", 300030, NamedTextColor.GREEN,
-        0, 0, null, 0, 0, 0, 0, Material.HOWL_POTTERY_SHERD),
-    MENDING_FLESH("mending_flesh", "治癒のスレッド", 300032, NamedTextColor.RED,
-        0, 0, null, 0, 0, 0, 0, Material.HEART_POTTERY_SHERD),
-    THORN("thorn", "棘のスレッド", 300035, NamedTextColor.DARK_RED,
-        0, 0, null, 0, 0, 0, 0, Material.DANGER_POTTERY_SHERD),
-    CONCUSSION("concussion", "昏倒のスレッド", 300036, NamedTextColor.DARK_AQUA,
-        0, 0, null, 0, 0, 0, 0, Material.BLADE_POTTERY_SHERD),
-    SWIFTCAST("swiftcast", "速攻のスレッド", 300037, NamedTextColor.YELLOW,
-        0, 0, null, 0, 0, 0, 0, Material.MOURNER_POTTERY_SHERD),
-    MARKSMAN("marksman", "射手のスレッド", 300038, NamedTextColor.DARK_GREEN,
-        0, 0, null, 0, 0, 0, 0, Material.ARCHER_POTTERY_SHERD),
-    LUCK("luck", "幸運のスレッド", 300040, NamedTextColor.GOLD,
-        0, 0, PotionEffectType.LUCK, 0, 0, 0, 0, Material.EXPLORER_POTTERY_SHERD),
+    public static final ThreadType SPOILS = new ThreadType("spoils", "戦利品のスレッド", 300028, NamedTextColor.GOLD,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType EXPERIENCE = new ThreadType("experience", "経験のスレッド", 300030, NamedTextColor.GREEN,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType MENDING_FLESH = new ThreadType("mending_flesh", "治癒のスレッド", 300032, NamedTextColor.RED,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType THORN = new ThreadType("thorn", "棘のスレッド", 300035, NamedTextColor.DARK_RED,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType CONCUSSION = new ThreadType("concussion", "昏倒のスレッド", 300036, NamedTextColor.DARK_AQUA,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType SWIFTCAST = new ThreadType("swiftcast", "速攻のスレッド", 300037, NamedTextColor.YELLOW,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType MARKSMAN = new ThreadType("marksman", "射手のスレッド", 300038, NamedTextColor.DARK_GREEN,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType LUCK = new ThreadType("luck", "幸運のスレッド", 300040, NamedTextColor.GOLD,
+        0, 0, PotionEffectType.LUCK, 0, 0, 0, 0, Material.STRING);
 
     // ================================================================
     // 2026-08-03 追加5種 (CMD 300041-300045)。
@@ -154,16 +179,16 @@ public enum ThreadType {
     //   "hit" を含む id を作らない(ThreadConfig の recovery 振り分けが文字列判定)。
     //   perfumer / apiarist / herder / appraiser / excavation はいずれも該当しない。
     // ================================================================
-    PERFUMER("perfumer", "調香のスレッド", 300041, NamedTextColor.LIGHT_PURPLE,
-        0, 0, null, 0, 0, 0, 0, Material.FLOWER_BANNER_PATTERN),
-    APIARIST("apiarist", "養蜂のスレッド", 300042, NamedTextColor.YELLOW,
-        0, 0, null, 0, 0, 0, 0, Material.FIELD_MASONED_BANNER_PATTERN),
-    HERDER("herder", "牧人のスレッド", 300043, NamedTextColor.GREEN,
-        0, 0, null, 0, 0, 0, 0, Material.PIGLIN_BANNER_PATTERN),
-    APPRAISER("appraiser", "鑑識のスレッド", 300044, NamedTextColor.GOLD,
-        0, 0, null, 0, 0, 0, 0, Material.PRIZE_POTTERY_SHERD),
-    EXCAVATION("excavation", "削岩のスレッド", 300045, NamedTextColor.DARK_GRAY,
-        0, 0, null, 0, 0, 0, 0, Material.NETHERITE_UPGRADE_SMITHING_TEMPLATE),
+    public static final ThreadType PERFUMER = new ThreadType("perfumer", "調香のスレッド", 300041, NamedTextColor.LIGHT_PURPLE,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType APIARIST = new ThreadType("apiarist", "養蜂のスレッド", 300042, NamedTextColor.YELLOW,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType HERDER = new ThreadType("herder", "牧人のスレッド", 300043, NamedTextColor.GREEN,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType APPRAISER = new ThreadType("appraiser", "鑑識のスレッド", 300044, NamedTextColor.GOLD,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType EXCAVATION = new ThreadType("excavation", "削岩のスレッド", 300045, NamedTextColor.DARK_GRAY,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
 
     // ================================================================
     // 【TFステ専用スレッド 6種】(2026-08-18 追加)
@@ -199,18 +224,18 @@ public enum ThreadType {
     //   いずれも該当しない。role_effeciency の綴りは catalog.yml 側の既存IDに合わせている
     //   (typo だが配布済みなので直せない)。
     // ================================================================
-    BETTER_FORTUNE("better_fortune", "開運のスレッド", 100023, NamedTextColor.RED,
-        0, 0, null, 0, 0, 0, 0, Material.STRING),
+    public static final ThreadType BETTER_FORTUNE = new ThreadType("better_fortune", "開運のスレッド", 100023, NamedTextColor.RED,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
     // catalog.yml の表示名は1文字ずつ虹色だが enum は単色しか持てないので GOLD で代表する。
-    GACHA("gacha", "ガチャスレッド", 100024, NamedTextColor.GOLD,
-        0, 0, null, 0, 0, 0, 0, Material.STRING),
-    ROLE_LUCK("role_luck", "ロール運のスレッド", 100025, NamedTextColor.WHITE,
-        0, 0, null, 0, 0, 0, 0, Material.STRING),
-    ROLE_EFFECIENCY("role_effeciency", "ロール効率のスレッド", 100026, NamedTextColor.WHITE,
-        0, 0, null, 0, 0, 0, 0, Material.STRING),
-    BLINDNESS("blindness", "崩命のスレッド", 100027, NamedTextColor.WHITE,
-        0, 0, null, 0, 0, 0, 0, Material.STRING),
-    TRANSLATE("translate", "流転のスレッド", 100028, NamedTextColor.WHITE,
+    public static final ThreadType GACHA = new ThreadType("gacha", "ガチャスレッド", 100024, NamedTextColor.GOLD,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType ROLE_LUCK = new ThreadType("role_luck", "ロール運のスレッド", 100025, NamedTextColor.WHITE,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType ROLE_EFFECIENCY = new ThreadType("role_effeciency", "ロール効率のスレッド", 100026, NamedTextColor.WHITE,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType BLINDNESS = new ThreadType("blindness", "崩命のスレッド", 100027, NamedTextColor.WHITE,
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
+    public static final ThreadType TRANSLATE = new ThreadType("translate", "流転のスレッド", 100028, NamedTextColor.WHITE,
         0, 0, null, 0, 0, 0, 0, Material.STRING);
 
     private final String id;
@@ -226,7 +251,7 @@ public enum ThreadType {
     private final int damageManaRecovery;
     private final Material baseMaterial;
 
-    ThreadType(String id, String displayName, int customModelData, NamedTextColor color,
+    private ThreadType(String id, String displayName, int customModelData, NamedTextColor color,
                int regenBonus, int manaBonus,
                PotionEffectType potionEffect, int potionAmplifier,
                int costReductionPercent,
@@ -244,6 +269,45 @@ public enum ThreadType {
         this.hitManaRecovery = hitManaRecovery;
         this.damageManaRecovery = damageManaRecovery;
         this.baseMaterial = baseMaterial;
+        // 台帳への登録はここ1箇所。組み込み定数も実行時登録も同じ経路を通る。
+        BY_ID.put(id, this);
+    }
+
+    /**
+     * {@code threads.yml} に書かれていて組み込み定数に無い id を、実行時にスレッドとして登録する
+     * (W-102: 「アイテムカタログのスレッドタブで設定したらスレッドとして扱われる」)。
+     *
+     * <p><b>効果の数値は一切持たせない。</b> 後発スレッドの効果は TrinityForge 側
+     * {@code stats/item-stats.yml} の {@code <素材>#<CMD>} が持ち、
+     * {@code ArmorManaListener} が {@code TrinityForgeBridge.resolveThreadStats} で引くので、
+     * ここで持つべきなのは<b>「スレッドである」という事実と、見た目(表示名/CMD/素材)</b>だけ。
+     * マナ/ポーション/飛行の数値を持たせると Ars 側と TF 側で二重に効く。
+     *
+     * <p>既に同じ id があれば<b>それを返して何もしない</b> —— 組み込み定数を
+     * yml から上書きさせない(上書きできると、飛行やバックパックのような
+     * 特殊挙動を持つスレッドを設定ミスで無効化できてしまう)。
+     *
+     * @return 登録済み(または既存)の定義。id が空なら {@code null}
+     */
+    public static ThreadType register(String id, String displayName, int customModelData,
+                                      NamedTextColor color, Material baseMaterial) {
+        if (id == null || id.isBlank()) return null;
+        ThreadType existing = BY_ID.get(id);
+        if (existing != null) return existing;
+        return new ThreadType(id,
+                displayName == null || displayName.isBlank() ? id : displayName,
+                customModelData,
+                color == null ? NamedTextColor.WHITE : color,
+                0, 0, null, 0, 0, 0, 0,
+                baseMaterial == null ? Material.STRING : baseMaterial);
+    }
+
+    /**
+     * 登録済みの全スレッド(組み込み + 実行時登録)。enum の {@code values()} と同じ用途。
+     * 呼び出し側が配列を書き換えても台帳は壊れないようコピーを返す。
+     */
+    public static ThreadType[] values() {
+        return BY_ID.values().toArray(new ThreadType[0]);
     }
 
     public Material getBaseMaterial() { return baseMaterial; }

@@ -71,89 +71,31 @@
 
 thread-sets:
   mana_regen:
-    thresholds:
-      "3":
-        magic-resistance: 0.03
-      "5":
-        magic-resistance: 0.05
+    thresholds: {}
   mana_boost:
-    thresholds:
-      "3":
-        crit-damage: 0.1
-      "5":
-        crit-damage: 0.15
-        crit-chance: 0.03
+    thresholds: {}
   speed:
-    thresholds:
-      "3":
-        dodge-chance: 0.03
-      "5":
-        dodge-chance: 0.04
-        crit-chance: 0.03
+    thresholds: {}
   jump_boost:
-    thresholds:
-      "3":
-        crit-damage: 0.06
-      "5":
-        crit-damage: 0.09
+    thresholds: {}
   night_vision:
-    thresholds:
-      "3":
-        dodge-chance: 0.02
-      "5":
-        dodge-chance: 0.03
+    thresholds: {}
   fire_resistance:
-    thresholds:
-      "3":
-        magic-resistance: 0.04
-      "5":
-        magic-resistance: 0.06
+    thresholds: {}
   dolphins_grace:
-    thresholds:
-      "3":
-        phys-resistance: 0.04
-      "5":
-        phys-resistance: 0.06
+    thresholds: {}
   conduit_power:
-    thresholds:
-      "3":
-        magic-flat-defense: 12
-      "5":
-        magic-flat-defense: 26
-        damage-reduction: 0.02
+    thresholds: {}
   hero_of_the_village:
-    thresholds:
-      "3":
-        percent-bonus-damage: 0.05
-      "5":
-        percent-bonus-damage: 0.08
+    thresholds: {}
   health_boost:
-    thresholds:
-      "4":
-        damage-reduction: 0.03
-        phys-flat-defense: 12
-      "8":
-        damage-reduction: 0.04
-        magic-flat-defense: 12
+    thresholds: {}
   hit_mana_recovery:
-    thresholds:
-      "3":
-        armor-strength: 0.06
-      "5":
-        armor-strength: 0.08
-        dodge-chance: 0.03
+    thresholds: {}
   damage_mana_recovery:
-    thresholds:
-      "3":
-        crit-chance: 0.04
-      "5":
-        bleed-chance: 0.07
+    thresholds: {}
   spell_cost_down:
-    thresholds:
-      "3":
-        penetration: 0.04
-      "5":
-        penetration: 0.06
+    thresholds: {}
   flight:
     thresholds: {}
   mana_amplify:
@@ -227,11 +169,12 @@ thread-sets:
   harvest:
     thresholds:
       "1":
-        harvest-extra-drop-chance: 0.024
+        harvest-extra-drop-chance: 0.035
       "3":
-        harvest-extra-drop-chance: 0.012
+        planted-crop-growth-bonus: 0.5
       "5":
-        harvest-extra-drop-chance: 0.012
+        harvest-extra-drop-chance: 0.035
+        planted-crop-growth-bonus: 0.5
   timber:
     thresholds:
       "1":
@@ -265,11 +208,7 @@ thread-sets:
       "5":
         food-restore-bonus: 0.18
   slow_falling:
-    thresholds:
-      "3":
-        phys-resistance: 0.024
-      "5":
-        phys-resistance: 0.024
+    thresholds: {}
   spoils:
     thresholds:
       "1":
@@ -351,11 +290,12 @@ thread-sets:
   herder:
     thresholds:
       "1":
-        breeding-extra-child-chance: 0.024
+        breeding-extra-child-chance: 0.05
       "3":
-        bred-animal-growth-bonus: 0.06
+        bred-animal-growth-bonus: 0.5
       "5":
-        breeding-extra-child-chance: 0.024
+        breeding-extra-child-chance: 0.05
+        bred-animal-growth-bonus: 0.5
   appraiser:
     thresholds:
       "1":
@@ -411,15 +351,21 @@ thread-sets:
         craft-roll-down-reduction: 5
       "6":
         craft-roll-down-reduction: 10
+  # 盲目のスレッド: 最大体力を削る代わりに攻撃力を大きく伸ばすピーキー品。
+  # 2026-08-21: attack-power を固定値(+100/+150)から【乗算モード】へ移した。
+  #   固定値だと Lv20 帯の最強武器(攻撃力 700 前後)をスレッド1本が上書きしてしまい、
+  #   低帯だけ極端に強くなる(TF ShippedThreadBandIndependenceTest が固定している
+  #   「スレッド1本ぶんのダメージ倍率は帯に依らず一定」を壊す)。
+  #   乗算なら 1個で +25% / 5個でさらに +40% = 合計 +65% が全帯で同じ意味になる。
   blindness:
     thresholds:
       "1":
         max-health: -4
-        attack-power: 100
+        attack-power: { mode: multiply, value: 0.25 }
       "5":
         max-health: -6
         damage-modifier: 0.3
-        attack-power: 150
+        attack-power: { mode: multiply, value: 0.40 }
   translate:
     thresholds:
       "2":
@@ -428,3 +374,154 @@ thread-sets:
       "5":
         mana-bonus: -60
         mana-regen: 5
+
+  # ---- 2026-08-21 戦闘系スレッド24種のセット効果 ------------------------------
+  #  攻撃力は【乗算モード】で配る。固定値だと帯(進行度)で桁が変わる攻撃力に対して
+  #  低帯だけ極端に強くなり、TF ShippedThreadBandIndependenceTest が固定している
+  #  「スレッド1本ぶんのダメージ倍率は帯に依らず一定」を壊すため。
+  #  percent-bonus-damage はセット効果側では【1件も配らない】——
+  #  帯予算(防具枠16本で +59%)は item-stats 側の1本あたりの値だけで管理する。
+  swordsman:
+    thresholds:
+      "3":
+        crit-chance: 0.03
+      "5":
+        attack-power: { mode: multiply, value: 0.05 }
+  berserker:
+    thresholds:
+      "3":
+        crit-damage: 0.08
+      "5":
+        attack-power: { mode: multiply, value: 0.06 }
+  lancer:
+    thresholds:
+      "3":
+        penetration: 0.04
+      "5":
+        attack-power: { mode: multiply, value: 0.05 }
+  reaper:
+    thresholds:
+      "3":
+        bleed-chance: 0.05
+      "5":
+        crit-damage: 0.1
+  crusher:
+    thresholds:
+      "3":
+        armor-strength: 0.05
+      "5":
+        attack-power: { mode: multiply, value: 0.05 }
+  assassin:
+    thresholds:
+      "3":
+        crit-chance: 0.04
+      "5":
+        crit-damage: 0.12
+  duelist:
+    thresholds:
+      "3":
+        dodge-chance: 0.03
+      "5":
+        crit-chance: 0.04
+  titan:
+    thresholds:
+      "3":
+        crit-damage: 0.08
+      "5":
+        attack-power: { mode: multiply, value: 0.07 }
+  greatsword:
+    thresholds:
+      "3":
+        damage-reduction: 0.03
+      "5":
+        attack-power: { mode: multiply, value: 0.05 }
+  longshot:
+    thresholds:
+      "3":
+        crit-damage: 0.1
+      "5":
+        penetration: 0.05
+  tidecaller:
+    thresholds:
+      "3":
+        magic-resistance: 0.04
+      "5":
+        attack-power: { mode: multiply, value: 0.05 }
+  earthshaker:
+    thresholds:
+      "3":
+        armor-strength: 0.05
+      "5":
+        attack-power: { mode: multiply, value: 0.06 }
+  bolter:
+    thresholds:
+      "3":
+        penetration: 0.05
+      "5":
+        crit-damage: 0.1
+  spellblade:
+    thresholds:
+      "3":
+        magic-resistance: 0.04
+      "5":
+        attack-power: { mode: multiply, value: 0.06 }
+  onslaught:
+    thresholds:
+      "3":
+        attack-power: { mode: multiply, value: 0.04 }
+      "5":
+        attack-power: { mode: multiply, value: 0.06 }
+  precision:
+    thresholds:
+      "3":
+        crit-chance: 0.04
+      "5":
+        crit-damage: 0.1
+  execution:
+    thresholds:
+      "3":
+        crit-damage: 0.1
+      "5":
+        crit-chance: 0.03
+  piercer:
+    thresholds:
+      "3":
+        penetration: 0.05
+      "5":
+        penetration: 0.05
+  hemorrhage:
+    thresholds:
+      "3":
+        bleed-chance: 0.05
+      "5":
+        bleed-chance: 0.05
+  bulwark:
+    thresholds:
+      "3":
+        damage-reduction: 0.03
+      "5":
+        damage-reduction: 0.04
+  aegis:
+    thresholds:
+      "3":
+        magic-resistance: 0.05
+      "5":
+        magic-resistance: 0.05
+  ironhide:
+    thresholds:
+      "3":
+        phys-resistance: 0.05
+      "5":
+        phys-resistance: 0.05
+  evasion:
+    thresholds:
+      "3":
+        dodge-chance: 0.03
+      "5":
+        dodge-chance: 0.03
+  resilience:
+    thresholds:
+      "3":
+        armor-strength: 0.05
+      "5":
+        armor-strength: 0.05

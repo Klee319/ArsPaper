@@ -236,51 +236,141 @@ class ThreadSetThresholdReachabilityTest {
         }
     }
 
+    /**
+     * TrinityForge の戦闘ステ語彙(攻撃系・防御系・最大体力)。
+     * TF 側の {@code StatVocabulary} を参照できない(フォークは TF を compileOnly でしか見ない
+     * うえ、テストは yml だけを読む)ので、ここに書き写している。増やしたときは
+     * TF の {@code ShippedThreadItemStatsTest#nonCombatThreadsCarryNoCombatStats} と対で直すこと。
+     */
+    private static final java.util.Set<String> COMBAT_STATS = java.util.Set.of(
+            "attack-power", "flat-bonus-damage", "percent-bonus-damage", "crit-chance", "crit-damage",
+            "penetration", "damage-modifier", "fixed-damage", "bleed-chance", "bleed-damage",
+            "bleed-damage-rate",
+            "phys-resistance", "magic-resistance", "flat-defense", "phys-flat-defense",
+            "magic-flat-defense", "damage-reduction", "dodge-chance", "armor-defense-rate",
+            "armor-strength",
+            "max-health");
+
+    /**
+     * 戦闘そのものが正体のスレッド = 戦闘ステを持ってよい側。
+     * 既存6種(修復の肉/棘/昏倒/速攻/射手/盲目)＋ 2026-08-21 に新設した戦闘系24種。
+     */
+    private static final java.util.Set<String> COMBAT_THREADS = java.util.Set.of(
+            "mending_flesh", "thorn", "concussion", "swiftcast", "marksman", "blindness",
+            "swordsman", "berserker", "lancer", "reaper", "crusher", "assassin", "duelist",
+            "titan", "greatsword", "longshot", "tidecaller", "earthshaker", "bolter", "spellblade",
+            "onslaught", "precision", "execution", "piercer", "hemorrhage", "bulwark", "aegis",
+            "ironhide", "evasion", "resilience");
+
     @Test
-    @DisplayName("A-5: 死に値だった3種の値と、引き上げ後のしきい値を固定する")
-    void repairedSetsKeepTheirNewValues() {
+    @DisplayName("A-5: 非戦闘系スレッドのセット効果には戦闘ステが1件も無い(2026-08-21 の住み分け)")
+    void nonCombatSetsCarryNoCombatStats() {
         ConfigurationSection sets = threadSets();
 
-        // 1点1個の系統 = 上限5。3/5 段(=5キャリア全部に載せて初めて最終段)。
+        // 2026-08-21 のユーザー指示:
+        //   「非戦闘系効果のスレッド(常時効果系含む)から戦闘関連ステータスの効果を削除」
+        // それまでは 移動速度・暗視・耐火・村の英雄・体力増強といった常時効果系のスレッドが
+        // セット効果で会心率や耐性を配っていた。常時効果を目当てに着けた枠が
+        // 「実は戦闘用の枠でもある」状態で、戦闘系スレッドを新設しても住み分けができない。
         //
-        // 2026-08-14: 実数ダメージ系(attack-power / flat-bonus-damage / bleed-damage)を
-        // 割合系へ全面振替したので、ここで固定する値も差し替えた。実数のダメージ加算は
-        // 帯非依存なので、装備が伸びない低帯だけ極端に強くなる(hero_of_the_village の
-        // attack-power 400 は Lv20 帯の最強剣 699.5 に単独で匹敵していた)。
+        // ここで固定するのは個々の数値ではなく【住み分け】。数値を書き写すと
+        // バランス調整のたびにテストを書き換えることになり、守れるものが残らない。
+        java.util.List<String> offenders = new java.util.ArrayList<>();
+        for (String threadId : sets.getKeys(false)) {
+            if (COMBAT_THREADS.contains(threadId)) {
+                continue;
+            }
+            ConfigurationSection thresholds = sets.getConfigurationSection(threadId + ".thresholds");
+            if (thresholds == null) {
+                continue;
+            }
+            for (String countKey : thresholds.getKeys(false)) {
+                ConfigurationSection stats = thresholds.getConfigurationSection(countKey);
+                if (stats == null) {
+                    continue;
+                }
+                for (String stat : stats.getKeys(false)) {
+                    if (COMBAT_STATS.contains(stat)) {
+                        offenders.add(threadId + ".thresholds." + countKey + "." + stat);
+                    }
+                }
+            }
+        }
+        assertEquals(java.util.List.of(), offenders,
+                "非戦闘系スレッドのセット効果に戦闘ステが残っている(常時効果の枠が戦闘枠を兼ねてしまう)");
+    }
+
+    @Test
+    @DisplayName("A-5b: 戦闘系スレッドのセット効果は空になっていない(剥がしすぎの検出)")
+    void combatSetsAreNotEmptied() {
+        ConfigurationSection sets = threadSets();
+
+        // 上の住み分けテストは「非戦闘系に戦闘ステが無いこと」しか見ないので、
+        // 全部消しても緑になる。剥がす側の走査が広がりすぎたときに気づけるよう、
+        // 戦闘系スレッドがセット効果を持っていることを対で縛る。
         //
-        // さらに【割合ダメージを配るセットは hero_of_the_village の1本だけ】に集約してある。
-        // 案Eで3本(村の英雄/マナ回復速度上昇/暗視)に増やしたところ、ThreadSetConfig#cumulativeBonus
-        // の累積規則と threads.yml の stackable/max の相乗で、TF 側 ShippedThreadBandIndependenceTest
-        // の帯目標(+39%/+49%/+59%)を Lv60/Lv100 で +13.0pt 超過した。
-        // night_vision を dodge-chance にしたのはその是正。会心系へ逃がさなかったのは意図的で、
-        // crit は実DPSを押し上げるのに帯ガードが数えないため、計測できない形で穴を作り直すことになる。
-        assertEquals(0.05, sets.getDouble("hero_of_the_village.thresholds.3.percent-bonus-damage"));
-        assertEquals(0.08, sets.getDouble("hero_of_the_village.thresholds.5.percent-bonus-damage"));
-        assertEquals(0.02, sets.getDouble("night_vision.thresholds.3.dodge-chance"));
-        assertEquals(0.03, sets.getDouble("night_vision.thresholds.5.dodge-chance"));
-        assertEquals(12.0, sets.getDouble("conduit_power.thresholds.3.magic-flat-defense"));
-        assertEquals(26.0, sets.getDouble("conduit_power.thresholds.5.magic-flat-defense"));
-        assertEquals(0.02, sets.getDouble("conduit_power.thresholds.5.damage-reduction"));
+        // ここで「戦闘ステ(COMBAT_STATS)を持つこと」まで要求してはいけない。既存6種のうち
+        // 修復の肉(health-regen-bonus) / 棘(reflect-percent) / 昏倒(stun-chance) /
+        // 速攻(cooldown-reduction) / 射手(ammo-save-chance) は、戦闘用でありながら
+        // 【攻撃力・耐性の語彙に属さない専用ステ】がそのスレッドの正体なので、
+        // 語彙で縛ると「正しいのに落ちる」検査になる。
+        java.util.List<String> empty = new java.util.ArrayList<>();
+        for (String threadId : COMBAT_THREADS) {
+            ConfigurationSection thresholds = sets.getConfigurationSection(threadId + ".thresholds");
+            if (thresholds == null || thresholds.getKeys(false).isEmpty()) {
+                empty.add(threadId + ": セット効果が無い");
+                continue;
+            }
+            boolean hasAnyStat = false;
+            for (String countKey : thresholds.getKeys(false)) {
+                ConfigurationSection stats = thresholds.getConfigurationSection(countKey);
+                hasAnyStat |= stats != null && !stats.getKeys(false).isEmpty();
+            }
+            if (!hasAnyStat) {
+                empty.add(threadId + ": しきい値はあるがステが1件も無い");
+            }
+        }
+        assertEquals(java.util.List.of(), empty,
+                "戦闘系スレッドのセット効果が空 = 非戦闘系から剥がす走査が広がりすぎている");
+    }
 
-        // 設計書が挙げていないが同じ死に値だった2件。
-        // damage_mana_recovery は bleed-damage(実数) を落として bleed-chance 一本にした。
-        assertEquals(0.07, sets.getDouble("damage_mana_recovery.thresholds.5.bleed-chance"));
-        assertEquals(12.0, sets.getDouble("health_boost.thresholds.4.phys-flat-defense"));
-        assertEquals(12.0, sets.getDouble("health_boost.thresholds.8.magic-flat-defense"));
+    @Test
+    @DisplayName("A-5c: 攻撃力のセット効果は乗算モードで書く(固定値は低帯だけ極端に強くなる)")
+    void attackPowerSetsUseMultiplyMode() {
+        ConfigurationSection sets = threadSets();
 
-        // 旧しきい値(枠合計9の時代の値)が残っていないこと。
-        // 2026-08-18 訂正: ここは「旧 3/6 段」を否定するつもりで
-        // assertFalse(contains("mana_regen.thresholds.3")) と書かれていたが、
-        // 引き上げ後の規約は 3/5 段(この同じテストが hero_of_the_village / night_vision /
-        // conduit_power を 3/5 で固定しているのと同じ)なので、"3" 段は**あるのが正しい**。
-        // 旧実装と新実装を区別できるのは 6 段の有無だけ。yml は正しく直っていたのに
-        // このアサートだけが赤かった(=直っているものを壊れていると報告する誤検知)。
-        // 否定形は「旧しきい値だけに存在する段」に限り、新しい形は値で固定する。
-        assertEquals(0.03, sets.getDouble("mana_regen.thresholds.3.magic-resistance"));
-        assertEquals(0.05, sets.getDouble("mana_regen.thresholds.5.magic-resistance"));
+        // 2026-08-21 のユーザー指示で乗算モード({ mode: multiply, value: X })を追加した。
+        // attack-power は帯(進行度)で桁が変わる実数ステなので、固定値で配ると
+        // Lv20 帯の最強武器(攻撃力 700 前後)をスレッド1本が上書きしてしまい、
+        // TF 側 ShippedThreadBandIndependenceTest が固定している
+        // 「スレッド1本ぶんのダメージ倍率は帯に依らず一定」を壊す。
+        java.util.List<String> flat = new java.util.ArrayList<>();
+        for (String threadId : sets.getKeys(false)) {
+            ConfigurationSection thresholds = sets.getConfigurationSection(threadId + ".thresholds");
+            if (thresholds == null) {
+                continue;
+            }
+            for (String countKey : thresholds.getKeys(false)) {
+                ConfigurationSection stats = thresholds.getConfigurationSection(countKey);
+                if (stats == null || !stats.contains("attack-power")) {
+                    continue;
+                }
+                ConfigurationSection mode = stats.getConfigurationSection("attack-power");
+                if (mode == null || !"multiply".equals(mode.getString("mode"))) {
+                    flat.add(threadId + ".thresholds." + countKey + ".attack-power");
+                }
+            }
+        }
+        assertEquals(java.util.List.of(), flat,
+                "attack-power のセット効果が固定値のまま(低帯だけ極端に強くなる)。"
+                        + "{ mode: multiply, value: 0.05 } のように割合で書くこと");
+    }
+
+    @Test
+    @DisplayName("A-5d: 旧しきい値(枠合計9の時代の段)が残っていない")
+    void oldThresholdTiersAreGone() {
+        ConfigurationSection sets = threadSets();
         assertFalse(sets.contains("mana_regen.thresholds.6"), "mana_regen が旧 6 段のまま");
-        assertEquals(0.04, sets.getDouble("spell_cost_down.thresholds.3.penetration"));
-        assertEquals(0.06, sets.getDouble("spell_cost_down.thresholds.5.penetration"));
         assertFalse(sets.contains("spell_cost_down.thresholds.2"), "spell_cost_down が旧 2 段のまま");
         assertFalse(sets.contains("spell_cost_down.thresholds.4"), "spell_cost_down が旧 4 段のまま");
     }

@@ -18,6 +18,7 @@ import com.trinityforge.stats.MaterialTier;
 import com.trinityforge.stats.StatKeys;
 import com.trinityforge.stats.CraftQualityService;
 import com.trinityforge.stats.CraftRollMods;
+import com.trinityforge.stats.RitualCraftFinalizer;
 import com.trinityforge.pdc.BindType;
 import com.trinityforge.pdc.ItemData;
 import com.trinityforge.pdc.PdcKeys;
@@ -763,6 +764,31 @@ public final class TrinityForgeBridge {
     }
 
     /**
+     * TrinityForge が刻印した所有者 UUID。所有者バインドが無い / TF 未ロード / 例外時は {@code null}。
+     *
+     * <p><b>なぜ Ars 側から要るのか(2026-08-18 W-100)</b> — 実サーバ報告
+     * 「儀式で作成した魔導書が所有者名の人が使えない」の真因は<b>所有者台帳が2本あったこと</b>。
+     * TF は {@link ItemData#owner()} を持ち、<b>lore の「所有者:」行はこちらを表示する</b>。
+     * 一方 {@code SpellBook} は独自の {@code arspaper:spell_book_owner} を持ち、
+     * <b>最初に右クリックした人</b>を焼き付けていた。儀式品を別の人が先に一度右クリックすると
+     * 2本がずれ、lore に自分の名前が出ているのに
+     * 「この魔導書の所有者ではありません」で弾かれる、という状態になる。
+     *
+     * <p>したがって<b>TF の所有者があるならそれが唯一の正</b>とし、Ars 側の台帳は追随させる。
+     * TF が居ない構成では {@code null} を返し、Ars 単体の従来挙動(初回使用者を所有者にする)へ落ちる。
+     */
+    public static java.util.UUID tfOwnerId(ItemStack item) {
+        if (item == null || item.getType().isAir() || !item.hasItemMeta()) {
+            return null;
+        }
+        try {
+            return ItemData.of(item.getItemMeta()).owner().orElse(null);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /**
      * Builds an unstamped TrinityForge catalog item (identity only) for ritual craft results.
      * Returns {@code null} when TF is absent or the catalog id is unknown.
      */
@@ -1330,13 +1356,27 @@ public final class TrinityForgeBridge {
             return;
         }
         try {
-            // 「品質はまだ決めない」マーカーだけを刻む(2026-08-04 仕様変更)。実際の品質ロールと
-            // lore/属性のフル再組み立ては TF 側 PickupQualityListener が「最初にインベントリへ
-            // 入ったプレイヤー」のステータスで行う。crafter は互換のため受け取るが参照しない
-            // (儀式結果は台座にドロップされるので、儀式実行者と回収者は一致しない)。
+            // 2026-08-18 (W-85): 品質と SOULBOUND 所有者を<b>儀式の実行者</b>でその場で確定させる。
+            //
+            // 2026-08-04〜08-18 は「品質はまだ決めない」マーカーだけを刻み、実際のロールと
+            // lore/属性のフル再組み立てを TF 側 PickupQualityListener が「最初にインベントリへ
+            // 入ったプレイヤー」のステータスで行っていた。成果物をコアの上へドロップしていたため
+            // 実サーバでは<b>儀式を行った本人より先に他のプレイヤーが拾えてしまい</b>、他人の
+            // 魔法鍛冶レベルで品質が決まり所有権まで拾い主のものになる報告(W-85)が出た。回収は
+            // 誰でもできてよい(ユーザ決定「誰でも回収可・品質は実行者基準」)が、決めるのは実行者。
+            //
+            // 実行者は儀式を発動した直後なので必ずオンライン ── 決定を後回しにする理由がそもそも無い。
+            TrinityForge tf = TrinityForge.getInstance();
+            if (tf != null && tf.craftQualityService() != null && tf.itemFactory() != null) {
+                new RitualCraftFinalizer(tf.craftQualityService(), tf.itemFactory())
+                        .finalizeForPerformer(item, crafter);
+                return;
+            }
+            // TF未初期化: せめてマーカーだけ残し、拾われた時点で刻印される従来経路へ落とす
+            // (品質0で確定させるより、遅れてでも付く方がまし)。
             item.editMeta(TrinityForgeBridge::markPendingCraftQuality);
         } catch (Throwable t) {
-            // TF未ロード / API不整合: マーカーはスキップ(品質0のまま、既存生成は維持)。
+            // TF未ロード / 旧 TrinityForge jar (RitualCraftFinalizer 未対応): 品質0のまま進む。
         }
     }
 
@@ -1582,6 +1622,63 @@ public final class TrinityForgeBridge {
     }
 
     /**
+     * セット効果1段ぶんのステ行を <b>TF 装備とまったく同じ体裁</b>で組む(2026-08-21)。
+     * {@link #threadStatLore} の乗算対応版で、加算ステと乗算ステを1回の呼び出しでまとめて描く。
+     *
+     * @param additive        加算モードのステ(canonical/生キーどちらでも可。TF 側で正規化される)
+     * @param multiplierDelta 乗算モードのステ。<b>値は倍率の「増分」</b>(0.1 = +10%)で、
+     *                        thread-sets.yml と PDC 乗算チャネルの表現に合わせてある。
+     *                        表示側(TF の {@code LoreComposer})は倍率そのものを要求するので、
+     *                        ここで {@code 1 + delta} へ変換して渡す。
+     *                        レイヤIDは {@code AddonCombatStats#MULTIPLIER_LAYER_ID} を使う
+     *                        (実際に効くレイヤと表示のレイヤを一致させるため)。
+     *
+     * <p>TF 未ロード / 例外時は空リスト(呼び出し側は「行が無い」として扱えばよい)。
+     */
+    public static java.util.List<net.kyori.adventure.text.Component> threadSetStatLore(
+            Map<String, Double> additive, Map<String, Double> multiplierDelta) {
+        boolean noAdditive = additive == null || additive.isEmpty();
+        boolean noMultiplier = multiplierDelta == null || multiplierDelta.isEmpty();
+        if (noAdditive && noMultiplier) {
+            return java.util.List.of();
+        }
+        try {
+            TrinityForge tf = TrinityForge.getInstance();
+            if (tf == null || tf.config() == null || tf.config().lore() == null
+                    || tf.loreComposer() == null) {
+                return java.util.List.of();
+            }
+            Map<String, Double> finite = new LinkedHashMap<>();
+            if (!noAdditive) {
+                additive.forEach((key, value) -> {
+                    if (key != null && value != null && Double.isFinite(value) && value != 0.0) {
+                        finite.put(key, value);
+                    }
+                });
+            }
+            Map<String, Map<String, Double>> layers = new LinkedHashMap<>();
+            if (!noMultiplier) {
+                Map<String, Double> ratios = new LinkedHashMap<>();
+                multiplierDelta.forEach((key, value) -> {
+                    if (key != null && value != null && Double.isFinite(value) && value != 0.0) {
+                        ratios.put(key, 1.0 + value);
+                    }
+                });
+                if (!ratios.isEmpty()) {
+                    layers.put(AddonCombatStats.MULTIPLIER_LAYER_ID, ratios);
+                }
+            }
+            if (finite.isEmpty() && layers.isEmpty()) {
+                return java.util.List.of();
+            }
+            return tf.loreComposer().statLines(finite, layers,
+                    tf.config().lore().displayTable(), tf.config().lore().layout());
+        } catch (Throwable t) {
+            return java.util.List.of();
+        }
+    }
+
+    /**
      * <b>装備とまったく同じ体裁</b>のステ lore ブロック(品質行【名匠】…pt / カテゴリ区切り線 /
      * ロール色 / 確率付与色 / 乗算行つき)を TF の装備経路そのものから組む
      * ({@code ItemFactory#statLoreBlock} → {@code ItemAssembler#statLoreBlock})。
@@ -1749,6 +1846,33 @@ public final class TrinityForgeBridge {
             }
         } catch (Throwable t) {
             // TF未ロード / API不整合: addon戦闘ステはスキップ(スレッドのマナ機能等には無影響)。
+        }
+    }
+
+    /**
+     * スレッドのセット効果「乗算モード」の合計を、プレイヤーPDCの<b>乗算チャネル</b>へ書き込む。
+     * 値は倍率の増分(canonical key -&gt; 0.1 = +10%)で、TF 側は
+     * {@code PlayerCombatAggregate#multiplierFor} の既存の乗算レイヤへ1レイヤとして合流させる。
+     *
+     * <p>コーデックは加算チャネル({@link #writeAddonCombatStats})と完全に共通
+     * ({@code AddonCombatStats#encode})。空/全ゼロならキーを消す —— 消さないと外した後も
+     * 古い倍率が残り続ける。TF未ロード / API不整合時は no-op(fail-open)。
+     */
+    public static void writeAddonCombatMultipliers(Player player, Map<String, Double> multipliers) {
+        if (player == null) {
+            return;
+        }
+        try {
+            String encoded = (multipliers == null || multipliers.isEmpty())
+                    ? "" : AddonCombatStats.encode(multipliers);
+            PersistentDataContainer pdc = player.getPersistentDataContainer();
+            if (encoded.isEmpty()) {
+                pdc.remove(PdcKeys.PLAYER_ADDON_COMBAT_MULTIPLIERS);
+            } else {
+                pdc.set(PdcKeys.PLAYER_ADDON_COMBAT_MULTIPLIERS, PersistentDataType.STRING, encoded);
+            }
+        } catch (Throwable t) {
+            // TF未ロード / API不整合: 乗算チャネルはスキップ(加算チャネル・マナ機能には無影響)。
         }
     }
 

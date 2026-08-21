@@ -396,7 +396,9 @@ public class ThreadGui extends BaseGui {
         }
         // displayName() はカスタム名未設定アイテムでは null。コンストラクタで解決済みの
         // Material名フォールバックを使い、バニラ装備でも情報ボタンを安全に生成する。
-        return createButton(targetItem.getType(), Component.text(targetDisplayName), lore);
+        // アイコンは【対象装備そのものを複製して】作る ── Material から組み直すと
+        // CustomModelData が落ちて、TF品が素のバニラ材質で表示される(2026-08-18 報告)。
+        return createButtonFrom(targetItem, Component.text(targetDisplayName), lore);
     }
 
     private ItemStack createThreadSlotButton(int index, String threadId, String encodedRoll) {
@@ -426,7 +428,9 @@ public class ThreadGui extends BaseGui {
         lore.add(Component.text("クリックで取り外し", NamedTextColor.DARK_GRAY)
             .decoration(TextDecoration.ITALIC, false));
 
-        return createButton(type.getBaseMaterial(),
+        // アイコンは【実物のスレッドを組んで】複製する。getBaseMaterial() から作ると CMD が無く、
+        // どのスレッドも素の鍛冶型/陶器の欠片という同じ見た目になる(2026-08-18 報告)。
+        return createButtonFrom(createThreadItemStack(type),
             Component.text(type.getDisplayName(), type.getColor()), lore);
     }
 

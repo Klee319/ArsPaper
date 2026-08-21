@@ -149,6 +149,7 @@ public class ThreadItem extends BaseCustomItem {
                 .decoration(TextDecoration.ITALIC, false));
         }
         lore.addAll(equipmentStyleRollLore(type, identity));
+        lore.addAll(setEffectLore(type));
         lore.add(Component.text("防具のスレッドスロットにセット可能", NamedTextColor.DARK_GRAY)
             .decoration(TextDecoration.ITALIC, false));
         com.arspaper.gui.BackpackGui.appendItemDataLore(meta, lore);
@@ -206,6 +207,61 @@ public class ThreadItem extends BaseCustomItem {
             return List.of();
         }
         return TrinityForgeBridge.threadStatLore(stats);
+    }
+
+    /**
+     * <b>セット効果({@code thread-sets.yml})を lore へ自動注入する行</b>(2026-08-21)。
+     *
+     * <p>それまでスレッドの lore にはセット効果が<b>一切出ていなかった</b>。効果の実体が
+     * セット効果側にしかないスレッドは、プレイヤーから見ると「厳選ステだけの微妙な品」に見えていた。
+     * 設定エディタで lore を手書きして補う運用は<b>採らない</b> —— 手書きは thread-sets.yml を
+     * 直した瞬間に嘘になり、しかも嘘になったことに誰も気づけないため。ここで毎回<b>設定から生成</b>する。
+     *
+     * <p>体裁: しきい値ごとに「N個以上」の見出し + そのしきい値<b>単体</b>のステ行
+     * (累積合計ではない ── 累積を出すと読み手が段差を暗算する羽目になる)。ステ行の整形は
+     * {@link TrinityForgeBridge#threadSetStatLore} 経由で TF の {@code LoreComposer} へ丸投げするので、
+     * 表示名・アイコン・桁数・単位・色・カテゴリ順・乗算行({@code x1.10})はすべて装備 lore と一致する。
+     *
+     * <p>ArsPaper 単体起動 / TF 未ロード / セット効果未定義のときは空リスト(行が増えないだけ)。
+     */
+    public static List<Component> setEffectLore(ThreadType type) {
+        if (type == null || !type.hasEffect()) {
+            return List.of();
+        }
+        com.arspaper.item.ThreadSetConfig sets;
+        try {
+            sets = com.arspaper.ArsPaper.getInstance().getThreadSetConfig();
+        } catch (Throwable notLoaded) {
+            return List.of();
+        }
+        if (sets == null) {
+            return List.of();
+        }
+        List<Integer> counts = sets.thresholds(type.getId());
+        if (counts.isEmpty()) {
+            return List.of();
+        }
+        List<Component> lore = new ArrayList<>();
+        List<Component> body = new ArrayList<>();
+        for (int count : counts) {
+            List<Component> statLines = TrinityForgeBridge.threadSetStatLore(
+                    sets.bonusAt(type.getId(), count), sets.multiplierAt(type.getId(), count));
+            if (statLines.isEmpty()) {
+                continue;
+            }
+            body.add(Component.text("  " + count + "個以上", NamedTextColor.YELLOW)
+                .decoration(TextDecoration.ITALIC, false));
+            body.addAll(statLines);
+        }
+        if (body.isEmpty()) {
+            return List.of();
+        }
+        lore.add(Component.text("セット効果", NamedTextColor.GOLD)
+            .decoration(TextDecoration.ITALIC, false)
+            .append(Component.text(" (同じ種類を装備した合計本数)", NamedTextColor.DARK_GRAY)
+                .decoration(TextDecoration.ITALIC, false)));
+        lore.addAll(body);
+        return lore;
     }
 
     public ThreadType getThreadType() {

@@ -1266,7 +1266,7 @@ public class RecipeBrowserGui extends BaseGui {
                 // エフェクトタイプ別アイコン
                 if ("thread".equals(recipe.effectType()) && recipe.effectParams().containsKey("thread")) {
                     com.arspaper.item.ThreadType tt = com.arspaper.item.ThreadType.fromId(recipe.effectParams().get("thread"));
-                    entry.icon = tt != null ? tt.getBaseMaterial() : Material.WAYFINDER_ARMOR_TRIM_SMITHING_TEMPLATE;
+                    entry.icon = tt != null ? tt.getBaseMaterial() : Material.STRING;
                 } else {
                     entry.icon = switch (recipe.effectType()) {
                         case "enchant_book" -> Material.ENCHANTED_BOOK;

@@ -187,13 +187,16 @@ class LootTableConfigTest {
     }
 
     @Test
-    @DisplayName("出荷 yml が警告ゼロでパースでき、5ティア全部に対象テーブルと候補と倍率がある")
+    @DisplayName("出荷 yml が警告ゼロでパースでき、10ティア全部に対象テーブルと候補と倍率がある")
     void shippedYamlParsesCleanly() {
         List<String> warnings = new ArrayList<>();
         Map<String, LootTableConfig.Pool> pools = shippedPools(warnings);
         assertTrue(warnings.isEmpty(), "出荷 yml が警告を出している: " + warnings);
-        for (String id : List.of("t5_structures", "t4_structures", "t3_structures",
-                "t2_structures", "t1_structures")) {
+        // 2026-08-21: 5 → 10 ティア(ユーザー指示「それぞれのダンジョンを漁る意味を作るため
+        // 10 ティアくらいに細分化」)。生成元は tmp/worldgen/gen_loot_yml.py。
+        for (String id : List.of("t10_structures", "t9_structures", "t8_structures",
+                "t7_structures", "t6_structures", "t5_structures", "t4_structures",
+                "t3_structures", "t2_structures", "t1_structures")) {
             LootTableConfig.Pool pool = pools.get(id);
             assertTrue(pool != null, "ティアプール " + id + " が無い");
             assertFalse(pool.tables().isEmpty(), id + " に tables: が無い");

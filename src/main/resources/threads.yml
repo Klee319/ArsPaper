@@ -237,3 +237,154 @@ threads:
     lore:
       - <gold>隠し満腹度の回復が増える</gold>
       - <color:dark_purple>直りやすくなっただろう？</color>
+
+  # ==========================================================================
+  # 2026-08-21: 戦闘系スレッド24種(武器アーキタイプ14 + 汎用10)。
+  #   ThreadType.java に定数は足していない —— ThreadConfig#registerIfUnknown が
+  #   display_name / custom-model-data / material の3つを読んで実行時登録する。
+  #   効果の数値は TrinityForge の stats/item-stats.yml の STRING#<CMD> 側が持つ。
+  # ==========================================================================
+  swordsman:
+    display_name: 剣士のスレッド
+    custom-model-data: 300046
+    material: STRING
+    lore:
+      - <gold>剣向けに組まれた戦闘用スレッド</gold>
+  berserker:
+    display_name: 狂戦士のスレッド
+    custom-model-data: 300047
+    material: STRING
+    lore:
+      - <gold>戦斧向けに組まれた戦闘用スレッド</gold>
+  lancer:
+    display_name: 槍衾のスレッド
+    custom-model-data: 300048
+    material: STRING
+    lore:
+      - <gold>槍向けに組まれた戦闘用スレッド</gold>
+  reaper:
+    display_name: 刈り手のスレッド
+    custom-model-data: 300049
+    material: STRING
+    lore:
+      - <gold>鎌向けに組まれた戦闘用スレッド</gold>
+  crusher:
+    display_name: 打擲のスレッド
+    custom-model-data: 300050
+    material: STRING
+    lore:
+      - <gold>ウォーハンマー向けに組まれた戦闘用スレッド</gold>
+  assassin:
+    display_name: 暗殺者のスレッド
+    custom-model-data: 300051
+    material: STRING
+    lore:
+      - <gold>短剣向けに組まれた戦闘用スレッド</gold>
+  duelist:
+    display_name: 決闘者のスレッド
+    custom-model-data: 300052
+    material: STRING
+    lore:
+      - <gold>レイピア向けに組まれた戦闘用スレッド</gold>
+  titan:
+    display_name: 巨戟のスレッド
+    custom-model-data: 300053
+    material: STRING
+    lore:
+      - <gold>大斧向けに組まれた戦闘用スレッド</gold>
+  greatsword:
+    display_name: 大剣士のスレッド
+    custom-model-data: 300054
+    material: STRING
+    lore:
+      - <gold>大剣向けに組まれた戦闘用スレッド</gold>
+  longshot:
+    display_name: 遠矢のスレッド
+    custom-model-data: 300055
+    material: STRING
+    lore:
+      - <gold>弓向けに組まれた戦闘用スレッド</gold>
+  tidecaller:
+    display_name: 潮呼びのスレッド
+    custom-model-data: 300056
+    material: STRING
+    lore:
+      - <gold>トライデント向けに組まれた戦闘用スレッド</gold>
+  earthshaker:
+    display_name: 震撼のスレッド
+    custom-model-data: 300057
+    material: STRING
+    lore:
+      - <gold>メイス向けに組まれた戦闘用スレッド</gold>
+  bolter:
+    display_name: 弩手のスレッド
+    custom-model-data: 300058
+    material: STRING
+    lore:
+      - <gold>クロスボウ向けに組まれた戦闘用スレッド</gold>
+  spellblade:
+    display_name: 呪刃のスレッド
+    custom-model-data: 300059
+    material: STRING
+    lore:
+      - <gold>杖・触媒向けに組まれた戦闘用スレッド</gold>
+  onslaught:
+    display_name: 猛攻のスレッド
+    custom-model-data: 300060
+    material: STRING
+    lore:
+      - <gold>汎用の戦闘用スレッド</gold>
+  precision:
+    display_name: 精確のスレッド
+    custom-model-data: 300061
+    material: STRING
+    lore:
+      - <gold>汎用の戦闘用スレッド</gold>
+  execution:
+    display_name: 追撃のスレッド
+    custom-model-data: 300062
+    material: STRING
+    lore:
+      - <gold>汎用の戦闘用スレッド</gold>
+  piercer:
+    display_name: 穿孔のスレッド
+    custom-model-data: 300063
+    material: STRING
+    lore:
+      - <gold>汎用の戦闘用スレッド</gold>
+  hemorrhage:
+    display_name: 流血のスレッド
+    custom-model-data: 300064
+    material: STRING
+    lore:
+      - <gold>汎用の戦闘用スレッド</gold>
+  bulwark:
+    display_name: 堅陣のスレッド
+    custom-model-data: 300065
+    material: STRING
+    lore:
+      - <gold>汎用の戦闘用スレッド</gold>
+  aegis:
+    display_name: 抗魔のスレッド
+    custom-model-data: 300066
+    material: STRING
+    lore:
+      - <gold>汎用の戦闘用スレッド</gold>
+  ironhide:
+    display_name: 鉄皮のスレッド
+    custom-model-data: 300067
+    material: STRING
+    lore:
+      - <gold>汎用の戦闘用スレッド</gold>
+  evasion:
+    display_name: 疾影のスレッド
+    custom-model-data: 300068
+    material: STRING
+    lore:
+      - <gold>汎用の戦闘用スレッド</gold>
+  resilience:
+    display_name: 剛靭のスレッド
+    custom-model-data: 300069
+    material: STRING
+    lore:
+      - <gold>汎用の戦闘用スレッド</gold>

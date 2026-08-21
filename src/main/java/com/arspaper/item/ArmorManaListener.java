@@ -27,7 +27,6 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import com.arspaper.integration.TrinityForgeBridge;
 
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -187,7 +186,9 @@ public class ArmorManaListener implements Listener {
         /** 装着スレッド1個ごとの厳選ステ + item-stats ステの合計(canonical化はTF側)。 */
         final Map<String, Double> combatStats = new LinkedHashMap<>();
         /** 同種スレッドの合計個数(thread-sets.yml の累積しきい値判定用)。 */
-        final Map<ThreadType, Integer> counts = new EnumMap<>(ThreadType.class);
+        // W-102 で ThreadType が enum ではなくなった(threads.yml から実行時に増える)ので EnumMap は使えない。
+        // 1 id につき1インスタンスなのは変わらないため、参照同一性で数えるこの用途は LinkedHashMap でそのまま動く。
+        final Map<ThreadType, Integer> counts = new LinkedHashMap<>();
     }
 
     /**
@@ -283,13 +284,19 @@ public class ArmorManaListener implements Listener {
         // (空なら PDC キーを消して古いステを残さない)。全体を try で隔離しマナ/飛行処理と分離する。
         try {
             ThreadSetConfig threadSetConfig = ArsPaper.getInstance().getThreadSetConfig();
+            // 乗算モードのセット効果は加算チャネルへ混ぜてはいけない(意味が違う)。別Mapに集めて
+            // 別PDCキーへ書く。TF 側は乗算レイヤ1本として「加算合算が終わった総合値」へ掛ける。
+            Map<String, Double> threadCombatMultipliers = new LinkedHashMap<>();
             if (threadSetConfig != null) {
                 for (Map.Entry<ThreadType, Integer> entry : threadCounts.entrySet()) {
                     threadSetConfig.cumulativeBonus(entry.getKey().getId(), entry.getValue())
                             .forEach((key, value) -> threadCombatStats.merge(key, value, Double::sum));
+                    threadSetConfig.cumulativeMultiplier(entry.getKey().getId(), entry.getValue())
+                            .forEach((key, value) -> threadCombatMultipliers.merge(key, value, Double::sum));
                 }
             }
             TrinityForgeBridge.writeAddonCombatStats(player, threadCombatStats);
+            TrinityForgeBridge.writeAddonCombatMultipliers(player, threadCombatMultipliers);
         } catch (Throwable tfUnavailable) {
             // TF未ロード / 連携失敗: 戦闘ステPDCはスキップ(マナ/飛行/ポーションへ波及させない)。
         }

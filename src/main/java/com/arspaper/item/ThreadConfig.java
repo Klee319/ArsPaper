@@ -1,5 +1,6 @@
 package com.arspaper.item;
 
+import com.arspaper.util.DisplayText;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -158,6 +159,12 @@ public class ThreadConfig {
             ConfigurationSection section = threads.getConfigurationSection(key);
             if (section == null) continue;
 
+            // W-102: 組み込み定数に無い id はここで実行時登録する。
+            // これが「アイテムカタログのスレッドタブで設定したらスレッドとして扱われる」の実装。
+            // 登録しないと ThreadGui#isEffectThread の ThreadType.fromId が null を返し、
+            // 防具に挿せず品質も乗らない(=3つの症状が同時に出る)。
+            registerIfUnknown(key, section);
+
             // stackable設定（未記載 = ThreadApplicationPolicy.DEFAULT_STACKABLE: 2026-08-18 から重複可）
             stackable.put(key, section.getBoolean("stackable", ThreadApplicationPolicy.DEFAULT_STACKABLE));
 
@@ -235,6 +242,49 @@ public class ThreadConfig {
                 }
             }
         }
+    }
+
+    /**
+     * {@code threads.yml} に書かれていて {@link ThreadType} の組み込み定数に無い id を、
+     * 実行時にスレッドとして登録する（W-102）。
+     *
+     * <p>効果の数値はここでは持たせない —— 後発スレッドの効果は TrinityForge 側
+     * {@code stats/item-stats.yml} の {@code <素材>#<CMD>} が持つ。
+     * したがって yml から読むのは<b>見た目に必要な3つ（表示名 / CMD / 素材）だけ</b>で、
+     * <b>素材と CMD が item-stats のキーと一致していることが唯一の要件</b>になる。
+     *
+     * <p>キー名は編集経路ごとの揺れを吸収する（{@code display_name} / {@code display-name}、
+     * {@code custom-model-data} / {@code custom_model_data}）。
+     * 素材が未指定・解決不能なら {@code STRING} へ落として起動は止めない ——
+     * ここで例外を投げると threads.yml の1行のタイポでスレッドが全滅する。
+     */
+    private void registerIfUnknown(String id, ConfigurationSection section) {
+        if (ThreadType.fromId(id) != null) return;
+
+        String displayName = section.getString("display_name");
+        if (displayName == null || displayName.isBlank()) {
+            displayName = section.getString("display-name");
+        }
+
+        int cmd = section.getInt("custom-model-data", section.getInt("custom_model_data", 0));
+
+        String rawMaterial = section.getString("material");
+        org.bukkit.Material material = null;
+        if (rawMaterial != null && !rawMaterial.isBlank()) {
+            material = org.bukkit.Material.matchMaterial(rawMaterial.trim().toUpperCase(Locale.ROOT));
+            if (material == null) {
+                plugin.getLogger().warning("threads.yml: スレッド '" + id + "' の material '"
+                        + rawMaterial + "' は解決できません。STRING で登録します。");
+            }
+        }
+
+        ThreadType registered = ThreadType.register(id, displayName, cmd, null, material);
+        if (registered == null) return;
+
+        plugin.getLogger().info("threads.yml: 後発スレッド '" + id + "' を実行時登録しました"
+                + " (CMD=" + registered.getCustomModelData()
+                + " / 素材=" + registered.getBaseMaterial() + ")。"
+                + "効果は TrinityForge の item-stats.yml 側が持ちます。");
     }
 
     /**
@@ -433,10 +483,23 @@ public class ThreadConfig {
      * バラバラに並び、しかも TF 装備の lore(灰色テンプレート {@code stats/lore.yml}
      * {@code layout.line-template})とも体裁が揃っていなかった。説明文は TF 側と同じ灰色に寄せ、
      * <b>色で意味を伝えるのはスレッド名(種別色)と数値(TF 側の正負色)だけ</b>にする。
+     *
+     * <p><b>2026-08-18 W-101 群(実サーバ報告「フレーバーテキストのカラーコードが反映されず生の
+     * 文字列が見えている」)</b>: ここは {@code Component.text(生文字列)} で包んでいたため、
+     * {@code threads.yml} の {@code lore:} に書かれた {@code <gold>…</gold>} /
+     * {@code <color:dark_purple>…</color>} が<b>タグのまま画面に出ていた</b>
+     * ({@code gacha} / {@code role_luck} / {@code role_effeciency} / {@code blindness} など
+     * {@code lore:} を持つスレッド全部)。{@link DisplayText} を通す ——
+     * これは「yml の生文字列を Component にする唯一の入口」として既にあるもので、
+     * レガシー {@code &} 記法と MiniMessage のどちらで書かれていても壊さない。
+     *
+     * <p>灰色は {@code colorIfAbsent} で当てる。ハードコードされた効果説明(色指定なし)は従来どおり
+     * 灰色になり、yml 側が明示した色はそのまま生きる。<b>{@code color()} で塗ると
+     * yml の色指定を上書きしてしまう</b>ので使わないこと。
      */
     private static net.kyori.adventure.text.Component loreText(String text) {
-        return net.kyori.adventure.text.Component.text(
-                text, net.kyori.adventure.text.format.NamedTextColor.GRAY)
+        return DisplayText.component(text)
+            .colorIfAbsent(net.kyori.adventure.text.format.NamedTextColor.GRAY)
             .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false);
     }
 }
