@@ -37,8 +37,22 @@ import java.util.Map;
  */
 public final class TrinityForgeStatPreview {
 
-    /** 表示する下限ステの最大行数。装備によっては十数個付くのでボタンの lore が破綻する。 */
-    private static final int MAX_LINES = 8;
+    /**
+     * 残り行数を渡さずに呼んだときの上限。<b>ツールチップの余白を知っているのは呼び出し側</b>なので、
+     * GUI からは {@link #minimumStatLines(ItemStack, int)} を使うこと。
+     *
+     * <p>出荷 item-stats で表示対象になるステが一番多いアイテムでも 17 件なので、
+     * この既定値は「短い lore なら大半が出る」程度の保険にすぎない。
+     */
+    private static final int DEFAULT_MAX_LINES = 12;
+
+    /**
+     * lore がどれだけ長くても最低これだけは出す。
+     *
+     * <p>0 まで許すと<b>見出しだけ出して中身が1行も無い</b>ブロックができる
+     * (呼び出し側は「1行も出ない」ではなく「見出し＋…ほか」を作ってしまう)。
+     */
+    private static final int MIN_LINES = 4;
 
     private TrinityForgeStatPreview() {
     }
@@ -68,10 +82,27 @@ public final class TrinityForgeStatPreview {
      * 1行目は「どの品質の話か」の見出しで、以降が {@code アイコン 表示名 値} の行。
      */
     public static List<Component> minimumStatLines(ItemStack probe) {
+        return minimumStatLines(probe, DEFAULT_MAX_LINES);
+    }
+
+    /**
+     * 同上。<b>ステ行に使ってよい行数</b>を呼び出し側が渡す版(2026-08-22 ユーザー報告
+     * 「まだloreの長さに余裕があるのに省略されてしまい、スレッド枠やマナ回復量などが出ていない」)。
+     *
+     * <p>以前は固定で 8 行だった。ところがツールチップの高さを決めるのは<b>lore 全体</b>なので、
+     * 短い lore のアイテムでも 8 行で頭打ちになり、画面に十分な余白があるのに
+     * {@code thread-slots} / {@code mana-bonus} / {@code mana-regen} のように
+     * 表示順が後ろのステだけが常に「…ほか」へ落ちていた
+     * (表示順は lore.yml の category → order なので、同じステが毎回こぼれる)。
+     *
+     * @param maxLines ステ行に使える残り行数。{@link #MIN_LINES} 未満は切り上げる。
+     */
+    public static List<Component> minimumStatLines(ItemStack probe, int maxLines) {
         Map<String, Double> floor = minimumStats(probe);
         if (floor.isEmpty()) {
             return List.of();
         }
+        int limit = lineLimit(maxLines);
         List<Component> lines = new ArrayList<>();
         lines.add(header());
         int shown = 0;
@@ -79,7 +110,7 @@ public final class TrinityForgeStatPreview {
             Double value = floor.get(StatKeys.canonical(spec.statKey()));
             if (value == null || !Double.isFinite(value)) continue;
             if (spec.hideWhenZero() && value == 0.0) continue;
-            if (shown >= MAX_LINES) {
+            if (shown >= limit) {
                 lines.add(text("  …ほか", NamedTextColor.DARK_GRAY));
                 break;
             }
@@ -90,6 +121,11 @@ public final class TrinityForgeStatPreview {
         }
         // 見出ししか出せなかった（lore.yml に表示定義が無いステだけだった）なら何も出さない
         return shown == 0 ? List.of() : lines;
+    }
+
+    /** 実際に使う上限。{@link #MIN_LINES} 未満は切り上げる(理由はその javadoc)。 */
+    public static int lineLimit(int maxLines) {
+        return Math.max(MIN_LINES, maxLines);
     }
 
     /**

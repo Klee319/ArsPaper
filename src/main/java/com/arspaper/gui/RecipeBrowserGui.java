@@ -73,6 +73,23 @@ public class RecipeBrowserGui extends BaseGui {
     /** チャット検索入力のタイムアウト(tick)。 */
     private static final long SEARCH_TIMEOUT_TICKS = 600L;
 
+    /**
+     * ツールチップ1枚に許す総行数(2026-08-22 ユーザー報告「まだloreの長さに余裕があるのに
+     * 省略されてしまい、スレッド枠やマナ回復量などが出ていない」)。
+     *
+     * <p>根拠: バニラのツールチップは<b>スクロールしない</b>ので、画面の論理高さが上限になる。
+     * 1080p でいちばん狭くなる現実的な設定(GUIスケール4 = 論理 270px)でも
+     * {@code 10px * 行数 + 6px} が 270px に収まるのは 26 行まで。
+     * スケール3(既定のAuto)ならもっと余るが、狭いほうに合わせる。
+     */
+    private static final int TOOLTIP_LINE_BUDGET = 26;
+
+    /**
+     * lore には出ないのにツールチップを押し下げる行の見込み。
+     * アイテム名1行 + 装備時の属性ブロック(見出し+最大3行) + 耐久表示1行。
+     */
+    private static final int NON_LORE_TOOLTIP_LINES = 6;
+
     /** 3×3 グリッドのGUIスロット（行×列）。素材クリック判定にも使う。 */
     private static final int[][] GRID_SLOTS = {{10, 11, 12}, {19, 20, 21}, {28, 29, 30}};
     /** 儀式詳細: 中央=コア。周囲8マスにペデスタル素材を（同一素材は集約して）並べる。 */
@@ -912,7 +929,7 @@ public class RecipeBrowserGui extends BaseGui {
                         .decoration(TextDecoration.ITALIC, false));
                 }
                 // 詳細情報を結果アイテムに表示
-                appendDetailLore(entry, resultLore);
+                appendDetailLore(entry, resultLore, entry.resultToken != null ? 2 : 0);
                 if (entry.resultToken != null) {
                     resultLore.add(Component.empty());
                     resultLore.add(detailText("クリック: これを使うレシピ一覧", NamedTextColor.DARK_GRAY));
@@ -924,7 +941,7 @@ public class RecipeBrowserGui extends BaseGui {
         ItemStack resultDisplay = new ItemStack(entry.icon);
         if (entry.amount > 1) resultDisplay.setAmount(entry.amount);
         List<Component> lore = new ArrayList<>();
-        appendDetailLore(entry, lore);
+        appendDetailLore(entry, lore, entry.resultToken != null ? 1 : 0);
         if (entry.resultToken != null) {
             lore.add(detailText("クリック: これを使うレシピ一覧", NamedTextColor.DARK_GRAY));
         }
@@ -1116,8 +1133,9 @@ public class RecipeBrowserGui extends BaseGui {
                 .decoration(TextDecoration.ITALIC, false));
         }
 
-        // 詳細情報を追加
-        appendDetailLore(entry, lore);
+        // 詳細情報を追加(このあとに足す「未解放」2行と「使用可能レベル」1行も先に数えておく)
+        appendDetailLore(entry, lore,
+            (isUnlocked(entry) ? 0 : 2) + (entry.sortLevel > 0 ? 1 : 0));
 
         // 解放状態(2026-07-27): 絞り込みが「すべて」でも一目で分かるようにする
         if (!isUnlocked(entry)) {
@@ -1551,8 +1569,12 @@ public class RecipeBrowserGui extends BaseGui {
 
     /**
      * レシピの結果アイテムやエフェクトに応じた詳細loreを追加する。
+     *
+     * @param trailingLines この呼び出しの<b>あと</b>に呼び出し側が足す行数。
+     *                      末尾に付く最低ステの行数はツールチップの残り行数から決めるので、
+     *                      ここを実際より少なく渡すと足きりが甘くなって末尾がはみ出す。
      */
-    private void appendDetailLore(RecipeEntry entry, List<Component> lore) {
+    private void appendDetailLore(RecipeEntry entry, List<Component> lore, int trailingLines) {
         ArsPaper plugin = ArsPaper.getInstance();
 
         // === 醸造の効果時間 (W-167) ===
@@ -1601,7 +1623,8 @@ public class RecipeBrowserGui extends BaseGui {
         // === 最低品質でのステータス下限(N4) ===
         // 品質と厳選ロールでどれだけ振れても「最低これだけは出る」を先に見せる。
         // TF未ロード / item-stats 未登録 / lore.yml に表示定義が無い場合は1行も出ない。
-        List<Component> floorLines = minimumStatLines(entry);
+        List<Component> floorLines =
+            minimumStatLines(entry, statLineRoom(lore.size(), trailingLines));
         if (!floorLines.isEmpty()) {
             lore.add(Component.empty());
             lore.addAll(floorLines);
@@ -1609,15 +1632,30 @@ public class RecipeBrowserGui extends BaseGui {
     }
 
     /**
+     * 最低ステの行に使ってよい残り行数。
+     *
+     * <p>ツールチップ全体の予算({@link #TOOLTIP_LINE_BUDGET})から
+     * lore に出ない行({@link #NON_LORE_TOOLTIP_LINES})・既に積んだ lore・このあと足す行、
+     * そして最低ステブロック自身の<b>空行1と見出し1</b>を引く。
+     *
+     * <p>負になっても構わない ── 下限は
+     * {@code TrinityForgeStatPreview.MIN_LINES} 側で切り上げる
+     * (見出しだけ出て中身ゼロ、を作らないため)。
+     */
+    static int statLineRoom(int loreLines, int trailingLines) {
+        return TOOLTIP_LINE_BUDGET - NON_LORE_TOOLTIP_LINES - loreLines - trailingLines - 2;
+    }
+
+    /**
      * このレシピの完成品が最低品質(既定では【劣悪】)で保証するステータスの lore 行。
      * 実際の計算は {@link com.arspaper.integration.TrinityForgeStatPreview} 側。
      */
-    private List<Component> minimumStatLines(RecipeEntry entry) {
+    private List<Component> minimumStatLines(RecipeEntry entry, int maxLines) {
         ItemStack probe = entry.iconItem;
         if (probe == null && entry.icon != null && entry.icon.isItem()) {
             probe = new ItemStack(entry.icon);
         }
-        return com.arspaper.integration.TrinityForgeStatPreview.minimumStatLines(probe);
+        return com.arspaper.integration.TrinityForgeStatPreview.minimumStatLines(probe, maxLines);
     }
 
     /**
