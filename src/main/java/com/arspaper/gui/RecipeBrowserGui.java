@@ -693,9 +693,12 @@ public class RecipeBrowserGui extends BaseGui {
     private static String brewBaseLabel(String baseName) {
         if (baseName == null) return "ベースのポーション";
         return switch (baseName.trim().toUpperCase()) {
+            // 2026-08-21 実サーバ報告「醸造レシピ表示で翻訳が間違っている」。
+            // ここはバニラ ja_jp の item.minecraft.potion.effect.<名前> と同じ語でなければ、
+            // 同じ瓶がレシピ画面とインベントリで別名になる(旧: MUNDANE=ただの水 / THICK=濃厚な水)。
             case "WATER" -> "水入り瓶";
-            case "MUNDANE" -> "ただの水";
-            case "THICK" -> "濃厚な水";
+            case "MUNDANE" -> "ありふれたポーション";
+            case "THICK" -> "濃厚なポーション";
             case "AWKWARD" -> "奇妙なポーション";
             default -> baseName;
         };

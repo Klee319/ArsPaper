@@ -155,6 +155,45 @@ volcanic:
     COAL_BLOCK: 45
     LAVA_BUCKET: 100
 
+    # --- 圧縮済みの燃料（2026-08-21 ユーザー要望「ソースリンク系の燃料に圧縮が
+    #     実装されているものはそれにも対応してほしい」） ---
+    # 値は【素の1個あたり x 圧縮倍率】で厳密に比例させてある(3x3 = 9倍 / 2x2 = 4倍)。
+    # 圧縮しても得も損もしない ＝ 在庫を畳めるだけ、という中立な入り方。
+    # ⚠ ここを比例から外すと「圧縮するだけでソースが増える/減る」経路になるので、
+    #   素の値を動かしたら圧縮側も同じ倍率で動かすこと。
+    # ⚠ 圧縮品は materials.yml 側の定義（custom_model_data 付き）が実体。
+    #   あちらから id を消すとこの行は黙って無効になる(警告は出ない)。
+    "custom:oak_wood_1x": 27
+    "custom:oak_wood_2x": 243
+    "custom:oak_wood_3x": 2187
+    "custom:spruce_wood_1x": 27
+    "custom:spruce_wood_2x": 243
+    "custom:spruce_wood_3x": 2187
+    "custom:birch_wood_1x": 27
+    "custom:birch_wood_2x": 243
+    "custom:birch_wood_3x": 2187
+    "custom:jungle_wood_1x": 27
+    "custom:jungle_wood_2x": 243
+    "custom:jungle_wood_3x": 2187
+    "custom:acacia_wood_1x": 27
+    "custom:acacia_wood_2x": 243
+    "custom:acacia_wood_3x": 2187
+    "custom:dark_oak_wood_1x": 27
+    "custom:dark_oak_wood_2x": 243
+    "custom:dark_oak_wood_3x": 2187
+    "custom:mangrove_wood_1x": 27
+    "custom:mangrove_wood_2x": 243
+    "custom:mangrove_wood_3x": 2187
+    "custom:cherry_blossom_wood_1x": 27
+    "custom:cherry_blossom_wood_2x": 243
+    "custom:cherry_blossom_wood_3x": 2187
+    "custom:coal_block_1x": 405
+    "custom:coal_block_2x": 3645
+    "custom:coal_block_3x": 32805
+    "custom:blaze_rod_1x": 40
+    "custom:blaze_rod_2x": 160
+    "custom:blaze_rod_3x": 640
+
 mycelial:
   materials:
     MELON_SLICE: 1
@@ -193,6 +232,64 @@ mycelial:
     PUMPKIN_PIE: 30
     GOLDEN_APPLE: 75
 
+    # --- 圧縮済みの食料（2026-08-21 ユーザー要望「ソースリンク系の燃料に圧縮が
+    #     実装されているものはそれにも対応してほしい」） ---
+    # 値は【素の1個あたり x 圧縮倍率】で厳密に比例させてある(3x3 = 9倍 / 2x2 = 4倍)。
+    # 圧縮しても得も損もしない ＝ 在庫を畳めるだけ、という中立な入り方。
+    # ⚠ ここを比例から外すと「圧縮するだけでソースが増える/減る」経路になるので、
+    #   素の値を動かしたら圧縮側も同じ倍率で動かすこと。
+    # ⚠ 圧縮品は materials.yml 側の定義（custom_model_data 付き）が実体。
+    #   あちらから id を消すとこの行は黙って無効になる(警告は出ない)。
+    "custom:apple_1x": 9
+    "custom:apple_2x": 81
+    "custom:apple_3x": 729
+    "custom:carrot_1x": 9
+    "custom:carrot_2x": 81
+    "custom:carrot_3x": 729
+    "custom:potato_1x": 9
+    "custom:potato_2x": 81
+    "custom:potato_3x": 729
+    "custom:beetroot_1x": 9
+    "custom:beetroot_2x": 81
+    "custom:beetroot_3x": 729
+    "custom:sweet_berries_1x": 9
+    "custom:sweet_berries_2x": 81
+    "custom:sweet_berries_3x": 729
+    "custom:glow_berries_1x": 9
+    "custom:glow_berries_2x": 81
+    "custom:glow_berries_3x": 729
+    "custom:cod_1x": 27
+    "custom:cod_2x": 243
+    "custom:cod_3x": 2187
+    "custom:salmon_1x": 27
+    "custom:salmon_2x": 243
+    "custom:salmon_3x": 2187
+    "custom:chicken_1x": 27
+    "custom:chicken_2x": 243
+    "custom:chicken_3x": 2187
+    "custom:mutton_1x": 27
+    "custom:mutton_2x": 243
+    "custom:mutton_3x": 2187
+    "custom:beef_1x": 27
+    "custom:beef_2x": 243
+    "custom:beef_3x": 2187
+    "custom:porkchop_1x": 27
+    "custom:porkchop_2x": 243
+    "custom:porkchop_3x": 2187
+    "custom:rabbit_1x": 45
+    "custom:rabbit_2x": 405
+    "custom:rabbit_3x": 3645
+    "custom:cookie_1x": 45
+    "custom:baked_potato_1x": 45
+    "custom:compressed_bread_1x": 45
+    "custom:baked_cod_1x": 45
+    "custom:baked_salon_1x": 45
+    "custom:cooked_chicken_1x": 45
+    "custom:cooked_mutton_1x": 90
+    "custom:cooked_porkchop_1x": 90
+    "custom:compressed_cooked_beef_1x": 90
+    "custom:pumpkin_pie_1x": 270
+
 alchemical:
   materials:
     GLASS_BOTTLE: 1
@@ -229,6 +326,18 @@ alchemical:
     "custom:source_crystal": 18000
     "custom:source_condenser": 700000
     "custom:source_engine": 30000000
+
+    # --- 圧縮済みの触媒（2026-08-21 ユーザー要望「ソースリンク系の燃料に圧縮が
+    #     実装されているものはそれにも対応してほしい」） ---
+    # 値は【素の1個あたり x 圧縮倍率】で厳密に比例させてある(3x3 = 9倍 / 2x2 = 4倍)。
+    # 圧縮しても得も損もしない ＝ 在庫を畳めるだけ、という中立な入り方。
+    # ⚠ ここを比例から外すと「圧縮するだけでソースが増える/減る」経路になるので、
+    #   素の値を動かしたら圧縮側も同じ倍率で動かすこと。
+    # ⚠ 圧縮品は materials.yml 側の定義（custom_model_data 付き）が実体。
+    #   あちらから id を消すとこの行は黙って無効になる(警告は出ない)。
+    "custom:dragon_breath_1x": 120
+    "custom:dragon_breath_2x": 480
+    "custom:dragon_breath_3x": 1920
 
 items:
   volcanic_sourcelink:
