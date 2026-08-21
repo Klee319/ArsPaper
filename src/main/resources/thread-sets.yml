@@ -75,21 +75,61 @@ thread-sets:
   mana_boost:
     thresholds: {}
   speed:
-    thresholds: {}
+    # 迅速: 速く動く → 速く壊す
+    thresholds:
+      "3":
+        break-vanilla-exp-bonus: 0.024
+      "5":
+        break-vanilla-exp-bonus: 0.036
   jump_boost:
-    thresholds: {}
+    # 跳躍: 動き回る → 食料の持ち
+    thresholds:
+      "3":
+        food-save-chance: 0.024
+      "5":
+        food-save-chance: 0.036
   night_vision:
-    thresholds: {}
+    # 暗視: 暗所 → 発掘品の磨き
+    thresholds:
+      "3":
+        suspicious-respawn-chance: 0.03
+      "5":
+        suspicious-respawn-chance: 0.045
   fire_resistance:
-    thresholds: {}
+    # 耐火: 火を扱う → 醸造の品質
+    thresholds:
+      "3":
+        potion-quality-bonus: 0.5
+      "5":
+        potion-quality-bonus: 0.5
   dolphins_grace:
-    thresholds: {}
+    # イルカの好意: 海 → 釣果の売値
+    thresholds:
+      "3":
+        fish-sell-price-bonus: 0.03
+      "5":
+        fish-sell-price-bonus: 0.045
   conduit_power:
-    thresholds: {}
+    # コンジットパワー: 水中 → 二本釣り
+    thresholds:
+      "3":
+        fishing-bonus: 0.024
+      "5":
+        fishing-bonus: 0.036
   hero_of_the_village:
-    thresholds: {}
+    # 村の英雄: 襲撃を退ける → 討伐EXP
+    thresholds:
+      "3":
+        kill-vanilla-exp-bonus: 0.03
+      "5":
+        kill-vanilla-exp-bonus: 0.045
   health_boost:
-    thresholds: {}
+    # 体力増強: 体力 → 隠し満腹度
+    thresholds:
+      "3":
+        hidden-saturation-bonus: 0.09
+      "5":
+        hidden-saturation-bonus: 0.12
   hit_mana_recovery:
     thresholds: {}
   damage_mana_recovery:
@@ -97,7 +137,19 @@ thread-sets:
   spell_cost_down:
     thresholds: {}
   flight:
-    thresholds: {}
+    # 飛行: 行動範囲 → 職業EXP
+    thresholds:
+      "3":
+        skill-exp-bonus: 0.012
+      "5":
+        skill-exp-bonus: 0.018
+  backpack:
+    # バックパック: 物を蓄える → 醸造素材の節約
+    thresholds:
+      "3":
+        ingredient-save-chance: 0.024
+      "5":
+        ingredient-save-chance: 0.036
   mana_amplify:
     thresholds: {}
   mana_circulate:
@@ -208,7 +260,12 @@ thread-sets:
       "5":
         food-restore-bonus: 0.18
   slow_falling:
-    thresholds: {}
+    # 浮遊: 高所 → 養蜂
+    thresholds:
+      "3":
+        hive-harvest-fortune: 0.024
+      "5":
+        hive-harvest-fortune: 0.036
   spoils:
     thresholds:
       "1":
