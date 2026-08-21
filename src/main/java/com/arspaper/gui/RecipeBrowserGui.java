@@ -863,9 +863,9 @@ public class RecipeBrowserGui extends BaseGui {
                 }
             }
         } else {
-            // Shapeless recipe: 左上から順に配置
+            // Shapeless recipe: 左上から順に配置(記号キー昇順 = config に書いた順)
             int idx = 0;
-            for (String ing : entry.ingredientMap.values()) {
+            for (String ing : RecipeShapeNormalizer.orderedIngredients(entry.ingredientMap)) {
                 if (idx >= 9) break;
                 int row = idx / 3, col = idx % 3;
                 inventory.setItem(gridSlots[row][col], withJumpHint(createIngredientDisplay(ing), ing));
@@ -1060,7 +1060,7 @@ public class RecipeBrowserGui extends BaseGui {
                 }
             }
         } else {
-            for (String ing : entry.ingredientMap.values()) {
+            for (String ing : RecipeShapeNormalizer.orderedIngredients(entry.ingredientMap)) {
                 counts.merge(localize(ing), 1, Integer::sum);
             }
         }
@@ -1360,6 +1360,12 @@ public class RecipeBrowserGui extends BaseGui {
         // 並べ替えキー(使用スキル種別 / 使用可能レベル)は、表示アイテムが最終確定した後にまとめて取る。
         for (RecipeEntry entry : entries) {
             applySortKeys(entry);
+            // 素材を1つも指していない shape はここで捨てる。詳細画面は shape が空でなければ
+            // 必ず格子描画へ倒し、引けなかったマスは黙って空欄にするので、記号が全滅した shape が
+            // 1本混ざるだけで「素材欄が空のレシピ」が出来上がる(2026-08-21 コア系3種の実バグ)。
+            // 供給元が3経路(Ars登録 / TFカタログ / 元configのspec上書き)あるので、
+            // 個々の経路ではなく全部が合流したここで1度だけ整える。
+            entry.shape = RecipeShapeNormalizer.usableShape(entry.shape, entry.ingredientMap);
             // 表示名の書式はここが最後の砦。displayName は yml(レガシー &記法) / TFカタログ
             // (MiniMessage) / ItemStack の3経路から来るので、描画側で Component.text() に渡す前に
             // 必ずプレーン化する ―― 1経路でも生記号が残ると画面にそのまま出る(2026-08-03 実バグ)。
@@ -1713,7 +1719,7 @@ public class RecipeBrowserGui extends BaseGui {
             }
         }
         if (counts.isEmpty()) {
-            for (String ing : entry.ingredientMap.values()) {
+            for (String ing : RecipeShapeNormalizer.orderedIngredients(entry.ingredientMap)) {
                 counts.merge(localize(ing), 1, Integer::sum);
             }
         }
