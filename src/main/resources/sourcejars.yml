@@ -169,7 +169,9 @@ jars:
       core-item: custom:source_vault
       pedestal-items:
         - custom:source_engine x4
-        - custom:tf_core_jewelry
+        # id は core_jewelry (materials.yml で定義)。tf_ 接頭辞を付けると解決できず、
+        # この儀式は永久に完成しない (2026-08-23 実サーバのログで発覚)。
+        - custom:core_jewelry
       source: 10000000
       result: custom:source_singularity_jar
       type: shapeless
