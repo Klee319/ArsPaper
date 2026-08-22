@@ -12,6 +12,7 @@ import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Warden;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.BlockDispenseLootEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.world.LootGenerateEvent;
 import org.bukkit.inventory.ItemStack;
@@ -31,6 +32,15 @@ import java.util.concurrent.ThreadLocalRandom;
  *
  * <p>チェストを漁る動機を「厳選スレッド」に置いている。{@code custom:thread_*} を指定すると
  * {@code ThreadItem.createItemStack()} が個体差を振るので、このクラス側に厳選のコードは要らない。
+ *
+ * <p><b>入口は2つある(2026-08-23、W-187)</b>:
+ * <ul>
+ *   <li>{@link #onLootGenerate} … 普通のチェスト・樽。{@code LootGenerateEvent}。</li>
+ *   <li>{@link #onBlockDispenseLoot} … <b>ヴォールトと試練のスポナー</b>。
+ *       これらは {@code LootGenerateEvent} を<b>発火しない</b>(PaperMC #11680 は
+ *       「対応しない」でクローズ)ので、{@code BlockDispenseLootEvent} でしか捕まえられない。</li>
+ * </ul>
+ * どちらも {@link #applyPools} を通す。<b>片方だけ直すと「ヴォールトだけ空」に戻る。</b>
  */
 public class LootTableListener implements Listener {
 
@@ -110,18 +120,59 @@ public class LootTableListener implements Listener {
         List<LootTableConfig.Pool> pools = config.poolsFor(tableKey);
         if (pools.isEmpty()) return;
 
-        ThreadLocalRandom random = ThreadLocalRandom.current();
+        applyPools(event.getLoot(), pools, ThreadLocalRandom.current());
+    }
 
-        // 【順序が仕様】除去 → 増量 → 追加。
-        //   除去を先にしないと、あとで足す自前のマナ系エンチャント本まで巻き込んで消える。
-        //   増量を追加より先にしないと、足したばかりの厳選スレッドや鍵にまで倍率が掛かって
-        //   「レア報酬が2個出る」ことになる(倍率はあくまで既定の戦利品の底上げ)。
+    /**
+     * ヴォールトと試練のスポナーが吐く戦利品へ追加抽選を差し込む。
+     *
+     * <p><b>なぜ {@link LootGenerateEvent} では足りないのか</b>: ヴォールト(vault)と
+     * 試練のスポナー(trial spawner)は戦利品を<b>ブロックが直接排出する</b>ので
+     * {@code LootGenerateEvent} を発火しない(PaperMC issue #11680 は「対応しない」で
+     * クローズ済み)。2026-08-23 のユーザー報告「試練のスポナーにカスタム登録のアイテムが
+     * 反映されず、一部チェストが空」はこれが原因で、{@code loot-tables.yml} に表を足すだけでは
+     * 永久に当たらない。Paper 1.21.10 で入った {@link BlockDispenseLootEvent} が唯一の入口。
+     *
+     * <p>試練の間の<b>普通のチェスト</b>({@code chests/trial_chambers/*})は従来どおり
+     * {@code LootGenerateEvent} 側で処理される。両方に同じ処理を通すため、中身は
+     * {@link #applyPools} に共通化してある ── 片方だけ直すと「ヴォールトだけ空」に戻る。
+     *
+     * <p>{@code getPlayer()} は試練のスポナーの報酬排出時に null になりうる(誰の報酬でもない)。
+     * このクラスはプレイヤーを見ないので分岐は要らない。
+     */
+    @EventHandler
+    public void onBlockDispenseLoot(BlockDispenseLootEvent event) {
+        if (!config.isEnabled()) return;
+        if (event.isCancelled()) return;
+        if (event.getLootTable() == null) return;
+
+        List<LootTableConfig.Pool> pools = config.poolsFor(event.getLootTable().getKey().toString());
+        if (pools.isEmpty()) return;
+
+        // getDispensedLoot() が返すリストの可変性は保証されていないので、
+        // 必ず自前のリストへ写して setDispensedLoot で戻す。
+        List<ItemStack> loot = new ArrayList<>(event.getDispensedLoot());
+        applyPools(loot, pools, ThreadLocalRandom.current());
+        event.setDispensedLoot(loot);
+    }
+
+    /**
+     * 戦利品リストへプールを適用する({@code LootGenerateEvent} と
+     * {@link BlockDispenseLootEvent} の共通処理)。
+     *
+     * <p>【順序が仕様】除去 → 増量 → 追加。
+     * 除去を先にしないと、あとで足す自前のマナ系エンチャント本まで巻き込んで消える。
+     * 増量を追加より先にしないと、足したばかりの厳選スレッドや鍵にまで倍率が掛かって
+     * 「レア報酬が2個出る」ことになる(倍率はあくまで既定の戦利品の底上げ)。
+     */
+    private void applyPools(List<ItemStack> loot, List<LootTableConfig.Pool> pools,
+                            ThreadLocalRandom random) {
         if (config.blocksDatapackEnchantBooks()) {
-            event.getLoot().removeIf(LootTableListener::isDatapackEnchantBook);
+            loot.removeIf(LootTableListener::isDatapackEnchantBook);
         }
         double multiplier = maxQuantityMultiplier(pools);
         if (multiplier > 1.0) {
-            for (ItemStack stack : event.getLoot()) {
+            for (ItemStack stack : loot) {
                 if (stack == null || stack.getType().isAir()) continue;
                 stack.setAmount(scaledAmount(stack.getAmount(), multiplier,
                         stack.getMaxStackSize(), random.nextDouble()));
@@ -136,7 +187,7 @@ public class LootTableListener implements Listener {
                     if (random.nextDouble() >= entry.chance()) continue;
                     ItemStack stack = createStack(entry, random);
                     if (stack == null) continue;
-                    event.getLoot().add(stack);
+                    loot.add(stack);
                     added++;
                 }
             }

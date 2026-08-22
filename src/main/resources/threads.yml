@@ -388,3 +388,93 @@ threads:
     material: STRING
     lore:
       - <gold>汎用の戦闘用スレッド</gold>
+
+  # ==========================================================================
+  # 2026-08-23 (W-187): トレジャーチェスト専用スレッド10種。
+  #   儀式でもクラフトでも作れない。**構造物のルートチェストからしか出ない**枠で、
+  #   ルートのティアを10段へ細分化したのに「どのティアでも同じスレッドが全種類出る」
+  #   状態を直すために新設した(どのティアに何が出るかは loot-tables.yml、
+  #   その生成元は TrinityForge の tmp/worldgen/gen_loot_yml.py)。
+  #
+  #   ThreadType.java に定数は足していない —— ThreadConfig#registerIfUnknown が
+  #   display_name / custom-model-data / material の3つを読んで実行時登録する
+  #   (2026-08-21 の戦闘系24種と同じ経路)。
+  #   効果の数値は TrinityForge の stats/item-stats.yml の STRING#<CMD> 側が持つので、
+  #   ここに数値キーは書かない(書くと Ars 側と TF 側で二重に効く)。
+  #   数値キーが0個だと getEffectLore() が0行になるため、説明文は必ず lore: で書く。
+  #
+  #   ⚠ この10種は既存75種が主軸に使っている戦闘ステ15種を1つも使わない。
+  #     ユーザー指示「住み分けできない(相互互換が発生する)ステータス校正にするな」。
+  #     ここへ新種を足すときも、まず既存の主軸一覧を洗ってから軸を決めること
+  #     (TF 側 item-stats.yml のこの帯のコメントに、選んではいけないステの一覧がある)。
+  # ==========================================================================
+  maelstrom:
+    display_name: 渦動のスレッド
+    custom-model-data: 300070
+    material: STRING
+    lore:
+      - <gold>範囲攻撃の威力が上がる</gold>
+      - <color:dark_purple>宝物庫の底でしか見つからない糸</color>
+  exsanguinate:
+    display_name: 瀉血のスレッド
+    custom-model-data: 300071
+    material: STRING
+    lore:
+      - <gold>出血のダメージ量が上がる</gold>
+      - <color:dark_purple>宝物庫の底でしか見つからない糸</color>
+  skyfall:
+    display_name: 墜撃のスレッド
+    custom-model-data: 300072
+    material: STRING
+    lore:
+      - <gold>空中からの攻撃が強くなる</gold>
+      - <color:dark_purple>宝物庫の底でしか見つからない糸</color>
+  farsight:
+    display_name: 遠見のスレッド
+    custom-model-data: 300073
+    material: STRING
+    lore:
+      - <gold>遠くから当てるほど威力が上がる</gold>
+      - <color:dark_purple>宝物庫の底でしか見つからない糸</color>
+  truesight:
+    display_name: 精射のスレッド
+    custom-model-data: 300074
+    material: STRING
+    lore:
+      - <gold>矢のブレが小さくなる</gold>
+      - <color:dark_purple>宝物庫の底でしか見つからない糸</color>
+  swiftarrow:
+    display_name: 疾矢のスレッド
+    custom-model-data: 300075
+    material: STRING
+    lore:
+      - <gold>矢が速く飛ぶ</gold>
+      - <color:dark_purple>宝物庫の底でしか見つからない糸</color>
+  piercingshot:
+    display_name: 貫矢のスレッド
+    custom-model-data: 300076
+    material: STRING
+    lore:
+      - <gold>矢が貫通する数が増える</gold>
+      - <color:dark_purple>宝物庫の底でしか見つからない糸</color>
+  rampart:
+    display_name: 城塞のスレッド
+    custom-model-data: 300077
+    material: STRING
+    lore:
+      - <gold>受けるダメージの割合が減る</gold>
+      - <color:dark_purple>宝物庫の底でしか見つからない糸</color>
+  bastion:
+    display_name: 鉄壁のスレッド
+    custom-model-data: 300078
+    material: STRING
+    lore:
+      - <gold>物理の守備力が上がる</gold>
+      - <color:dark_purple>宝物庫の底でしか見つからない糸</color>
+  wardstone:
+    display_name: 護法のスレッド
+    custom-model-data: 300079
+    material: STRING
+    lore:
+      - <gold>魔法の守備力が上がる</gold>
+      - <color:dark_purple>宝物庫の底でしか見つからない糸</color>

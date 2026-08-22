@@ -1,9 +1,13 @@
 # ============================================================
 # ArsPaper 構造物ルートチェストへの追加抽選 (loot-tables.yml)
 # ============================================================
-# 「構造物を漁る旨み」を作るファイル。バニラのルートテーブルが生成される瞬間
-# (LootGenerateEvent) に割り込んで、(1) 既存の戦利品の個数を増やし、
-# (2) ここに書いたアイテムを確率で足す。
+# 「構造物を漁る旨み」を作るファイル。ルートテーブルが実体化する瞬間に割り込んで、
+# (1) 既存の戦利品の個数を増やし、(2) ここに書いたアイテムを確率で足す。
+#
+# 割り込む入口は2つある(2026-08-23、W-187):
+#   ・LootGenerateEvent      … 普通のチェスト・樽
+#   ・BlockDispenseLootEvent … **ヴォールトと試練のスポナー**
+#     (これらは LootGenerateEvent を発火しない。PaperMC #11680 は「対応しない」でクローズ)
 #
 # 【2026-08-16 全面改訂】資源サーバへ入れるデータパック(案1)の構造物を実際に
 # ダウンロードして全ルートテーブルを読み、**既存の戦利品の豪華さ順** にティアへ
@@ -51,10 +55,28 @@
 #       chance: 0.0-1.0。1判定あたりの確率
 #       min / max: 個数の範囲(省略時 1)
 #
+# 【2026-08-23 改訂 (W-187)】ユーザー指摘「スレッドやカギなどが各tier固有のものが少ない。
+#   同じ tier に全種類入っているのが問題。それぞれを漁る意義を設けたい」。実測すると
+#   品質系スレッド10種が 9/10 ティア、モブ素材13種が 10/10 ティアに出ていて、
+#   帯分けできていたのは鍵だけだった。方針【強く専属化】で作り直した:
+#     ・**トレジャースレッド10種(新設・CMD 300070-300079)は 1ティア1種の完全専属**。
+#       儀式にもクラフトにもレシピが無いので、そのティアを漁る以外の入手経路が無い。
+#     ・既存の品質系スレッド10種は **看板1ティア + 隣接1ティア(確率 1/3)** だけ。
+#     ・モブ素材13種は **浅/中/深の3帯**。
+#     ・鍵とリセット系は **1本につき2ティア**まで。
+#
+# 【2026-08-23 改訂 (W-187)】トライアルチャンバーとヴォールトを **対象へ戻した**。
+#   ユーザー報告「試練のスポナーにカスタム登録のアイテムが反映されず、一部チェストが空」。
+#   2026-08-16 に経済理由で意図的に除外していたが、ユーザー判断は
+#   「デフォルトの試練のスポナーの中身の豪華さで tier を判断 => tier 割り当て」なので、
+#   特別扱いをやめて他の表と同じ豪華さスコアに載せた。
+#   ⚠ ヴォールトと試練のスポナーは **LootGenerateEvent を発火しない**
+#     (PaperMC #11680 は「対応しない」でクローズ)。ArsPaper 側の
+#     BlockDispenseLootEvent リスナーが受け持つので、片方だけでは無言で効かない。
+#
 # 【バランスの考え方】
 # ・構造物は「厳選スレッドと、作れない鍵の入手経路」。ステ上限を上げる縦強化は置かない。
-# ・村・トライアルチャンバー・壺/発掘は **意図的に対象外**(無限湧き・大量にあるので
-#   経済が壊れる)。除外した表は 117 本。
+# ・村・壺/発掘は **意図的に対象外**(無限湧き・大量にあるので経済が壊れる)。
 # ・深淵の合金 / 束縛者の欠片は構造物から出さない(ダンジョン主の独占素材という設定を守る)。
 # ============================================================
 
@@ -66,94 +88,65 @@ pools:
 
 
   # ----------------------------------------------------------------------
-  # T10_極上 — 14 本 (既存戦利品スコア 35.0〜84.1)
-  # 既存の中身が最も豪華な14本。要塞跡の宝物庫・洋館・エンドの塔など。現実の芯・深部の鍵・リセット系がまとまって出る唯一の場所。
+  # T10_極上 — 18 本 (既存戦利品スコア 46.8〜84.1)
+  # 既存の中身が最も豪華な帯。要塞跡の宝物庫・洋館・エンドの塔・上位ヴォールトなど。現実の芯と深部の鍵が最も厚い。
   # ----------------------------------------------------------------------
   t10_structures:
     quantity-multiplier: 1.20
     rolls: 1
     tables:
       - minecraft:chests/bastion_treasure
+      - nova_structures:chests/piglin_donjon/vault_piglin_donjon
       - nova_structures:chests/mansion_overhaul/mansion_overhaul_generic
+      - nova_structures:chests/trident_trial_monument/ttm_boss_vault_trident
       - minecraft:chests/bastion_other
+      - nova_structures:chests/end_castle/vault_galleon
       - structory_towers:end_tower
+      - nova_structures:chests/trident_trial_monument/ttm_boss_vault_heart
+      - nova_structures:chests/sealing_halls/vault_ominous
       - minecraft:chests/bastion_hoglin_stable
+      - nova_structures:chests/cave_chambers/cave_chamber_dungeon_vault
+      - nova_structures:chests/end_castle/vault_slope
+      - nova_structures:chests/end_castle/vault_brigattine
       - structory_towers:top/warped_top
+      - nova_structures:chests/lone_citadel/c_vault_boss
+      - nova_structures:chests/shrine/vault_shrine_ominous
+      - nova_structures:chests/piglin_outstation/vault_piglin_outstation
       - nova_structures:chests/piglin_outstation/outstation_treasure
-      - structory_towers:top/strange_top
-      - structory_towers:top/lighthouse_top
-      - incendium:castle/barrel/blacksmith
-      - nova_structures:chests/pale_residence/residence_generic
-      - minecraft:chests/end_city_treasure
-      - nova_structures:chests/undead_crypts_grave
-      - structory_towers:top/sacred_temple_top
     entries:
       # --- 厳選の触媒(現実の芯)
       - item: custom:reality_thread_core
         chance: 0.1
         min: 1
         max: 2
-      # --- レシピの無い鍵(深部)。2026-08-21: 確率を引き上げた枠
+      # --- ★このティア専属のスレッド: 墜撃(空中攻撃)。他のどのティアにも出ない
+      - item: custom:thread_skyfall
+        chance: 0.037
+      # --- レシピの無い鍵。2026-08-23: 1本につき2ティアまでへ絞った(深部帯)
       - item: custom:key_dark_cathedral
-        chance: 0.055
-      - item: custom:key_nether_bell
         chance: 0.055
       - item: custom:key_nether_wastes
         chance: 0.055
-      # --- 品質系スレッド 10 種。2026-08-21: ダンジョン中ボス側を主経路にしたため薄くした
+      # --- 品質系スレッド。看板は等倍、隣接ティアは 1/3。ここに無い種はこのティアでは出ない
       - item: custom:thread_artisan
         chance: 0.015
       - item: custom:thread_ritualist
-        chance: 0.015
-      - item: custom:thread_angler
-        chance: 0.015
-      - item: custom:thread_perfumer
-        chance: 0.015
-      - item: custom:thread_appraiser
-        chance: 0.015
-      - item: custom:thread_scholar
-        chance: 0.015
-      - item: custom:thread_better_fortune
-        chance: 0.015
-      - item: custom:thread_gacha
-        chance: 0.015
-      - item: custom:thread_role_luck
-        chance: 0.015
-      - item: custom:thread_role_effeciency
-        chance: 0.015
-      # --- リセット系(極低確率)
+        chance: 0.005
+      # --- リセット系(極低確率)。2026-08-23: 1本につき2ティアまで
       - item: custom:skill_node_lock
-        chance: 0.008
-      - item: custom:skill_tree_reset
         chance: 0.008
       - item: custom:stat_reroll_ticket
         chance: 0.008
-      # --- モブ素材・ソース
+      # --- モブ素材(浅/中/深の3帯へ分割済み)・ソース
       - item: custom:ravager_hide
         chance: 0.022
       - item: custom:piglin_brute_plate
         chance: 0.022
-      - item: custom:pillager_plate
-        chance: 0.022
-      - item: custom:witch_elixir
-        chance: 0.022
-      - item: custom:piglin_ear
-        chance: 0.022
-      - item: custom:stray_cloth
-        chance: 0.022
-      - item: custom:skeleton_horse_bone
-        chance: 0.022
-      - item: custom:endermite_soot
-        chance: 0.022
       - item: custom:guardian_spine
         chance: 0.022
-      - item: custom:husk_cloth
-        chance: 0.022
-      - item: custom:bogged_mossy_bone
-        chance: 0.022
-      - item: custom:parched_sandy_bone
-        chance: 0.022
       - item: custom:hoglin_fang
+        chance: 0.022
+      - item: custom:piglin_ear
         chance: 0.022
       - item: custom:source_crystal
         chance: 0.05
@@ -174,13 +167,26 @@ pools:
         chance: 0.05
 
   # ----------------------------------------------------------------------
-  # T9_最上位 — 21 本 (既存戦利品スコア 31.0〜34.2)
+  # T9_最上位 — 27 本 (既存戦利品スコア 31.5〜44.4)
   # 極上に次ぐ帯。深部の鍵はここまで。芯もまだ厚い。
   # ----------------------------------------------------------------------
   t9_structures:
     quantity-multiplier: 1.25
     rolls: 1
     tables:
+      - structory_towers:top/strange_top
+      - nova_structures:chests/lone_citadel/c_vault
+      - nova_structures:chests/nether_keep/vault_keep_generic
+      - structory_towers:top/lighthouse_top
+      - incendium:castle/barrel/blacksmith
+      - nova_structures:chests/trident_trial_monument/ttm_common_vault
+      - nova_structures:chests/shrine/tier_6/ominous_vault
+      - nova_structures:chests/pale_residence/residence_generic
+      - minecraft:chests/end_city_treasure
+      - nova_structures:chests/undead_crypts_grave
+      - nova_structures:chests/shrine/combat_shrine/vault_ominous
+      - nova_structures:chests/sealing_halls/vault_boss
+      - structory_towers:top/sacred_temple_top
       - structory_towers:top/pillager_top
       - incendium:castle/barrel/random
       - nova_structures:chests/hamlet/hamlet
@@ -195,80 +201,38 @@ pools:
       - incendium:castle/king_statue
       - nova_structures:chests/dungeon_3
       - nova_structures:chests/dungeon_1
-      - nova_structures:chests/dungeon_2
-      - nova_structures:chests/dungeon_4
-      - nova_structures:chests/dungeon_5
-      - nova_structures:chests/dungeon_6
-      - minecraft:chests/simple_dungeon
-      - nova_structures:chests/illager_hideout_random
-      - structory_towers:top/fortress_top
     entries:
       # --- 厳選の触媒(現実の芯)
       - item: custom:reality_thread_core
         chance: 0.08
         min: 1
         max: 2
-      # --- レシピの無い鍵(深部)。2026-08-21: 確率を引き上げた枠
+      # --- ★このティア専属のスレッド: 渦動(範囲ダメージ)。他のどのティアにも出ない
+      - item: custom:thread_maelstrom
+        chance: 0.03
+      # --- レシピの無い鍵。2026-08-23: 1本につき2ティアまでへ絞った(深部帯)
       - item: custom:key_dark_cathedral
         chance: 0.045
       - item: custom:key_nether_bell
         chance: 0.045
-      - item: custom:key_nether_wastes
-        chance: 0.045
-      # --- 品質系スレッド 10 種。2026-08-21: ダンジョン中ボス側を主経路にしたため薄くした
+      # --- 品質系スレッド。看板は等倍、隣接ティアは 1/3。ここに無い種はこのティアでは出ない
       - item: custom:thread_artisan
-        chance: 0.012
+        chance: 0.004
       - item: custom:thread_ritualist
         chance: 0.012
-      - item: custom:thread_angler
-        chance: 0.012
-      - item: custom:thread_perfumer
-        chance: 0.012
-      - item: custom:thread_appraiser
-        chance: 0.012
-      - item: custom:thread_scholar
-        chance: 0.012
-      - item: custom:thread_better_fortune
-        chance: 0.012
-      - item: custom:thread_gacha
-        chance: 0.012
-      - item: custom:thread_role_luck
-        chance: 0.012
-      - item: custom:thread_role_effeciency
-        chance: 0.012
-      # --- リセット系(極低確率)
-      - item: custom:skill_node_lock
-        chance: 0.006
+      # --- リセット系(極低確率)。2026-08-23: 1本につき2ティアまで
       - item: custom:skill_tree_reset
         chance: 0.006
-      - item: custom:stat_reroll_ticket
-        chance: 0.006
-      # --- モブ素材・ソース
+      # --- モブ素材(浅/中/深の3帯へ分割済み)・ソース
       - item: custom:ravager_hide
         chance: 0.02
       - item: custom:piglin_brute_plate
         chance: 0.02
-      - item: custom:pillager_plate
-        chance: 0.02
-      - item: custom:witch_elixir
-        chance: 0.02
-      - item: custom:piglin_ear
-        chance: 0.02
-      - item: custom:stray_cloth
-        chance: 0.02
-      - item: custom:skeleton_horse_bone
-        chance: 0.02
-      - item: custom:endermite_soot
-        chance: 0.02
       - item: custom:guardian_spine
         chance: 0.02
-      - item: custom:husk_cloth
-        chance: 0.02
-      - item: custom:bogged_mossy_bone
-        chance: 0.02
-      - item: custom:parched_sandy_bone
-        chance: 0.02
       - item: custom:hoglin_fang
+        chance: 0.02
+      - item: custom:piglin_ear
         chance: 0.02
       - item: custom:source_crystal
         chance: 0.04
@@ -289,19 +253,30 @@ pools:
         chance: 0.04
 
   # ----------------------------------------------------------------------
-  # T8_上位 — 27 本 (既存戦利品スコア 21.6〜30.9)
-  # 要塞の主要チェストとダンジョン main 帯。中位の鍵の本命。
+  # T8_上位 — 37 本 (既存戦利品スコア 21.9〜31.5)
+  # 要塞の主要チェストとダンジョン main 帯。中位の鍵の本命。深部素材の下限。
   # ----------------------------------------------------------------------
   t8_structures:
     quantity-multiplier: 1.30
     rolls: 1
     tables:
+      - nova_structures:chests/dungeon_2
+      - nova_structures:chests/dungeon_4
+      - nova_structures:chests/dungeon_5
+      - nova_structures:chests/dungeon_6
+      - minecraft:chests/simple_dungeon
+      - nova_structures:chests/illager_hideout_random
+      - structory_towers:top/fortress_top
       - nova_structures:chests/jungle_temple_treasure
       - minecraft:chests/stronghold/jail
       - minecraft:chests/stronghold/generic
+      - minecraft:chests/trial_chambers/reward_ominous
       - minecraft:chests/stronghold/jail_cell
       - nova_structures:chests/mansion_overhaul/supply
       - nova_structures:chests/piglin_outstation/outstation_tower
+      - nova_structures:chests/nether_keep/vault_keep_chart
+      - nova_structures:chests/nether_keep/vault_keep
+      - nova_structures:chests/nether_keep/vault_keep_base
       - minecraft:chests/woodland_mansion
       - minecraft:chests/desert_pyramid
       - structory_towers:top/dark_top
@@ -310,88 +285,54 @@ pools:
       - minecraft:chests/abandoned_mineshaft
       - terralith:spire/treasure
       - structory:ruin/swamp/loot
+      - nova_structures:chests/shrine/tier_6/normal_vault
       - minecraft:archaelogy/ancient_city
       - structory_towers:top/wizard_top
       - incendium:sanctum/tax_collector
       - structory:ruin/taiga/loot
+      - nova_structures:chests/creeping_crypt/vault_creeping
       - nova_structures:chests/desert_ruins/desert_ruin_main_temple
       - structory_towers:top/forager_top
       - minecraft:chests/ruined_portal
       - structory_towers:top/mangrove_top
       - minecraft:chests/nether_fortress/fort_inside_generic
       - nova_structures:chests/nether_fortress_overhaul/fortress_overhaul
-      - minecraft:chests/stronghold/sewer
-      - nova_structures:chests/bunker_altar
-      - minecraft:chests/illager_mansion/evoker_chest
       # データパック無し構成のための保険(structures.json には現れない表)
       - minecraft:chests/stronghold_corridor
     entries:
       # --- 厳選の触媒(現実の芯)
       - item: custom:reality_thread_core
         chance: 0.05
-      # --- レシピの無い鍵(中位)。2026-08-21: 確率を引き上げた枠
+      # --- ★このティア専属のスレッド: 瀉血(出血ダメージ量)。他のどのティアにも出ない
+      - item: custom:thread_exsanguinate
+        chance: 0.025
+      # --- レシピの無い鍵。2026-08-23: 1本につき2ティアまでへ絞った(中位帯)
+      - item: custom:key_nether_bell
+        chance: 0.048
+      - item: custom:key_nether_wastes
+        chance: 0.048
       - item: custom:key_climb
-        chance: 0.048
-      - item: custom:key_palace
-        chance: 0.048
-      - item: custom:key_knight_castle
         chance: 0.048
       - item: custom:key_fireworks
         chance: 0.048
-      # --- 品質系スレッド 10 種。2026-08-21: ダンジョン中ボス側を主経路にしたため薄くした
-      - item: custom:thread_artisan
-        chance: 0.01
-      - item: custom:thread_ritualist
-        chance: 0.01
-      - item: custom:thread_angler
-        chance: 0.01
-      - item: custom:thread_perfumer
-        chance: 0.01
+      # --- 品質系スレッド。看板は等倍、隣接ティアは 1/3。ここに無い種はこのティアでは出ない
       - item: custom:thread_appraiser
         chance: 0.01
       - item: custom:thread_scholar
-        chance: 0.01
-      - item: custom:thread_better_fortune
-        chance: 0.01
-      - item: custom:thread_gacha
-        chance: 0.01
-      - item: custom:thread_role_luck
-        chance: 0.01
-      - item: custom:thread_role_effeciency
-        chance: 0.01
-      # --- リセット系(極低確率)
+        chance: 0.003
+      # --- リセット系(極低確率)。2026-08-23: 1本につき2ティアまで
       - item: custom:skill_node_lock
         chance: 0.004
-      - item: custom:skill_tree_reset
-        chance: 0.004
-      - item: custom:stat_reroll_ticket
-        chance: 0.004
-      # --- モブ素材・ソース
+      # --- モブ素材(浅/中/深の3帯へ分割済み)・ソース
       - item: custom:ravager_hide
         chance: 0.02
       - item: custom:piglin_brute_plate
         chance: 0.02
-      - item: custom:pillager_plate
-        chance: 0.02
-      - item: custom:witch_elixir
-        chance: 0.02
-      - item: custom:piglin_ear
-        chance: 0.02
-      - item: custom:stray_cloth
-        chance: 0.02
-      - item: custom:skeleton_horse_bone
-        chance: 0.02
-      - item: custom:endermite_soot
-        chance: 0.02
       - item: custom:guardian_spine
         chance: 0.02
-      - item: custom:husk_cloth
-        chance: 0.02
-      - item: custom:bogged_mossy_bone
-        chance: 0.02
-      - item: custom:parched_sandy_bone
-        chance: 0.02
       - item: custom:hoglin_fang
+        chance: 0.02
+      - item: custom:piglin_ear
         chance: 0.02
       - item: custom:source_shard
         chance: 0.14
@@ -410,13 +351,16 @@ pools:
         chance: 0.03
 
   # ----------------------------------------------------------------------
-  # T7_準上位 — 35 本 (既存戦利品スコア 12.2〜21.5)
-  # 塔の最上階・城の宝物庫帯。中位の鍵とモブ素材。
+  # T7_準上位 — 45 本 (既存戦利品スコア 12.7〜21.6)
+  # 塔の最上階・城の宝物庫帯。バニラ試練の間の報酬チェストもここ。中位素材の上限。
   # ----------------------------------------------------------------------
   t7_structures:
     quantity-multiplier: 1.35
     rolls: 1
     tables:
+      - minecraft:chests/stronghold/sewer
+      - nova_structures:chests/bunker_altar
+      - minecraft:chests/illager_mansion/evoker_chest
       - incendium:quartz_flats/kitchen_treasure
       - structory_towers:top/paranoid_top
       - structory_towers:toadstool
@@ -430,95 +374,65 @@ pools:
       - nova_structures:chests/nether_port/nether_port_chest
       - minecraft:chests/buried_treasure
       - structory_towers:top/desert_top
+      - minecraft:chests/trial_chambers/reward
       - nova_structures:chests/cave_chambers/cave_chamber_camp
+      - nova_structures:spawners/end_castle/shulker
+      - nova_structures:spawners/end_castle/shulker_ominous
       - minecraft:chests/bastion_bridge
       - nova_structures:chests/end_castle/supply
+      - nova_structures:spawners/end_castle/endermite
+      - nova_structures:spawners/end_castle/phantom
+      - nova_structures:spawners/end_castle/mini_boss
+      - nova_structures:spawners/end_castle/mini_boss_ominous
+      - nova_structures:spawners/end_castle/endermite_ominous
       - nova_structures:chests/pale_residence/residence_kitchen
       - minecraft:chests/nether_bridge
       - nova_structures:chests/desert_temple/desert_temple_lesser
       - nova_structures:chests/ocean_monument/trident_treasure
       - minecraft:chests/stronghold/library
+      - nova_structures:spawners/end_castle/phantom_ominous
       - structory_towers:top/nomad_top
+      - nova_structures:spawners/trident_trial_monument/drowned_center_ominous
       - nova_structures:chests/jungle_ruins/jungle_ruins_main_temple
       - nova_structures:chests/cave_chambers/apple_shrine
       - minecraft:archaelogy/jungle_ruins
+      - minecraft:chests/trial_chambers/intersection
+      - nova_structures:spawners/trident_trial_monument/elder_guardian
+      - nova_structures:spawners/trident_trial_monument/elder_guardian_ominous
       - terralith:underground/chest
+      - nova_structures:spawners/trident_trial_monument/drowned_center
       - minecraft:chests/jungle_temple
       - incendium:castle/barrel/food
-      - nova_structures:chests/ocean_monument/greater_treasure
-      - nova_structures:chests/sealing_halls/chest_generic
-      - incendium:castle/barrel/food_low
-      - nova_structures:chests/illager_hideout_heart_loot
-      - incendium:castle/tower_barrel
-      - incendium:castle/barrel/library
-      - nova_structures:chests/conduit_ruin/conduit_ruin_big
     entries:
       # --- 厳選の触媒(現実の芯)
       - item: custom:reality_thread_core
         chance: 0.04
-      # --- レシピの無い鍵(中位)。2026-08-21: 確率を引き上げた枠
+      # --- ★このティア専属のスレッド: 城塞(防御率)。他のどのティアにも出ない
+      - item: custom:thread_rampart
+        chance: 0.02
+      # --- レシピの無い鍵。2026-08-23: 1本につき2ティアまでへ絞った(中位帯)
       - item: custom:key_climb
         chance: 0.04
       - item: custom:key_palace
         chance: 0.04
-      - item: custom:key_knight_castle
-        chance: 0.04
-      - item: custom:key_fireworks
-        chance: 0.04
-      # --- 品質系スレッド 10 種。2026-08-21: ダンジョン中ボス側を主経路にしたため薄くした
-      - item: custom:thread_artisan
-        chance: 0.008
-      - item: custom:thread_ritualist
-        chance: 0.008
-      - item: custom:thread_angler
-        chance: 0.008
-      - item: custom:thread_perfumer
-        chance: 0.008
+      # --- 品質系スレッド。看板は等倍、隣接ティアは 1/3。ここに無い種はこのティアでは出ない
       - item: custom:thread_appraiser
-        chance: 0.008
+        chance: 0.003
       - item: custom:thread_scholar
         chance: 0.008
-      - item: custom:thread_better_fortune
-        chance: 0.008
-      - item: custom:thread_gacha
-        chance: 0.008
-      - item: custom:thread_role_luck
-        chance: 0.008
-      - item: custom:thread_role_effeciency
-        chance: 0.008
-      # --- リセット系(極低確率)
-      - item: custom:skill_node_lock
-        chance: 0.003
+      # --- リセット系(極低確率)。2026-08-23: 1本につき2ティアまで
       - item: custom:skill_tree_reset
         chance: 0.003
       - item: custom:stat_reroll_ticket
         chance: 0.003
-      # --- モブ素材・ソース
-      - item: custom:ravager_hide
-        chance: 0.018
-      - item: custom:piglin_brute_plate
-        chance: 0.018
+      # --- モブ素材(浅/中/深の3帯へ分割済み)・ソース
       - item: custom:pillager_plate
         chance: 0.018
       - item: custom:witch_elixir
         chance: 0.018
-      - item: custom:piglin_ear
-        chance: 0.018
-      - item: custom:stray_cloth
-        chance: 0.018
-      - item: custom:skeleton_horse_bone
-        chance: 0.018
       - item: custom:endermite_soot
         chance: 0.018
-      - item: custom:guardian_spine
-        chance: 0.018
-      - item: custom:husk_cloth
-        chance: 0.018
       - item: custom:bogged_mossy_bone
-        chance: 0.018
-      - item: custom:parched_sandy_bone
-        chance: 0.018
-      - item: custom:hoglin_fang
         chance: 0.018
       - item: custom:source_shard
         chance: 0.13
@@ -531,33 +445,56 @@ pools:
         chance: 0.012
 
   # ----------------------------------------------------------------------
-  # T6_中上位 — 38 本 (既存戦利品スコア 6.5〜11.7)
+  # T6_中上位 — 50 本 (既存戦利品スコア 7.6〜12.6)
   # 前哨基地・醸造室帯。中位の鍵の下限で、圧縮ブロックが鉄になる。
   # ----------------------------------------------------------------------
   t6_structures:
     quantity-multiplier: 1.45
     rolls: 1
     tables:
+      - nova_structures:chests/ocean_monument/greater_treasure
+      - nova_structures:chests/sealing_halls/chest_generic
+      - incendium:castle/barrel/food_low
+      - nova_structures:chests/illager_hideout_heart_loot
+      - incendium:castle/tower_barrel
+      - incendium:castle/barrel/library
+      - nova_structures:chests/conduit_ruin/conduit_ruin_big
       - nova_structures:chests/pillager_outpost_small_treasure
       - incendium:castle/barrel/ice
+      - nova_structures:spawners/undead_crypt/normal
       - incendium:sanctum/brewery
       - structory_towers:basic/pillager_basic
       - incendium:sanctum/common_loot
       - minecraft:archaelogy/ruins
       - minecraft:chests/shipwreck_treasure
+      - nova_structures:spawners/shrine/normal_water
+      - nova_structures:spawners/shrine/tier_6/normal_water
       - minecraft:chests/illager_mansion/generic
+      - nova_structures:spawners/shrine/normal
+      - nova_structures:spawners/shrine/ominous
+      - nova_structures:spawners/shrine/ominous_water
+      - nova_structures:spawners/shrine/tier_6/normal
+      - nova_structures:spawners/shrine/tier_6/ominous
+      - nova_structures:spawners/shrine/tier_6/ominous_water
+      - nova_structures:chests/shrine/combat_shrine/vault
       - nova_structures:archaelogy/desert_ruin_inside_temple
       - nova_structures:chests/cave_chambers/cave_chamber_grave
       - nova_structures:chests/piglin_outstation/outstation_generic
       - nova_structures:chests/pale_residence/residence_forge
       - nova_structures:chests/desert_ruins/desert_ruin_house
       - nova_structures:chests/toxic_lair/generic
+      - nova_structures:chests/nether_port/nether_port_vault
       - nova_structures:chests/desert_ruins/desert_ruin_grave
+      - nova_structures:chests/nether_port/nether_port_vault_chart
       - minecraft:chests/illager_mansion/ancient_city_raid_chest
       - nova_structures:chests/pale_residence/residence_grave
+      - minecraft:chests/trial_chambers/intersection_barrel
       - nova_structures:chests/end_castle/lesser_loot
+      - nova_structures:spawners/lone_citadel/normal
+      - nova_structures:spawners/lone_citadel/ominous
       - nova_structures:chests/stray_fort_tresure
       - nova_structures:chests/shrine/tier_6/pots
+      - nova_structures:spawners/undead_crypt/ominous
       - incendium:sanctum/coffin
       - structory:ruin/taiga/illager_treasure
       - terralith:spire/common
@@ -565,84 +502,33 @@ pools:
       - nova_structures:archaelogy/crypt
       - nova_structures:chests/witch_villa/lab
       - nova_structures:chests/pale_residence/pale_cleric
-      - incendium:reactor/treasure
-      - nova_structures:chests/shrine/combat_pot
-      - structory:ruin/taiga/illager_high
-      - nova_structures:chests/mineshaft_overhaul/barrel
-      - structory:outcast/boat/loot
-      - nova_structures:chests/lone_citadel/c_forge
-      - nova_structures:chests/nether_port/nether_port_supplies
-      - structory_towers:basic/warped_basic
-      - nova_structures:chests/pillager_outpost_treasure
-      - terralith:spire/rare
-      - nova_structures:chests/badland_miner_outpost
     entries:
       # --- 厳選の触媒(現実の芯)
       - item: custom:reality_thread_core
         chance: 0.03
-      # --- レシピの無い鍵(中位)。2026-08-21: 確率を引き上げた枠
-      - item: custom:key_climb
-        chance: 0.033
+      # --- ★このティア専属のスレッド: 鉄壁(物理守備力)。他のどのティアにも出ない
+      - item: custom:thread_bastion
+        chance: 0.015
+      # --- レシピの無い鍵。2026-08-23: 1本につき2ティアまでへ絞った(中位帯)
       - item: custom:key_palace
         chance: 0.033
       - item: custom:key_knight_castle
         chance: 0.033
       - item: custom:key_fireworks
         chance: 0.033
-      # --- 品質系スレッド 10 種。2026-08-21: ダンジョン中ボス側を主経路にしたため薄くした
-      - item: custom:thread_artisan
-        chance: 0.006
-      - item: custom:thread_ritualist
-        chance: 0.006
-      - item: custom:thread_angler
-        chance: 0.006
+      # --- 品質系スレッド。看板は等倍、隣接ティアは 1/3。ここに無い種はこのティアでは出ない
       - item: custom:thread_perfumer
         chance: 0.006
-      - item: custom:thread_appraiser
-        chance: 0.006
-      - item: custom:thread_scholar
-        chance: 0.006
       - item: custom:thread_better_fortune
-        chance: 0.006
-      - item: custom:thread_gacha
-        chance: 0.006
-      - item: custom:thread_role_luck
-        chance: 0.006
-      - item: custom:thread_role_effeciency
-        chance: 0.006
-      # --- リセット系(極低確率)
-      - item: custom:skill_node_lock
         chance: 0.002
-      - item: custom:skill_tree_reset
-        chance: 0.002
-      - item: custom:stat_reroll_ticket
-        chance: 0.002
-      # --- モブ素材・ソース
-      - item: custom:ravager_hide
-        chance: 0.016
-      - item: custom:piglin_brute_plate
-        chance: 0.016
+      # --- モブ素材(浅/中/深の3帯へ分割済み)・ソース
       - item: custom:pillager_plate
         chance: 0.016
       - item: custom:witch_elixir
         chance: 0.016
-      - item: custom:piglin_ear
-        chance: 0.016
-      - item: custom:stray_cloth
-        chance: 0.016
-      - item: custom:skeleton_horse_bone
-        chance: 0.016
       - item: custom:endermite_soot
         chance: 0.016
-      - item: custom:guardian_spine
-        chance: 0.016
-      - item: custom:husk_cloth
-        chance: 0.016
       - item: custom:bogged_mossy_bone
-        chance: 0.016
-      - item: custom:parched_sandy_bone
-        chance: 0.016
-      - item: custom:hoglin_fang
         chance: 0.016
       - item: custom:source_shard
         chance: 0.12
@@ -655,17 +541,31 @@ pools:
         chance: 0.015
 
   # ----------------------------------------------------------------------
-  # T5_中位 — 41 本 (既存戦利品スコア 3.8〜6.5)
-  # 図書室・工房帯。浅部の鍵の本命。
+  # T5_中位 — 54 本 (既存戦利品スコア 4.0〜7.5)
+  # 図書室・工房帯。浅部の鍵の本命。中位素材の下限。
   # ----------------------------------------------------------------------
   t5_structures:
     quantity-multiplier: 1.50
     rolls: 1
     tables:
+      - incendium:reactor/treasure
+      - nova_structures:chests/shrine/combat_pot
+      - structory:ruin/taiga/illager_high
+      - nova_structures:chests/mineshaft_overhaul/barrel
+      - structory:outcast/boat/loot
+      - nova_structures:chests/sealing_halls/vault
+      - nova_structures:chests/lone_citadel/c_forge
+      - nova_structures:chests/nether_port/nether_port_supplies
+      - structory_towers:basic/warped_basic
+      - nova_structures:chests/pillager_outpost_treasure
+      - terralith:spire/rare
+      - nova_structures:spawners/sealing_halls/normal
+      - nova_structures:chests/badland_miner_outpost
       - nova_structures:chests/illager_hideout_utility
       - nova_structures:chests/lone_citadel/c_library
       - nova_structures:chests/pale_residence/pale_smith
       - nova_structures:chests/witch_villa/dirty_clothes
+      - nova_structures:spawners/sealing_halls/ominous
       - minecraft:chests/illager_mansion/vindicator_chest
       - nova_structures:chests/pale_residence/residence_basement
       - incendium:castle/treasure/quartz
@@ -678,6 +578,8 @@ pools:
       - incendium:quartz_flats/kitchen_extra_treasure
       - incendium:castle/barrel/monument
       - minecraft:chests/illager_mansion/ravager_chest
+      - nova_structures:spawners/trident_trial_monument/drowned_ominous
+      - nova_structures:spawners/creeping_crypt/ominous
       - nova_structures:archaelogy/archeology_toxic
       - nova_structures:chests/conduit_ruin/conduit_ruin_main
       - nova_structures:chests/stray_fort/stray_fort_generic
@@ -694,75 +596,39 @@ pools:
       - structory_towers:basic/dark_basic
       - incendium:quartz_flats/kitchen_basic
       - minecraft:chests/igloo_chest
+      - nova_structures:spawners/trident_trial_monument/guardian_ominous
+      - nova_structures:spawners/piglin_donjon/ominous
+      - nova_structures:spawners/piglin_donjon/normal
       - nova_structures:chests/cave_chambers/farmer
       - nova_structures:chests/stray_fort_loot_generic
       - nova_structures:chests/stray_fort/stray_fort_citadel_lead
-      - structory:outcast/bandit/desert_copper
-      - structory:outcast/bandit/desert
-      - structory:outcast/farm_ruin
-      - nova_structures:chests/cave_chambers/cave_chamber_tree
-      - structory:outcast/settlement
-      - structory:harvest/graveyard
     entries:
       # --- 厳選の触媒(現実の芯)
       - item: custom:reality_thread_core
         chance: 0.02
-      # --- レシピの無い鍵(浅部)。2026-08-21: 確率を引き上げた枠
+      # --- ★このティア専属のスレッド: 護法(魔法守備力)。他のどのティアにも出ない
+      - item: custom:thread_wardstone
+        chance: 0.013
+      # --- レシピの無い鍵。2026-08-23: 1本につき2ティアまでへ絞った(浅部帯)
+      - item: custom:key_knight_castle
+        chance: 0.04
       - item: custom:key_bridge
-        chance: 0.04
-      - item: custom:key_city
-        chance: 0.04
-      - item: custom:key_sewer_maze
         chance: 0.04
       - item: custom:key_steamworks
         chance: 0.04
-      # --- 品質系スレッド 10 種。2026-08-21: ダンジョン中ボス側を主経路にしたため薄くした
-      - item: custom:thread_artisan
-        chance: 0.005
-      - item: custom:thread_ritualist
-        chance: 0.005
-      - item: custom:thread_angler
-        chance: 0.005
+      # --- 品質系スレッド。看板は等倍、隣接ティアは 1/3。ここに無い種はこのティアでは出ない
       - item: custom:thread_perfumer
-        chance: 0.005
-      - item: custom:thread_appraiser
-        chance: 0.005
-      - item: custom:thread_scholar
-        chance: 0.005
+        chance: 0.002
       - item: custom:thread_better_fortune
         chance: 0.005
-      - item: custom:thread_gacha
-        chance: 0.005
-      - item: custom:thread_role_luck
-        chance: 0.005
-      - item: custom:thread_role_effeciency
-        chance: 0.005
-      # --- モブ素材・ソース
-      - item: custom:ravager_hide
-        chance: 0.015
-      - item: custom:piglin_brute_plate
-        chance: 0.015
+      # --- モブ素材(浅/中/深の3帯へ分割済み)・ソース
       - item: custom:pillager_plate
         chance: 0.015
       - item: custom:witch_elixir
         chance: 0.015
-      - item: custom:piglin_ear
-        chance: 0.015
-      - item: custom:stray_cloth
-        chance: 0.015
-      - item: custom:skeleton_horse_bone
-        chance: 0.015
       - item: custom:endermite_soot
         chance: 0.015
-      - item: custom:guardian_spine
-        chance: 0.015
-      - item: custom:husk_cloth
-        chance: 0.015
       - item: custom:bogged_mossy_bone
-        chance: 0.015
-      - item: custom:parched_sandy_bone
-        chance: 0.015
-      - item: custom:hoglin_fang
         chance: 0.015
       - item: custom:source_shard
         chance: 0.12
@@ -775,25 +641,38 @@ pools:
         chance: 0.015
 
   # ----------------------------------------------------------------------
-  # T4_中下位 — 45 本 (既存戦利品スコア 1.8〜3.7)
-  # 倉庫・墓地帯。浅部の鍵と素材が中心。
+  # T4_中下位 — 59 本 (既存戦利品スコア 2.0〜4.0)
+  # 倉庫・墓地帯。浅部の鍵と浅部素材が中心。
   # ----------------------------------------------------------------------
   t4_structures:
     quantity-multiplier: 1.60
     rolls: 1
     tables:
+      - structory:outcast/bandit/desert_copper
+      - structory:outcast/bandit/desert
+      - structory:outcast/farm_ruin
+      - nova_structures:chests/cave_chambers/cave_chamber_tree
+      - structory:outcast/settlement
+      - structory:harvest/graveyard
       - structory:harvest/graveyard2
       - nova_structures:chests/end_lighthouse/supply_lighthouse
       - nova_structures:chests/witch_villa/general_storage
       - structory:outcast/generic/bandit
       - structory:outcast/mine/loot
+      - nova_structures:spawners/cave_chambers/trial_spawner_ominous
       - nova_structures:chests/end_castle/castle_bar
+      - nova_structures:spawners/cave_chambers/trial_spawner
       - terralith:igloo
       - terralith:witch_hut
       - kaisyn:outpost/common/food
       - minecraft:chests/stronghold_crossing
       - nova_structures:chests/tavern/tavern_quest_chest
       - nova_structures:chests/food_supply
+      - nova_structures:spawners/end_castle/boss
+      - nova_structures:spawners/end_castle/boss_ominous
+      - nova_structures:spawners/end_lighthouse/normal
+      - nova_structures:spawners/end_lighthouse/ominous
+      - nova_structures:spawners/trident_trial_monument/monument_ominous
       - nova_structures:chests/witch_villa/music_room
       - incendium:reactor/waste
       - nova_structures:chests/piglin_camp/piglin_camp_chart
@@ -815,78 +694,44 @@ pools:
       - nova_structures:chests/nether_tower/nether_warped_tower_chart_lesser
       - nova_structures:chests/nether_tower/nether_tower_lesser
       - minecraft:chests/illager_mansion/library_chest
+      - nova_structures:spawners/nether_keep/ominous
       - nova_structures:chests/badland_miner_outpost_forge
       - nova_structures:chests/witch_villa/bedroom
+      - nova_structures:spawners/nether_port/ominous
+      - nova_structures:spawners/catacomb/normal
+      - nova_structures:spawners/catacomb/ominous
       - terralith:mage/barracks
+      - nova_structures:spawners/creeping_crypt/normal
+      - nova_structures:spawners/lone_citadel/boss
+      - nova_structures:spawners/lone_citadel/boss_ominous
       - nova_structures:archaelogy/desert_ruin_ruins
       - nova_structures:chests/piglin_camp/piglin_camp_supply
       - nova_structures:chests/conduit_ruin/conduit_ruin_small
-      - structory_towers:basic/forager_basic
-      - nova_structures:chests/witch_villa/potion_brewing
-      - nova_structures:chests/creeping_crypt/crypt_grave
-      - nova_structures:chests/illager_hideout_weaponry
-      - structory_towers:basic/farm_basic
-      - nova_structures:chests/end_castle/castle_brewing
     entries:
       # --- 厳選の触媒(現実の芯)
       - item: custom:reality_thread_core
         chance: 0.015
-      # --- レシピの無い鍵(浅部)。2026-08-21: 確率を引き上げた枠
+      # --- ★このティア専属のスレッド: 遠見(距離ダメージ)。他のどのティアにも出ない
+      - item: custom:thread_farsight
+        chance: 0.01
+      # --- レシピの無い鍵。2026-08-23: 1本につき2ティアまでへ絞った(浅部帯)
       - item: custom:key_bridge
         chance: 0.033
       - item: custom:key_city
         chance: 0.033
-      - item: custom:key_sewer_maze
-        chance: 0.033
-      - item: custom:key_steamworks
-        chance: 0.033
-      # --- 品質系スレッド 10 種。2026-08-21: ダンジョン中ボス側を主経路にしたため薄くした
-      - item: custom:thread_artisan
-        chance: 0.004
-      - item: custom:thread_ritualist
-        chance: 0.004
-      - item: custom:thread_angler
-        chance: 0.004
-      - item: custom:thread_perfumer
-        chance: 0.004
-      - item: custom:thread_appraiser
-        chance: 0.004
-      - item: custom:thread_scholar
-        chance: 0.004
-      - item: custom:thread_better_fortune
-        chance: 0.004
+      # --- 品質系スレッド。看板は等倍、隣接ティアは 1/3。ここに無い種はこのティアでは出ない
       - item: custom:thread_gacha
         chance: 0.004
       - item: custom:thread_role_luck
-        chance: 0.004
-      - item: custom:thread_role_effeciency
-        chance: 0.004
-      # --- モブ素材・ソース
-      - item: custom:ravager_hide
-        chance: 0.013
-      - item: custom:piglin_brute_plate
-        chance: 0.013
-      - item: custom:pillager_plate
-        chance: 0.013
-      - item: custom:witch_elixir
-        chance: 0.013
-      - item: custom:piglin_ear
-        chance: 0.013
+        chance: 0.001
+      # --- モブ素材(浅/中/深の3帯へ分割済み)・ソース
       - item: custom:stray_cloth
         chance: 0.013
       - item: custom:skeleton_horse_bone
         chance: 0.013
-      - item: custom:endermite_soot
-        chance: 0.013
-      - item: custom:guardian_spine
-        chance: 0.013
       - item: custom:husk_cloth
         chance: 0.013
-      - item: custom:bogged_mossy_bone
-        chance: 0.013
       - item: custom:parched_sandy_bone
-        chance: 0.013
-      - item: custom:hoglin_fang
         chance: 0.013
       - item: custom:source_shard
         chance: 0.11
@@ -899,13 +744,19 @@ pools:
         chance: 0.015
 
   # ----------------------------------------------------------------------
-  # T3_下位 — 42 本 (既存戦利品スコア 1.0〜1.8)
+  # T3_下位 — 54 本 (既存戦利品スコア 0.9〜2.0)
   # 旗・石工などの端物チェスト帯。浅部の鍵は薄く出る。
   # ----------------------------------------------------------------------
   t3_structures:
     quantity-multiplier: 1.70
     rolls: 1
     tables:
+      - structory_towers:basic/forager_basic
+      - nova_structures:chests/witch_villa/potion_brewing
+      - nova_structures:chests/creeping_crypt/crypt_grave
+      - nova_structures:chests/illager_hideout_weaponry
+      - structory_towers:basic/farm_basic
+      - nova_structures:chests/end_castle/castle_brewing
       - nova_structures:chests/lone_citadel/c_banner
       - minecraft:chests/underwater_ruin_small
       - nova_structures:chests/pale_residence/pale_mason
@@ -926,6 +777,7 @@ pools:
       - nova_structures:chests/toxic_lair/brewing
       - structory_towers:basic/paranoid_basic
       - minecraft:chests/illager_mansion/witch_chest
+      - minecraft:chests/trial_chambers/corridor
       - nova_structures:chests/lone_citadel/c_cold_barrel
       - structory_towers:basic/mangrove_basic
       - minecraft:chests/illager_mansion/pillager_chest
@@ -936,11 +788,15 @@ pools:
       - nova_structures:chests/catacomb/catacomb_generic
       - nova_structures:chests/catacomb/catacomb_grave
       - nova_structures:chests/stray_fort/stray_fort_forge
+      - nova_structures:spawners/nether_keep/normal
+      - nova_structures:spawners/nether_port/normal
       - nova_structures:chests/illager_hideout_brewing
       - incendium:cvill/blacksmith
+      - nova_structures:spawners/trident_trial_monument/small_monument
       - terralith:ruin/glacial/junk
       - incendium:cvill/medium
       - minecraft:chests/shipwreck_supply
+      - nova_structures:chests/toxic_lair/toxic_vault
       - incendium:castle/barrel/lumber_big
       - terralith:ruin/glacial/main_cs
       - nova_structures:chests/remnant_bundle_tent
@@ -948,66 +804,34 @@ pools:
       - nova_structures:chests/stray_fort/stray_fort_food
       - nova_structures:chests/witch_villa/gardening
       - structory_towers:basic/lighthouse_basic
+      - incendium:castle/barrel/greenhouse_secret
     entries:
       # --- 厳選の触媒(現実の芯)
       - item: custom:reality_thread_core
         chance: 0.01
-      # --- レシピの無い鍵(浅部)。2026-08-21: 確率を引き上げた枠
-      - item: custom:key_bridge
-        chance: 0.026
+      # --- ★このティア専属のスレッド: 貫矢(矢貫通)。他のどのティアにも出ない
+      - item: custom:thread_piercingshot
+        chance: 0.007
+      # --- レシピの無い鍵。2026-08-23: 1本につき2ティアまでへ絞った(浅部帯)
       - item: custom:key_city
         chance: 0.026
       - item: custom:key_sewer_maze
         chance: 0.026
-      - item: custom:key_steamworks
-        chance: 0.026
-      # --- 品質系スレッド 10 種。2026-08-21: ダンジョン中ボス側を主経路にしたため薄くした
-      - item: custom:thread_artisan
-        chance: 0.003
-      - item: custom:thread_ritualist
-        chance: 0.003
-      - item: custom:thread_angler
-        chance: 0.003
-      - item: custom:thread_perfumer
-        chance: 0.003
-      - item: custom:thread_appraiser
-        chance: 0.003
-      - item: custom:thread_scholar
-        chance: 0.003
-      - item: custom:thread_better_fortune
-        chance: 0.003
+      # --- 品質系スレッド。看板は等倍、隣接ティアは 1/3。ここに無い種はこのティアでは出ない
       - item: custom:thread_gacha
-        chance: 0.003
+        chance: 0.001
       - item: custom:thread_role_luck
         chance: 0.003
       - item: custom:thread_role_effeciency
-        chance: 0.003
-      # --- モブ素材・ソース
-      - item: custom:ravager_hide
-        chance: 0.011
-      - item: custom:piglin_brute_plate
-        chance: 0.011
-      - item: custom:pillager_plate
-        chance: 0.011
-      - item: custom:witch_elixir
-        chance: 0.011
-      - item: custom:piglin_ear
-        chance: 0.011
+        chance: 0.001
+      # --- モブ素材(浅/中/深の3帯へ分割済み)・ソース
       - item: custom:stray_cloth
         chance: 0.011
       - item: custom:skeleton_horse_bone
         chance: 0.011
-      - item: custom:endermite_soot
-        chance: 0.011
-      - item: custom:guardian_spine
-        chance: 0.011
       - item: custom:husk_cloth
         chance: 0.011
-      - item: custom:bogged_mossy_bone
-        chance: 0.011
       - item: custom:parched_sandy_bone
-        chance: 0.011
-      - item: custom:hoglin_fang
         chance: 0.011
       - item: custom:source_shard
         chance: 0.1
@@ -1020,14 +844,13 @@ pools:
         chance: 0.02
 
   # ----------------------------------------------------------------------
-  # T2_準下位 — 41 本 (既存戦利品スコア 0.4〜0.9)
+  # T2_準下位 — 55 本 (既存戦利品スコア 0.3〜0.9)
   # 生活雑貨帯。素材と圧縮ブロックが中心で、鍵とスレッドは当たり枠。
   # ----------------------------------------------------------------------
   t2_structures:
     quantity-multiplier: 1.85
     rolls: 1
     tables:
-      - incendium:castle/barrel/greenhouse_secret
       - incendium:cvill/low
       - incendium:cvill/lumberjack
       - incendium:pipeline/treasure
@@ -1036,6 +859,8 @@ pools:
       - minecraft:chests/illager_mansion/wool
       - nova_structures:chests/stray_fort/stray_fort_library
       - nova_structures:chests/stray_fort/stray_fort_fishing
+      - nova_structures:chests/toxic_lair/toxic_boss_vault
+      - nova_structures:chests/toxic_lair/toxic_ominous_vault
       - nova_structures:chests/stray_fort/stray_fort_fletcher
       - nova_structures:chests/witch_villa/kitchen
       - incendium:lab/treasure
@@ -1047,6 +872,7 @@ pools:
       - structory:library/low
       - incendium:castle/barrel/lumber
       - incendium:cvill/farmer
+      - minecraft:chests/trial_chambers/supply
       - nova_structures:chests/pillager_outpost_kitchen
       - incendium:reactor/junk
       - minecraft:chests/shipwreck_map
@@ -1067,64 +893,41 @@ pools:
       - incendium:lab/rare
       - incendium:reactor/office
       - kaisyn:outpost/exclusives/outpost_rustic_barrel
+      - minecraft:dispensers/trial_chambers/chamber
       - nova_structures:chests/illager_hideout_fishing
+      - nova_structures:chests/illager_hideout_trash
+      - nova_structures:chests/water_supply
+      - structory:mood/farmer
+      - structory:mood/miner
+      - incendium:castle/barrel/alchemist
+      - incendium:castle/barrel/generic_big
+      - incendium:lab/piglin_loot
+      - nova_structures:chests/firewatch_tower
+      - nova_structures:chests/lone_citadel/c_dispenser
+      - nova_structures:chests/mining_supply
+      - nova_structures:chests/witch_villa/pumpkin_room
     entries:
-      # --- レシピの無い鍵(浅部)。2026-08-21: 確率を引き上げた枠
-      - item: custom:key_bridge
-        chance: 0.018
-      - item: custom:key_city
-        chance: 0.018
+      # --- ★このティア専属のスレッド: 疾矢(矢速度)。他のどのティアにも出ない
+      - item: custom:thread_swiftarrow
+        chance: 0.005
+      # --- レシピの無い鍵。2026-08-23: 1本につき2ティアまでへ絞った(浅部帯)
       - item: custom:key_sewer_maze
         chance: 0.018
       - item: custom:key_steamworks
         chance: 0.018
-      # --- 品質系スレッド 10 種。2026-08-21: ダンジョン中ボス側を主経路にしたため薄くした
-      - item: custom:thread_artisan
-        chance: 0.002
-      - item: custom:thread_ritualist
-        chance: 0.002
-      - item: custom:thread_angler
-        chance: 0.002
-      - item: custom:thread_perfumer
-        chance: 0.002
-      - item: custom:thread_appraiser
-        chance: 0.002
-      - item: custom:thread_scholar
-        chance: 0.002
-      - item: custom:thread_better_fortune
-        chance: 0.002
-      - item: custom:thread_gacha
-        chance: 0.002
-      - item: custom:thread_role_luck
-        chance: 0.002
+      # --- 品質系スレッド。看板は等倍、隣接ティアは 1/3。ここに無い種はこのティアでは出ない
       - item: custom:thread_role_effeciency
         chance: 0.002
-      # --- モブ素材・ソース
-      - item: custom:ravager_hide
-        chance: 0.009
-      - item: custom:piglin_brute_plate
-        chance: 0.009
-      - item: custom:pillager_plate
-        chance: 0.009
-      - item: custom:witch_elixir
-        chance: 0.009
-      - item: custom:piglin_ear
-        chance: 0.009
+      - item: custom:thread_angler
+        chance: 0.001
+      # --- モブ素材(浅/中/深の3帯へ分割済み)・ソース
       - item: custom:stray_cloth
         chance: 0.009
       - item: custom:skeleton_horse_bone
         chance: 0.009
-      - item: custom:endermite_soot
-        chance: 0.009
-      - item: custom:guardian_spine
-        chance: 0.009
       - item: custom:husk_cloth
         chance: 0.009
-      - item: custom:bogged_mossy_bone
-        chance: 0.009
       - item: custom:parched_sandy_bone
-        chance: 0.009
-      - item: custom:hoglin_fang
         chance: 0.009
       - item: custom:source_shard
         chance: 0.08
@@ -1137,38 +940,42 @@ pools:
         chance: 0.015
 
   # ----------------------------------------------------------------------
-  # T1_最下位 — 42 本 (既存戦利品スコア 0.1〜0.4)
-  # 食料箱・樽などの端物。追加報酬は素材とソースの欠片だけで、代わりに既存戦利品の量を2倍にする。
+  # T1_最下位 — 54 本 (既存戦利品スコア 0.1〜0.3)
+  # 食料箱・樽・低級スポナーなどの端物。鍵と芯は出ないが、**このティア専属のスレッドと潮読みの看板がここにある**ので漁る理由はある。既存戦利品の量は2倍。
   # ----------------------------------------------------------------------
   t1_structures:
     quantity-multiplier: 2.00
     rolls: 1
     tables:
-      - nova_structures:chests/illager_hideout_trash
-      - nova_structures:chests/water_supply
-      - structory:mood/farmer
-      - structory:mood/miner
-      - incendium:castle/barrel/alchemist
-      - incendium:castle/barrel/generic_big
-      - incendium:lab/piglin_loot
-      - nova_structures:chests/firewatch_tower
-      - nova_structures:chests/lone_citadel/c_dispenser
-      - nova_structures:chests/mining_supply
-      - nova_structures:chests/witch_villa/pumpkin_room
+      - nova_structures:spawners/toxic_lair/ominous
       - structory:mood/desert
       - structory:mood/grassy
       - incendium:quartz_flats/ghastling_food
       - incendium:quartz_flats/kitchen_junk
       - minecraft:chests/ancient_city_ice_box
       - minecraft:chests/stronghold_library
+      - minecraft:chests/trial_chambers/entrance
       - nova_structures:chests/cave_chambers/crop_mushroom
+      - nova_structures:chests/end_lighthouse/vault_lighthouse
       - nova_structures:chests/nether_tower/nether_tower_supply
+      - nova_structures:spawners/toxic_lair/normal
+      - nova_structures:spawners/toxic_lair/slime_boss
+      - nova_structures:spawners/trident_trial_monument/guardian
       - terralith:lodge_drinkables
       - kaisyn:outpost/exclusives/outpost_beach_barrel
       - kaisyn:outpost/exclusives/outpost_mediterranean_barrel
+      - minecraft:spawners/ominous/trial_chamber/consumables
+      - minecraft:spawners/trial_chamber/consumables
+      - minecraft:spawners/trial_chamber/items_to_drop_when_ominous
       - nova_structures:chests/cave_chambers/crop_beetroot
       - nova_structures:chests/end_castle/rocket_barrel
       - nova_structures:chests/illager_hideout_library
+      - nova_structures:spawners/hamlet/normal
+      - nova_structures:spawners/hamlet/ominous
+      - nova_structures:spawners/piglin_outstation/normal
+      - nova_structures:spawners/piglin_outstation/ominous
+      - nova_structures:spawners/toxic_lair/slime_boss_ominous
+      - nova_structures:spawners/trident_trial_monument/drowned
       - incendium:castle/barrel/library_low
       - incendium:lab/basalt
       - nova_structures:chests/cave_chambers/crop_potato
@@ -1177,7 +984,12 @@ pools:
       - terralith:underground/giant_bee_hive
       - incendium:entity/sentry
       - nova_structures:chests/cave_chambers/crop_carrots
+      - nova_structures:spawners/sealing_halls/boss
       - incendium:castle/base/blackstone
+      - minecraft:dispensers/trial_chambers/corridor
+      - minecraft:spawners/ominous/trial_chamber/key
+      - minecraft:spawners/trial_chamber/key
+      - nova_structures:chests/shrine/shrine_tower_vault
       - nova_structures:mob/blaze_fireball
       - nova_structures:mob/piglin_brute_donjon
       - nova_structures:mob/piglin_brute_hamlet
@@ -1186,33 +998,24 @@ pools:
       - nova_structures:mob/piglin_donjon_netherite
       - nova_structures:mob/piglin_hamlet
       - nova_structures:mob/piglin_outstation
+      - nova_structures:spawners/shrine_tower/shrine_charts
+      - nova_structures:spawners/toxic_lair/spider_boss
+      - nova_structures:spawners/toxic_lair/spider_boss_ominous
     entries:
-      # --- モブ素材・ソース
-      - item: custom:ravager_hide
-        chance: 0.005
-      - item: custom:piglin_brute_plate
-        chance: 0.005
-      - item: custom:pillager_plate
-        chance: 0.005
-      - item: custom:witch_elixir
-        chance: 0.005
-      - item: custom:piglin_ear
-        chance: 0.005
+      # --- ★このティア専属のスレッド: 精射(弓精度)。他のどのティアにも出ない
+      - item: custom:thread_truesight
+        chance: 0.004
+      # --- 品質系スレッド。看板は等倍、隣接ティアは 1/3。ここに無い種はこのティアでは出ない
+      - item: custom:thread_angler
+        chance: 0.002
+      # --- モブ素材(浅/中/深の3帯へ分割済み)・ソース
       - item: custom:stray_cloth
         chance: 0.005
       - item: custom:skeleton_horse_bone
         chance: 0.005
-      - item: custom:endermite_soot
-        chance: 0.005
-      - item: custom:guardian_spine
-        chance: 0.005
       - item: custom:husk_cloth
         chance: 0.005
-      - item: custom:bogged_mossy_bone
-        chance: 0.005
       - item: custom:parched_sandy_bone
-        chance: 0.005
-      - item: custom:hoglin_fang
         chance: 0.005
       - item: custom:source_shard
         chance: 0.06

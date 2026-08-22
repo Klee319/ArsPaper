@@ -271,12 +271,35 @@ class LootTableConfigTest {
         // 深淵素材2種はダンジョン主の独占素材（ユーザー判断で構造物からは出さない）。
         assertFalse(offersSomewhere(pools, "custom:abyssal_ingot"), "深淵の合金が構造物から出ている");
         assertFalse(offersSomewhere(pools, "custom:binder_fragment"), "束縛者の欠片が構造物から出ている");
-        // 村・トライアルチャンバー・壺/発掘は無限湧き or 大量にあるので対象外。
+        // 村・壺/発掘は無限湧き or 大量にあるので対象外。
+        // ⚠ 2026-08-23 (W-187) にトライアルチャンバーはこの一覧から外れた。
+        //    「一部チェストが空」という報告の真因がこの除外だったので、
+        //    ユーザー判断で「バニラの中身の豪華さでティアを決めて割り当てる」へ変更した。
         for (String key : List.of("minecraft:chests/village/village_armorer",
-                "minecraft:chests/trial_chambers/reward", "minecraft:chests/trial_chambers/reward_ominous",
                 "minecraft:archaeology/desert_pyramid")) {
             assertFalse(pools.values().stream().anyMatch(p -> p.matches(key)),
                     "対象外にしたはずの " + key + " に当たるプールがある");
+        }
+    }
+
+    @Test
+    @DisplayName("トライアルチャンバーはチェスト・ヴォールト・スポナーの3経路とも当たる")
+    void shippedYamlCoversTrialChambers() {
+        Map<String, LootTableConfig.Pool> pools = shippedPools(new ArrayList<>());
+        // 2026-08-23 (W-187): 試練の間は戦利品の出口が3つに割れていて、しかも
+        // ヴォールトとスポナーは LootGenerateEvent を発火しない(BlockDispenseLootEvent 側)。
+        // yml から1本でも落ちると「宝物庫だけ空」という形で部分的に壊れるので、
+        // 3経路それぞれの代表表を固定する。
+        // ヴォールトが引く表は chests/trial_chambers/reward(通常) と ..._ominous(不吉)。
+        // 不吉版は構造物 piece から参照されないので、生成側で ID 名指しして拾っている。
+        for (String key : List.of(
+                "minecraft:chests/trial_chambers/reward",
+                "minecraft:chests/trial_chambers/reward_ominous",
+                "minecraft:chests/trial_chambers/supply",
+                "minecraft:spawners/trial_chamber/consumables",
+                "minecraft:spawners/ominous/trial_chamber/consumables")) {
+            assertTrue(pools.values().stream().anyMatch(p -> p.matches(key)),
+                    "試練の間の " + key + " がどのプールにも入っていない");
         }
     }
 
