@@ -23,69 +23,123 @@ import java.util.Map;
 
 /**
  * 対象ブロックや近くのドロップアイテムを精錬するEffect。Ars Nouveau準拠。
- * ブロック: ハードコードされた精錬マップに基づきブロックを変換する。
- * Sensitive: ドロップアイテムのみを対象にする。
+ *
+ * <p>変換表は<b>サーバに登録されているバニラのかまどレシピそのもの</b>
+ * ({@link #buildTable})。ハードコードの表を持っていた頃は、バニラで焼けるのに
+ * 魔法では焼けないものが多数あった(2026-08-22「精錬魔法が粘土玉に効かない」)。
+ * TF 独自の追加は {@link #EXTRA_SMELTS} だけ。
+ *
+ * <p>Sensitive: ドロップアイテムのみを対象にする。
  */
 public class SmeltEffect implements SpellEffect {
 
-    /** ブロック精錬マップ: 精錬前 → 精錬後 */
-    private static final Map<Material, Material> SMELT_MAP = new HashMap<>();
+    /**
+     * <b>バニラのかまどレシピに無い</b>TF 独自の追加分。
+     *
+     * <p>原石ブロックをまとめて焼けるのはこのフォークの独自仕様
+     * (バニラのかまどに {@code raw_iron_block -> iron_block} は無い)。
+     * これ以外の変換は<b>ハードコードせず、サーバのかまどレシピ登録から引く</b> ——
+     * 手書きの表は必ず腐るため。2026-08-22 の実サーバ報告「精錬魔法が粘土玉に効かない」の
+     * 真因がまさにこれで、{@code CLAY_BALL -> BRICK} をはじめ<b>バニラで焼けるのに
+     * 表に無いものが多数</b>あった(石炭/ラピス/レッドストーン/ダイヤ/エメラルドの各鉱石、
+     * ネザーの金鉱石・ネザークォーツ鉱石、淡いオークなど後から増えた原木、
+     * コーラスフルーツ、濡れたスポンジ、シーピクルス など)。
+     */
+    private static final Map<Material, Material> EXTRA_SMELTS = Map.of(
+            Material.RAW_IRON_BLOCK,   Material.IRON_BLOCK,
+            Material.RAW_GOLD_BLOCK,   Material.GOLD_BLOCK,
+            Material.RAW_COPPER_BLOCK, Material.COPPER_BLOCK);
 
-    static {
-        // 鉱石 → 素材（溶鉱炉出力に準拠）
-        SMELT_MAP.put(Material.IRON_ORE,       Material.IRON_INGOT);
-        SMELT_MAP.put(Material.DEEPSLATE_IRON_ORE, Material.IRON_INGOT);
-        SMELT_MAP.put(Material.GOLD_ORE,       Material.GOLD_INGOT);
-        SMELT_MAP.put(Material.DEEPSLATE_GOLD_ORE, Material.GOLD_INGOT);
-        SMELT_MAP.put(Material.COPPER_ORE,     Material.COPPER_INGOT);
-        SMELT_MAP.put(Material.DEEPSLATE_COPPER_ORE, Material.COPPER_INGOT);
-        SMELT_MAP.put(Material.ANCIENT_DEBRIS, Material.NETHERITE_SCRAP);
-        // 原石ブロック → 精錬ブロック
-        SMELT_MAP.put(Material.RAW_IRON_BLOCK,   Material.IRON_BLOCK);
-        SMELT_MAP.put(Material.RAW_GOLD_BLOCK,   Material.GOLD_BLOCK);
-        SMELT_MAP.put(Material.RAW_COPPER_BLOCK, Material.COPPER_BLOCK);
-        // 原石 → インゴット（ドロップアイテム精錬用）
-        SMELT_MAP.put(Material.RAW_IRON,   Material.IRON_INGOT);
-        SMELT_MAP.put(Material.RAW_GOLD,   Material.GOLD_INGOT);
-        SMELT_MAP.put(Material.RAW_COPPER, Material.COPPER_INGOT);
-        // ブロック変換
-        SMELT_MAP.put(Material.COBBLESTONE,    Material.STONE);
-        SMELT_MAP.put(Material.COBBLED_DEEPSLATE, Material.DEEPSLATE);
-        SMELT_MAP.put(Material.STONE,          Material.SMOOTH_STONE);
-        SMELT_MAP.put(Material.SANDSTONE,      Material.SMOOTH_SANDSTONE);
-        SMELT_MAP.put(Material.RED_SANDSTONE,  Material.SMOOTH_RED_SANDSTONE);
-        SMELT_MAP.put(Material.QUARTZ_BLOCK,   Material.SMOOTH_QUARTZ);
-        SMELT_MAP.put(Material.SAND,           Material.GLASS);
-        SMELT_MAP.put(Material.RED_SAND,       Material.GLASS);
-        SMELT_MAP.put(Material.CLAY,           Material.TERRACOTTA);
-        SMELT_MAP.put(Material.NETHERRACK,     Material.NETHER_BRICK);
-        SMELT_MAP.put(Material.BASALT,         Material.SMOOTH_BASALT);
-        // ひび割れたブロック（かまど精錬に準拠）
-        SMELT_MAP.put(Material.STONE_BRICKS,           Material.CRACKED_STONE_BRICKS);
-        SMELT_MAP.put(Material.DEEPSLATE_BRICKS,       Material.CRACKED_DEEPSLATE_BRICKS);
-        SMELT_MAP.put(Material.DEEPSLATE_TILES,        Material.CRACKED_DEEPSLATE_TILES);
-        SMELT_MAP.put(Material.NETHER_BRICKS,          Material.CRACKED_NETHER_BRICKS);
-        SMELT_MAP.put(Material.POLISHED_BLACKSTONE_BRICKS, Material.CRACKED_POLISHED_BLACKSTONE_BRICKS);
-        SMELT_MAP.put(Material.CACTUS,         Material.GREEN_DYE);
-        // 食料（調理）
-        SMELT_MAP.put(Material.BEEF,           Material.COOKED_BEEF);
-        SMELT_MAP.put(Material.CHICKEN,        Material.COOKED_CHICKEN);
-        SMELT_MAP.put(Material.PORKCHOP,       Material.COOKED_PORKCHOP);
-        SMELT_MAP.put(Material.MUTTON,         Material.COOKED_MUTTON);
-        SMELT_MAP.put(Material.RABBIT,         Material.COOKED_RABBIT);
-        SMELT_MAP.put(Material.COD,            Material.COOKED_COD);
-        SMELT_MAP.put(Material.SALMON,         Material.COOKED_SALMON);
-        SMELT_MAP.put(Material.POTATO,         Material.BAKED_POTATO);
-        SMELT_MAP.put(Material.KELP,           Material.DRIED_KELP);
-        // 木材 → 木炭
-        SMELT_MAP.put(Material.OAK_LOG,        Material.CHARCOAL);
-        SMELT_MAP.put(Material.SPRUCE_LOG,     Material.CHARCOAL);
-        SMELT_MAP.put(Material.BIRCH_LOG,      Material.CHARCOAL);
-        SMELT_MAP.put(Material.JUNGLE_LOG,     Material.CHARCOAL);
-        SMELT_MAP.put(Material.ACACIA_LOG,     Material.CHARCOAL);
-        SMELT_MAP.put(Material.DARK_OAK_LOG,   Material.CHARCOAL);
-        SMELT_MAP.put(Material.MANGROVE_LOG,   Material.CHARCOAL);
-        SMELT_MAP.put(Material.CHERRY_LOG,     Material.CHARCOAL);
+    /** かまどレシピ1件を「入力材質の集合 -> 出力材質」へ潰したもの。 */
+    record SmeltRule(java.util.Set<Material> inputs, Material result) {
+    }
+
+    /**
+     * 精錬表。<b>初回の詠唱時にサーバのレシピ登録から組む</b>(遅延)。
+     *
+     * <p>静的初期化子では組めない: {@code Bukkit.recipeIterator()} はサーバが立ち上がって
+     * レシピが登録されたあとでないと空になる。クラスのロード時点では間に合わない。
+     */
+    private static volatile Map<Material, Material> smeltTable;
+
+    private static Map<Material, Material> smeltTable() {
+        Map<Material, Material> table = smeltTable;
+        if (table == null) {
+            table = buildTable(vanillaFurnaceRules(), material -> material.getMaxDurability() > 0);
+            smeltTable = table;
+        }
+        return table;
+    }
+
+    /**
+     * サーバに登録されている<b>バニラの</b>かまどレシピを {@link SmeltRule} へ落とす。
+     *
+     * <p><b>{@code minecraft:} 名前空間だけを見る</b>のは意図的。プラグインが登録した
+     * かまどレシピを混ぜると、入力/出力の CustomModelData が落ちた「材質だけ」の変換になり、
+     * W-172 と同じ<b>カスタムアイテムの無言の喪失</b>を作ってしまう
+     * ({@link CustomItemConversionPolicy} が守れるのは入力側だけで、出力側は守れない)。
+     */
+    private static java.util.List<SmeltRule> vanillaFurnaceRules() {
+        java.util.List<SmeltRule> rules = new java.util.ArrayList<>();
+        java.util.Iterator<org.bukkit.inventory.Recipe> it = Bukkit.recipeIterator();
+        while (it.hasNext()) {
+            org.bukkit.inventory.Recipe recipe = it.next();
+            if (!(recipe instanceof org.bukkit.inventory.FurnaceRecipe furnace)) {
+                continue;
+            }
+            if (!"minecraft".equals(furnace.getKey().getNamespace())) {
+                continue;
+            }
+            Material result = furnace.getResult().getType();
+            if (result.isAir()) {
+                continue;
+            }
+            java.util.Set<Material> inputs = inputMaterials(furnace.getInputChoice());
+            if (!inputs.isEmpty()) {
+                rules.add(new SmeltRule(inputs, result));
+            }
+        }
+        return rules;
+    }
+
+    private static java.util.Set<Material> inputMaterials(org.bukkit.inventory.RecipeChoice choice) {
+        if (choice instanceof org.bukkit.inventory.RecipeChoice.MaterialChoice materials) {
+            return new java.util.LinkedHashSet<>(materials.getChoices());
+        }
+        if (choice instanceof org.bukkit.inventory.RecipeChoice.ExactChoice exact) {
+            java.util.Set<Material> out = new java.util.LinkedHashSet<>();
+            exact.getChoices().forEach(stack -> out.add(stack.getType()));
+            return out;
+        }
+        return java.util.Set.of();
+    }
+
+    /**
+     * 精錬表を組む本体。Bukkit ランタイム無しで固定できるよう、レシピの読み出しと分けてある
+     * (このフォークのテスト基盤は MockBukkit/Mockito を持たない)。
+     *
+     * @param damageable 「耐久を持つ材質か」の判定。<b>道具・防具は精錬しない</b> ——
+     *                   バニラには {@code iron_pickaxe -> iron_nugget} のようなレシピが実在し、
+     *                   そのまま取り込むと<b>足元に落とした装備が詠唱1回でナゲットに化ける</b>。
+     *                   実運用では {@code Material#getMaxDurability() > 0}。
+     */
+    static Map<Material, Material> buildTable(java.util.Collection<SmeltRule> rules,
+                                              java.util.function.Predicate<Material> damageable) {
+        Map<Material, Material> table = new HashMap<>();
+        for (SmeltRule rule : rules) {
+            for (Material input : rule.inputs()) {
+                if (input == null || damageable.test(input)) {
+                    continue;
+                }
+                table.putIfAbsent(input, rule.result());
+            }
+        }
+        // 独自分はバニラより優先(原石ブロックはバニラに無いので実際には衝突しない)。
+        table.putAll(EXTRA_SMELTS);
+        // Map.copyOf にしないのは意図的 —— 不変Mapは get(null) で NPE を投げる。
+        // ここは Material が null になり得ない経路だけだが、同じ罠で右クリックが
+        // 全部落ちた前例があるので null 許容の実装を包む。
+        return java.util.Collections.unmodifiableMap(table);
     }
 
     private final NamespacedKey id;
@@ -108,7 +162,7 @@ public class SmeltEffect implements SpellEffect {
         smeltNearbyItems(blockLocation);
 
         Block block = blockLocation.getBlock();
-        Material result = SMELT_MAP.get(block.getType());
+        Material result = smeltTable().get(block.getType());
         if (result == null) return;
 
         org.bukkit.entity.Player caster = context.getCaster();
@@ -152,7 +206,7 @@ public class SmeltEffect implements SpellEffect {
      *
      * <p>{@link #applyToBlock} は範囲内の全ブロックについて1回ずつ呼ばれ、その都度
      * {@link #smeltNearbyItems} が半径2を掃くので、<b>同じアイテムが何十回も精錬対象になる</b>。
-     * {@link #SMELT_MAP} には {@code COBBLESTONE → STONE → SMOOTH_STONE} という2段の連鎖があり、
+     * 精錬表には {@code COBBLESTONE → STONE → SMOOTH_STONE} という2段の連鎖があり、
      * ガードが無いと落ちている丸石が1回の詠唱で滑らかな石まで進んでしまう
      * (範囲が1ブロックだった頃は掃き取りも1回だけだったので表面化しなかった)。
      *
@@ -179,7 +233,7 @@ public class SmeltEffect implements SpellEffect {
             // 2026-08-20 W-172: カスタムアイテムは Material が一致しても絶対に焼かない
             // (差し替えなので CMD/PDC/表示名が丸ごと消える)。理由は
             // CustomItemConversionPolicy の javadoc。
-            Material smelted = CustomItemConversionPolicy.resultFor(SMELT_MAP, stack);
+            Material smelted = CustomItemConversionPolicy.resultFor(smeltTable(), stack);
             if (smelted == null) continue;
             if (!smeltedThisTick.add(item.getUniqueId())) continue;
             item.setItemStack(new ItemStack(smelted, stack.getAmount()));
