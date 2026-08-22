@@ -53,11 +53,9 @@ public class ScribingTableGui extends BaseGui {
         displayedGlyphs.clear();
 
         Set<String> unlocked = getUnlockedGlyphs();
-        // カテゴリ順（形態→効果→増強）、同カテゴリ内はtier順にソート
-        List<SpellComponent> allGlyphs = new ArrayList<>(plugin.getSpellRegistry().getAll());
-        allGlyphs.sort(java.util.Comparator
-            .<SpellComponent, Integer>comparing(c -> c.getType().ordinal())
-            .thenComparingInt(SpellComponent::getTier));
+        // 並びは GlyphOrder が唯一の定義（3画面共通）。ここで独自にソートし直さないこと。
+        List<SpellComponent> allGlyphs = com.arspaper.spell.GlyphOrder.canonical(
+            plugin.getSpellRegistry().getAll());
         int totalPages = Math.max(1, (int) Math.ceil((double) allGlyphs.size() / GLYPHS_PER_PAGE));
         currentPage = Math.min(currentPage, totalPages - 1);
 
@@ -199,11 +197,10 @@ public class ScribingTableGui extends BaseGui {
     );
 
     private ItemStack createGlyphButton(SpellComponent component, boolean unlocked) {
-        Material material = switch (component.getType()) {
-            case FORM -> unlocked ? Material.DIAMOND : Material.COAL;
-            case EFFECT -> unlocked ? Material.EMERALD : Material.COAL;
-            case AUGMENT -> unlocked ? Material.AMETHYST_SHARD : Material.COAL;
-        };
+        // アイコンはグリフごと（GlyphIcons が唯一の定義）。未解放でも石炭に潰さない ——
+        // 「どれを解放するか選ぶ画面」で全部が同じ絵になるのが元の不満そのもの。
+        // 解放状態は名前の色（緑=解放済 / 赤=未解放）と lore の解放コストで示す。
+        Material material = com.arspaper.spell.GlyphIcons.iconFor(component, plugin.getGlyphConfig());
 
         NamedTextColor typeColor = switch (component.getType()) {
             case FORM -> NamedTextColor.GREEN;

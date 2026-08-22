@@ -62,6 +62,14 @@ public class GlyphConfig {
                 displayNameOverride = null;
             }
 
+            // アイコンの上書き（未設定なら null ＝ GlyphIcons のハードコード既定へ）。
+            // 既定を yml に置かないのは、glyphs.yml が saveResource(..., false) で
+            // 書き出されるため —— jar を替えても配備先の yml には新しいキーが増えない。
+            String iconOverride = section.getString("icon", "");
+            if (iconOverride != null && iconOverride.isBlank()) {
+                iconOverride = null;
+            }
+
             int unlockLevel = 5;
             Map<ItemCostRef, Integer> unlockMaterials = new LinkedHashMap<>();
 
@@ -102,7 +110,7 @@ public class GlyphConfig {
                 }
             }
 
-            newData.put(key, new GlyphData(tier, manaCost, unlockLevel, unlockMaterials, compatibleEffects, params, maxAugments, displayNameOverride));
+            newData.put(key, new GlyphData(tier, manaCost, unlockLevel, unlockMaterials, compatibleEffects, params, maxAugments, displayNameOverride, iconOverride));
         }
 
         // アトミックに差し替え（volatile書き込み）
@@ -444,7 +452,7 @@ public class GlyphConfig {
     private record GlyphData(int tier, int manaCost, int unlockLevel, Map<ItemCostRef, Integer> unlockMaterials,
                               List<String> compatibleEffects,
                               Map<String, Double> params, Map<String, Integer> maxAugments,
-                              String displayNameOverride) {}
+                              String displayNameOverride, String iconOverride) {}
 
     /**
      * glyphs.yml の display-name 上書き値を返す。未設定の場合は null。
@@ -453,6 +461,17 @@ public class GlyphConfig {
     public String displayNameOverride(String glyphKey) {
         GlyphData data = glyphData.get(glyphKey);
         return data != null ? data.displayNameOverride : null;
+    }
+
+    /**
+     * glyphs.yml の {@code icon:} 上書き値（材質名）を返す。未設定なら null。
+     *
+     * <p>既定は {@link GlyphIcons} 側にハードコードしてある。ここは<b>上書き専用</b>で、
+     * 配備先の glyphs.yml へ手で {@code icon: BLAZE_ROD} と書いたときだけ効く。
+     */
+    public String iconOverride(String glyphKey) {
+        GlyphData data = glyphData.get(glyphKey);
+        return data != null ? data.iconOverride : null;
     }
 
     // ============================================================

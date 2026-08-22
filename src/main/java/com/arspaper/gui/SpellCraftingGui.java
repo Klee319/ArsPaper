@@ -178,7 +178,7 @@ public class SpellCraftingGui extends BaseGui {
             if (comp != null) {
                 NamedTextColor color = getTypeColor(comp.getType());
                 inventory.setItem(slot, createButton(
-                    getTypeMaterial(comp.getType()),
+                    com.arspaper.spell.GlyphIcons.iconFor(comp, plugin.getGlyphConfig()),
                     Component.text(GlyphNames.display(comp), color),
                     List.of(
                         Component.text("種類: " + localizeType(comp.getType()), NamedTextColor.GRAY),
@@ -196,8 +196,7 @@ public class SpellCraftingGui extends BaseGui {
     }
 
     private void renderGlyphPalette() {
-        List<SpellComponent> available = filterAndSortPalette(
-            plugin.getSpellRegistry().getByType(currentTab));
+        List<SpellComponent> available = palette();
 
         List<Integer> paletteSlots = new ArrayList<>();
         for (int s = GLYPH_START; s <= GLYPH_END; s++) {
@@ -224,9 +223,10 @@ public class SpellCraftingGui extends BaseGui {
 
             NamedTextColor nameColor = usable ? getTypeColor(comp.getType())
                 : isUnlocked ? NamedTextColor.GRAY : NamedTextColor.DARK_GRAY;
-            Material mat = !isUnlocked ? Material.BARRIER
-                : !usable ? Material.GRAY_DYE
-                : getTypeMaterial(comp.getType());
+            // アイコンはグリフごと（GlyphIcons が唯一の定義）。未解放/使用不可でも
+            // バリアや灰色染料に潰さない —— 潰すと「どれがどの魔法か分からない」に逆戻りする。
+            // 使えない理由は名前の色（灰=使用不可 / 濃灰=未解放）と lore の赤字で示す。
+            Material mat = com.arspaper.spell.GlyphIcons.iconFor(comp, plugin.getGlyphConfig());
 
             List<Component> lore = new ArrayList<>();
             if (!comp.getDescription().isEmpty()) {
@@ -422,8 +422,7 @@ public class SpellCraftingGui extends BaseGui {
             return true;
         }
         if (slot == BTN_NEXT_PAGE) {
-            List<SpellComponent> available = filterAndSortPalette(
-                plugin.getSpellRegistry().getByType(currentTab));
+            List<SpellComponent> available = palette();
             int totalPages = Math.max(1, (int) Math.ceil((double) available.size() / Math.max(1, glyphsPerPage)));
             if (currentPage < totalPages - 1) {
                 currentPage++;
@@ -480,8 +479,7 @@ public class SpellCraftingGui extends BaseGui {
     private void handleGlyphClick(int slot, Player clicker) {
         if (slot % 9 == 0 || slot % 9 == 8) return;
 
-        List<SpellComponent> available = filterAndSortPalette(
-                plugin.getSpellRegistry().getByType(currentTab));
+        List<SpellComponent> available = palette();
 
         int paletteIndex = 0;
         for (int s = GLYPH_START; s <= slot; s++) {
@@ -649,42 +647,17 @@ public class SpellCraftingGui extends BaseGui {
      * - Effectタブ: 選択中の形態と互換のないエフェクトを除外
      * - Augmentタブ: 超増強をベースオーグメントの直後に配置
      */
-    private List<SpellComponent> filterAndSortPalette(List<SpellComponent> raw) {
-        if (raw.isEmpty()) return raw;
-        SpellComponent.ComponentType type = raw.get(0).getType();
-
-        // Effect: フィルタなし（グレーアウトで表示、getDisableReasonで制御）
-
-        // Augment: 超増強をベースの直後に配置
-        if (type == SpellComponent.ComponentType.AUGMENT) {
-            List<SpellComponent> sorted = new ArrayList<>();
-            java.util.Set<String> added = new java.util.HashSet<>();
-            for (SpellComponent c : raw) {
-                if (added.contains(c.getId().getKey())) continue;
-                if (c instanceof com.arspaper.spell.augment.SuperAugment) continue; // 超増強は後で追加
-                sorted.add(c);
-                added.add(c.getId().getKey());
-                // ベースの直後に対応する超増強を挿入
-                String superKey = "super_" + c.getId().getKey();
-                for (SpellComponent s : raw) {
-                    if (s.getId().getKey().equals(superKey) && !added.contains(superKey)) {
-                        sorted.add(s);
-                        added.add(superKey);
-                        break;
-                    }
-                }
-            }
-            // 残りの超増強（ベースが見つからなかったもの）
-            for (SpellComponent c : raw) {
-                if (!added.contains(c.getId().getKey())) {
-                    sorted.add(c);
-                    added.add(c.getId().getKey());
-                }
-            }
-            return sorted;
-        }
-
-        return raw;
+    /**
+     * 現在タブのグリフを正典順で返す。
+     *
+     * <p>並びは {@link com.arspaper.spell.GlyphOrder} が唯一の定義（筆記台・グリフレシピと共通）。
+     * 超増強をベースの直後へ寄せる処理はそちらへ移した。
+     * {@code SpellRegistry#getByType} はティア順に並べ替えてしまうので<b>使わない</b> ——
+     * 登録順に込めた対のペア（増幅⇔減衰 など）がティアで割れる。
+     */
+    private List<SpellComponent> palette() {
+        return com.arspaper.spell.GlyphOrder.canonical(
+            plugin.getSpellRegistry().getAll(), currentTab);
     }
 
     /**
@@ -790,11 +763,4 @@ public class SpellCraftingGui extends BaseGui {
         };
     }
 
-    private Material getTypeMaterial(SpellComponent.ComponentType type) {
-        return switch (type) {
-            case FORM -> Material.DIAMOND;
-            case EFFECT -> Material.EMERALD;
-            case AUGMENT -> Material.AMETHYST_SHARD;
-        };
-    }
 }

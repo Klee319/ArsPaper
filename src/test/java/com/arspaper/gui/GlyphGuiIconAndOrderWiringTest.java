@@ -1,0 +1,83 @@
+package com.arspaper.gui;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * グリフを並べる3画面が<b>同じ1本の定義</b>を通ることを固定する
+ * （2026-08-22 ユーザー報告「グリフレシピ、グリフ設定、グリフ解放で順番もそろえてほしい」
+ * 「どれがどの魔法かぱっと見で分からない」）。
+ *
+ * <p><b>何が壊れていたか。</b> 3画面がそれぞれ自前で並べ、自前でアイコンを決めていた:
+ *
+ * <ul>
+ *   <li>{@code ScribingTableGui}（グリフ解放）: 種類 → ティア / 未解放は石炭</li>
+ *   <li>{@code GlyphBrowserGui}（グリフレシピ）: 種類 → ティア → <b>ID順</b> / 未解放は石炭</li>
+ *   <li>{@code SpellCraftingGui}（グリフ設定）: ティアのみ / 未解放はバリア・使用不可は灰色染料</li>
+ * </ul>
+ *
+ * <p>3箇所に散らばった switch とソートは、片方だけ直しても<b>実機で並べて見るまで
+ * 食い違いに気づけない</b>（画面を切り替えて初めて分かる）。単体テストでは各画面が
+ * 「正しく描けている」ようにしか見えないので、<b>1本を通っているか</b>を直接縛る。
+ *
+ * <p>ソース文字列で縛るのは筋が悪いが、GUI の描画は {@code Player}/{@code Inventory} が要り
+ * このフォークのテスト基盤（MockBukkit なし）では動かせない。並び自体の正しさは
+ * {@code GlyphOrderTest}、アイコンの網羅は {@code GlyphIconCoverageTest} が別途見ている。
+ */
+class GlyphGuiIconAndOrderWiringTest {
+
+    /** グリフを並べる3画面。 */
+    private static final List<String> GLYPH_GUIS = List.of(
+            "ScribingTableGui",   // グリフ解放（筆記台）
+            "GlyphBrowserGui",    // グリフレシピ（解放素材）
+            "SpellCraftingGui");  // グリフ設定（呪文編集）
+
+    private static String source(String simpleName) {
+        Path path = Path.of("src/main/java/com/arspaper/gui/" + simpleName + ".java");
+        assertTrue(Files.isRegularFile(path), "ソースが見つからない: " + path.toAbsolutePath());
+        try {
+            return Files.readString(path, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    @Test
+    @DisplayName("3画面ともアイコンは GlyphIcons を通す(画面ごとの switch を持たない)")
+    void allGuisResolveIconsThroughGlyphIcons() {
+        for (String gui : GLYPH_GUIS) {
+            String src = source(gui);
+            assertTrue(src.contains("GlyphIcons.iconFor("),
+                    gui + " が GlyphIcons を通っていない");
+            assertFalse(src.contains("case FORM -> Material.DIAMOND")
+                            || src.contains("case FORM -> unlocked ? Material.DIAMOND"),
+                    gui + " に種類ごとのアイコン switch が残っている(3画面でずれる)");
+            assertFalse(src.contains("Material.COAL"),
+                    gui + " が未解放グリフを石炭に潰している(全部同じ絵に戻る)");
+        }
+    }
+
+    @Test
+    @DisplayName("3画面とも並びは GlyphOrder を通す(画面ごとのソートを持たない)")
+    void allGuisSortThroughGlyphOrder() {
+        for (String gui : GLYPH_GUIS) {
+            String src = source(gui);
+            assertTrue(src.contains("GlyphOrder.canonical("),
+                    gui + " が GlyphOrder を通っていない");
+            assertFalse(src.contains("thenComparingInt(SpellComponent::getTier)"),
+                    gui + " が独自にティア順へ並べ替えている");
+            assertFalse(src.contains("getSpellRegistry().getByType("),
+                    gui + " が getByType を使っている(ティア順に潰されて対のペアが割れる)");
+        }
+    }
+}

@@ -94,13 +94,10 @@ public class GlyphBrowserGui extends BaseGui {
     }
 
     private static List<SpellComponent> collectGlyphs() {
-        ArsPaper plugin = ArsPaper.getInstance();
-        List<SpellComponent> glyphs = new ArrayList<>(plugin.getSpellRegistry().getAll());
-        glyphs.sort(Comparator
-            .<SpellComponent, Integer>comparing(c -> c.getType().ordinal())
-            .thenComparingInt(SpellComponent::getTier)
-            .thenComparing(c -> c.getId().getKey()));
-        return glyphs;
+        // 並びは GlyphOrder が唯一の定義（3画面共通）。
+        // 以前はここだけ ID のアルファベット順で、筆記台・呪文編集と食い違っていた。
+        return com.arspaper.spell.GlyphOrder.canonical(
+            ArsPaper.getInstance().getSpellRegistry().getAll());
     }
 
     private void refresh() {
@@ -247,7 +244,7 @@ public class GlyphBrowserGui extends BaseGui {
         lore.add(Component.empty());
         lore.add(detailText("クリックで必要素材を表示", NamedTextColor.DARK_GRAY));
 
-        return createButton(iconOf(glyph.getType(), unlocked),
+        return createButton(iconOf(glyph),
             Component.text((unlocked ? "[解放済] " : "") + GlyphNames.display(glyph),
                 unlocked ? NamedTextColor.GREEN : NamedTextColor.WHITE),
             lore);
@@ -278,7 +275,7 @@ public class GlyphBrowserGui extends BaseGui {
         titleLore.add(unlocked
             ? detailText("✔ 解放済み", NamedTextColor.GREEN)
             : detailText("未解放 — 筆記台で解放できます", NamedTextColor.YELLOW));
-        inventory.setItem(4, createButton(iconOf(glyph.getType(), unlocked),
+        inventory.setItem(4, createButton(iconOf(glyph),
             Component.text(GlyphNames.display(glyph),
                 unlocked ? NamedTextColor.GREEN : NamedTextColor.WHITE),
             titleLore));
@@ -366,15 +363,13 @@ public class GlyphBrowserGui extends BaseGui {
         return result;
     }
 
-    private static Material iconOf(SpellComponent.ComponentType type, boolean unlocked) {
-        if (!unlocked) {
-            return Material.COAL;
-        }
-        return switch (type) {
-            case FORM -> Material.DIAMOND;
-            case EFFECT -> Material.EMERALD;
-            case AUGMENT -> Material.AMETHYST_SHARD;
-        };
+    /**
+     * アイコンはグリフごと（{@link com.arspaper.spell.GlyphIcons} が唯一の定義）。
+     * 未解放でも石炭に潰さない —— 素材を調べる画面なので、どのグリフの話かが分からないと意味がない。
+     * 解放状態は名前の色と lore（✔解放済み / 必要レベル・素材）で示す。
+     */
+    private static Material iconOf(SpellComponent glyph) {
+        return com.arspaper.spell.GlyphIcons.iconFor(glyph, ArsPaper.getInstance().getGlyphConfig());
     }
 
     private static NamedTextColor typeColor(SpellComponent.ComponentType type) {
