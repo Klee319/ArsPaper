@@ -244,7 +244,7 @@ public class GlyphBrowserGui extends BaseGui {
         lore.add(Component.empty());
         lore.add(detailText("クリックで必要素材を表示", NamedTextColor.DARK_GRAY));
 
-        return createButton(iconOf(glyph),
+        return createButton(iconOf(glyph, unlocked),
             Component.text((unlocked ? "[解放済] " : "") + GlyphNames.display(glyph),
                 unlocked ? NamedTextColor.GREEN : NamedTextColor.WHITE),
             lore);
@@ -275,7 +275,7 @@ public class GlyphBrowserGui extends BaseGui {
         titleLore.add(unlocked
             ? detailText("✔ 解放済み", NamedTextColor.GREEN)
             : detailText("未解放 — 筆記台で解放できます", NamedTextColor.YELLOW));
-        inventory.setItem(4, createButton(iconOf(glyph),
+        inventory.setItem(4, createButton(iconOf(glyph, unlocked),
             Component.text(GlyphNames.display(glyph),
                 unlocked ? NamedTextColor.GREEN : NamedTextColor.WHITE),
             titleLore));
@@ -365,11 +365,13 @@ public class GlyphBrowserGui extends BaseGui {
 
     /**
      * アイコンはグリフごと（{@link com.arspaper.spell.GlyphIcons} が唯一の定義）。
-     * 未解放でも石炭に潰さない —— 素材を調べる画面なので、どのグリフの話かが分からないと意味がない。
-     * 解放状態は名前の色と lore（✔解放済み / 必要レベル・素材）で示す。
+     * ただし<b>未解放は {@code GlyphIcons.LOCKED_ICON}（灰色の染料）へ潰す</b> ——
+     * 全部に個別アイコンを付けたら「解放済みかどうかが絵から消えた」という報告が出た
+     * （2026-08-22）。一覧を見渡すのに名前の色と lore では読み取れない。
+     * 解放済みは個別アイコンのままなので「どれがどの魔法か分からない」へは戻らない。
      */
-    private static Material iconOf(SpellComponent glyph) {
-        return com.arspaper.spell.GlyphIcons.iconFor(glyph, ArsPaper.getInstance().getGlyphConfig());
+    private static Material iconOf(SpellComponent glyph, boolean unlocked) {
+        return com.arspaper.spell.GlyphIcons.iconFor(glyph, ArsPaper.getInstance().getGlyphConfig(), unlocked);
     }
 
     private static NamedTextColor typeColor(SpellComponent.ComponentType type) {

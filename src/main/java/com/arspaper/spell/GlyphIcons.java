@@ -193,7 +193,53 @@ public final class GlyphIcons {
     }
 
     /**
+     * <b>未解放グリフのアイコン。</b>
+     *
+     * <p>2026-08-22 のユーザー報告「解放したのか解放してないのか直感的にわからなくなった。
+     * 今まで解放してるやつだけカーソル移動すればよかったのに、今は一個ずつ見ないといけない」。
+     * 全 120 種へ個別アイコンを付けた結果、<b>解放状態が絵から消えた</b>のがこの不満の正体で、
+     * 名前の色と lore だけでは 36 個/ページの一覧を見渡したときに読み取れない。
+     *
+     * <p>そこで<b>未解放だけ</b>を1種類の絵に潰す。解放済みは個別アイコンのままなので、
+     * 「どれがどの魔法か分からない」（同日の別報告）へは戻らない ——
+     * <b>実際に使うのは解放済みの側</b>だからこの非対称でよい。
+     */
+    public static final Material LOCKED_ICON = Material.GRAY_DYE;
+
+    /**
+     * 解放状態を織り込んだアイコン。<b>解放/未解放を並べる画面は必ずこちらを通す。</b>
+     *
+     * @param comp 対象グリフ
+     * @param config {@code glyphs.yml}。{@code icon:} を書いてあればそれが最優先。null 可
+     * @param unlocked 解放済みなら true。false なら {@link #LOCKED_ICON} に潰す
+     */
+    public static Material iconFor(SpellComponent comp, GlyphConfig config, boolean unlocked) {
+        if (!unlocked) {
+            return LOCKED_ICON;
+        }
+        return iconFor(comp, config);
+    }
+
+    /**
+     * 解放状態を織り込んだ解決。{@link #iconFor(SpellComponent, GlyphConfig, boolean)} の本体で、
+     * テストからも直接叩く（{@code SpellComponent} を組み立てずに全キーを回せる）。
+     *
+     * <p>未解放は {@code icon:} の上書きより優先して {@link #LOCKED_ICON} にする ——
+     * yml を書いた1個だけ解放済みに見えるのを避けるため。
+     */
+    public static Material resolveForState(String glyphKey, SpellComponent.ComponentType type,
+                                           String override, boolean unlocked) {
+        if (!unlocked) {
+            return LOCKED_ICON;
+        }
+        return resolve(glyphKey, type, override);
+    }
+
+    /**
      * グリフのアイコン。3画面から必ずここを通す。
+     *
+     * <p>解放状態を持つ画面は {@link #iconFor(SpellComponent, GlyphConfig, boolean)} を使うこと。
+     * こちらは「解放状態と無関係に、そのグリフの絵が欲しい」場所（詳細表示など）向け。
      *
      * @param comp 対象グリフ
      * @param config {@code glyphs.yml}。{@code icon:} を書いてあればそれが最優先。null 可

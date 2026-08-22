@@ -223,10 +223,13 @@ public class SpellCraftingGui extends BaseGui {
 
             NamedTextColor nameColor = usable ? getTypeColor(comp.getType())
                 : isUnlocked ? NamedTextColor.GRAY : NamedTextColor.DARK_GRAY;
-            // アイコンはグリフごと（GlyphIcons が唯一の定義）。未解放/使用不可でも
-            // バリアや灰色染料に潰さない —— 潰すと「どれがどの魔法か分からない」に逆戻りする。
-            // 使えない理由は名前の色（灰=使用不可 / 濃灰=未解放）と lore の赤字で示す。
-            Material mat = com.arspaper.spell.GlyphIcons.iconFor(comp, plugin.getGlyphConfig());
+            // アイコンはグリフごと（GlyphIcons が唯一の定義）。ただし<b>未解放だけ</b>は
+            // GlyphIcons.LOCKED_ICON（灰色の染料）へ潰す —— 全部に個別アイコンを付けたら
+            // 「解放済みかどうかが絵から消えた」という報告が出た（2026-08-22）。
+            // 「解放済みだが今は使えない」は個別アイコンのまま残す（解放の有無とは別の軸で、
+            // 一覧を見渡すときに知りたいのは「持っているか」の方）。理由は名前の色
+            // （灰=使用不可 / 濃灰=未解放）と lore の赤字で示す。
+            Material mat = com.arspaper.spell.GlyphIcons.iconFor(comp, plugin.getGlyphConfig(), isUnlocked);
 
             List<Component> lore = new ArrayList<>();
             if (!comp.getDescription().isEmpty()) {

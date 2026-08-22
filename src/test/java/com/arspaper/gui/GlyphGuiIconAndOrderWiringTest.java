@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -29,6 +30,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>3箇所に散らばった switch とソートは、片方だけ直しても<b>実機で並べて見るまで
  * 食い違いに気づけない</b>（画面を切り替えて初めて分かる）。単体テストでは各画面が
  * 「正しく描けている」ようにしか見えないので、<b>1本を通っているか</b>を直接縛る。
+ *
+ * <p><b>2026-08-22 の追記。</b> 「全部に個別アイコン」まで振り切ったら
+ * 「解放したのか解放してないのか直感的にわからなくなった」という逆向きの報告が来た。
+ * 現在の規約は<b>未解放だけ {@code GlyphIcons.LOCKED_ICON}（灰色の染料）へ潰し、
+ * 解放済みは個別アイコンのまま</b>。3画面とも解放状態を {@code GlyphIcons} へ渡すこと
+ * （渡し忘れは {@link #allGuisPassUnlockedStateToIconResolution} が落とす）。
  *
  * <p>ソース文字列で縛るのは筋が悪いが、GUI の描画は {@code Player}/{@code Inventory} が要り
  * このフォークのテスト基盤（MockBukkit なし）では動かせない。並び自体の正しさは
@@ -64,6 +71,45 @@ class GlyphGuiIconAndOrderWiringTest {
                     gui + " に種類ごとのアイコン switch が残っている(3画面でずれる)");
             assertFalse(src.contains("Material.COAL"),
                     gui + " が未解放グリフを石炭に潰している(全部同じ絵に戻る)");
+        }
+    }
+
+    /**
+     * {@code GlyphIcons.iconFor(...)} 呼び出しの最大引数個数。
+     *
+     * <p>3引数版が「解放状態を渡している」版。文字列の部分一致だと
+     * {@code plugin.getGlyphConfig()} の内側の括弧に引っかかるので、括弧の対応を数えて判定する。
+     */
+    private static int maxIconForArity(String src) {
+        final String call = "GlyphIcons.iconFor(";
+        int max = 0;
+        for (int at = src.indexOf(call); at >= 0; at = src.indexOf(call, at + 1)) {
+            int depth = 1;
+            int args = 1;
+            for (int i = at + call.length(); i < src.length() && depth > 0; i++) {
+                char c = src.charAt(i);
+                if (c == '(') {
+                    depth++;
+                } else if (c == ')') {
+                    depth--;
+                } else if (c == ',' && depth == 1) {
+                    args++;
+                }
+            }
+            max = Math.max(max, args);
+        }
+        return max;
+    }
+
+    @Test
+    @DisplayName("3画面とも未解放グリフには解放状態を渡す(絵から解放状態が消えない)")
+    void allGuisPassUnlockedStateToIconResolution() {
+        for (String gui : GLYPH_GUIS) {
+            String src = source(gui);
+            assertEquals(3, maxIconForArity(src),
+                    gui + " が解放状態を渡さずにアイコンを決めている。"
+                            + "全部に個別アイコンを付けると『解放済みかどうかが絵から消える』"
+                            + "(2026-08-22 報告: 1個ずつカーソルを当てないと分からない)");
         }
     }
 

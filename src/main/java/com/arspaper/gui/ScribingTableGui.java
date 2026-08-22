@@ -140,7 +140,11 @@ public class ScribingTableGui extends BaseGui {
             plugin, clicker, component, tableLocation,
             materials, levelCost, unlocked,
             () -> {
-                // アニメーション完了後にXPを再検証（TOCTOU防止）
+                // アニメーション完了後にXPを再検証（TOCTOU防止）。
+                // 2026-08-18: ここで中断したことを <b>戻り値で伝える</b>。以前は void だったため、
+                // 中断しても呼び出し元(GlyphUnlockAnimation#completeUnlock)が最大マナ+5 と
+                // 「解放しました」を続行しており、レベル不足のまま押し続けるだけで
+                // 最大マナだけが無限に増える経路になっていた（素材は下で返している）。
                 if (clicker.getLevel() < levelCost) {
                     clicker.sendMessage(Component.text(
                         "経験値レベルが不足しています！アンロックに失敗しました。", NamedTextColor.RED));
@@ -148,7 +152,7 @@ public class ScribingTableGui extends BaseGui {
                     for (var entry : materials.entrySet()) {
                         entry.getKey().giveOrDrop(clicker, entry.getValue());
                     }
-                    return;
+                    return false;
                 }
                 clicker.setLevel(clicker.getLevel() - levelCost);
                 // アニメーション中（約3秒）に他経路でUNLOCKED_GLYPHSが書き換わっている可能性があるため、
@@ -159,6 +163,7 @@ public class ScribingTableGui extends BaseGui {
                 // 2026-08-16: TF の「魔導士への道」アチーブメントが読む累計カウンタ。
                 // 解放は取り消せないので、種類数はここで数えた値をそのまま書き写してよい。
                 recordGlyphUnlockCounters(clicker, fresh, component.getId().toString());
+                return true;
             }
         );
         return true;
@@ -197,10 +202,11 @@ public class ScribingTableGui extends BaseGui {
     );
 
     private ItemStack createGlyphButton(SpellComponent component, boolean unlocked) {
-        // アイコンはグリフごと（GlyphIcons が唯一の定義）。未解放でも石炭に潰さない ——
-        // 「どれを解放するか選ぶ画面」で全部が同じ絵になるのが元の不満そのもの。
-        // 解放状態は名前の色（緑=解放済 / 赤=未解放）と lore の解放コストで示す。
-        Material material = com.arspaper.spell.GlyphIcons.iconFor(component, plugin.getGlyphConfig());
+        // アイコンはグリフごと（GlyphIcons が唯一の定義）。ただし未解放は GlyphIcons.LOCKED_ICON
+        // （灰色の染料）へ潰す —— 全部に個別アイコンを付けたら「解放済みかどうかが絵から消えた」
+        // という報告が出た（2026-08-22）。36個/ページを見渡すのに名前の色と lore では足りない。
+        // 解放済みは個別アイコンのままなので「どれがどの魔法か分からない」へは戻らない。
+        Material material = com.arspaper.spell.GlyphIcons.iconFor(component, plugin.getGlyphConfig(), unlocked);
 
         NamedTextColor typeColor = switch (component.getType()) {
             case FORM -> NamedTextColor.GREEN;
