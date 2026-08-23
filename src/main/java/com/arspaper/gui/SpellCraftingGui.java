@@ -224,7 +224,7 @@ public class SpellCraftingGui extends BaseGui {
             NamedTextColor nameColor = usable ? getTypeColor(comp.getType())
                 : isUnlocked ? NamedTextColor.GRAY : NamedTextColor.DARK_GRAY;
             // アイコンはグリフごと（GlyphIcons が唯一の定義）。ただし<b>未解放だけ</b>は
-            // GlyphIcons.LOCKED_ICON（灰色の染料）へ潰す —— 全部に個別アイコンを付けたら
+            // GlyphIcons.LOCKED_ICON（石炭＝昔の仕様）へ潰す —— 全部に個別アイコンを付けたら
             // 「解放済みかどうかが絵から消えた」という報告が出た（2026-08-22）。
             // 「解放済みだが今は使えない」は個別アイコンのまま残す（解放の有無とは別の軸で、
             // 一覧を見渡すときに知りたいのは「持っているか」の方）。理由は名前の色

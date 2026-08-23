@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 /**
- * <b>未解放グリフは1種類の絵（灰色の染料）に潰す</b>ことを固定する
+ * <b>未解放グリフは1種類の絵（石炭）に潰す</b>ことを固定する
  * （2026-08-22 ユーザー報告「解放したのか解放してないのか直感的にわからなくなった。
  * 今まで解放してるやつだけカーソル移動すればよかったのに、今は一個ずつ見ないといけない」）。
  *
@@ -27,14 +27,14 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 class GlyphLockedIconTest {
 
     @Test
-    @DisplayName("未解放は全グリフが灰色の染料になる")
+    @DisplayName("未解放は全グリフが石炭になる")
     void lockedGlyphsCollapseToOneIcon() {
-        assertEquals(Material.GRAY_DYE, GlyphIcons.LOCKED_ICON);
+        assertEquals(Material.COAL, GlyphIcons.LOCKED_ICON);
         for (Map.Entry<String, Material> entry : GlyphIcons.defaults().entrySet()) {
             for (SpellComponent.ComponentType type : SpellComponent.ComponentType.values()) {
-                assertEquals(Material.GRAY_DYE,
+                assertEquals(Material.COAL,
                         GlyphIcons.resolveForState(entry.getKey(), type, null, false),
-                        entry.getKey() + " の未解放アイコンが灰色の染料でない");
+                        entry.getKey() + " の未解放アイコンが石炭でない");
             }
         }
     }
@@ -62,7 +62,7 @@ class GlyphLockedIconTest {
         Material overridden = GlyphIcons.resolveForState("projectile", SpellComponent.ComponentType.FORM,
                 "NETHER_STAR", true);
         assertEquals(Material.NETHER_STAR, overridden, "解放済みでは icon: の上書きが効くこと");
-        assertEquals(Material.GRAY_DYE,
+        assertEquals(Material.COAL,
                 GlyphIcons.resolveForState("projectile", SpellComponent.ComponentType.FORM, "NETHER_STAR", false),
                 "未解放で上書きが効くと、そのグリフだけ解放済みに見える");
         assertNotEquals(overridden,

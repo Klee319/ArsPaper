@@ -203,8 +203,14 @@ public final class GlyphIcons {
      * <p>そこで<b>未解放だけ</b>を1種類の絵に潰す。解放済みは個別アイコンのままなので、
      * 「どれがどの魔法か分からない」（同日の別報告）へは戻らない ——
      * <b>実際に使うのは解放済みの側</b>だからこの非対称でよい。
+     *
+     * <p><b>材質は石炭＝{@code fc97b4f} 以前の仕様に戻したもの</b>（2026-08-22 指示）。
+     * 一度 {@code GRAY_DYE} にしたが、<b>スキルツリーの未解放パークが南京錠アイコン</b>
+     * （TF 側 {@code SkillTreeGuiVisuals}、リソパの {@code gui/node_locked}）なので、
+     * 未解放の絵はそちらと役割を分けたい。既存プレイヤーが覚えている絵をそのまま使う方が
+     * 学習コストがゼロで済むという判断。
      */
-    public static final Material LOCKED_ICON = Material.GRAY_DYE;
+    public static final Material LOCKED_ICON = Material.COAL;
 
     /**
      * 解放状態を織り込んだアイコン。<b>解放/未解放を並べる画面は必ずこちらを通す。</b>

@@ -33,9 +33,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p><b>2026-08-22 の追記。</b> 「全部に個別アイコン」まで振り切ったら
  * 「解放したのか解放してないのか直感的にわからなくなった」という逆向きの報告が来た。
- * 現在の規約は<b>未解放だけ {@code GlyphIcons.LOCKED_ICON}（灰色の染料）へ潰し、
+ * 現在の規約は<b>未解放だけ {@code GlyphIcons.LOCKED_ICON}（石炭＝この修正以前と同じ絵）へ潰し、
  * 解放済みは個別アイコンのまま</b>。3画面とも解放状態を {@code GlyphIcons} へ渡すこと
  * （渡し忘れは {@link #allGuisPassUnlockedStateToIconResolution} が落とす）。
+ * <b>画面側に石炭を直接書いてはいけない</b>のは変わらない ── 材質を決めるのは {@code GlyphIcons} 1箇所で、
+ * 画面ごとに書くと 3 画面でずれる（スキルツリーの未解放パークは南京錠アイコンで別物、という
+ * 役割分担も {@code GlyphIcons} 側のコメントにしか書かれていない）。
  *
  * <p>ソース文字列で縛るのは筋が悪いが、GUI の描画は {@code Player}/{@code Inventory} が要り
  * このフォークのテスト基盤（MockBukkit なし）では動かせない。並び自体の正しさは
@@ -70,7 +73,8 @@ class GlyphGuiIconAndOrderWiringTest {
                             || src.contains("case FORM -> unlocked ? Material.DIAMOND"),
                     gui + " に種類ごとのアイコン switch が残っている(3画面でずれる)");
             assertFalse(src.contains("Material.COAL"),
-                    gui + " が未解放グリフを石炭に潰している(全部同じ絵に戻る)");
+                    gui + " が石炭を直接書いている。未解放の材質を決めるのは GlyphIcons.LOCKED_ICON の1箇所"
+                            + "(画面ごとに書くと3画面でずれる)");
         }
     }
 

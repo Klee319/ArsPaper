@@ -365,7 +365,7 @@ public class GlyphBrowserGui extends BaseGui {
 
     /**
      * アイコンはグリフごと（{@link com.arspaper.spell.GlyphIcons} が唯一の定義）。
-     * ただし<b>未解放は {@code GlyphIcons.LOCKED_ICON}（灰色の染料）へ潰す</b> ——
+     * ただし<b>未解放は {@code GlyphIcons.LOCKED_ICON}（石炭＝昔の仕様）へ潰す</b> ——
      * 全部に個別アイコンを付けたら「解放済みかどうかが絵から消えた」という報告が出た
      * （2026-08-22）。一覧を見渡すのに名前の色と lore では読み取れない。
      * 解放済みは個別アイコンのままなので「どれがどの魔法か分からない」へは戻らない。

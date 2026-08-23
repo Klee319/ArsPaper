@@ -203,7 +203,7 @@ public class ScribingTableGui extends BaseGui {
 
     private ItemStack createGlyphButton(SpellComponent component, boolean unlocked) {
         // アイコンはグリフごと（GlyphIcons が唯一の定義）。ただし未解放は GlyphIcons.LOCKED_ICON
-        // （灰色の染料）へ潰す —— 全部に個別アイコンを付けたら「解放済みかどうかが絵から消えた」
+        // （石炭＝昔の仕様）へ潰す —— 全部に個別アイコンを付けたら「解放済みかどうかが絵から消えた」
         // という報告が出た（2026-08-22）。36個/ページを見渡すのに名前の色と lore では足りない。
         // 解放済みは個別アイコンのままなので「どれがどの魔法か分からない」へは戻らない。
         Material material = com.arspaper.spell.GlyphIcons.iconFor(component, plugin.getGlyphConfig(), unlocked);
