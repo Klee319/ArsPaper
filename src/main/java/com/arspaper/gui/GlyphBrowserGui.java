@@ -55,12 +55,21 @@ public class GlyphBrowserGui extends BaseGui {
     private static final int DETAIL_SUMMARY_SLOT = 24;
     /** 詳細画面: 戻るボタン。 */
     private static final int DETAIL_BACK_SLOT = 49;
+    /**
+     * 詳細画面: ピン止め(お気に入り)の付け外し (2026-08-23)。
+     * レシピ一覧({@link RecipeBrowserGui})と同じ位置に置く。
+     */
+    private static final int DETAIL_PIN_SLOT = 47;
 
     /** 表示絞り込み。並べ替えは「種別→ティア」固定(筆記台の並びと揃える)。 */
     private enum FilterMode {
         ALL("すべて"),
         LOCKED("未解放のみ"),
-        UNLOCKED("解放済みのみ");
+        UNLOCKED("解放済みのみ"),
+        // 2026-08-23 ユーザー要望「ピン止め(お気に入り)したものだけに絞り込めるように」。
+        // 専用ボタンを増やさず既存の巡回へ足したのは、下段に空きを作るためではなく
+        // 「表示を切り替える」操作が2箇所に散らないようにするため。
+        PINNED("★ お気に入りのみ");
 
         private final String label;
 
@@ -82,6 +91,15 @@ public class GlyphBrowserGui extends BaseGui {
     private int currentPage = 0;
     private FilterMode filterMode = FilterMode.ALL;
 
+    /**
+     * ピン止め(お気に入り)したグリフ id (2026-08-23)。
+     *
+     * <p><b>呪文編集(グリフ配置)画面と同じ集合を共有する</b> ── 保存先の PDC キーが同じ。
+     * ピンを付けるのはこの画面（枠に余裕がある方）、使うのは配置画面（並びが上に来る）、
+     * という分担。ユーザーの「配置画面はスペースが狭いので別途GUIで並び替えを」に対応する。
+     */
+    private java.util.Set<String> pins;
+
     private boolean detailMode = false;
     private SpellComponent detailGlyph = null;
 
@@ -90,8 +108,17 @@ public class GlyphBrowserGui extends BaseGui {
             .decoration(TextDecoration.ITALIC, false));
         this.allGlyphs = collectGlyphs();
         this.visible = this.allGlyphs;
+        this.pins = PinnedEntries.load(viewer, GLYPH_PINS_PREF);
         refresh();
     }
+
+    /**
+     * ピン止めしたグリフ id の PDC キー名。
+     *
+     * <p><b>{@link SpellCraftingGui} と共有する。</b> 片方だけ別名にすると
+     * 「レシピ画面で★を付けたのに配置画面で上に来ない」という無言の食い違いになる。
+     */
+    static final String GLYPH_PINS_PREF = "glyph_pins";
 
     private static List<SpellComponent> collectGlyphs() {
         // 並びは GlyphOrder が唯一の定義（3画面共通）。
@@ -107,6 +134,7 @@ public class GlyphBrowserGui extends BaseGui {
                 case ALL -> true;
                 case LOCKED -> !unlocked.contains(glyph.getId().toString());
                 case UNLOCKED -> unlocked.contains(glyph.getId().toString());
+                case PINNED -> pins.contains(glyph.getId().toString());
             })
             .toList();
         int totalPages = totalPages();
@@ -154,9 +182,16 @@ public class GlyphBrowserGui extends BaseGui {
                     NamedTextColor.GRAY),
                 detailText("解放は筆記台(Scribing Table)で行えます", NamedTextColor.DARK_GRAY))));
         inventory.setItem(BTN_FILTER, createButton(
-            filterMode == FilterMode.LOCKED ? Material.IRON_BARS : Material.LIME_DYE,
-            Component.text("表示: " + filterMode.label(), NamedTextColor.AQUA),
-            List.of(detailText("クリックで切り替え", NamedTextColor.DARK_GRAY))));
+            switch (filterMode) {
+                case LOCKED -> Material.IRON_BARS;
+                case PINNED -> Material.NETHER_STAR;
+                default -> Material.LIME_DYE;
+            },
+            Component.text("表示: " + filterMode.label(),
+                filterMode == FilterMode.PINNED ? NamedTextColor.GOLD : NamedTextColor.AQUA),
+            List.of(detailText("クリックで切り替え", NamedTextColor.DARK_GRAY),
+                detailText("お気に入り " + pins.size() + " 件", NamedTextColor.DARK_GRAY),
+                detailText("★はグリフの詳細画面から付け外しできます", NamedTextColor.DARK_GRAY))));
         inventory.setItem(BTN_CLOSE, createButton(Material.DARK_OAK_DOOR,
             Component.text("閉じる", NamedTextColor.RED)));
         inventory.setItem(BTN_PREV, currentPage > 0
@@ -174,6 +209,8 @@ public class GlyphBrowserGui extends BaseGui {
                 detailMode = false;
                 detailGlyph = null;
                 render();
+            } else if (slot == DETAIL_PIN_SLOT) {
+                togglePin(detailGlyph, clicker);
             }
             return true;
         }
@@ -183,6 +220,14 @@ public class GlyphBrowserGui extends BaseGui {
         }
         if (slot == BTN_FILTER) {
             filterMode = filterMode.next();
+            // ピンが1件も無いのに「お気に入りのみ」へ入ると空一覧になり、
+            // 「グリフが消えた」ようにしか見えない。1つ飛ばして ALL へ戻す。
+            if (filterMode == FilterMode.PINNED && pins.isEmpty()) {
+                clicker.sendMessage(Component.text(
+                    "お気に入りがまだありません。グリフをクリック→詳細画面の★ボタンでピン止めできます",
+                    NamedTextColor.YELLOW));
+                filterMode = filterMode.next();
+            }
             currentPage = 0;
             refresh();
             render();
@@ -245,7 +290,8 @@ public class GlyphBrowserGui extends BaseGui {
         lore.add(detailText("クリックで必要素材を表示", NamedTextColor.DARK_GRAY));
 
         return createButton(iconOf(glyph),
-            Component.text((unlocked ? "[解放済] " : "") + GlyphNames.display(glyph),
+            Component.text((pins.contains(glyph.getId().toString()) ? "★ " : "")
+                    + (unlocked ? "[解放済] " : "") + GlyphNames.display(glyph),
                 unlocked ? NamedTextColor.GREEN : NamedTextColor.WHITE),
             lore);
     }
@@ -329,8 +375,48 @@ public class GlyphBrowserGui extends BaseGui {
         inventory.setItem(DETAIL_SUMMARY_SLOT, createButton(Material.BOOK,
             Component.text("解放コスト", NamedTextColor.WHITE), summary));
 
+        boolean pinned = pins.contains(glyph.getId().toString());
+        inventory.setItem(DETAIL_PIN_SLOT, createButton(
+            pinned ? Material.NETHER_STAR : Material.BOOK,
+            Component.text(pinned ? "★ お気に入り登録済み" : "☆ お気に入りに追加",
+                pinned ? NamedTextColor.GOLD : NamedTextColor.WHITE),
+            List.of(
+                detailText(pinned ? "クリックでお気に入りから外す" : "クリックでお気に入りに追加",
+                    NamedTextColor.GRAY),
+                detailText("お気に入りは呪文編集の一覧でも先頭に来ます", NamedTextColor.DARK_GRAY),
+                detailText("現在 " + pins.size() + " / " + PinnedEntries.MAX_PINS + " 件",
+                    NamedTextColor.DARK_GRAY))));
+
         inventory.setItem(DETAIL_BACK_SLOT, createButton(Material.DARK_OAK_DOOR,
             Component.text("← 一覧に戻る", NamedTextColor.YELLOW)));
+    }
+
+    /**
+     * ピンを反転して保存する。「お気に入りのみ」で最後の1件を外したら全件表示へ戻す
+     * （空の画面に取り残さない）。
+     */
+    private void togglePin(SpellComponent glyph, Player clicker) {
+        if (glyph == null) {
+            return;
+        }
+        String id = glyph.getId().toString();
+        if (PinnedEntries.wouldExceedCap(pins, id)) {
+            clicker.sendMessage(Component.text(
+                "お気に入りは " + PinnedEntries.MAX_PINS + " 件までです。どれかを外してから追加してください",
+                NamedTextColor.RED));
+            return;
+        }
+        pins = PinnedEntries.toggled(pins, id);
+        PinnedEntries.save(clicker, GLYPH_PINS_PREF, pins);
+        if (filterMode == FilterMode.PINNED && pins.isEmpty()) {
+            filterMode = FilterMode.ALL;
+        }
+        clicker.sendActionBar(Component.text(
+            pins.contains(id) ? "★ " + GlyphNames.display(glyph) + " をお気に入りに追加しました"
+                : "☆ " + GlyphNames.display(glyph) + " をお気に入りから外しました",
+            pins.contains(id) ? NamedTextColor.GOLD : NamedTextColor.GRAY));
+        refresh();
+        render();
     }
 
     /** 所持数カウント。素材解決に失敗しても画面を落とさない(0扱い)。 */

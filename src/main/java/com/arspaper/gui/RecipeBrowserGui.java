@@ -63,11 +63,22 @@ public class RecipeBrowserGui extends BaseGui {
     private static final int BTN_RELATED_CLEAR = 50;
     /** 圧縮の中間段階・解凍レシピを出すかのトグル (2026-08-19 W-122 / W-99)。 */
     private static final int BTN_COMPRESSION = 51;
+    /** ピン止め(お気に入り)だけに絞るトグル (2026-08-23)。 */
+    private static final int BTN_PINNED_ONLY = 52;
     private static final int BTN_NEXT = 53;
     /** 詳細画面: 完成品スロット（ここをクリックすると「これを使うレシピ」一覧へ）。 */
     private static final int DETAIL_RESULT_SLOT = 15;
     /** 詳細画面: 戻るボタン。 */
     private static final int DETAIL_BACK_SLOT = 49;
+    /**
+     * 詳細画面: ピン止めの付け外し (2026-08-23)。
+     *
+     * <p><b>一覧側ではなく詳細側に置く。</b> 一覧で右クリック／シフトクリックに割り当てると
+     * 統合版(Geyser)で押し分けられない ── このGUI群はそもそも
+     * 「ドラッグ・シフトクリックを全部キャンセルしてスロットクリックだけで操作する」
+     * 設計（{@link BaseGui} のクラス説明）なので、クリック種別に意味を持たせない。
+     */
+    private static final int DETAIL_PIN_SLOT = 47;
     /** 検索をクリアするための入力トークン。 */
     private static final String SEARCH_CLEAR_TOKEN = "-";
     /** チャット検索入力のタイムアウト(tick)。 */
@@ -116,6 +127,11 @@ public class RecipeBrowserGui extends BaseGui {
      */
     private boolean showCompressionDetails = false;
 
+    /** ピン止め(お気に入り)したレシピ id。プレイヤーの PDC に保存する (2026-08-23)。 */
+    private Set<String> pins;
+    /** 「お気に入りのみ」で絞っているか。 */
+    private boolean pinnedOnly = false;
+
     /**
      * 関連レシピ表示（素材/完成品クリック由来の絞り込み）。null なら通常の全件一覧。
      *
@@ -150,6 +166,13 @@ public class RecipeBrowserGui extends BaseGui {
     private static final String PREF_KIND = "recipe_browser_kind";
     /** 圧縮の中間段階トグル。未設定 = 既定(隠す)。 */
     private static final String PREF_COMPRESSION = "recipe_browser_compression";
+    /**
+     * ピン止め(お気に入り)したレシピ id の JSON 配列 (2026-08-23)。
+     * {@link PinnedEntries} が読み書きする。
+     */
+    static final String PREF_PINS = "recipe_browser_pins";
+    /** 「お気に入りのみ」で開いているか。未設定 = 全件。 */
+    private static final String PREF_PINNED_ONLY = "recipe_browser_pinned_only";
 
     public RecipeBrowserGui(Player viewer) {
         super(viewer, 6, Component.text("レシピ一覧", NamedTextColor.DARK_PURPLE)
@@ -163,6 +186,10 @@ public class RecipeBrowserGui extends BaseGui {
         this.kindMode = readPreference(viewer, PREF_KIND,
             RecipeBrowserFilter.KindMode.class, RecipeBrowserFilter.KindMode.ALL);
         this.showCompressionDetails = readFlag(viewer, PREF_COMPRESSION);
+        this.pins = PinnedEntries.load(viewer, PREF_PINS);
+        // ピンが1件も無い状態で「お気に入りのみ」を復元すると、開いた瞬間に空一覧になって
+        // 「レシピが全部消えた」ようにしか見えない。ピンがあるときだけ引き継ぐ。
+        this.pinnedOnly = !pins.isEmpty() && readFlag(viewer, PREF_PINNED_ONLY);
         refresh();
     }
 
@@ -203,6 +230,8 @@ public class RecipeBrowserGui extends BaseGui {
                 kindMode.name());
             pdc.set(prefKey(PREF_COMPRESSION), org.bukkit.persistence.PersistentDataType.STRING,
                 Boolean.toString(showCompressionDetails));
+            pdc.set(prefKey(PREF_PINNED_ONLY), org.bukkit.persistence.PersistentDataType.STRING,
+                Boolean.toString(pinnedOnly));
         } catch (RuntimeException ignored) {
             // 保存できなくても一覧の表示は続ける(記憶は利便性であって機能ではない)。
         }
@@ -212,7 +241,7 @@ public class RecipeBrowserGui extends BaseGui {
     private void refresh() {
         List<RecipeEntry> base = related == null ? allRecipes : relatedEntries(related);
         this.visible = RecipeBrowserFilter.arrange(base, sortMode, kindMode, searchTerm,
-            showCompressionDetails);
+            showCompressionDetails, pinnedOnly ? pins : null);
         int totalPages = Math.max(1, (int) Math.ceil((double) visible.size() / ITEMS_PER_PAGE));
         if (currentPage > totalPages - 1) {
             currentPage = totalPages - 1;
@@ -262,6 +291,12 @@ public class RecipeBrowserGui extends BaseGui {
                 NamedTextColor.AQUA),
             compressionLore(showCompressionDetails)));
 
+        inventory.setItem(BTN_PINNED_ONLY, createButton(
+            pinnedOnly ? Material.NETHER_STAR : Material.BOOK,
+            Component.text(pinnedOnly ? "★ お気に入りのみ" : "お気に入り: すべて表示",
+                pinnedOnly ? NamedTextColor.GOLD : NamedTextColor.AQUA),
+            pinnedOnlyLore()));
+
         if (related != null) {
             inventory.setItem(BTN_RELATED_CLEAR, createButton(Material.BARRIER,
                 Component.text("← 全レシピに戻る", NamedTextColor.YELLOW)));
@@ -288,6 +323,9 @@ public class RecipeBrowserGui extends BaseGui {
         }
         if (!searchTerm.isEmpty()) {
             lore.add(detailText("検索: " + searchTerm, NamedTextColor.YELLOW));
+        }
+        if (pinnedOnly) {
+            lore.add(detailText("★ お気に入りのみ表示中", NamedTextColor.GOLD));
         }
         lore.add(detailText("並べ替え: " + sortMode.label(), NamedTextColor.DARK_GRAY));
         lore.add(detailText("表示: " + kindMode.label(), NamedTextColor.DARK_GRAY));
@@ -331,6 +369,21 @@ public class RecipeBrowserGui extends BaseGui {
         }
         if (slot == BTN_COMPRESSION) {
             showCompressionDetails = !showCompressionDetails;
+            currentPage = 0;
+            rememberPreferences();
+            refresh();
+            render();
+            return true;
+        }
+        if (slot == BTN_PINNED_ONLY) {
+            if (!pinnedOnly && pins.isEmpty()) {
+                // 空一覧に切り替えて「レシピが消えた」と誤解されるより、付け方を案内する。
+                clicker.sendMessage(Component.text(
+                    "お気に入りがまだありません。レシピをクリック→詳細画面の★ボタンでピン止めできます",
+                    NamedTextColor.YELLOW));
+                return true;
+            }
+            pinnedOnly = !pinnedOnly;
             currentPage = 0;
             rememberPreferences();
             refresh();
@@ -392,6 +445,10 @@ public class RecipeBrowserGui extends BaseGui {
         if (detailEntry == null) {
             detailMode = false;
             render();
+            return true;
+        }
+        if (slot == DETAIL_PIN_SLOT) {
+            togglePin(detailEntry, clicker);
             return true;
         }
         if (slot == DETAIL_RESULT_SLOT) {
@@ -623,13 +680,64 @@ public class RecipeBrowserGui extends BaseGui {
         detailSlotTokens.clear();
         if (detailEntry != null && detailEntry.isRitual) {
             renderRitualDetail();
-            return;
-        }
-        if (detailEntry != null && detailEntry.isBrewing) {
+        } else if (detailEntry != null && detailEntry.isBrewing) {
             renderBrewingDetail();
+        } else {
+            renderWorkbenchDetail();
+        }
+        // ★ボタンは3種類の詳細画面すべてに出す。各 render*Detail() が inventory.clear() を
+        // 呼ぶので【必ずその後で】置くこと。3画面へ個別に書くと、片方だけ足し忘れて
+        // 「儀式レシピだけピン止めできない」になる。
+        renderPinButton();
+    }
+
+    /** 詳細画面の★ボタン(下段の枠内)。ピン止めの唯一の入口。 */
+    private void renderPinButton() {
+        if (detailEntry == null || detailEntry.id == null) {
             return;
         }
-        renderWorkbenchDetail();
+        boolean pinned = pins.contains(detailEntry.id);
+        List<Component> lore = new ArrayList<>();
+        lore.add(detailText(pinned ? "クリックでお気に入りから外す" : "クリックでお気に入りに追加",
+            NamedTextColor.GRAY));
+        lore.add(detailText("一覧の★ボタンでお気に入りだけに絞れます", NamedTextColor.DARK_GRAY));
+        lore.add(detailText("現在 " + pins.size() + " / " + PinnedEntries.MAX_PINS + " 件",
+            NamedTextColor.DARK_GRAY));
+        inventory.setItem(DETAIL_PIN_SLOT, createButton(
+            pinned ? Material.NETHER_STAR : Material.BOOK,
+            Component.text(pinned ? "★ お気に入り登録済み" : "☆ お気に入りに追加",
+                pinned ? NamedTextColor.GOLD : NamedTextColor.WHITE),
+            lore));
+    }
+
+    /**
+     * ピンを反転して保存し、画面を描き直す。
+     *
+     * <p>「お気に入りのみ」で見ているときに最後の1件を外すと一覧が空になるので、
+     * そのときは全件表示へ戻す(空の画面に取り残さない)。
+     */
+    private void togglePin(RecipeEntry entry, Player clicker) {
+        if (entry == null || entry.id == null) {
+            return;
+        }
+        if (PinnedEntries.wouldExceedCap(pins, entry.id)) {
+            clicker.sendMessage(Component.text(
+                "お気に入りは " + PinnedEntries.MAX_PINS + " 件までです。どれかを外してから追加してください",
+                NamedTextColor.RED));
+            return;
+        }
+        pins = PinnedEntries.toggled(pins, entry.id);
+        PinnedEntries.save(clicker, PREF_PINS, pins);
+        if (pinnedOnly && pins.isEmpty()) {
+            pinnedOnly = false;
+            rememberPreferences();
+        }
+        clicker.sendActionBar(Component.text(
+            pins.contains(entry.id) ? "★ " + entry.sortName() + " をお気に入りに追加しました"
+                : "☆ " + entry.sortName() + " をお気に入りから外しました",
+            pins.contains(entry.id) ? NamedTextColor.GOLD : NamedTextColor.GRAY));
+        refresh();
+        renderDetail();
     }
 
     /**
@@ -1148,18 +1256,22 @@ public class RecipeBrowserGui extends BaseGui {
                 NamedTextColor.DARK_AQUA));
         }
 
+        // ピン止め済みは名前の頭に★を出す(2026-08-23)。アイコンは元のままにする ——
+        // 見た目まで変えると「どのアイテムのレシピか」が読めなくなり、絞り込みの用を成さない。
+        String label = (entry.id != null && pins.contains(entry.id) ? "★ " : "") + entry.displayName;
+
         // iconItemがある場合はそのItemStackベースでボタン生成（革防具の色等を保持）
         if (entry.iconItem != null) {
             ItemStack button = entry.iconItem.clone();
             button.editMeta(meta -> {
-                meta.displayName(Component.text(entry.displayName, kindColor(entry))
+                meta.displayName(Component.text(label, kindColor(entry))
                     .decoration(TextDecoration.ITALIC, false));
                 meta.lore(lore);
             });
             return button;
         }
         return createButton(icon,
-            Component.text(entry.displayName, kindColor(entry)),
+            Component.text(label, kindColor(entry)),
             lore);
     }
 
@@ -1820,6 +1932,26 @@ public class RecipeBrowserGui extends BaseGui {
             showDetails ? NamedTextColor.GREEN : NamedTextColor.DARK_GRAY));
         lore.add(detailText("圧縮素材は1系統で最大5段あるため、", NamedTextColor.DARK_GRAY));
         lore.add(detailText("既定では中間段と解凍を隠しています", NamedTextColor.DARK_GRAY));
+        return lore;
+    }
+
+    /**
+     * お気に入り絞り込みボタンの lore (2026-08-23)。
+     *
+     * <p>ピンの付け方（詳細画面のボタン）を必ず書く —— 絞り込みボタンだけ見つけて
+     * 「お気に入りに入れられない」と詰まるのを防ぐ。
+     */
+    private List<Component> pinnedOnlyLore() {
+        List<Component> lore = new ArrayList<>();
+        lore.add(detailText("クリックで切り替え", NamedTextColor.GRAY));
+        lore.add(detailText((pinnedOnly ? "  " : "▶ ") + "すべてのレシピ",
+            pinnedOnly ? NamedTextColor.DARK_GRAY : NamedTextColor.GREEN));
+        lore.add(detailText((pinnedOnly ? "▶ " : "  ") + "お気に入りのみ",
+            pinnedOnly ? NamedTextColor.GREEN : NamedTextColor.DARK_GRAY));
+        lore.add(Component.empty());
+        lore.add(detailText("現在 " + pins.size() + " 件をピン止め中", NamedTextColor.GRAY));
+        lore.add(detailText("ピン止めはレシピをクリックして", NamedTextColor.DARK_GRAY));
+        lore.add(detailText("詳細画面の★ボタンから", NamedTextColor.DARK_GRAY));
         return lore;
     }
 

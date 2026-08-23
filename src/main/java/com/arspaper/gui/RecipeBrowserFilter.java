@@ -150,6 +150,17 @@ final class RecipeBrowserFilter {
      */
     static List<RecipeEntry> arrange(List<RecipeEntry> source, SortMode sort, KindMode kind,
                                      String search, boolean showCompressionDetails) {
+        return arrange(source, sort, kind, search, showCompressionDetails, null);
+    }
+
+    /**
+     * ピン止め(お気に入り)での絞り込みまで含めた版 (2026-08-23)。
+     *
+     * @param pinnedOnly null なら絞り込みなし。非 null なら<b>id がこの集合にあるものだけ</b>を残す。
+     */
+    static List<RecipeEntry> arrange(List<RecipeEntry> source, SortMode sort, KindMode kind,
+                                     String search, boolean showCompressionDetails,
+                                     java.util.Set<String> pinnedOnly) {
         List<RecipeEntry> result = new ArrayList<>();
         Pattern pattern = compileGlob(search);
         // 「その連鎖の最大段」は検索語や種別で変わってはいけない(検索するたびに出る段が
@@ -157,9 +168,13 @@ final class RecipeBrowserFilter {
         Map<String, Integer> topStages = showCompressionDetails ? Map.of() : topCompressionStages(source);
         for (RecipeEntry entry : source) {
             if (entry == null) continue;
+            if (pinnedOnly != null && (entry.id == null || !pinnedOnly.contains(entry.id))) continue;
             if (pattern != null && !pattern.matcher(entry.sortName()).matches()) continue;
             if (kind != null && !kind.accepts(entry)) continue;
-            if (!showCompressionDetails && isHiddenCompressionStep(entry, topStages)) continue;
+            // ピンを明示した行は圧縮の間引きを通さない。自分でピン止めしたのに
+            // 「中間段だから」で消えると、お気に入り一覧が無言で歯抜けになる。
+            if (pinnedOnly == null && !showCompressionDetails
+                    && isHiddenCompressionStep(entry, topStages)) continue;
             result.add(entry);
         }
         Comparator<RecipeEntry> comparator = comparatorFor(sort);

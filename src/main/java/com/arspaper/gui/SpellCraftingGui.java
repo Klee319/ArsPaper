@@ -64,6 +64,16 @@ public class SpellCraftingGui extends BaseGui {
     private int glyphsPerPage = 0;
     private final Set<String> unlockedGlyphs;
 
+    /**
+     * ピン止め(お気に入り)したグリフ id (2026-08-23)。
+     *
+     * <p>この画面では<b>読むだけ</b>で、付け外しはグリフレシピ画面({@code /tf glyphs})の詳細から行う
+     * （ユーザー指示「配置画面はスペースが狭いので別途GUIで並び替えをカスタマイズできた方がいい」）。
+     * 保存キーは {@link GlyphBrowserGui#GLYPH_PINS_PREF} を共有する。
+     * フィールド初期化子で読むのは、コンストラクタが2本あって片方に書き忘れるのを避けるため。
+     */
+    private final Set<String> pins = PinnedEntries.load(viewer, GlyphBrowserGui.GLYPH_PINS_PREF);
+
     public SpellCraftingGui(ArsPaper plugin, Player player, ItemStack spellBookItem, int spellSlot, int maxGlyphTier) {
         this(plugin, player, spellBookItem, spellSlot, maxGlyphTier, HARD_MAX_GLYPHS);
     }
@@ -266,7 +276,8 @@ public class SpellCraftingGui extends BaseGui {
             }
 
             inventory.setItem(slot, createButton(mat,
-                Component.text(GlyphNames.display(comp), nameColor), lore));
+                Component.text((pins.contains(comp.getId().toString()) ? "★ " : "")
+                    + GlyphNames.display(comp), nameColor), lore));
         }
 
         if (totalPages > 1) {
@@ -674,8 +685,24 @@ public class SpellCraftingGui extends BaseGui {
      * 登録順に込めた対のペア（増幅⇔減衰 など）がティアで割れる。
      */
     private List<SpellComponent> palette() {
-        return com.arspaper.spell.GlyphOrder.canonical(
+        List<SpellComponent> ordered = com.arspaper.spell.GlyphOrder.canonical(
             plugin.getSpellRegistry().getAll(), currentTab);
+        if (pins.isEmpty()) {
+            return ordered;
+        }
+        // ピン止め(お気に入り)を先頭へ寄せる (2026-08-23)。
+        //
+        // <b>正典順そのものは壊さない</b> —— ピン内・非ピン内はどちらも GlyphOrder の順のまま。
+        // この画面はスロットが狭くページ送りが多いので「よく使うものを前に」だけを足す。
+        // ★の付け外しはこの画面には置かず、グリフレシピ画面(/tf glyphs)の詳細から行う
+        // (ユーザー指示 2026-08-23「配置画面はスペースが狭いので別途GUIで」)。
+        List<SpellComponent> pinnedFirst = new ArrayList<>(ordered.size());
+        List<SpellComponent> rest = new ArrayList<>(ordered.size());
+        for (SpellComponent comp : ordered) {
+            (pins.contains(comp.getId().toString()) ? pinnedFirst : rest).add(comp);
+        }
+        pinnedFirst.addAll(rest);
+        return pinnedFirst;
     }
 
     /**

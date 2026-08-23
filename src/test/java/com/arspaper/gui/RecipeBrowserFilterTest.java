@@ -284,6 +284,49 @@ class RecipeBrowserFilterTest {
     }
 
     @Test
+    @DisplayName("お気に入り絞り込みは id で突き合わせ、他の絞り込みとも重なる (2026-08-23)")
+    void pinnedOnlyFiltersById() {
+        List<RecipeEntry> src = List.of(
+            entry("iron_sword", "", 0), entry("iron_axe", "", 0), entry("gold_sword", "", 0));
+
+        assertEquals(List.of("iron_sword", "gold_sword"),
+            names(RecipeBrowserFilter.arrange(src, RecipeBrowserFilter.SortMode.DEFAULT,
+                RecipeBrowserFilter.KindMode.ALL, "", false, Set.of("iron_sword", "gold_sword"))),
+            "ピンした id だけが残ること");
+
+        assertEquals(List.of("iron_sword"),
+            names(RecipeBrowserFilter.arrange(src, RecipeBrowserFilter.SortMode.DEFAULT,
+                RecipeBrowserFilter.KindMode.ALL, "iron", false, Set.of("iron_sword", "gold_sword"))),
+            "検索語との AND になること(片方だけ効いてはいけない)");
+
+        assertEquals(3,
+            RecipeBrowserFilter.arrange(src, RecipeBrowserFilter.SortMode.DEFAULT,
+                RecipeBrowserFilter.KindMode.ALL, "", false, null).size(),
+            "null は絞り込みなし(既存の呼び出しの意味を変えない)");
+
+        assertTrue(RecipeBrowserFilter.arrange(src, RecipeBrowserFilter.SortMode.DEFAULT,
+                RecipeBrowserFilter.KindMode.ALL, "", false, Set.of()).isEmpty(),
+            "空集合は『お気に入り0件』であって全件表示ではない");
+    }
+
+    @Test
+    @DisplayName("ピンした圧縮の中間段は間引きを免れる(お気に入りが無言で歯抜けにならない)")
+    void pinnedCompressionStagesSurviveThinning() {
+        List<RecipeEntry> src = List.of(
+            entry("stone_1x", "", 0), entry("stone_2x", "", 0), entry("stone_3x", "", 0));
+
+        assertEquals(List.of("stone_3x"),
+            names(RecipeBrowserFilter.arrange(src, RecipeBrowserFilter.SortMode.DEFAULT,
+                RecipeBrowserFilter.KindMode.ALL, "", false)),
+            "既定では最大段だけが出る(従来どおり)");
+
+        assertEquals(List.of("stone_1x"),
+            names(RecipeBrowserFilter.arrange(src, RecipeBrowserFilter.SortMode.DEFAULT,
+                RecipeBrowserFilter.KindMode.ALL, "", false, Set.of("stone_1x"))),
+            "自分でピンした中間段は、圧縮の間引きに消されてはいけない");
+    }
+
+    @Test
     @DisplayName("空白のみ/nullの検索語は検索なし扱い")
     void blankSearchIsNoop() {
         assertNull(RecipeBrowserFilter.compileGlob(null));
