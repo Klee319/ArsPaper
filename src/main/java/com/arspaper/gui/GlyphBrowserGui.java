@@ -244,7 +244,7 @@ public class GlyphBrowserGui extends BaseGui {
         lore.add(Component.empty());
         lore.add(detailText("クリックで必要素材を表示", NamedTextColor.DARK_GRAY));
 
-        return createButton(iconOf(glyph, unlocked),
+        return createButton(iconOf(glyph),
             Component.text((unlocked ? "[解放済] " : "") + GlyphNames.display(glyph),
                 unlocked ? NamedTextColor.GREEN : NamedTextColor.WHITE),
             lore);
@@ -275,7 +275,7 @@ public class GlyphBrowserGui extends BaseGui {
         titleLore.add(unlocked
             ? detailText("✔ 解放済み", NamedTextColor.GREEN)
             : detailText("未解放 — 筆記台で解放できます", NamedTextColor.YELLOW));
-        inventory.setItem(4, createButton(iconOf(glyph, unlocked),
+        inventory.setItem(4, createButton(iconOf(glyph),
             Component.text(GlyphNames.display(glyph),
                 unlocked ? NamedTextColor.GREEN : NamedTextColor.WHITE),
             titleLore));
@@ -365,13 +365,15 @@ public class GlyphBrowserGui extends BaseGui {
 
     /**
      * アイコンはグリフごと（{@link com.arspaper.spell.GlyphIcons} が唯一の定義）。
-     * ただし<b>未解放は {@code GlyphIcons.LOCKED_ICON}（石炭＝昔の仕様）へ潰す</b> ——
-     * 全部に個別アイコンを付けたら「解放済みかどうかが絵から消えた」という報告が出た
-     * （2026-08-22）。一覧を見渡すのに名前の色と lore では読み取れない。
-     * 解放済みは個別アイコンのままなので「どれがどの魔法か分からない」へは戻らない。
+     *
+     * <p><b>この画面は解放状態で潰さない ── 全部が個別アイコン</b>（2026-08-23 指示）。
+     * ここは「何を集めればどれが解放できるか」を読む画面なので、
+     * <b>未解放こそが主役</b>で、それを 1 種類の絵に潰すと素材表を引く手掛かりが消える。
+     * 解放済みかどうかは名前の色と「[解放済]」の接頭辞で足りる。
+     * 未解放を潰すのは筆記台（{@link ScribingTableGui}）と呪文編集（{@link SpellCraftingGui}）だけ。
      */
-    private static Material iconOf(SpellComponent glyph, boolean unlocked) {
-        return com.arspaper.spell.GlyphIcons.iconFor(glyph, ArsPaper.getInstance().getGlyphConfig(), unlocked);
+    private static Material iconOf(SpellComponent glyph) {
+        return com.arspaper.spell.GlyphIcons.iconFor(glyph, ArsPaper.getInstance().getGlyphConfig());
     }
 
     private static NamedTextColor typeColor(SpellComponent.ComponentType type) {

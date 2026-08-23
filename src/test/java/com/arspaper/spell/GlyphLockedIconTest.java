@@ -23,6 +23,11 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
  * <p><b>なぜ「未解放だけ」潰すのか。</b> 実際に選んで使うのは解放済みの側なので、
  * 個別アイコンが要るのはそちら。未解放は「まだ持っていない」と分かれば足りる。
  * この非対称のおかげで両方の報告を同時に満たせる。
+ *
+ * <p><b>2026-08-23 の追加。</b> 塞がれ方は 2 種類ある ── 筆記台で解放していない（石炭）と、
+ * スキルパークを持っていない（鍵）。<b>直し方が違う</b>のに同じ絵だと次にどこへ行けばよいか
+ * 分からないので、グリフ配置（呪文編集）画面ではパーク未所持を鍵に分ける。
+ * 優先順は <b>鍵 &gt; 石炭 &gt; 個別アイコン</b>（パークが無ければ解放しても使えないため）。
  */
 class GlyphLockedIconTest {
 
@@ -67,5 +72,44 @@ class GlyphLockedIconTest {
                 "未解放で上書きが効くと、そのグリフだけ解放済みに見える");
         assertNotEquals(overridden,
                 GlyphIcons.resolveForState("projectile", SpellComponent.ComponentType.FORM, "NETHER_STAR", false));
+    }
+
+    @Test
+    @DisplayName("パーク未所持は鍵になり、未解放(石炭)とも個別アイコンとも別物")
+    void perkLockedGlyphsCollapseToTheKeyIcon() {
+        assertEquals(Material.TRIAL_KEY, GlyphIcons.PERK_LOCKED_ICON);
+        assertNotEquals(GlyphIcons.LOCKED_ICON, GlyphIcons.PERK_LOCKED_ICON,
+                "未解放(筆記台へ行け)とパーク未所持(スキルツリーへ行け)は直し方が違うので絵を分ける");
+        assertFalse(GlyphIcons.defaults().containsValue(GlyphIcons.PERK_LOCKED_ICON),
+                "鍵と同じ材質を持つグリフがあると、パークを持っているのに塞がれて見える");
+
+        for (Map.Entry<String, Material> entry : GlyphIcons.defaults().entrySet()) {
+            for (boolean unlocked : new boolean[] {true, false}) {
+                assertEquals(Material.TRIAL_KEY,
+                        GlyphIcons.resolveForState(entry.getKey(), SpellComponent.ComponentType.EFFECT,
+                                null, unlocked, false),
+                        entry.getKey() + " のパーク未所持アイコンが鍵でない(unlocked=" + unlocked + ")");
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("パークを満たしていれば従来どおり 未解放=石炭 / 解放済み=個別アイコン")
+    void perkAllowedFallsBackToTheUnlockedStateRules() {
+        assertEquals(Material.COAL,
+                GlyphIcons.resolveForState("projectile", SpellComponent.ComponentType.FORM, null, false, true),
+                "パークを満たした未解放は石炭のまま(筆記台へ誘導する絵)");
+        assertEquals(GlyphIcons.defaults().get("projectile"),
+                GlyphIcons.resolveForState("projectile", SpellComponent.ComponentType.FORM, null, true, true),
+                "パークを満たした解放済みは個別アイコンのまま");
+    }
+
+    @Test
+    @DisplayName("パーク未所持は yml の icon: 上書きにも優先する")
+    void perkLockBeatsIconOverride() {
+        assertEquals(Material.TRIAL_KEY,
+                GlyphIcons.resolveForState("projectile", SpellComponent.ComponentType.FORM,
+                        "NETHER_STAR", true, false),
+                "上書きが効くと、そのグリフだけ使えるように見える");
     }
 }

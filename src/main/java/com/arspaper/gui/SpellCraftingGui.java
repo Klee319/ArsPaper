@@ -218,18 +218,26 @@ public class SpellCraftingGui extends BaseGui {
             paletteIdx++;
 
             boolean isUnlocked = unlockedGlyphs.contains(comp.getId().toString());
+            // パークゲートは解放状態と独立に見る。getDisableReason は解放済みにしか通さないので、
+            // ここで別途引かないと「未解放かつパーク未所持」が石炭に埋もれる
+            // （筆記台で解放しても使えないので、先に潰すべき詰まりはパークの方）。
+            boolean perkAllowed =
+                plugin.getSpellCaster().hasGlyphPermission(viewer, comp.getId().getKey());
             String disableReason = isUnlocked ? getDisableReason(comp) : null;
             boolean usable = isUnlocked && disableReason == null;
 
             NamedTextColor nameColor = usable ? getTypeColor(comp.getType())
                 : isUnlocked ? NamedTextColor.GRAY : NamedTextColor.DARK_GRAY;
-            // アイコンはグリフごと（GlyphIcons が唯一の定義）。ただし<b>未解放だけ</b>は
-            // GlyphIcons.LOCKED_ICON（石炭＝昔の仕様）へ潰す —— 全部に個別アイコンを付けたら
-            // 「解放済みかどうかが絵から消えた」という報告が出た（2026-08-22）。
-            // 「解放済みだが今は使えない」は個別アイコンのまま残す（解放の有無とは別の軸で、
-            // 一覧を見渡すときに知りたいのは「持っているか」の方）。理由は名前の色
+            // アイコンはグリフごと（GlyphIcons が唯一の定義）。ただしこの画面だけは
+            // <b>パーク未所持=鍵 > 未解放=石炭 > 個別アイコン</b>へ潰す（2026-08-23 指示）。
+            // 全部に個別アイコンを付けたら「解放済みかどうかが絵から消えた」という報告が出たうえ
+            // （2026-08-22）、未解放とパーク未所持は<b>直し方が違う</b>（筆記台 / スキルツリー）ので
+            // 同じ絵にすると次にどこへ行けばよいか分からない。
+            // 「解放済み・パークあり・今の構成では置けない」は個別アイコンのまま残す
+            // （一覧を見渡すときに知りたいのは「持っているか」の方）。理由は名前の色
             // （灰=使用不可 / 濃灰=未解放）と lore の赤字で示す。
-            Material mat = com.arspaper.spell.GlyphIcons.iconFor(comp, plugin.getGlyphConfig(), isUnlocked);
+            Material mat = com.arspaper.spell.GlyphIcons.iconFor(
+                comp, plugin.getGlyphConfig(), isUnlocked, perkAllowed);
 
             List<Component> lore = new ArrayList<>();
             if (!comp.getDescription().isEmpty()) {
@@ -242,7 +250,14 @@ public class SpellCraftingGui extends BaseGui {
                     NamedTextColor.DARK_GRAY).decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, true));
             }
             lore.add(Component.text("マナ: " + comp.getManaCost(), NamedTextColor.AQUA));
-            if (!isUnlocked) {
+            if (!perkAllowed) {
+                // 鍵アイコンと同じ順で理由を並べる（アイコンが指す先＝最初の赤字行）。
+                lore.add(Component.text("パーク未所持 - スキルツリーで解放してください",
+                    NamedTextColor.RED));
+                if (!isUnlocked) {
+                    lore.add(Component.text("未解放 - 筆記台で解放してください", NamedTextColor.RED));
+                }
+            } else if (!isUnlocked) {
                 lore.add(Component.text("未解放 - 筆記台で解放してください", NamedTextColor.RED));
             } else if (disableReason != null) {
                 lore.add(Component.text(disableReason, NamedTextColor.RED));

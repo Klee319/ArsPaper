@@ -213,6 +213,21 @@ public final class GlyphIcons {
     public static final Material LOCKED_ICON = Material.COAL;
 
     /**
+     * <b>スキルパークで塞がれているグリフのアイコン（鍵）。</b>
+     *
+     * <p>「未解放（筆記台で解放していない）」と「パーク未所持（スキルツリー側で開いていない）」は
+     * <b>直し方が違う</b>のに、どちらも同じ石炭だと画面上で区別できない（2026-08-23 指示
+     * 「スキルパークで解放されていないグリフをグリフの配置画面で鍵にして」）。
+     * 鍵＝スキルツリーへ行け、石炭＝筆記台へ行け、という読み分けにする。
+     *
+     * <p>使うのは<b>グリフ配置（呪文編集）画面だけ</b>。グリフ解放（筆記台）は
+     * 「解放したか」だけを見せる画面なので石炭のまま、グリフレシピ（解放素材）は
+     * 素材を読む画面なので全部個別アイコンのまま。画面ごとの割り当ては
+     * {@code GlyphGuiIconAndOrderWiringTest} が固定している。
+     */
+    public static final Material PERK_LOCKED_ICON = Material.TRIAL_KEY;
+
+    /**
      * 解放状態を織り込んだアイコン。<b>解放/未解放を並べる画面は必ずこちらを通す。</b>
      *
      * @param comp 対象グリフ
@@ -224,6 +239,26 @@ public final class GlyphIcons {
             return LOCKED_ICON;
         }
         return iconFor(comp, config);
+    }
+
+    /**
+     * 解放状態とパークゲートを織り込んだアイコン。<b>グリフ配置（呪文編集）画面はこちらを通す。</b>
+     *
+     * <p>優先順は <b>パーク未所持（鍵） &gt; 未解放（石炭） &gt; 個別アイコン</b>。
+     * パークを先に見るのは、パークが無ければ筆記台で解放しても使えるようにならない
+     * ＝<b>先に潰すべき詰まりがそちら</b>だから。
+     *
+     * @param comp 対象グリフ
+     * @param config {@code glyphs.yml}。{@code icon:} を書いてあればそれが最優先。null 可
+     * @param unlocked 筆記台で解放済みなら true
+     * @param perkAllowed スキルパークの使用ゲートを満たしていれば true
+     */
+    public static Material iconFor(SpellComponent comp, GlyphConfig config,
+                                   boolean unlocked, boolean perkAllowed) {
+        if (!perkAllowed) {
+            return PERK_LOCKED_ICON;
+        }
+        return iconFor(comp, config, unlocked);
     }
 
     /**
@@ -239,6 +274,21 @@ public final class GlyphIcons {
             return LOCKED_ICON;
         }
         return resolve(glyphKey, type, override);
+    }
+
+    /**
+     * パークゲートまで織り込んだ解決。{@link #iconFor(SpellComponent, GlyphConfig, boolean, boolean)}
+     * の本体で、テストからも直接叩く。
+     *
+     * <p>パーク未所持は<b>解放状態にも {@code icon:} の上書きにも優先する</b> ——
+     * 解放済みでも使えないものが個別アイコンで並ぶと「使える側」と見分けが付かない。
+     */
+    public static Material resolveForState(String glyphKey, SpellComponent.ComponentType type,
+                                           String override, boolean unlocked, boolean perkAllowed) {
+        if (!perkAllowed) {
+            return PERK_LOCKED_ICON;
+        }
+        return resolveForState(glyphKey, type, override, unlocked);
     }
 
     /**

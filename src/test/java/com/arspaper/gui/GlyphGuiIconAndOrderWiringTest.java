@@ -33,12 +33,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p><b>2026-08-22 の追記。</b> 「全部に個別アイコン」まで振り切ったら
  * 「解放したのか解放してないのか直感的にわからなくなった」という逆向きの報告が来た。
- * 現在の規約は<b>未解放だけ {@code GlyphIcons.LOCKED_ICON}（石炭＝この修正以前と同じ絵）へ潰し、
- * 解放済みは個別アイコンのまま</b>。3画面とも解放状態を {@code GlyphIcons} へ渡すこと
- * （渡し忘れは {@link #allGuisPassUnlockedStateToIconResolution} が落とす）。
- * <b>画面側に石炭を直接書いてはいけない</b>のは変わらない ── 材質を決めるのは {@code GlyphIcons} 1箇所で、
- * 画面ごとに書くと 3 画面でずれる（スキルツリーの未解放パークは南京錠アイコンで別物、という
- * 役割分担も {@code GlyphIcons} 側のコメントにしか書かれていない）。
+ *
+ * <p><b>2026-08-23 の確定仕様（画面ごとに違う）。</b> 潰し方は 3 画面で揃えない ──
+ * 画面ごとに「見に来ている目的」が違うため:
+ *
+ * <ul>
+ *   <li>{@code ScribingTableGui}（グリフ解放）: 未解放=石炭 / 他=個別アイコン</li>
+ *   <li>{@code GlyphBrowserGui}（グリフレシピ）: <b>全部が個別アイコン</b>
+ *       ── 未解放こそが主役の画面なので潰すと素材を引く手掛かりが消える</li>
+ *   <li>{@code SpellCraftingGui}（グリフ配置／呪文編集）:
+ *       <b>パーク未所持=鍵</b> / 未解放=石炭 / 他=個別アイコン
+ *       ── 直し方が違う（スキルツリー / 筆記台）ので絵を分ける</li>
+ * </ul>
+ *
+ * この割り当ては {@link #eachGuiPassesExactlyTheStatesItsSpecCallsFor} が固定する。
+ * <b>画面側に材質を直接書いてはいけない</b>のは変わらない ── 決めるのは {@code GlyphIcons} 1箇所で、
+ * 画面ごとに書くと 3 画面でずれる。
  *
  * <p>ソース文字列で縛るのは筋が悪いが、GUI の描画は {@code Player}/{@code Inventory} が要り
  * このフォークのテスト基盤（MockBukkit なし）では動かせない。並び自体の正しさは
@@ -75,14 +85,18 @@ class GlyphGuiIconAndOrderWiringTest {
             assertFalse(src.contains("Material.COAL"),
                     gui + " が石炭を直接書いている。未解放の材質を決めるのは GlyphIcons.LOCKED_ICON の1箇所"
                             + "(画面ごとに書くと3画面でずれる)");
+            assertFalse(src.contains("Material.TRIAL_KEY"),
+                    gui + " が鍵を直接書いている。パーク未所持の材質を決めるのは"
+                            + " GlyphIcons.PERK_LOCKED_ICON の1箇所");
         }
     }
 
     /**
      * {@code GlyphIcons.iconFor(...)} 呼び出しの最大引数個数。
      *
-     * <p>3引数版が「解放状態を渡している」版。文字列の部分一致だと
-     * {@code plugin.getGlyphConfig()} の内側の括弧に引っかかるので、括弧の対応を数えて判定する。
+     * <p>2引数=解放状態で潰さない / 3引数=未解放を潰す / 4引数=パーク未所持も潰す。
+     * 文字列の部分一致だと {@code plugin.getGlyphConfig()} の内側の括弧に引っかかるので、
+     * 括弧の対応を数えて判定する。
      */
     private static int maxIconForArity(String src) {
         final String call = "GlyphIcons.iconFor(";
@@ -106,15 +120,21 @@ class GlyphGuiIconAndOrderWiringTest {
     }
 
     @Test
-    @DisplayName("3画面とも未解放グリフには解放状態を渡す(絵から解放状態が消えない)")
-    void allGuisPassUnlockedStateToIconResolution() {
-        for (String gui : GLYPH_GUIS) {
-            String src = source(gui);
-            assertEquals(3, maxIconForArity(src),
-                    gui + " が解放状態を渡さずにアイコンを決めている。"
-                            + "全部に個別アイコンを付けると『解放済みかどうかが絵から消える』"
-                            + "(2026-08-22 報告: 1個ずつカーソルを当てないと分からない)");
-        }
+    @DisplayName("画面ごとに潰す状態が違う(解放=未解放だけ / レシピ=潰さない / 配置=パークも)")
+    void eachGuiPassesExactlyTheStatesItsSpecCallsFor() {
+        assertEquals(3, maxIconForArity(source("ScribingTableGui")),
+                "グリフ解放(筆記台)は解放状態を渡して未解放を石炭へ潰すこと。"
+                        + "全部に個別アイコンを付けると『解放済みかどうかが絵から消える』"
+                        + "(2026-08-22 報告: 1個ずつカーソルを当てないと分からない)");
+
+        assertEquals(2, maxIconForArity(source("GlyphBrowserGui")),
+                "グリフレシピ(解放素材)は潰さず全部を個別アイコンにすること(2026-08-23 指示)。"
+                        + "未解放こそが主役の画面なので、1種類の絵に潰すと素材表を引く手掛かりが消える");
+
+        assertEquals(4, maxIconForArity(source("SpellCraftingGui")),
+                "グリフ配置(呪文編集)はパークゲートも渡すこと(2026-08-23 指示)。"
+                        + "未解放(筆記台へ行け)とパーク未所持(スキルツリーへ行け)は直し方が違うので、"
+                        + "同じ石炭に潰すと次にどこへ行けばよいか分からない");
     }
 
     @Test
