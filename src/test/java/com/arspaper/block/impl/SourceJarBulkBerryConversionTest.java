@@ -17,6 +17,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  *       入り切らなかったソースが黙って消える。プレイヤーからは「ベリーが1個減っただけ」に見え、
  *       ログにも何も出ない。</li>
  * </ol>
+ *
+ * <p>⚠ 2026-08-24 以降、「何個入れたいか」を決めるのは
+ * {@code com.arspaper.source.BulkFeed}（スニーク = 手持ち全部 / 通常 = 1個）で、
+ * ここが縛るのは<b>容器側の頭打ち</b>だけ。1件目のテストの「手持ち全部」は
+ * 「渡された個数をそのまま通す」の意味であって、右クリック1回の挙動ではない。
  */
 class SourceJarBulkBerryConversionTest {
 

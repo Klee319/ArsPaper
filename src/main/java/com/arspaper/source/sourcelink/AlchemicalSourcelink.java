@@ -131,8 +131,8 @@ public class AlchemicalSourcelink extends Sourcelink {
         int sourceValue = alchemyValues.valueOf(hand);
 
         if (sourceValue > 0) {
-            // 通常 = 手持ち全部、スニーク = 1個（判定は Sourcelink#feedCount に集約）。
-            int addCount = feedCount(hand.getAmount(), player.isSneaking());
+            // スニーク = 手持ち全部、通常 = 1個（判定は BulkFeed に集約。ジャー側と同じ規約）。
+            int addCount = com.arspaper.source.BulkFeed.count(hand.getAmount(), player.isSneaking());
             // 階梯の生成量倍率(items.<id>.yield-multiplier)は「新しく生まれた分」にだけ掛ける。
             int totalAdded = scaleGeneratedYield((long) sourceValue * addCount);
 

@@ -24,8 +24,8 @@ public final class SourceGenerationScaling {
      *
      * <p>{@code rawAmount} を {@code long} で受けるのは、燃料の単価が最大 3000万
      * ({@code custom:source_engine})で64個同時投入が 19.2億 —— そこへ倍率を掛けると
-     * int を越えるため。2026-08-24 に一括投入が<b>通常の右クリック</b>側へ移った
-     * ({@code Sourcelink#feedCount})ので、この桁は例外ケースではなく既定の経路になった。上限に当たった分は {@code addToBuffer} 側の {@code buffer-cap} クランプで
+     * int を越えるため。一括投入は<b>スニーク＋右クリック</b>({@link BulkFeed})で日常的に起きるので、
+     * この桁は例外ケースではない。上限に当たった分は {@code addToBuffer} 側の {@code buffer-cap} クランプで
      * 警告付きに捨てられる(この関数はオーバーフローで負値に化けるのを防ぐだけ)。
      *
      * @param rawAmount 倍率を掛ける前の生成量。0以下は 0(生成なし)。

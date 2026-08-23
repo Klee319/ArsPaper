@@ -243,12 +243,15 @@ public class SourceJar extends CustomBlock {
     /**
      * 1回の右クリックで流し込めるソースベリーの個数を返す(2026-08-23 / W-189)。
      *
-     * <p>「手持ちの全部」か「ジャーがあふれる一段階前」の<b>小さい方</b>。
+     * <p>「入れたい個数」か「ジャーがあふれる一段階前」の<b>小さい方</b>。
      * 端数は必ず切り捨てる —— {@code room} が 1 個ぶんに満たない状態で 1 個消費すると、
      * 入り切らなかったぶんが黙って消える。プレイヤーからは「ベリーが1個消えた」としか
      * 見えず、ログにも何も出ない種類の損失になる。
      *
-     * @param handAmount    手に持っているスタックの個数
+     * <p>「入れたい個数」を決めるのは {@link com.arspaper.source.BulkFeed}（スニーク = 手持ち全部 /
+     * 通常 = 1個）。ここは容器側の頭打ちだけを担当する。
+     *
+     * @param handAmount    入れたい個数（{@code BulkFeed#count} の戻り値）
      * @param room          ジャーの残り容量(= 最大 - 現在値)
      * @return 消費してよい個数。0 なら「残り容量が1個ぶんに足りない」
      */
@@ -275,13 +278,18 @@ public class SourceJar extends CustomBlock {
 
                 // 【一括変換 2026-08-23 (W-189)】以前は1回の右クリックで1個だけ消費していたため、
                 // 上位ジャー(容量200万〜5,000万)では現実的に連打しきれなかった
-                // (2,000,000 / 100 = 20,000 回)。手に持っているスタックを一度に流し込む。
+                // (2,000,000 / 100 = 20,000 回)。スタックを一度に流し込めるようにした。
+                //
+                // 【2026-08-24】一括の合図をソースリンク側と揃えて BulkFeed へ集約
+                // ── スニーク = 手持ち全部 / 通常 = 1個。以前は無条件で一括だったので、
+                //    1個だけ入れて残量を微調整する手段が無かった。
                 //
                 // ⚠ 端数を切り捨てて「あふれる一段階前」で止める ── ceil にすると最後の1個が
                 //   部分的にしか入らず、余ったソースが無言で消える(ユーザーから見れば
                 //   「ベリーが1個消えた」だけになる)。
                 int room = maxSource(tileState) - currentSource;
-                int convertible = convertibleBerries(hand.getAmount(), room);
+                int convertible = convertibleBerries(
+                    com.arspaper.source.BulkFeed.count(hand.getAmount(), player.isSneaking()), room);
                 if (convertible <= 0) {
                     // 残り容量が 1個ぶんに満たない = 実質満タン。消費せずに知らせる。
                     player.sendMessage(Component.text(
