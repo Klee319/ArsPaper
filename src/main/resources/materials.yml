@@ -97,48 +97,123 @@ materials:
     display_name: "&bソースの欠片"
     enchant_glow: true
     lore:
-      - "&7&o凝ったソースの結晶。焼べると注いだ量より多くが返る。"
-      - ""
-      - "&3焼べると 500 ソース"
+      - "&5凝ったソースの結晶。焼べると注いだ量より多くが返る。"
+    recipes:
+      - method: ritual
+        core-item: AMETHYST_SHARD
+        pedestal-items:
+          - COAL x4
+        source: 100
+        result: custom:source_shard
+        result-amount: 4
+        type: shapeless
+        ingredients: []
+      - method: ritual
+        type: shapeless
+        ingredients: []
+        pedestal-items:
+          - CHARCOAL x4
+        source: 100
+        core-item: AMETHYST_SHARD
+      - method: ritual
+        type: shapeless
+        ingredients: []
+        pedestal-items:
+          - COAL_BLOCK
+        source: 100
+        core-item: AMETHYST_SHARD
+      # 【一括版 2026-08-23 (W-189)】儀式の試行回数が多すぎるという報告への対応。
+      #   1つ上の「AMETHYST_SHARD + COAL x4 → 4個 / ソース100」を**厳密に9倍**したもの。
+      #   9個ぶんのアメジスト(custom:amethyst_shard_1x) + 石炭36個(COAL_BLOCK x4) で 36個。
+      #   ⚠ 素材効率は素の儀式と完全に同じ。ここを 9倍から外すと「まとめると得/損」になり、
+      #     欠片の供給量そのものが変わる(下流の結晶・凝縮物・機関まで全部ずれる)。
+      #   ⚠ 台座は1台につき1個なので、pedestal-items の要素数がそのまま必要な台座の数。
+      #     RitualManager が拾えるのは中心から Chebyshev 距離2のリング = 1層あたり16台まで。
+      - method: ritual
+        core-item: custom:amethyst_shard_1x
+        pedestal-items:
+          - COAL_BLOCK x4
+        source: 900
+        result: custom:source_shard
+        result-amount: 36
+        type: shapeless
+        ingredients: []
+  amethyst_shard_1x:
+    base_material: AMETHYST_SHARD
+    custom_model_data: 5447
+    enchant_glow: true
+    display_name: "&f9倍圧縮アメジストの欠片"
+    lore:
+      - "&7アメジストの欠片 9 個ぶん。"
+      - "&7ソースの欠片の一括生成に使う。"
     recipe:
-      method: ritual
-      core-item: AMETHYST_SHARD
-      pedestal-items:
-        - COAL x4
-      source: 100
-      result: custom:source_shard
-      result-amount: 4
-      type: shapeless
-      ingredients: []
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: AMETHYST_SHARD
+      shape:
+        - iii
+        - iii
+        - iii
+  source_shard_1x:
+    base_material: AMETHYST_SHARD
+    custom_model_data: 5448
+    enchant_glow: true
+    display_name: "&b9倍圧縮ソースの欠片"
+    lore:
+      - "&7ソースの欠片 9 個ぶん。"
+      - "&7ソース結晶の一括生成に使う。"
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:source_shard
+      shape:
+        - iii
+        - iii
+        - iii
   source_crystal:
     base_material: PRISMARINE_CRYSTALS
     custom_model_data: 5442
     display_name: "&3ソース結晶"
     enchant_glow: true
     lore:
-      - "&7&o欠片を束ねて育てた結晶。内側で光が回っている。"
-      - ""
-      - "&3焼べると 18,000 ソース"
-    recipe:
-      method: ritual
-      core-item: custom:source_shard
-      pedestal-items:
-        - custom:source_shard x7
-        - GLOWSTONE_DUST x4
-      source: 2500
-      result: custom:source_crystal
-      result-amount: 4
-      type: shapeless
-      ingredients: []
+      - "&5欠片を束ねて育てた結晶。内側で光が回っている。"
+    recipes:
+      - method: ritual
+        core-item: custom:source_shard
+        pedestal-items:
+          - custom:source_shard x7
+          - GLOWSTONE_DUST x4
+        source: 2500
+        result: custom:source_crystal
+        result-amount: 4
+        type: shapeless
+        ingredients: []
+      # 【一括版 2026-08-23 (W-189)】上を**厳密に9倍**したもの。
+      #   欠片 72個(圧縮欠片8個ぶん) + 光石の粉36個(GLOWSTONE x9 = 4個/ブロック) で 36個。
+      #   ⚠ 台座は 7 + 9 = 16 台。RitualManager が1層で拾える上限ちょうど
+      #     (Chebyshev 距離2のリング = 16マス)。これ以上素材を増やすなら圧縮品を作るしかない。
+      #   ⚠ 素材効率は素の儀式と完全に同じ。9倍から外すと結晶の供給量が変わる。
+      - method: ritual
+        core-item: custom:source_shard_1x
+        pedestal-items:
+          - custom:source_shard_1x x7
+          - GLOWSTONE x9
+        source: 22500
+        result: custom:source_crystal
+        result-amount: 36
+        type: shapeless
+        ingredients: []
   source_condenser:
     base_material: HEART_OF_THE_SEA
     custom_model_data: 5443
     display_name: "&9ソース凝縮物"
     enchant_glow: true
     lore:
-      - "&7&o結晶を圧して作った核。触れると指先が痺れる。"
-      - ""
-      - "&3焼べると 700,000 ソース"
+      - "&5結晶を圧して作った核。触れると指先が痺れる。"
     recipe:
       method: ritual
       core-item: custom:source_crystal
@@ -153,12 +228,10 @@ materials:
   source_engine:
     base_material: CONDUIT
     custom_model_data: 5444
-    display_name: "&5ソース機関"
+    display_name: "&dソース機関"
     enchant_glow: true
     lore:
-      - "&7&o自分でソースを回し始めた装置。もう止め方が分からない。"
-      - ""
-      - "&3焼べると 30,000,000 ソース"
+      - "&5自分でソースを回し始めた装置。もう止め方が分からない。"
     recipe:
       method: ritual
       core-item: custom:source_condenser
@@ -176,11 +249,10 @@ materials:
     display_name: "&6&l無限ソース核"
     enchant_glow: true
     lore:
-      - "&7&oここまでに築いた貯蔵設備そのものを焚べた結果。"
-      - "&7&o1億のソースが1点に折り畳まれている。"
+      - "&5ここまでに築いた貯蔵設備そのものを焚べた結果。"
+      - "&51億のソースが1点に折り畳まれている。"
       - ""
       - "&e第2の目標「1億ソース」の到達証明"
-      - "&8※ 焼べられない(焼べたら証明が消える)"
     recipe:
       method: ritual
       core-item: custom:source_singularity_jar
@@ -2887,7 +2959,7 @@ materials:
     base_material: COPPER_NUGGET
     custom_model_data: 5315
     display_name: "&bダイヤモンドスクラップ"
-    enchant_glow: true
+    enchant_glow: false
     lore:
       - "&7&oダイヤ装備を解体して得られる結晶片。4個でダイヤモンドに戻せる。"
       - ""
@@ -2896,7 +2968,7 @@ materials:
     base_material: NETHERITE_SCRAP
     custom_model_data: 5316
     display_name: "&8ネザライトスクラップ"
-    enchant_glow: true
+    enchant_glow: false
     lore:
       - "&7&oネザライト装備を解体して得られる金属片。4個でネザライトインゴットに戻せる。"
       - ""
@@ -2957,6 +3029,7 @@ materials:
         r: COPPER_INGOT
         c: IRON_INGOT
         d: DIAMOND
+    enchant_glow: false
   hard_metal:
     base_material: NETHERITE_SCRAP
     custom_model_data: 108
@@ -2974,6 +3047,7 @@ materials:
         r: QUARTZ_BLOCK
         c: OBSIDIAN
         d: DIAMOND
+    enchant_glow: false
   reinforced_leather:
     base_material: LEATHER
     custom_model_data: 5105
@@ -2993,6 +3067,19 @@ materials:
         r: PHANTOM_MEMBRANE
         c: LEATHER
         d: DIAMOND
+    enchant_glow: false
+  # 2026-08-16: 用途を実配線に合わせて修正。スレッド振り直し儀式(thread_reroll)は
+  # ゲーム内に出していないため、この芯の実用途は「スレッド枠拡張の儀式Ⅲ」の素材と
+  # 束縛者帯装備の儀式素材。入手は構造物チェスト(loot-tables.yml の3プール)。
+  reality_thread_core:
+    base_material: ECHO_SHARD
+    custom_model_data: 5452
+    display_name: "&b現実の芯"
+    enchant_glow: false
+    lore:
+      - "&7&o解けた現実を巻き取った芯。装備に糸を通す隙間をこじ開ける。"
+      - ""
+      - "&3スレッド枠拡張の儀式Ⅲの触媒"
   dragon_scale:
     base_material: TURTLE_SCUTE
     custom_model_data: 86
@@ -3130,6 +3217,7 @@ materials:
     custom_model_data: 236
     display_name: ホグリンの牙
     lore: []
+    enchant_glow: false
   parched_sandy_bone:
     base_material: BONE
     custom_model_data: 5413
@@ -3143,29 +3231,17 @@ materials:
     base_material: NETHERITE_SCRAP
     custom_model_data: 5451
     display_name: "&d次元の破片"
-    enchant_glow: true
+    enchant_glow: false
     lore:
       - "&7&o世界を繋いでいた縫い目の切れ端。"
       - "&7&o持っているだけで方角が分からなくなる。"
       - ""
       - "&5最終装備の主素材"
-  # 2026-08-16: 用途を実配線に合わせて修正。スレッド振り直し儀式(thread_reroll)は
-  # ゲーム内に出していないため、この芯の実用途は「スレッド枠拡張の儀式Ⅲ」の素材と
-  # 束縛者帯装備の儀式素材。入手は構造物チェスト(loot-tables.yml の3プール)。
-  reality_thread_core:
-    base_material: ECHO_SHARD
-    custom_model_data: 5452
-    display_name: "&b現実の芯"
-    enchant_glow: true
-    lore:
-      - "&7&o解けた現実を巻き取った芯。装備に糸を通す隙間をこじ開ける。"
-      - ""
-      - "&3スレッド枠拡張の儀式Ⅲの触媒"
   abyssal_ingot:
     base_material: NETHERITE_INGOT
     custom_model_data: 5453
     display_name: "&8深淵の合金"
-    enchant_glow: true
+    enchant_glow: false
     lore:
       - "&7&o高位のダンジョン主だけが体内に抱える金属。"
       - ""
@@ -4241,6 +4317,7 @@ _editor:
       - heavy_metal
       - hard_metal
       - reinforced_leather
+      - reality_thread_core
       - dragon_scale
       - elder_guardian_spike
       - wither_skull_fragment
@@ -4259,7 +4336,6 @@ _editor:
       - hoglin_fang
       - parched_sandy_bone
       - binder_fragment
-      - reality_thread_core
       - abyssal_ingot
       - dungeon_seal_mines
       - dungeon_seal_deep_mines

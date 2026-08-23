@@ -240,6 +240,25 @@ public class SourceJar extends CustomBlock {
     /** ソースベリー1個あたりのSource追加量 */
     public static final int SOURCE_PER_BERRY = 100;
 
+    /**
+     * 1回の右クリックで流し込めるソースベリーの個数を返す(2026-08-23 / W-189)。
+     *
+     * <p>「手持ちの全部」か「ジャーがあふれる一段階前」の<b>小さい方</b>。
+     * 端数は必ず切り捨てる —— {@code room} が 1 個ぶんに満たない状態で 1 個消費すると、
+     * 入り切らなかったぶんが黙って消える。プレイヤーからは「ベリーが1個消えた」としか
+     * 見えず、ログにも何も出ない種類の損失になる。
+     *
+     * @param handAmount    手に持っているスタックの個数
+     * @param room          ジャーの残り容量(= 最大 - 現在値)
+     * @return 消費してよい個数。0 なら「残り容量が1個ぶんに足りない」
+     */
+    static int convertibleBerries(int handAmount, int room) {
+        if (handAmount <= 0 || room <= 0) {
+            return 0;
+        }
+        return Math.min(handAmount, room / SOURCE_PER_BERRY);
+    }
+
     @Override
     public void onBlockInteract(Player player, Block block, TileState tileState) {
         // ソースベリーを持っている場合: Source追加
@@ -254,11 +273,30 @@ public class SourceJar extends CustomBlock {
                     return;
                 }
 
+                // 【一括変換 2026-08-23 (W-189)】以前は1回の右クリックで1個だけ消費していたため、
+                // 上位ジャー(容量200万〜5,000万)では現実的に連打しきれなかった
+                // (2,000,000 / 100 = 20,000 回)。手に持っているスタックを一度に流し込む。
+                //
+                // ⚠ 端数を切り捨てて「あふれる一段階前」で止める ── ceil にすると最後の1個が
+                //   部分的にしか入らず、余ったソースが無言で消える(ユーザーから見れば
+                //   「ベリーが1個消えた」だけになる)。
+                int room = maxSource(tileState) - currentSource;
+                int convertible = convertibleBerries(hand.getAmount(), room);
+                if (convertible <= 0) {
+                    // 残り容量が 1個ぶんに満たない = 実質満タン。消費せずに知らせる。
+                    player.sendMessage(Component.text(
+                        "残り容量がソースベリー1個ぶん(" + SOURCE_PER_BERRY + ")に足りません ("
+                            + currentSource + "/" + maxSource(tileState) + ")",
+                        NamedTextColor.YELLOW));
+                    return;
+                }
+
                 // ベリー消費 + Source追加
-                hand.setAmount(hand.getAmount() - 1);
-                int added = setSourceAmount(tileState, currentSource + SOURCE_PER_BERRY) - currentSource;
+                hand.setAmount(hand.getAmount() - convertible);
+                int added = setSourceAmount(
+                    tileState, currentSource + SOURCE_PER_BERRY * convertible) - currentSource;
                 player.sendMessage(Component.text(
-                    "ソースを" + added + "追加しました ("
+                    "ソースベリー" + convertible + "個でソースを" + added + "追加しました ("
                         + getSourceAmount(tileState) + "/" + maxSource(tileState) + ")",
                     NamedTextColor.AQUA));
                 player.playSound(player.getLocation(),

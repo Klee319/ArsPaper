@@ -40,8 +40,15 @@ class ShippedSourceLadderTest {
 
     private static final List<String> TYPES =
             List.of("volcanic", "mycelial", "alchemical", "vitalic", "botanical");
-    /** 段の並び。core-item はこの順で前段を指す必要がある。 */
-    private static final List<String> TIERS = List.of("ii", "iii", "iv", "v");
+    /**
+     * 段の並び。core-item はこの順で前段を指す必要がある。
+     *
+     * <p>2026-08-23 (W-189) に 4段 → 8段へ細分化した。id が {@code ii_b} のような枝番なのは、
+     * <b>既存 id を詰め直せない</b>ため —— 変えると設置済みブロックの PDC と、
+     * 他段の {@code core-item: custom:..._iii} が全部切れる。
+     */
+    private static final List<String> TIERS =
+            List.of("ii", "ii_b", "iii", "iii_b", "iv", "iv_b", "v", "vi");
 
     /** 「ソースジャー II」「炉 III」のような数字の段表記(全角/半角のローマ数字も含む)。 */
     private static final Pattern NUMERIC_TIER =
@@ -56,7 +63,7 @@ class ShippedSourceLadderTest {
     }
 
     @Test
-    @DisplayName("5種すべてに II〜V の4段があり、core-item が前段を指す")
+    @DisplayName("5種すべてに階梯の全段があり、core-item が前段を指す")
     void everyTypeHasTheFullLadderChainedToItsPreviousTier() {
         ConfigurationSection items = items();
         for (String type : TYPES) {
@@ -65,7 +72,7 @@ class ShippedSourceLadderTest {
             for (int i = 0; i < TIERS.size(); i++) {
                 String id = base + "_" + TIERS.get(i);
                 ConfigurationSection entry = items.getConfigurationSection(id);
-                assertNotNull(entry, id + " が無い(5種 x 4段が揃っている必要がある)");
+                assertNotNull(entry, id + " が無い(5種 x " + TIERS.size() + "段が揃っている必要がある)");
                 String expectedCore = "custom:" + base + (i == 0 ? "" : "_" + TIERS.get(i - 1));
                 assertEquals(expectedCore, entry.getString("recipe.core-item"),
                         id + " の core-item は前段でなければならない"
