@@ -396,6 +396,28 @@ public class UnifiedRecipeLoader {
     private void loadMaterialRitualFromSection(String id, String recipeKey,
                                                 ConfigurationSection recipeSection,
                                                 ConfigurationSection matSection) {
+        ritualRecipes.add(materialRitualFrom(id, recipeKey, recipeSection, matSection));
+    }
+
+    /**
+     * materials.yml の儀式1件を組み立てる。
+     *
+     * <p><b>2026-08-23 の実サーバ報告「儀式で個数を複数に設定しても1つしかクラフトされない」の修正</b>:
+     * ここは {@code result-amount} を読まずに<b>後方互換コンストラクタ(結果は常に1個)</b>を呼んでいた。
+     * 儀式ローダーは2本あり、items.yml 等を読む {@link #loadRitualFromSection} は最初から読んでいたので、
+     * 「同じキーが片方の config でだけ効く」状態になっていた。設定エディタは materials.yml の儀式にも
+     * 結果個数の入力欄を出すため、<b>入力できるのに何の警告も出ずに捨てられる</b>のが症状だった
+     * (出荷 yml でも 11 件中 6 件が該当。例: ソースの欠片の 9 個一括儀式は 36 個の指定が 1 個になっていた)。
+     *
+     * <p>個数の読み取りだけ {@link #ritualResultAmount} へ寄せて、両方の儀式ローダーが同じ1本を通るようにした。
+     * ローダー本体を分けたまま個数だけ各々で読むと、同じ取りこぼしがまた起きる。
+     *
+     * <p>{@code void} ではなく組み立てた {@link RitualRecipe} を返すのは、プラグイン無しで
+     * 結果個数を検証できるようにするため（テストから直接呼ぶ）。
+     */
+    RitualRecipe materialRitualFrom(String id, String recipeKey,
+                                    ConfigurationSection recipeSection,
+                                    ConfigurationSection matSection) {
         // 生の display_name を連結すると "&6&l無限ソース核精製" がそのままGUIへ出る(2026-08-03 実バグ)。
         // materials.yml はレガシー &記法なので、必ず DisplayText でプレーン化してから連結する。
         String name = displayName(matSection.getString("display_name", id), id) + "精製";
@@ -404,9 +426,20 @@ public class UnifiedRecipeLoader {
         int source = recipeSection.getInt("source", 0);
 
         // 登録キーだけ一意化する。結果アイテムは常に元の素材ID。
-        ritualRecipes.add(new RitualRecipe(
+        return new RitualRecipe(
             recipeKey, name, coreItem, pedestalItems, source,
-            id, null, "craft", Map.of()));
+            id, null, "craft", Map.of(), ritualResultAmount(recipeSection));
+    }
+
+    /**
+     * 儀式の結果個数（{@code result-amount}、既定 1）。
+     *
+     * <p><b>儀式ローダーは2本あるので、必ずここを通す。</b> 0 以下は 1 に丸める
+     * ({@code ItemStack#setAmount(0)} は「空のスタック」になり、儀式が成功したのに何も出ない
+     * という一番分かりにくい壊れ方をするため)。
+     */
+    static int ritualResultAmount(ConfigurationSection recipeSection) {
+        return Math.max(1, recipeSection.getInt("result-amount", 1));
     }
 
     // ============================
@@ -474,7 +507,7 @@ public class UnifiedRecipeLoader {
 
         String effectType = recipeSection.getString("effect-type", "craft");
         Map<String, String> effectParams = parseEffectParams(recipeSection);
-        int resultAmount = recipeSection.getInt("result-amount", 1);
+        int resultAmount = ritualResultAmount(recipeSection);
 
         ritualRecipes.add(new RitualRecipe(
             recipeKey, name, coreItem, pedestalItems, source,
