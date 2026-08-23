@@ -26,11 +26,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <ol>
  *   <li><b>2つの倍率が段ごとに単調増加</b> —— 上位が下位より遅い/実入りが少ない、という
  *       気づきにくい逆転を止める。</li>
- *   <li><b>無印5種は転送倍率を書かない</b> —— レートは既定1.0のままにして「階梯を入れたら
- *       無印のレートが変わった」を防ぐ。
- *       ⚠ 2026-08-24 に<b>生成量だけ</b>は無印にも書くようになった(階梯 tier1 = 2.0)。
- *       生成量倍率を 2 の階梯乗へ張り替えるユーザー指示によるもので、
- *       「無印は倍率キーを一切持たない」という元の不変条件はここで意図的に緩めている。</li>
+ *   <li><b>2つの倍率が 2 の階梯乗で、かつ全段で互いに一致する</b> —— 2026-08-24 の指示。
+ *       無印を tier1 とみなして 2 / 4 / 8 / … / 512。
+ *       ⚠ 元は「無印5種は倍率キーを一切持たない(=1.0)」を不変条件にしていたが、
+ *       無印にも倍率を乗せる指示だったのでここで<b>意図的に緩めている</b>。
+ *       ⚠ 2つを同率にするのは「階梯を上げても生成と排出の釣り合いを変えない」ため。
+ *       片方だけ上げると、その段だけバッファが詰まる(または空になる)。</li>
  *   <li><b>レシピの (core-item, pedestal-items) の組が全体で一意</b> —— 重複すると後から
  *       登録した段が {@code findFirst} に負けて<b>永久にクラフト不可</b>になる
  *       ({@code docs/agent-context/common-traps.md})。</li>
@@ -54,10 +55,10 @@ class ShippedSourceLadderTest {
             List.of("ii", "ii_b", "iii", "iii_b", "iv", "iv_b", "v", "vi");
 
     /**
-     * 無印(階梯 tier1)の生成量倍率。2026-08-24 にユーザー指示で生成量倍率を
-     * <b>2 の階梯乗</b>へ張り替えたときの起点で、以降 _ii=4 … _vi=512 と倍々になる。
+     * 無印(階梯 tier1)の倍率。2026-08-24 にユーザー指示で<b>転送レート倍率と生成量倍率の
+     * 両方</b>を 2 の階梯乗へ張り替えたときの起点で、以降 _ii=4 … _vi=512 と倍々になる。
      */
-    private static final double BASE_YIELD = 2.0;
+    private static final double BASE_MULTIPLIER = 2.0;
 
     /** 「ソースジャー II」「炉 III」のような数字の段表記(全角/半角のローマ数字も含む)。 */
     private static final Pattern NUMERIC_TIER =
@@ -123,38 +124,59 @@ class ShippedSourceLadderTest {
     }
 
     @Test
-    @DisplayName("無印5種は転送倍率を書かず、生成倍率だけ 2.0 を持つ(2026-08-24 の 2^tier 化)")
-    void baseSourcelinksCarryOnlyTheYieldMultiplier() {
+    @DisplayName("無印5種も階梯 tier1 として両方の倍率 2.0 を持つ(2026-08-24 の 2^tier 化)")
+    void baseSourcelinksCarryTheTierOneMultipliers() {
         ConfigurationSection items = items();
-        for (String type : TYPES) {
-            ConfigurationSection entry = items.getConfigurationSection(type + "_sourcelink");
-            assertNotNull(entry);
-            assertTrue(!entry.isSet("transfer-multiplier"),
-                    type + "_sourcelink (無印) には transfer-multiplier を書かない"
-                            + "(既定1.0を明示すると『無印のレートを触った』差分に見えてしまう。"
-                            + "レート側は 2026-08-24 の生成量改定でも据え置き)");
-            assertEquals(BASE_YIELD, entry.getDouble("yield-multiplier"), 1e-9,
-                    type + "_sourcelink (無印) の yield-multiplier が " + BASE_YIELD + " ではない。"
-                            + "無印は階梯 tier1 として 2^1 を持つのが 2026-08-24 の指示"
-                            + "(この値を落とすと無印だけ 1.0 に戻り、階梯の最下段が抜ける)");
+        for (String key : List.of("transfer-multiplier", "yield-multiplier")) {
+            for (String type : TYPES) {
+                ConfigurationSection entry = items.getConfigurationSection(type + "_sourcelink");
+                assertNotNull(entry);
+                assertEquals(BASE_MULTIPLIER, entry.getDouble(key), 1e-9,
+                        type + "_sourcelink (無印) の " + key + " が " + BASE_MULTIPLIER + " ではない。"
+                                + "無印は階梯 tier1 として 2^1 を持つのが 2026-08-24 の指示"
+                                + "(落とすと無印だけ 1.0 に戻り、階梯の最下段が抜ける)");
+            }
         }
     }
 
     @Test
-    @DisplayName("生成量倍率が段ごとにちょうど2倍(=2^tier)になっている")
-    void yieldMultiplierDoublesAtEveryRung() {
+    @DisplayName("転送レート倍率も生成量倍率も段ごとにちょうど2倍(=2^tier)になっている")
+    void bothMultipliersDoubleAtEveryRung() {
+        ConfigurationSection items = items();
+        for (String key : List.of("transfer-multiplier", "yield-multiplier")) {
+            for (String type : TYPES) {
+                double expected = BASE_MULTIPLIER;
+                String base = type + "_sourcelink";
+                assertEquals(expected, items.getDouble(base + "." + key), 1e-9,
+                        base + " (無印) の " + key + " がずれている");
+                for (String tier : TIERS) {
+                    expected *= 2.0;
+                    String id = base + "_" + tier;
+                    assertEquals(expected, items.getDouble(id + "." + key), 1e-9,
+                            id + " の " + key + " が 2^tier からずれている。"
+                                    + "1段でも外すと階梯全体の伸びが崩れる(上限は _vi の 512.0)");
+                }
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("転送レート倍率と生成量倍率が全段で一致する(片方だけ動かすと詰まり方が段で変わる)")
+    void theTwoMultipliersStayEqualAtEveryRung() {
         ConfigurationSection items = items();
         for (String type : TYPES) {
-            double expected = BASE_YIELD;
-            String base = type + "_sourcelink";
-            assertEquals(expected, items.getDouble(base + ".yield-multiplier"), 1e-9,
-                    base + " (無印) の生成量倍率がずれている");
+            List<String> ids = new ArrayList<>();
+            ids.add(type + "_sourcelink");
             for (String tier : TIERS) {
-                expected *= 2.0;
-                String id = base + "_" + tier;
-                assertEquals(expected, items.getDouble(id + ".yield-multiplier"), 1e-9,
-                        id + " の生成量倍率が 2^tier からずれている。"
-                                + "1段でも外すと階梯全体の伸びが崩れる(上限は _vi の 512.0)");
+                ids.add(type + "_sourcelink_" + tier);
+            }
+            for (String id : ids) {
+                assertEquals(items.getDouble(id + ".transfer-multiplier"),
+                        items.getDouble(id + ".yield-multiplier"), 1e-9,
+                        id + " の転送レート倍率と生成量倍率が食い違っている。"
+                                + "2026-08-24 の設計は『2つを同率にして、階梯を上げても"
+                                + "生成と排出の釣り合いを変えない』こと。"
+                                + "片方だけ上げると、その段だけバッファが詰まる/空になる");
             }
         }
     }
