@@ -1,8 +1,8 @@
 # ============================================================
 # functional-items.yml - 機能アイテム設定 (2026-07-25 統合)
 # ============================================================
-# 対象7アイテム: dominion_wand / teleport_compass / pedestal / ritual_core /
-#                scribing_table / waystone / source_berry
+# 対象8アイテム: dominion_wand / teleport_compass / pedestal / ritual_core /
+#                scribing_table / waystone / infinity_source_core / source_berry
 # (ワンド/コンパス/儀式ブロック等、プログラム制御の機能アイテム)
 #
 # 2026-08-14 追加: エンチャント本8件 (enchant_book_*)。
@@ -18,9 +18,9 @@
 #   lore          : 説明文リスト (MiniMessage記法)
 #   enchant-glow  : エンチャント光の表示有無 (true/false)
 #   material      : 素材 (※ dominion_wand / teleport_compass / source_berry の
-#                   「保持アイテム」3種のみ有効。pedestal/ritual_core/scribing_table/waystone
-#                   の「ブロック」4種はTileState対応判定・儀式の近傍探索等、Materialに
-#                   密結合したコードが複数あるため未対応。書いても無視され警告ログが出る)
+#                   「保持アイテム」3種のみ有効。pedestal/ritual_core/scribing_table/waystone/
+#                   infinity_source_core の「ブロック」5種はTileState対応判定・儀式の近傍探索等、
+#                   Materialに密結合したコードが複数あるため未対応。書いても無視され警告ログが出る)
 #   recipe        : クラフトレシピ。method: workbench(作業台/2×2インベントリ) または
 #                   method: ritual(儀式) に対応。記法は下記参照。
 #
@@ -136,6 +136,32 @@ items:
         - CHORUS_FLOWER x2
         - DIAMOND_BLOCK x2
       source: 1000
+      type: shapeless
+      ingredients: []
+  # 到達証明「無限ソース核」。実体は Java のカスタムブロック(InfinitySourceCore)。
+  # ⚠ 2026-08-24 に materials.yml から移設した。あちらにも同じ id の定義が残っていたが、
+  #   ブロック登録済みの id は素材アイテム登録の側で丸ごとスキップされる仕様なので、
+  #   base_material(NETHER_STAR)も display_name も lore も一度も効いていなかった
+  #   (効いていたのは recipe だけ)。実装を Java 側で特別扱いしているアイテムは
+  #   materials.yml ではなくこの「特殊アイテム」へ置くこと。
+  # material / custom-model-data はブロック系なので編集不可(書いても無視され警告が出る)。
+  infinity_source_core:
+    display-name: <gold><bold>無限ソース核</bold></gold>
+    enchant-glow: true
+    lore:
+      - <dark_purple>ここまでに築いた貯蔵設備そのものを焚べた結果。</dark_purple>
+      - <dark_purple>1億のソースが1点に折り畳まれている。</dark_purple>
+      - ""
+      - <yellow>第2の目標「1億ソース」の到達証明</yellow>
+      - <gray>設置すると周囲のソースリンクを強化する</gray>
+      - <dark_gray>右クリックで回収可能(消費されない)</dark_gray>
+    recipe:
+      method: ritual
+      core-item: custom:source_singularity_jar
+      pedestal-items:
+        - custom:source_singularity_jar x3
+        - custom:source_engine x8
+      source: 45000000
       type: shapeless
       ingredients: []
   source_berry:

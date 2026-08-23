@@ -116,20 +116,6 @@ materials:
         source: 100
         core-item: AMETHYST_SHARD
       - method: ritual
-        type: shapeless
-        ingredients: []
-        pedestal-items:
-          - COAL_BLOCK
-        source: 100
-        core-item: AMETHYST_SHARD
-      # 【一括版 2026-08-23 (W-189)】儀式の試行回数が多すぎるという報告への対応。
-      #   1つ上の「AMETHYST_SHARD + COAL x4 → 4個 / ソース100」を**厳密に9倍**したもの。
-      #   9個ぶんのアメジスト(custom:amethyst_shard_1x) + 石炭36個(COAL_BLOCK x4) で 36個。
-      #   ⚠ 素材効率は素の儀式と完全に同じ。ここを 9倍から外すと「まとめると得/損」になり、
-      #     欠片の供給量そのものが変わる(下流の結晶・凝縮物・機関まで全部ずれる)。
-      #   ⚠ 台座は1台につき1個なので、pedestal-items の要素数がそのまま必要な台座の数。
-      #     RitualManager が拾えるのは中心から Chebyshev 距離2のリング = 1層あたり16台まで。
-      - method: ritual
         core-item: custom:amethyst_shard_1x
         pedestal-items:
           - COAL_BLOCK x4
@@ -138,6 +124,7 @@ materials:
         result-amount: 36
         type: shapeless
         ingredients: []
+        amount: 9
   amethyst_shard_1x:
     base_material: AMETHYST_SHARD
     custom_model_data: 5447
@@ -192,11 +179,6 @@ materials:
         result-amount: 4
         type: shapeless
         ingredients: []
-      # 【一括版 2026-08-23 (W-189)】上を**厳密に9倍**したもの。
-      #   欠片 72個(圧縮欠片8個ぶん) + 光石の粉36個(GLOWSTONE x9 = 4個/ブロック) で 36個。
-      #   ⚠ 台座は 7 + 9 = 16 台。RitualManager が1層で拾える上限ちょうど
-      #     (Chebyshev 距離2のリング = 16マス)。これ以上素材を増やすなら圧縮品を作るしかない。
-      #   ⚠ 素材効率は素の儀式と完全に同じ。9倍から外すと結晶の供給量が変わる。
       - method: ritual
         core-item: custom:source_shard_1x
         pedestal-items:
@@ -207,6 +189,7 @@ materials:
         result-amount: 36
         type: shapeless
         ingredients: []
+        amount: 9
   source_condenser:
     base_material: HEART_OF_THE_SEA
     custom_model_data: 5443
@@ -243,27 +226,49 @@ materials:
       result-amount: 4
       type: shapeless
       ingredients: []
-  infinity_source_core:
-    base_material: NETHER_STAR
-    custom_model_data: 5445
-    display_name: "&6&l無限ソース核"
+  # ⚠ infinity_source_core はここに書かない(2026-08-24 に functional-items.yml へ移設)。
+  #   実体は Java のカスタムブロック(InfinitySourceCore)で、ブロック登録済みの id は
+  #   素材アイテム登録の側で丸ごとスキップされる。つまりここに書いた base_material /
+  #   display_name / lore は一度も効かず、設定エディタで直しても無反応になる。
+  #   表示と儀式レシピの正典は functional-items.yml(「特殊アイテム」画面)。
+  source_gem_block_1x:
+    base_material: AMETHYST_BLOCK
+    custom_model_data: 100012
     enchant_glow: true
+    display_name: "&b9倍圧縮ソースジェムブロック"
     lore:
-      - "&5ここまでに築いた貯蔵設備そのものを焚べた結果。"
-      - "&51億のソースが1点に折り畳まれている。"
+      - "&7ソースジェム81個分の結晶塊"
       - ""
-      - "&e第2の目標「1億ソース」の到達証明"
+      - "&5すべての核となれ"
     recipe:
-      method: ritual
-      core-item: custom:source_singularity_jar
-      pedestal-items:
-        - custom:source_singularity_jar x3
-        - custom:source_engine x8
-      source: 45000000
-      result: custom:infinity_source_core
-      result-amount: 1
-      type: shapeless
-      ingredients: []
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:source_gem_block
+      shape:
+        - iii
+        - iii
+        - iii
+  source_gem_block_2x:
+    base_material: AMETHYST_BLOCK
+    custom_model_data: 100012
+    enchant_glow: true
+    display_name: "&b81倍圧縮ソースジェムブロック"
+    lore:
+      - "&7ソースジェム729個分の結晶塊"
+      - ""
+      - "&5すべての核となれ"
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:source_gem_block_1x
+      shape:
+        - iii
+        - iii
+        - iii
   stone_1x:
     base_material: STONE
     custom_model_data: 100041
@@ -3519,44 +3524,6 @@ materials:
       - "&7&o世界を繋ぐ者の聖所の主を討った証。"
       - ""
       - "&6踏破の証明(図鑑に記録される)"
-  source_gem_block_1x:
-    base_material: AMETHYST_BLOCK
-    custom_model_data: 100012
-    enchant_glow: true
-    display_name: "&b9倍圧縮ソースジェムブロック"
-    lore:
-      - "&7ソースジェム81個分の結晶塊"
-      - ""
-      - "&5すべての核となれ"
-    recipe:
-      method: workbench
-      reversible: true
-      type: shaped
-      ingredients:
-        i: custom:source_gem_block
-      shape:
-        - iii
-        - iii
-        - iii
-  source_gem_block_2x:
-    base_material: AMETHYST_BLOCK
-    custom_model_data: 100012
-    enchant_glow: true
-    display_name: "&b81倍圧縮ソースジェムブロック"
-    lore:
-      - "&7ソースジェム729個分の結晶塊"
-      - ""
-      - "&5すべての核となれ"
-    recipe:
-      method: workbench
-      reversible: true
-      type: shaped
-      ingredients:
-        i: custom:source_gem_block_1x
-      shape:
-        - iii
-        - iii
-        - iii
   gacha_ticket_fishing:
     base_material: PAPER
     custom_model_data: 5015
@@ -3995,9 +3962,10 @@ _editor:
           - source_crystal
           - source_condenser
           - source_engine
-          - infinity_source_core
           - source_gem_block_1x
           - source_gem_block_2x
+          - amethyst_shard_1x
+          - source_shard_1x
       - id: cat_1784733374294
         label: 食料
         itemIds:
@@ -4158,10 +4126,13 @@ _editor:
       - magebloom_fiber
       - sourcestone
       - source_shard
+      - amethyst_shard_1x
+      - source_shard_1x
       - source_crystal
       - source_condenser
       - source_engine
-      - infinity_source_core
+      - source_gem_block_1x
+      - source_gem_block_2x
       - stone_1x
       - stone_2x
       - stone_3x
