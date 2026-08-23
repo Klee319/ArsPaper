@@ -351,6 +351,8 @@ items:
     lore:
       - "燃料を燃やしてソースを生成"
       - "燃料を手に持って右クリックで投入"
+      - "生成量 x2.0"
+    yield-multiplier: 2.0
     recipe:
       method: ritual
       core-item: FURNACE
@@ -368,6 +370,8 @@ items:
     lore:
       - "食料を消費してソースを生成"
       - "食料を手に持って右クリックで投入"
+      - "生成量 x2.0"
+    yield-multiplier: 2.0
     recipe:
       method: ritual
       core-item: SMOKER
@@ -385,6 +389,8 @@ items:
     custom-model-data: 200005
     lore:
       - "醸造素材を消費してソースを生成"
+      - "生成量 x2.0"
+    yield-multiplier: 2.0
     recipe:
       method: ritual
       core-item: BLAST_FURNACE
@@ -401,6 +407,8 @@ items:
     custom-model-data: 200006
     lore:
       - "生命の力でソースを生成"
+      - "生成量 x2.0"
+    yield-multiplier: 2.0
     recipe:
       method: ritual
       core-item: BARREL
@@ -417,6 +425,8 @@ items:
     custom-model-data: 200007
     lore:
       - "植物の成長からソースを生成"
+      - "生成量 x2.0"
+    yield-multiplier: 2.0
     recipe:
       method: ritual
       core-item: BEEHIVE
@@ -448,8 +458,22 @@ items:
   #        毎周期ソースが増える無限増殖になる(理由の全文は SourceGenerationScaling の javadoc)。
   #   どちらも未設定なら 1.0 = 無印と完全に同じ挙動。0以下/非有限値は警告のうえ 1.0 へ落とす。
   #
-  # 【段の設計】生成量倍率を転送より緩くしているのは、生成量は素材効率そのもの
-  #   (=無限資源に近づく)なので、速度より伸びを抑えたいため。
+  # 【段の設計 2026-08-24 改定】生成量倍率は <b>2 の 階梯乗</b> に張り替えた(ユーザー指示)。
+  #   無印を tier1 とみなして 2 / 4 / 8 / 16 / 32 / 64 / 128 / 256 / 512。
+  #   ⚠ <b>無印にも倍率が乗るようになった</b>(2.0)。以前は「無印は倍率キーを持たない=1.0」を
+  #     不変条件として ShippedSourceLadderTest が固定していたので、そちらも同時に緩めてある。
+  #
+  #   ⚠ これで <b>生成量が転送レートを大きく追い越した</b>(最上段で生成 x512 / 転送 x32)。
+  #     以前は逆に生成側を緩くしていたが、その前提はもう成り立たない。実際の律速はほぼ
+  #     完全に転送側になる ── バッファ上限(buffer-cap)は int 上限で実質無制限なので
+  #     生成分が消えることはないが、ジャーへ流れ込む速さは transfer-multiplier のままである。
+  #     生成を増やしても回収が速くなるわけではない、という形の階梯になっている。
+  #
+  #   ⚠ 最上段では int の上限に当たりうる。ソース機関(custom:source_engine = 3,000万)を
+  #     スニークで1スタック(64個)焼べると 19.2億 x 512 ≒ 9,800億で、
+  #     SourceGenerationScaling が int 上限(約21.4億)へ切り詰める(負値には化けない)。
+  #     つまり最上段で機関を一括投入すると <b>投入分の大半は捨てられる</b>。
+  #     高階梯では安い燃料を回す方が効率がよい、という逆転が起きる点に注意。
   #
   # 【2026-08-23 (W-189) に 4段 → 8段へ細分化】それまで触媒は
   #   欠片(_ii) / 結晶(_iii) / 凝縮物(_iv) / 機関(_v) と1段ずつしか無く、
@@ -458,7 +482,8 @@ items:
   #   触媒ごとに「同じ触媒で届く2段目」を1つずつ足して 8段にした:
   #     _ii(欠片x4) → _ii_b(欠片x8) → _iii(結晶x4) → _iii_b(結晶x8)
   #     → _iv(凝縮物x4) → _iv_b(凝縮物x8) → _v(機関x2) → _vi(機関x3+深淵の延べ棒)
-  #   倍率: 転送 x2/x4/x6/x8/x12/x16/x24/x32、生成 x1.5/x2/x2.5/x3/x3.5/x4/x5/x6。
+  #   倍率: 転送 x2/x4/x6/x8/x12/x16/x24/x32、生成 x4/x8/x16/x32/x64/x128/x256/x512
+  #   (生成側は 2026-08-24 に 2の階梯乗へ張り替え。旧値は x1.5/x2/x2.5/x3/x3.5/x4/x5/x6)。
   #   ⚠ <b>既存の段は誰も弱くしていない</b> ── 新段は上へ伸ばして空いた位置に入れてあり、
   #     _iii は x4.0/x2.0 → x6.0/x2.5 と<b>上がって</b>いる。既存プレイヤーの設置済み
   #     ソースリンクが弱体化しないのが、この足し方を選んだ理由。
@@ -486,9 +511,9 @@ items:
     display-name: "&c焔喰いの炉"
     lore:
       - "焔を喰らって育った燃料炉"
-      - "転送レート x2.0 / 生成量 x1.5"
+      - "転送レート x2.0 / 生成量 x4.0"
     transfer-multiplier: 2.0
-    yield-multiplier: 1.5
+    yield-multiplier: 4.0
     recipe:
       method: ritual
       core-item: custom:volcanic_sourcelink
@@ -503,9 +528,9 @@ items:
     display-name: "&c熾火溜めの炉"
     lore:
       - "熾火を絶やさず溜め込む炉"
-      - "転送レート x4.0 / 生成量 x2.0"
+      - "転送レート x4.0 / 生成量 x8.0"
     transfer-multiplier: 4.0
-    yield-multiplier: 2.0
+    yield-multiplier: 8.0
     recipe:
       method: ritual
       core-item: custom:volcanic_sourcelink_ii
@@ -520,9 +545,9 @@ items:
     display-name: "&4溶岩心の大炉"
     lore:
       - "溶岩の心臓を埋めた大炉"
-      - "転送レート x6.0 / 生成量 x2.5"
+      - "転送レート x6.0 / 生成量 x16.0"
     transfer-multiplier: 6.0
-    yield-multiplier: 2.5
+    yield-multiplier: 16.0
     recipe:
       method: ritual
       core-item: custom:volcanic_sourcelink_ii_b
@@ -537,9 +562,9 @@ items:
     display-name: "&4灼熱脈の大炉"
     lore:
       - "灼熱の脈が走り続ける大炉"
-      - "転送レート x8.0 / 生成量 x3.0"
+      - "転送レート x8.0 / 生成量 x32.0"
     transfer-multiplier: 8.0
-    yield-multiplier: 3.0
+    yield-multiplier: 32.0
     recipe:
       method: ritual
       core-item: custom:volcanic_sourcelink_iii
@@ -554,9 +579,9 @@ items:
     display-name: "&6火霊王の溶炉"
     lore:
       - "火の霊が住み着いた溶炉"
-      - "転送レート x12.0 / 生成量 x3.5"
+      - "転送レート x12.0 / 生成量 x64.0"
     transfer-multiplier: 12.0
-    yield-multiplier: 3.5
+    yield-multiplier: 64.0
     recipe:
       method: ritual
       core-item: custom:volcanic_sourcelink_iii_b
@@ -571,9 +596,9 @@ items:
     display-name: "&6煉獄門の溶炉"
     lore:
       - "煉獄へ口を開けた溶炉"
-      - "転送レート x16.0 / 生成量 x4.0"
+      - "転送レート x16.0 / 生成量 x128.0"
     transfer-multiplier: 16.0
-    yield-multiplier: 4.0
+    yield-multiplier: 128.0
     recipe:
       method: ritual
       core-item: custom:volcanic_sourcelink_iv
@@ -588,9 +613,9 @@ items:
     display-name: "&4&l星焔の煉炉"
     lore:
       - "星の焔で焚く煉炉"
-      - "転送レート x24.0 / 生成量 x5.0"
+      - "転送レート x24.0 / 生成量 x256.0"
     transfer-multiplier: 24.0
-    yield-multiplier: 5.0
+    yield-multiplier: 256.0
     recipe:
       method: ritual
       core-item: custom:volcanic_sourcelink_iv_b
@@ -605,9 +630,9 @@ items:
     display-name: "&c&l超新星の煉炉"
     lore:
       - "星が砕けるたびに焔が増す煉炉"
-      - "転送レート x32.0 / 生成量 x6.0"
+      - "転送レート x32.0 / 生成量 x512.0"
     transfer-multiplier: 32.0
-    yield-multiplier: 6.0
+    yield-multiplier: 512.0
     recipe:
       method: ritual
       core-item: custom:volcanic_sourcelink_v
@@ -624,9 +649,9 @@ items:
     display-name: "&a菌糸織りの燻製器"
     lore:
       - "菌糸を織り込んだ燻製器"
-      - "転送レート x2.0 / 生成量 x1.5"
+      - "転送レート x2.0 / 生成量 x4.0"
     transfer-multiplier: 2.0
-    yield-multiplier: 1.5
+    yield-multiplier: 4.0
     recipe:
       method: ritual
       core-item: custom:mycelial_sourcelink
@@ -641,9 +666,9 @@ items:
     display-name: "&a菌輪の燻製器"
     lore:
       - "菌が輪を描いて広がる燻製器"
-      - "転送レート x4.0 / 生成量 x2.0"
+      - "転送レート x4.0 / 生成量 x8.0"
     transfer-multiplier: 4.0
-    yield-multiplier: 2.0
+    yield-multiplier: 8.0
     recipe:
       method: ritual
       core-item: custom:mycelial_sourcelink_ii
@@ -658,9 +683,9 @@ items:
     display-name: "&2胞子雨の大燻炉"
     lore:
       - "胞子の雨が降り続く大燻炉"
-      - "転送レート x6.0 / 生成量 x2.5"
+      - "転送レート x6.0 / 生成量 x16.0"
     transfer-multiplier: 6.0
-    yield-multiplier: 2.5
+    yield-multiplier: 16.0
     recipe:
       method: ritual
       core-item: custom:mycelial_sourcelink_ii_b
@@ -675,9 +700,9 @@ items:
     display-name: "&2霧胞の大燻炉"
     lore:
       - "霧のような胞子が満ちる大燻炉"
-      - "転送レート x8.0 / 生成量 x3.0"
+      - "転送レート x8.0 / 生成量 x32.0"
     transfer-multiplier: 8.0
-    yield-multiplier: 3.0
+    yield-multiplier: 32.0
     recipe:
       method: ritual
       core-item: custom:mycelial_sourcelink_iii
@@ -692,9 +717,9 @@ items:
     display-name: "&a腐海の培養炉"
     lore:
       - "腐海をまるごと抱えた培養炉"
-      - "転送レート x12.0 / 生成量 x3.5"
+      - "転送レート x12.0 / 生成量 x64.0"
     transfer-multiplier: 12.0
-    yield-multiplier: 3.5
+    yield-multiplier: 64.0
     recipe:
       method: ritual
       core-item: custom:mycelial_sourcelink_iii_b
@@ -709,9 +734,9 @@ items:
     display-name: "&a腐海心の培養炉"
     lore:
       - "腐海の中心を切り取った培養炉"
-      - "転送レート x16.0 / 生成量 x4.0"
+      - "転送レート x16.0 / 生成量 x128.0"
     transfer-multiplier: 16.0
-    yield-multiplier: 4.0
+    yield-multiplier: 128.0
     recipe:
       method: ritual
       core-item: custom:mycelial_sourcelink_iv
@@ -726,9 +751,9 @@ items:
     display-name: "&2&l母菌床の大炉"
     lore:
       - "すべての菌糸が還る母菌床"
-      - "転送レート x24.0 / 生成量 x5.0"
+      - "転送レート x24.0 / 生成量 x256.0"
     transfer-multiplier: 24.0
-    yield-multiplier: 5.0
+    yield-multiplier: 256.0
     recipe:
       method: ritual
       core-item: custom:mycelial_sourcelink_iv_b
@@ -743,9 +768,9 @@ items:
     display-name: "&a&l始原菌の大炉"
     lore:
       - "すべての菌の始まりを飼う大炉"
-      - "転送レート x32.0 / 生成量 x6.0"
+      - "転送レート x32.0 / 生成量 x512.0"
     transfer-multiplier: 32.0
-    yield-multiplier: 6.0
+    yield-multiplier: 512.0
     recipe:
       method: ritual
       core-item: custom:mycelial_sourcelink_v
@@ -762,9 +787,9 @@ items:
     display-name: "&d賢者見習いの坩堝"
     lore:
       - "見習いでも扱える坩堝"
-      - "転送レート x2.0 / 生成量 x1.5"
+      - "転送レート x2.0 / 生成量 x4.0"
     transfer-multiplier: 2.0
-    yield-multiplier: 1.5
+    yield-multiplier: 4.0
     recipe:
       method: ritual
       core-item: custom:alchemical_sourcelink
@@ -779,9 +804,9 @@ items:
     display-name: "&d錬金士の坩堝"
     lore:
       - "錬金士が日々使い込む坩堝"
-      - "転送レート x4.0 / 生成量 x2.0"
+      - "転送レート x4.0 / 生成量 x8.0"
     transfer-multiplier: 4.0
-    yield-multiplier: 2.0
+    yield-multiplier: 8.0
     recipe:
       method: ritual
       core-item: custom:alchemical_sourcelink_ii
@@ -796,9 +821,9 @@ items:
     display-name: "&5賢者の坩堝"
     lore:
       - "賢者が使い込んだ坩堝"
-      - "転送レート x6.0 / 生成量 x2.5"
+      - "転送レート x6.0 / 生成量 x16.0"
     transfer-multiplier: 6.0
-    yield-multiplier: 2.5
+    yield-multiplier: 16.0
     recipe:
       method: ritual
       core-item: custom:alchemical_sourcelink_ii_b
@@ -813,9 +838,9 @@ items:
     display-name: "&5賢者石の坩堝"
     lore:
       - "賢者の石を沈めた坩堝"
-      - "転送レート x8.0 / 生成量 x3.0"
+      - "転送レート x8.0 / 生成量 x32.0"
     transfer-multiplier: 8.0
-    yield-multiplier: 3.0
+    yield-multiplier: 32.0
     recipe:
       method: ritual
       core-item: custom:alchemical_sourcelink_iii
@@ -830,9 +855,9 @@ items:
     display-name: "&d第五元素の坩堝"
     lore:
       - "第五元素を溶かす坩堝"
-      - "転送レート x12.0 / 生成量 x3.5"
+      - "転送レート x12.0 / 生成量 x64.0"
     transfer-multiplier: 12.0
-    yield-multiplier: 3.5
+    yield-multiplier: 64.0
     recipe:
       method: ritual
       core-item: custom:alchemical_sourcelink_iii_b
@@ -847,9 +872,9 @@ items:
     display-name: "&d虚無溶けの坩堝"
     lore:
       - "虚無すら溶かし込む坩堝"
-      - "転送レート x16.0 / 生成量 x4.0"
+      - "転送レート x16.0 / 生成量 x128.0"
     transfer-multiplier: 16.0
-    yield-multiplier: 4.0
+    yield-multiplier: 128.0
     recipe:
       method: ritual
       core-item: custom:alchemical_sourcelink_iv
@@ -864,9 +889,9 @@ items:
     display-name: "&5&l万物溶解の大坩堝"
     lore:
       - "万物を溶かし尽くす大坩堝"
-      - "転送レート x24.0 / 生成量 x5.0"
+      - "転送レート x24.0 / 生成量 x256.0"
     transfer-multiplier: 24.0
-    yield-multiplier: 5.0
+    yield-multiplier: 256.0
     recipe:
       method: ritual
       core-item: custom:alchemical_sourcelink_iv_b
@@ -881,9 +906,9 @@ items:
     display-name: "&d&l原初元素の大坩堝"
     lore:
       - "原初の元素を煮出す大坩堝"
-      - "転送レート x32.0 / 生成量 x6.0"
+      - "転送レート x32.0 / 生成量 x512.0"
     transfer-multiplier: 32.0
-    yield-multiplier: 6.0
+    yield-multiplier: 512.0
     recipe:
       method: ritual
       core-item: custom:alchemical_sourcelink_v
@@ -900,9 +925,9 @@ items:
     display-name: "&f息吹の樽"
     lore:
       - "息吹を溜め込む樽"
-      - "転送レート x2.0 / 生成量 x1.5"
+      - "転送レート x2.0 / 生成量 x4.0"
     transfer-multiplier: 2.0
-    yield-multiplier: 1.5
+    yield-multiplier: 4.0
     recipe:
       method: ritual
       core-item: custom:vitalic_sourcelink
@@ -917,9 +942,9 @@ items:
     display-name: "&f脈動の樽"
     lore:
       - "中で鼓動が響き続ける樽"
-      - "転送レート x4.0 / 生成量 x2.0"
+      - "転送レート x4.0 / 生成量 x8.0"
     transfer-multiplier: 4.0
-    yield-multiplier: 2.0
+    yield-multiplier: 8.0
     recipe:
       method: ritual
       core-item: custom:vitalic_sourcelink_ii
@@ -934,9 +959,9 @@ items:
     display-name: "&7生命律の樽"
     lore:
       - "生命の律動を刻む樽"
-      - "転送レート x6.0 / 生成量 x2.5"
+      - "転送レート x6.0 / 生成量 x16.0"
     transfer-multiplier: 6.0
-    yield-multiplier: 2.5
+    yield-multiplier: 16.0
     recipe:
       method: ritual
       core-item: custom:vitalic_sourcelink_ii_b
@@ -951,9 +976,9 @@ items:
     display-name: "&7魂繋ぎの樽"
     lore:
       - "魂を繋ぎ止める樽"
-      - "転送レート x8.0 / 生成量 x3.0"
+      - "転送レート x8.0 / 生成量 x32.0"
     transfer-multiplier: 8.0
-    yield-multiplier: 3.0
+    yield-multiplier: 32.0
     recipe:
       method: ritual
       core-item: custom:vitalic_sourcelink_iii
@@ -968,9 +993,9 @@ items:
     display-name: "&f輪廻の霊樽"
     lore:
       - "輪廻を閉じ込めた霊樽"
-      - "転送レート x12.0 / 生成量 x3.5"
+      - "転送レート x12.0 / 生成量 x64.0"
     transfer-multiplier: 12.0
-    yield-multiplier: 3.5
+    yield-multiplier: 64.0
     recipe:
       method: ritual
       core-item: custom:vitalic_sourcelink_iii_b
@@ -985,9 +1010,9 @@ items:
     display-name: "&f転生炉の霊樽"
     lore:
       - "転生の炉を組み込んだ霊樽"
-      - "転送レート x16.0 / 生成量 x4.0"
+      - "転送レート x16.0 / 生成量 x128.0"
     transfer-multiplier: 16.0
-    yield-multiplier: 4.0
+    yield-multiplier: 128.0
     recipe:
       method: ritual
       core-item: custom:vitalic_sourcelink_iv
@@ -1002,9 +1027,9 @@ items:
     display-name: "&7&l不死鳥の霊樽"
     lore:
       - "灰から蘇り続ける霊樽"
-      - "転送レート x24.0 / 生成量 x5.0"
+      - "転送レート x24.0 / 生成量 x256.0"
     transfer-multiplier: 24.0
-    yield-multiplier: 5.0
+    yield-multiplier: 256.0
     recipe:
       method: ritual
       core-item: custom:vitalic_sourcelink_iv_b
@@ -1019,9 +1044,9 @@ items:
     display-name: "&f&l生命樹の霊樽"
     lore:
       - "生命樹の根を張らせた霊樽"
-      - "転送レート x32.0 / 生成量 x6.0"
+      - "転送レート x32.0 / 生成量 x512.0"
     transfer-multiplier: 32.0
-    yield-multiplier: 6.0
+    yield-multiplier: 512.0
     recipe:
       method: ritual
       core-item: custom:vitalic_sourcelink_v
@@ -1038,9 +1063,9 @@ items:
     display-name: "&e芽吹きの巣"
     lore:
       - "芽吹きが絶えない巣"
-      - "転送レート x2.0 / 生成量 x1.5"
+      - "転送レート x2.0 / 生成量 x4.0"
     transfer-multiplier: 2.0
-    yield-multiplier: 1.5
+    yield-multiplier: 4.0
     recipe:
       method: ritual
       core-item: custom:botanical_sourcelink
@@ -1055,9 +1080,9 @@ items:
     display-name: "&e花冠の巣"
     lore:
       - "花が絶えず冠のように咲く巣"
-      - "転送レート x4.0 / 生成量 x2.0"
+      - "転送レート x4.0 / 生成量 x8.0"
     transfer-multiplier: 4.0
-    yield-multiplier: 2.0
+    yield-multiplier: 8.0
     recipe:
       method: ritual
       core-item: custom:botanical_sourcelink_ii
@@ -1072,9 +1097,9 @@ items:
     display-name: "&6万緑の巣"
     lore:
       - "万緑を呼び込む巣"
-      - "転送レート x6.0 / 生成量 x2.5"
+      - "転送レート x6.0 / 生成量 x16.0"
     transfer-multiplier: 6.0
-    yield-multiplier: 2.5
+    yield-multiplier: 16.0
     recipe:
       method: ritual
       core-item: custom:botanical_sourcelink_ii_b
@@ -1089,9 +1114,9 @@ items:
     display-name: "&6千樹の巣"
     lore:
       - "千本の樹を呼び寄せる巣"
-      - "転送レート x8.0 / 生成量 x3.0"
+      - "転送レート x8.0 / 生成量 x32.0"
     transfer-multiplier: 8.0
-    yield-multiplier: 3.0
+    yield-multiplier: 32.0
     recipe:
       method: ritual
       core-item: custom:botanical_sourcelink_iii
@@ -1106,9 +1131,9 @@ items:
     display-name: "&e世界樹の苗床"
     lore:
       - "世界樹の枝を挿した苗床"
-      - "転送レート x12.0 / 生成量 x3.5"
+      - "転送レート x12.0 / 生成量 x64.0"
     transfer-multiplier: 12.0
-    yield-multiplier: 3.5
+    yield-multiplier: 64.0
     recipe:
       method: ritual
       core-item: custom:botanical_sourcelink_iii_b
@@ -1123,9 +1148,9 @@ items:
     display-name: "&e天輪樹の苗床"
     lore:
       - "天へ伸びる輪樹の苗床"
-      - "転送レート x16.0 / 生成量 x4.0"
+      - "転送レート x16.0 / 生成量 x128.0"
     transfer-multiplier: 16.0
-    yield-multiplier: 4.0
+    yield-multiplier: 128.0
     recipe:
       method: ritual
       core-item: custom:botanical_sourcelink_iv
@@ -1140,9 +1165,9 @@ items:
     display-name: "&6&l豊穣女神の苗床"
     lore:
       - "豊穣の女神が宿る苗床"
-      - "転送レート x24.0 / 生成量 x5.0"
+      - "転送レート x24.0 / 生成量 x256.0"
     transfer-multiplier: 24.0
-    yield-multiplier: 5.0
+    yield-multiplier: 256.0
     recipe:
       method: ritual
       core-item: custom:botanical_sourcelink_iv_b
@@ -1157,9 +1182,9 @@ items:
     display-name: "&6&l原初森の苗床"
     lore:
       - "原初の森をそのまま抱えた苗床"
-      - "転送レート x32.0 / 生成量 x6.0"
+      - "転送レート x32.0 / 生成量 x512.0"
     transfer-multiplier: 32.0
-    yield-multiplier: 6.0
+    yield-multiplier: 512.0
     recipe:
       method: ritual
       core-item: custom:botanical_sourcelink_v
