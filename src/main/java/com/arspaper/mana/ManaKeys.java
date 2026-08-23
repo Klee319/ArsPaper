@@ -68,6 +68,16 @@ public final class ManaKeys {
     /** 儀式飛行の終了時刻（エポックミリ秒） */
     public static final NamespacedKey RITUAL_FLIGHT_END = new NamespacedKey(NAMESPACE, "ritual_flight_end");
 
+    /**
+     * スケール魔法の終了時刻（エポックミリ秒）。
+     *
+     * <p>属性修飾子は NBT に保存されて再ログイン・再起動を跨いで残るのに、解除役が
+     * スケジューラのタスクしか無かったため「抜けて入ると縮んだまま」になっていた（W-191）。
+     * 終了時刻をここへ書いておき、参加時／チャンク読み込み時に
+     * {@code ScaleEffect#restore} が読み直す。
+     */
+    public static final NamespacedKey SPELL_SCALE_END = new NamespacedKey(NAMESPACE, "spell_scale_end");
+
     /** 累計マナ消費量（統計用） */
     public static final NamespacedKey TOTAL_MANA_CONSUMED = new NamespacedKey(NAMESPACE, "total_mana_consumed");
 
