@@ -267,10 +267,11 @@ public class CustomItemListener implements Listener {
      */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onHopperToVanillaMachine(InventoryMoveItemEvent event) {
-        if (!isConsumingMachine(event.getDestination().getType())) {
+        org.bukkit.event.inventory.InventoryType destination = event.getDestination().getType();
+        if (!isConsumingMachine(destination)) {
             return;
         }
-        if (isConfigurableMaterial(event.getItem())) {
+        if (isBlockedFromMachine(event.getItem(), destination)) {
             event.setCancelled(true);
         }
     }
@@ -305,6 +306,44 @@ public class CustomItemListener implements Listener {
     }
 
     /**
+     * 「TF が意図して焼けるようにした素材だけ」を通してよい装置（2026-08-23）。
+     *
+     * <p>{@link #CONSUMING_MACHINES} と同じ理由で名前集合で持つ。溶鉱炉と醸造台は入れない ——
+     * 圧縮食料は溶鉱炉では焼けないので通しても得が無く、醸造台は<b>材料スロットが Material しか
+     * 見ずに飲み込む</b>ので、通した瞬間に W-172 と同じ「黙って消える」経路が復活する。
+     */
+    static final java.util.Set<String> SMELTING_MACHINES = java.util.Set.of("FURNACE", "SMOKER");
+
+    /**
+     * この素材をこの装置へ入れさせないか。
+     *
+     * <p>materials.yml 素材は原則すべて拒否({@code W-132})だが、TF の
+     * {@code compressed-smelting} に載っている id だけは<b>かまど／燻製器に限り</b>通す。
+     * 通さないと {@code CatalogRecipeRegistrar} が登録した圧縮精錬レシピが
+     * <b>一度も発火できない</b>（入れる経路が全部塞がっているため）。
+     */
+    private boolean isBlockedFromMachine(ItemStack item, InventoryType machine) {
+        if (!isConfigurableMaterial(item)) {
+            return false;
+        }
+        boolean smeltingBlock = machine != null && SMELTING_MACHINES.contains(machine.name());
+        return !(smeltingBlock && isSmeltingExempt(item));
+    }
+
+    /**
+     * TF の {@code compressed-smelting} が扱う素材か（入力・結果の両方）。
+     * TF 未ロード時は空集合が返るので、従来どおり全部塞がる（fail-closed）。
+     */
+    private static boolean isSmeltingExempt(ItemStack item) {
+        if (item == null || item.getType().isAir()) {
+            return false;
+        }
+        Optional<String> customId = PdcHelper.getCustomItemId(item);
+        return customId.isPresent()
+                && com.arspaper.integration.TrinityForgeBridge.tfSmeltableMaterialIds().contains(customId.get());
+    }
+
+    /**
      * かまど系での精錬そのものを止める（2026-08-19 W-132）。
      *
      * <p>入口を塞いでも、<b>既にかまどの中にある個体</b>や、将来また別の搬入経路が見つかったときに
@@ -314,9 +353,16 @@ public class CustomItemListener implements Listener {
      */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onBlockCook(BlockCookEvent event) {
-        if (isConfigurableMaterial(event.getSource())) {
-            event.setCancelled(true);
+        if (!isConfigurableMaterial(event.getSource())) {
+            return;
         }
+        // 2026-08-23: TF の compressed-smelting に載っている素材だけは焼かせる。
+        // ここは焚き火も通るイベントなので装置種別では絞らない ——
+        // 「焼ける先が定義されている」ことそのものが許可の根拠。
+        if (isSmeltingExempt(event.getSource())) {
+            return;
+        }
+        event.setCancelled(true);
     }
 
     /**
@@ -367,8 +413,11 @@ public class CustomItemListener implements Listener {
         if (!isConsumingMachine(type) || type == InventoryType.COMPOSTER) {
             return;
         }
-        if (isConfigurableMaterial(event.getCursor())
-                || isConfigurableMaterial(event.getCurrentItem())) {
+        // 2026-08-23: 圧縮精錬の対象素材は かまど／燻製器 に限り通す。
+        // getCurrentItem() 側も同じ判定にしないと、焼き上がった圧縮品が結果スロットに入った瞬間
+        // 【取り出すクリックまで塞がって永久に回収できない】。
+        if (isBlockedFromMachine(event.getCursor(), type)
+                || isBlockedFromMachine(event.getCurrentItem(), type)) {
             event.setCancelled(true);
         }
     }

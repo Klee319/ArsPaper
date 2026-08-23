@@ -2093,6 +2093,48 @@ public final class TrinityForgeBridge {
     }
 
     /**
+     * TF の {@code progression/crafting-features.yml} の {@code compressed-smelting} が扱う
+     * materials.yml 素材 id の全体(<b>入力と結果の両方</b>)。2026-08-23 追加。
+     *
+     * <p>用途: {@code CustomItemListener} のかまど系ガードの穴あけ。あちらは materials.yml 素材を
+     * かまど/燻製器へ入れること自体を塞いでいる(W-132「9個ぶんが1個に化けて消える」の対策)ので、
+     * <b>意図して焼けるようにした素材だけ</b>を素通しさせる必要がある。
+     * <b>結果側も含める</b>のは、焼き上がった圧縮品が結果スロットに入るため —— 含めないと
+     * プレイヤーが完成品を取り出すクリックまで塞がってしまう。
+     *
+     * <p>TF 未ロード/例外時は {@link Collections#emptySet()}(fail-closed)。穴が開いたままより
+     * 「焼けない(＝従来どおり)」に倒す方が損失が無い。
+     */
+    public static Set<String> tfSmeltableMaterialIds() {
+        try {
+            TrinityForge tf = TrinityForge.getInstance();
+            if (tf == null) {
+                return Collections.emptySet();
+            }
+            com.trinityforge.config.domains.CraftingFeaturesConfig features = tf.config().craftingFeatures();
+            if (features == null) {
+                return Collections.emptySet();
+            }
+            Map<String, com.trinityforge.config.domains.CraftingFeaturesConfig.CompressedSmelt> table =
+                    features.compressedSmelting();
+            if (table == null || table.isEmpty()) {
+                return Collections.emptySet();
+            }
+            Set<String> ids = new java.util.HashSet<>(table.size() * 2);
+            for (Map.Entry<String,
+                    com.trinityforge.config.domains.CraftingFeaturesConfig.CompressedSmelt> e : table.entrySet()) {
+                ids.add(e.getKey());
+                if (e.getValue() != null && e.getValue().resultId() != null) {
+                    ids.add(e.getValue().resultId());
+                }
+            }
+            return Collections.unmodifiableSet(ids);
+        } catch (Throwable t) {
+            return Collections.emptySet();
+        }
+    }
+
+    /**
      * TF未ロード/{@code config()}未初期化/例外(NoClassDefFoundError等含む)を一括で
      * {@link Collections#emptyMap()}へフォールバックする共通アクセサ。
      */

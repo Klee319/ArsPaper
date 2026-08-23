@@ -1883,6 +1883,27 @@ materials:
         - iii
         - iii
         - iii
+  # 2026-08-23: 圧縮焼き物で唯一欠番だったウサギ肉を追加した。
+  # 圧縮生肉をかまどで焼けるようにした(TF 側 crafting-features.yml の compressed-smelting)ので、
+  # rabbit_1x だけ焼き先が無い状態になっていた。
+  cooked_rabbit_1x:
+    base_material: COOKED_RABBIT
+    edible: true
+    custom_model_data: 260
+    display_name: 圧縮焼きウサギ肉
+    enchant_glow: true
+    lore:
+      - "&7&o9個分の焼きウサギ肉を1個に凝縮した保存食。"
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: COOKED_RABBIT
+      shape:
+        - iii
+        - iii
+        - iii
   cookie_1x:
     base_material: COOKIE
     edible: true
@@ -3987,6 +4008,7 @@ _editor:
           - cooked_porkchop_1x
           - cooked_mutton_1x
           - cooked_chicken_1x
+          - cooked_rabbit_1x
           - cookie_1x
           - pumpkin_pie_1x
           - carrot_1x
@@ -4241,6 +4263,7 @@ _editor:
       - cooked_porkchop_1x
       - cooked_mutton_1x
       - cooked_chicken_1x
+      - cooked_rabbit_1x
       - cookie_1x
       - baked_salon_1x
       - baked_cod_1x
