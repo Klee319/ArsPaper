@@ -443,7 +443,12 @@ public class SpellCaster {
         // 2026-08-16: TF の「魔導士への道」アチーブメントが読む累計カウンタ。
         // **キャンセル判定より後に置くこと** ── 上の isCancelled ブロックはマナを返す＝
         // 「詠唱しなかった」扱いなので、そこより前に積むと自己キャンセルの連打で回数を稼げる。
-        recordCastCounters(caster, recipe, catalystData != null, sharedSpell);
+        // 2026-08-23: 「触媒から唱えたか」は catalysts.yml の登録有無ではなく、魔法のステ供給元を
+        // 決めるのと同じ判定(use-skill: ARS_MAGIC or catalysts.yml 登録)で見る。TFカタログの杖10本は
+        // catalysts.yml に載っていないので、catalystData != null では永久に 0 のままだった。
+        recordCastCounters(caster, recipe,
+            com.arspaper.integration.TrinityForgeBridge.isCatalystCast(catalyst, castItem),
+            sharedSpell);
 
         // アクションバーにスペル名を表示
         caster.sendActionBar(Component.text("§d" + recipe.getName()));

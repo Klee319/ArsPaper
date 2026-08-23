@@ -203,6 +203,40 @@ class MagicStatSourceWiringTest {
         assertTrue(offenders.isEmpty(), String.join("; ", offenders));
     }
 
+    // --- 2026-08-23: 進捗「触媒を振るう」(catalyst_cast)の判定 ---
+
+    @Test
+    @DisplayName("catalyst_cast は catalysts.yml の登録有無ではなくステ供給元の判定で数える")
+    void catalystCastCounterUsesStatSourcePredicate() throws Exception {
+        String bridge = read("integration/TrinityForgeBridge.java");
+        assertTrue(bridge.contains("public static boolean isCatalystCast(ItemStack catalyst, ItemStack castItem)"),
+                "「触媒から唱えたか」の判定は bridge の公開入口として1本だけ持つ必要がある");
+        assertTrue(bridge.contains("return resolveMagicStatSource(catalyst, castItem) != null;"),
+                "判定はステ供給元の解決と同一でなければならない。別の述語を書くと"
+                        + "杖を1本足すたびに2か所を直すことになり、また片方が腐る");
+
+        String caster = read("spell/SpellCaster.java");
+        assertTrue(caster.contains("TrinityForgeBridge.isCatalystCast(catalyst, castItem)"),
+                "SpellCaster は catalyst_cast の加算判定を bridge へ委ねる必要がある");
+        assertFalse(caster.contains("recordCastCounters(caster, recipe, catalystData != null"),
+                "catalystData != null へ戻してはならない ── TFカタログの杖10本は"
+                        + " spellbooks.yml の catalysts: に1本も載っていないので、"
+                        + "杖で何回撃っても catalyst_cast が0のままになる(2026-08-23 のバグ)");
+    }
+
+    @Test
+    @DisplayName("魔導書の直接詠唱は catalyst_cast に数えない")
+    void spellBookDirectCastIsNotCountedAsCatalystCast() throws Exception {
+        // 直接詠唱は castItem=null(上の spellBookDirectCastPassesNullCastItem が固定)なので、
+        // resolveMagicStatSource は catalyst(=魔導書)が catalysts.yml 登録品のときしか
+        // 非 null を返さない。つまり魔導書ぶんが混ざらないことは、その解決規則が
+        // castItem==null で catalysts.yml 登録だけを見ることに依存している。
+        String bridge = read("integration/TrinityForgeBridge.java");
+        assertTrue(bridge.contains("boolean castItemAccepted = castItem != null"),
+                "castItem が null の経路でステ供給元が拾われてはならない"
+                        + "(拾うと魔導書の素の右クリック詠唱まで catalyst_cast に混ざる)");
+    }
+
     // --- G10: 杖の use-level-requirement / use-skill をバインド詠唱でも強制する ---
 
     @Test

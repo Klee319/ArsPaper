@@ -419,6 +419,34 @@ public final class TrinityForgeBridge {
     }
 
     /**
+     * この詠唱を「触媒(杖)から唱えた」と数えてよいか(2026-08-23)。
+     *
+     * <p>TF の進捗「触媒を振るう」({@code progression/achievements.yml} の {@code m_catalyst}、
+     * {@code counter: catalyst_cast})が読むカウンタの唯一の判定。
+     *
+     * <p><b>以前は {@code catalysts.yml} の登録有無だけで数えていた。</b> TFカタログの杖10本
+     * ({@code WOODEN_SWORD#400008}〜{@code NETHERITE_SWORD#400014})は catalysts: に1本も
+     * 載っていないので、<b>杖で何回撃ってもカウンタが0のまま</b>だった
+     * (2026-08-23 のユーザー報告「杖で魔法100回打ったのにできない」の真因)。
+     *
+     * <p>判定は {@link #resolveMagicStatSource} と<b>同じものに寄せてある</b> ──
+     * 「魔法のステを供給したアイテムがあった詠唱」＝「触媒(杖)から唱えた詠唱」。定義を1本に
+     * しておかないと、杖を1本足すたびに2か所を直すことになり、また片方が腐る。
+     *
+     * <p>魔導書を素で右クリックした詠唱は今までどおり数えない ── そのとき {@code castItem} は
+     * {@code null}、{@code catalyst} は魔導書で、魔導書は catalysts.yml 未登録かつ
+     * {@code use-skill: ARS_MAGIC} も持たないので {@code NONE} になる。
+     */
+    public static boolean isCatalystCast(ItemStack catalyst, ItemStack castItem) {
+        try {
+            return resolveMagicStatSource(catalyst, castItem) != null;
+        } catch (Throwable t) {
+            // TF未ロード/例外: このカウンタは進捗表示のためだけのものなので、詠唱自体は壊さない。
+            return false;
+        }
+    }
+
+    /**
      * {@code item} を魔法のステ供給元として認めるか。TF の {@code use-skill}(=item-stats.yml が真源)が
      * {@code ARS_MAGIC} なら認める。{@code use-skill} が引けない品
      * ({@code catalysts.yml} の動的登録のみで item-stats.yml にエントリが無い触媒など)は、
