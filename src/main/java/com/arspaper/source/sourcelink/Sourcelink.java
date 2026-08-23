@@ -76,6 +76,35 @@ public abstract class Sourcelink extends CustomBlock {
     }
 
     /**
+     * 1回の右クリックで焼べる個数（2026-08-24 要望「ソースベリーと同様に一括でくべたい」）。
+     *
+     * <p><b>通常の右クリック = 手持ちスタック全部 / スニーク = 1個。</b>
+     * ソースジャーへのソースベリー投入（{@link com.arspaper.block.impl.SourceJar#convertibleBerries}）は
+     * 無条件で一括なのに、ソースリンクは逆に<b>スニークしたときだけ一括</b>だったため、
+     * 同じ「くべる」操作で挙動が食い違っていた。さらにヴォルカニックの燃料は原木や石炭ブロックのような
+     * <b>設置できるアイテム</b>が多く、スニーク＋右クリックはそもそも設置操作と競合するので、
+     * 一括側をスニークに置くのは操作としても無理があった。
+     *
+     * <p>1個だけ焼べる手段は<b>残す</b>（スニーク側へ移した）。上位ソースリンクの燃料は1個あたりの
+     * 価値が桁違い（例 {@code custom:source_engine} = 3,000万）で、握ったまま右クリックした瞬間に
+     * スタック全部が消えるのを避ける逃げ道が要る。
+     *
+     * <p>ジャー側と違って「あふれる一段階手前で止める」上限は掛けない。ソースリンクのバッファ上限は
+     * 既定が int 上限＝実質無制限で、{@link #addToBuffer} がクランプした分は警告ログに残るため、
+     * ジャーのような「無言で消える」損失にはならない。
+     *
+     * @param handAmount 手に持っているスタックの個数
+     * @param sneaking   スニーク中か
+     * @return 消費してよい個数（手持ちを超えない）
+     */
+    public static int feedCount(int handAmount, boolean sneaking) {
+        if (handAmount <= 0) {
+            return 0;
+        }
+        return sneaking ? 1 : handAmount;
+    }
+
+    /**
      * Source生成時の追加処理（副産物の生成など）。
      */
     public void onGenerate(Block block) {}

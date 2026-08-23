@@ -12,6 +12,7 @@ import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.Ageable;
 import org.bukkit.block.data.BlockData;
+import org.bukkit.block.data.type.CaveVinesPlant;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.block.BlockBreakEvent;
@@ -78,6 +79,40 @@ public class HarvestEffect implements SpellEffect {
      */
     private void processBlock(Block block, Player caster, int amplify, int fortuneLevel, boolean extract) {
         Material type = block.getType();
+
+        // Case 0: 洞窟のつた（グロウベリー）。実だけ摘んで、つるは残す。
+        //
+        // 2026-08-24 要望「ソースベリーを収穫魔法で取れるようにできない？」への対応。
+        // ソースベリーは GLOW_BERRIES + アメジストの欠片のクラフト品(functional-items.yml)なので、
+        // 収穫できる実体は原料のグロウベリー側。摘む処理自体は「使用」グリフ
+        // ({@code InteractEffect#simulateRightClick})が既に持っていたので、同じ手順を踏む。
+        //
+        // ⚠ 下の Ageable 分岐より必ず前に置く。CAVE_VINES(先端)は Ageable でもあり、その age は
+        //   「つるがどこまで伸びたか」であって実の熟度ではない。後ろに置くと最大 age のつるが
+        //   breakNaturally() で丸ごと壊され、実を摘むどころか栽培設備が消える
+        //   (=この分岐を入れるまで、収穫魔法を洞窟のつたへ当てると実際にそうなっていた)。
+        if (type == Material.CAVE_VINES || type == Material.CAVE_VINES_PLANT) {
+            // CAVE_VINES(先端) の BlockData も CaveVinesPlant を実装するので1本で両方拾える。
+            if (!(block.getBlockData() instanceof CaveVinesPlant vines) || !vines.isBerries()) {
+                return;
+            }
+            // 破壊はしないが、保護プラグインに拒否させる口は他の分岐と揃える。
+            // マーカー付きなので TF 側の採取ギミックは二重発動しない。
+            BlockBreakEvent pickEvent = SpellBreakMarker.callMarkedBreakEvent(block, caster);
+            if (pickEvent.isCancelled()) return;
+
+            vines.setBerries(false);
+            block.setBlockData(vines);
+            // バニラの手摘みと同じ 1 個。幸運はここでは掛けない —— グロウベリーはソース経済の
+            // 入り口(ベリー1個 = 100 ソース)なので、増量は別途決める話にする。
+            block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.5, 0.5),
+                    new ItemStack(Material.GLOW_BERRIES));
+            block.getWorld().playSound(block.getLocation(),
+                    org.bukkit.Sound.BLOCK_CAVE_VINES_PICK_BERRIES,
+                    org.bukkit.SoundCategory.BLOCKS, 1.0f, 1.0f);
+            SpellFxUtil.spawnHarvestFx(block.getLocation());
+            return;
+        }
 
         // Case 1: Ageable作物（小麦、ニンジン等）
         if (block.getBlockData() instanceof Ageable ageable) {

@@ -148,8 +148,8 @@ public class VolcanicSourcelink extends Sourcelink {
         int sourceValue = fuelValues.valueOf(hand);
 
         if (sourceValue > 0) {
-            int addCount = player.isSneaking() ? hand.getAmount() : 1;
-            addCount = Math.min(addCount, hand.getAmount());
+            // 通常 = 手持ち全部、スニーク = 1個（判定は Sourcelink#feedCount に集約）。
+            int addCount = feedCount(hand.getAmount(), player.isSneaking());
             // 階梯の生成量倍率(items.<id>.yield-multiplier)は「新しく生まれた分」にだけ掛ける。
             int totalAdded = scaleGeneratedYield((long) sourceValue * addCount);
 
