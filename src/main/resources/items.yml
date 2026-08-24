@@ -143,6 +143,19 @@ ritual_effects:
       - BONE x2
       - custom:source_gem x2
     source: 800
+  zombie_villager_summon:
+    name: 村人ゾンビ召喚の儀式
+    effect-type: mob_summon
+    effect-params:
+      group: default
+      entities:
+        - ZOMBIE_VILLAGER
+      count: 1
+    pedestal-items:
+      - ROTTEN_FLESH x4
+      - BONE x4
+      - custom:hay_block_1x
+    source: 10000
   mob_summon_raid:
     name: 襲撃モブ召喚の儀式
     effect-type: mob_summon
