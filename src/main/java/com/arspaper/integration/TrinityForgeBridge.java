@@ -2163,6 +2163,66 @@ public final class TrinityForgeBridge {
     }
 
     /**
+     * TF の {@code progression/crafting-features.yml} の {@code brew-unlocks} が
+     * 醸造素材として宣言している materials.yml 素材 id の全体。2026-08-24 追加。
+     *
+     * <p>用途: {@code CustomItemListener} の醸造台ガードの穴あけ。あちらは materials.yml 素材を
+     * 醸造台インベントリへ入れること自体を塞いでいる(W-132)ので、<b>意図して醸造素材にした id だけ</b>を
+     * 素通しさせる必要がある。塞いだままだと TF の {@code BrewPotionMixRegistrar} が登録した
+     * {@code PotionMix} が<b>一度も発火できない</b> —— 出荷 config の醸造素材 8 件は
+     * <b>全部 materials.yml 素材</b>なので、カスタム素材を使う醸造レシピが 1 件残らず死んでいた
+     * (実サーバ報告「クリスタルリンゴが醸造台に入らない」の真因)。
+     *
+     * <p>結果側(ポーション)はバニラの {@code POTION} なので含める必要は無い
+     * ({@link #tfSmeltableMaterialIds()} が結果側も含めるのは、焼き上がりが materials.yml 素材
+     * そのものだから)。
+     *
+     * <p>TF 未ロード/例外時は {@link Collections#emptySet()}(fail-closed)。
+     */
+    public static Set<String> tfBrewIngredientMaterialIds() {
+        try {
+            TrinityForge tf = TrinityForge.getInstance();
+            if (tf == null) {
+                return Collections.emptySet();
+            }
+            com.trinityforge.config.domains.CraftingFeaturesConfig features = tf.config().craftingFeatures();
+            if (features == null) {
+                return Collections.emptySet();
+            }
+            Map<String, com.trinityforge.config.domains.CraftingFeaturesConfig.BrewUnlockGroup> groups =
+                    features.brewUnlocks();
+            if (groups == null || groups.isEmpty()) {
+                return Collections.emptySet();
+            }
+            Set<String> ids = new java.util.HashSet<>();
+            for (com.trinityforge.config.domains.CraftingFeaturesConfig.BrewUnlockGroup group : groups.values()) {
+                if (group == null || group.potions() == null) {
+                    continue;
+                }
+                for (com.trinityforge.config.domains.CraftingFeaturesConfig.BrewPotionSpec spec : group.potions()) {
+                    String ingredient = spec == null ? null : spec.ingredient();
+                    if (ingredient == null) {
+                        continue;
+                    }
+                    String trimmed = ingredient.trim();
+                    // custom: 接頭辞が付いているものだけが materials.yml / TF カタログ由来。
+                    // バニラ材質(NETHER_WART 等)はそもそもこのガードに掛からない。
+                    if (!trimmed.regionMatches(true, 0, "custom:", 0, "custom:".length())) {
+                        continue;
+                    }
+                    String id = trimmed.substring("custom:".length()).trim();
+                    if (!id.isEmpty()) {
+                        ids.add(id);
+                    }
+                }
+            }
+            return Collections.unmodifiableSet(ids);
+        } catch (Throwable t) {
+            return Collections.emptySet();
+        }
+    }
+
+    /**
      * TF未ロード/{@code config()}未初期化/例外(NoClassDefFoundError等含む)を一括で
      * {@link Collections#emptyMap()}へフォールバックする共通アクセサ。
      */

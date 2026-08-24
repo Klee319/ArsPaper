@@ -308,26 +308,53 @@ public class CustomItemListener implements Listener {
     /**
      * 「TF が意図して焼けるようにした素材だけ」を通してよい装置（2026-08-23）。
      *
-     * <p>{@link #CONSUMING_MACHINES} と同じ理由で名前集合で持つ。溶鉱炉と醸造台は入れない ——
-     * 圧縮食料は溶鉱炉では焼けないので通しても得が無く、醸造台は<b>材料スロットが Material しか
-     * 見ずに飲み込む</b>ので、通した瞬間に W-172 と同じ「黙って消える」経路が復活する。
+     * <p>{@link #CONSUMING_MACHINES} と同じ理由で名前集合で持つ。溶鉱炉は入れない ——
+     * 圧縮食料は溶鉱炉では焼けないので通しても得が無い。
+     * 醸造台は<b>別の穴({@link #BREWING_MACHINES})で扱う</b>(2026-08-24 に分離)。
      */
     static final java.util.Set<String> SMELTING_MACHINES = java.util.Set.of("FURNACE", "SMOKER");
 
     /**
+     * 「TF が意図して醸造素材にした id だけ」を通してよい装置（2026-08-24）。
+     *
+     * <p>上の javadoc の「醸造台は材料スロットが Material しか見ずに飲み込む」は<b>誤り</b>だった。
+     * TF の {@code BrewPotionMixRegistrar} は Paper の {@code PotionMix} を
+     * <b>述語({@code createPredicateChoice})</b>で登録しており、素材スロットの受け入れ判定
+     * ({@code PotionBrewing#isIngredient})はその述語を見る ——
+     * つまり醸造台は PDC 付きのカスタム素材をちゃんと見分ける。
+     *
+     * <p>その誤解のせいで、出荷 config の醸造素材 8 件<b>全部</b>
+     * ({@code tf_crystal_apple} / {@code ravager_hide} / {@code witch_elixir} /
+     * {@code endermite_soot} / {@code stray_cloth} / {@code piglin_ear} /
+     * {@code sweet_berries_2x} / {@code bogged_mossy_bone} —— いずれも materials.yml 素材)が
+     * 醸造台へ入れられず、<b>カスタム素材を使う醸造レシピが 1 件残らず死んでいた</b>
+     * (2026-08-24 実サーバ報告「クリスタルリンゴが醸造台に入らない」)。
+     */
+    static final java.util.Set<String> BREWING_MACHINES = java.util.Set.of("BREWING");
+
+    /**
      * この素材をこの装置へ入れさせないか。
      *
-     * <p>materials.yml 素材は原則すべて拒否({@code W-132})だが、TF の
-     * {@code compressed-smelting} に載っている id だけは<b>かまど／燻製器に限り</b>通す。
-     * 通さないと {@code CatalogRecipeRegistrar} が登録した圧縮精錬レシピが
-     * <b>一度も発火できない</b>（入れる経路が全部塞がっているため）。
+     * <p>materials.yml 素材は原則すべて拒否({@code W-132})だが、TF が「その装置で使う」と
+     * 宣言した id だけは通す。通さないと TF 側が登録したレシピ／{@code PotionMix} が
+     * <b>一度も発火できない</b>（入れる経路が全部塞がっているため）:
+     * <ul>
+     *   <li>かまど／燻製器 —— {@code compressed-smelting} の入力と結果</li>
+     *   <li>醸造台 —— {@code brew-unlocks} の {@code ingredient}</li>
+     * </ul>
      */
     private boolean isBlockedFromMachine(ItemStack item, InventoryType machine) {
         if (!isConfigurableMaterial(item)) {
             return false;
         }
-        boolean smeltingBlock = machine != null && SMELTING_MACHINES.contains(machine.name());
-        return !(smeltingBlock && isSmeltingExempt(item));
+        String name = machine == null ? "" : machine.name();
+        if (SMELTING_MACHINES.contains(name) && isSmeltingExempt(item)) {
+            return false;
+        }
+        if (BREWING_MACHINES.contains(name) && isBrewIngredientExempt(item)) {
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -341,6 +368,25 @@ public class CustomItemListener implements Listener {
         Optional<String> customId = PdcHelper.getCustomItemId(item);
         return customId.isPresent()
                 && com.arspaper.integration.TrinityForgeBridge.tfSmeltableMaterialIds().contains(customId.get());
+    }
+
+    /**
+     * TF の {@code brew-unlocks} が醸造素材として宣言している id か。
+     * TF 未ロード時は空集合が返るので、従来どおり全部塞がる（fail-closed）。
+     *
+     * <p>解放していないプレイヤーの投入を弾くのは<b>TF 側の {@code BrewUnlockListener}</b> の仕事
+     * (スキルツリーの {@code brew:<groupId>} で判定し、未解放なら投入も燃料補給も拒否する)。
+     * ここは「そもそも醸造素材として使う気があるか」だけを見る —— 解放判定を二重に持つと
+     * 片方だけ直したときに静かに食い違う。
+     */
+    private static boolean isBrewIngredientExempt(ItemStack item) {
+        if (item == null || item.getType().isAir()) {
+            return false;
+        }
+        Optional<String> customId = PdcHelper.getCustomItemId(item);
+        return customId.isPresent()
+                && com.arspaper.integration.TrinityForgeBridge.tfBrewIngredientMaterialIds()
+                        .contains(customId.get());
     }
 
     /**
@@ -404,6 +450,15 @@ public class CustomItemListener implements Listener {
 
     /**
      * かまど/醸造台インベントリへ materials.yml 素材を置かせない。
+     *
+     * <p><b>⚠ 判定は「装置側のスロットを触るクリック」に限る(2026-08-24)。</b>
+     * {@link InventoryClickEvent#getInventory()} は<b>クリックしたスロットに関係なく必ず上段
+     * (＝装置)のインベントリ</b>を返す。以前はスロットを一切見ずに
+     * {@code getCurrentItem()} を判定していたので、<b>装置を開いている間はプレイヤー側の
+     * インベントリに入っている materials.yml 素材を掴むことすらできなかった</b>
+     * ——「そもそもインベントリから動かない」という報告の半分はこれ。
+     * 装置へ入る経路は「装置のスロットを直接触る」か「シフトクリックでのクイック移動」の
+     * 2 つだけなので、その 2 つに絞れば守るものは何も減らない。
      */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onVanillaMachineClick(InventoryClickEvent event) {
@@ -413,13 +468,40 @@ public class CustomItemListener implements Listener {
         if (!isConsumingMachine(type) || type == InventoryType.COMPOSTER) {
             return;
         }
+        if (!clickCanReachMachine(event.getRawSlot(), event.getInventory().getSize(),
+                event.isShiftClick())) {
+            return; // プレイヤー側インベントリ内での持ち替え・整理は装置と無関係
+        }
         // 2026-08-23: 圧縮精錬の対象素材は かまど／燻製器 に限り通す。
+        // 2026-08-24: 醸造素材(brew-unlocks の ingredient)は醸造台に限り通す。
         // getCurrentItem() 側も同じ判定にしないと、焼き上がった圧縮品が結果スロットに入った瞬間
         // 【取り出すクリックまで塞がって永久に回収できない】。
         if (isBlockedFromMachine(event.getCursor(), type)
                 || isBlockedFromMachine(event.getCurrentItem(), type)) {
             event.setCancelled(true);
         }
+    }
+
+    /**
+     * このクリックが装置のスロットへ届きうるか（2026-08-24）。
+     *
+     * <p>装置へ素材が入る経路は 2 つだけ:
+     * <ul>
+     *   <li><b>装置側のスロットを直接触る</b> —— {@code rawSlot} が上段インベントリの範囲内。
+     *       カーソルから置く／中身を取る／入れ替えるのは全部これ。</li>
+     *   <li><b>シフトクリックのクイック移動</b> —— プレイヤー側スロットを触っているが、
+     *       中身は装置側へ飛ぶ。</li>
+     * </ul>
+     * それ以外（プレイヤー側インベントリでの素の持ち替え・整理・{@code rawSlot < 0} の画面外投棄）は
+     * 装置に一切触れないので、判定に掛けてはいけない。掛けると<b>装置を開いている間だけ
+     * materials.yml 素材が手持ちの中で固まる</b>。
+     *
+     * <p>{@link org.bukkit.event.inventory.InventoryClickEvent#getInventory()} が
+     * <b>クリックしたスロットに関係なく常に上段（＝装置）を返す</b>のがこの取り違えの原因なので、
+     * 判定を純関数に切り出してテストで固定する。
+     */
+    static boolean clickCanReachMachine(int rawSlot, int machineSize, boolean shiftClick) {
+        return shiftClick || (rawSlot >= 0 && rawSlot < machineSize);
     }
 
     /**
