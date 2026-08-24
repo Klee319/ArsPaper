@@ -146,16 +146,38 @@ public abstract class Sourcelink extends CustomBlock {
     }
 
     /**
-     * バッファから1周期あたりの上限({@code transfer.sourcelink.max-per-transfer})まで排出する。
-     * 排出量を返す。
+     * バッファから1周期あたりの上限まで排出する。排出量を返す。
+     *
+     * <p>上限は<b>定額と割合の大きい方</b>:
+     * {@code max(max-per-transfer × 階梯倍率 × コア倍率, バッファ × drain-ratio)}。
+     *
+     * <p>⚠ 2026-08-24 に割合の項を足した。それまでは定額だけだったので
+     * 「1点あたり0.1秒」が燃料の価値に関係なく固定で、階梯を上げても
+     * {@code transfer-multiplier} と {@code yield-multiplier} が同じ倍率で伸びるため
+     * <b>この比率は永久に改善しなかった</b>(圧縮薪1個で3分40秒、ソース機関1個で約35日)。
+     * 割合を入れると、溜まっている量が多いほど1周期の排出も増えて指数的に減衰する。
+     *
+     * <p>⚠ 割合の項に階梯倍率は掛けない。掛けると生成量倍率と再び同率で伸びて
+     * 元の「階梯を上げても比率が変わらない」構造に戻る。
+     *
+     * <p>⚠ 隣接ジャーが満杯で注ぎ切れない分は捨てられず、
+     * {@link SourceYield#refundToBuffer} でバッファへ戻る。したがって割合を大きくしても
+     * 「ジャーの空きより多く排出してしまって消える」損失は起きない
+     * (ジャーの容量が実質的な上限として働く元設計はそのまま)。
      */
     protected int drainBuffer(Block block) {
         if (!(block.getState() instanceof TileState tile)) return 0;
         int buffer = getBuffer(tile);
         if (buffer <= 0) return 0;
-        int drain = Math.min(buffer, effectiveMaxPerTransfer(block));
+        int drain = Math.min(buffer, drainAllowance(block, buffer));
         setBuffer(tile, buffer - drain);
         return drain;
+    }
+
+    /** 1周期に排出してよい量(定額と割合の大きい方)。判断は {@link com.arspaper.source.SourceDrainPolicy}。 */
+    private int drainAllowance(Block block, int buffer) {
+        return com.arspaper.source.SourceDrainPolicy.allowance(
+                effectiveMaxPerTransfer(block), buffer, transferConfig().sourcelinkDrainRatio());
     }
 
     /**

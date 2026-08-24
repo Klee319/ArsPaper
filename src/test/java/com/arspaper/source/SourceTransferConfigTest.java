@@ -52,23 +52,54 @@ class SourceTransferConfigTest {
     }
 
     @Test
-    @DisplayName("経路パーティクルの既定値は保守的な値で固定する(毎秒の粒子数の見積り付き)")
+    @DisplayName("経路パーティクルの既定値は「細い線を近くだけ」で固定する(毎秒の粒子数の見積り付き)")
     void particleDefaultsStayConservative() {
         SourceTransferConfig cfg = SourceTransferConfig.defaults();
 
         assertTrue(cfg.pathParticlesEnabled(), "既定はON(可視化しないと経路が追えない)");
-        assertEquals(20, cfg.pathParticleIntervalTicks());
-        assertEquals(1.0, cfg.pathParticleSpacing(), 1e-9);
-        assertEquals(48, cfg.pathParticleViewDistance());
-        assertEquals(16, cfg.pathParticleMaxPaths());
+        assertEquals(10, cfg.pathParticleIntervalTicks());
+        assertEquals(0.5, cfg.pathParticleSpacing(), 1e-9);
+        assertEquals(0.45, cfg.pathParticleDotSize(), 1e-9);
+        assertEquals(24, cfg.pathParticleViewDistance());
+        assertEquals(8, cfg.pathParticleMaxPaths());
+
+        // ⚠ DUST の寿命は約8〜40tick。描き直し周期がこれを超えると
+        //    「描いた線が次の描画までに消える」= 点滅になる。20tick の既定がまさにそれだった。
+        assertTrue(cfg.pathParticleIntervalTicks() <= 10,
+                "描き直しは10tick以下に保つ(超えると点滅する): " + cfg.pathParticleIntervalTicks());
+        // ⚠ 粒の大きさ1.0はバニラのレッドストーン粒と同じで、線に使うと太い玉の飛び石になる。
+        assertTrue(cfg.pathParticleDotSize() < 1.0,
+                "線に使う粒はバニラ既定(1.0)より小さくする: " + cfg.pathParticleDotSize());
 
         // 1経路30mでの毎秒粒子数 = (30 ÷ spacing + 1 端点 + 2 終端マーカー) × max-paths × (20 ÷ interval)
         int dots = SourcePathVisualPolicy.dotCount(30.0, cfg.pathParticleSpacing());
         int perSecond = (dots + 2) * cfg.pathParticleMaxPaths() * (20 / cfg.pathParticleIntervalTicks());
-        assertEquals(528, perSecond, "ワンド保持者1人あたりの定常負荷");
-        assertTrue(perSecond <= 1000,
-                "初版の既定(10tick / 0.5m / 64経路)は毎秒約8,064粒子だった。"
-                        + "ワンドは設置作業中ずっと持つ道具なので、ここは1,000粒子/秒を超えさせない: " + perSecond);
+        assertEquals(1008, perSecond, "ワンド保持者1人あたりの定常負荷");
+        assertTrue(perSecond <= 1200,
+                "初版の既定(10tick / 0.5m / 64経路 / 48m)は毎秒約8,064粒子だった。"
+                        + "ワンドは設置作業中ずっと持つ道具なので、密度を上げるなら"
+                        + "範囲(view-distance)と本数(max-paths)を必ず下げて相殺する: " + perSecond);
+    }
+
+    @Test
+    @DisplayName("割合排出の既定は 0.25（定額だけだと高価値燃料ほど不利になる）")
+    void drainRatioDefaultBoundsWorstCaseDrainTime() {
+        SourceTransferConfig cfg = SourceTransferConfig.defaults();
+        assertEquals(0.25, cfg.sourcelinkDrainRatio(), 1e-9);
+
+        // 割合排出があると、どれだけ溜まっていても指数的に減衰する。
+        // ソース機関1個(3,000万)でも「定額のみなら約35日」→「割合込みなら数分」。
+        long buffer = 30_000_000L;
+        int cycles = 0;
+        while (buffer > 0 && cycles < 10_000) {
+            long drain = Math.max(50L, (long) Math.ceil(buffer * cfg.sourcelinkDrainRatio()));
+            buffer -= Math.min(buffer, drain);
+            cycles++;
+        }
+        assertEquals(0L, buffer, "吐き切れずに残ってはいけない");
+        long seconds = (long) cycles * cfg.sourcelinkIntervalTicks() / 20L;
+        assertTrue(seconds <= 900,
+                "3,000万でも15分以内に吐き切ること(定額のみなら約35日かかっていた): " + seconds + "秒");
     }
 
     @Test
@@ -184,6 +215,53 @@ class SourceTransferConfigTest {
         assertEquals(8, cfg.pathParticleMaxPaths());
         // クランプしたのは interval-ticks / spacing / view-distance の3件。max-paths=8 は範囲内。
         assertEquals(3, warnings.size(), "3件クランプしたはず: " + warnings);
+    }
+
+    @Test
+    @DisplayName("粒の大きさは設定でき、0 は描画が壊れるので下限へクランプする")
+    void dotSizeIsConfigurableAndNeverZero() {
+        List<String> warnings = new ArrayList<>();
+        SourceTransferConfig cfg = parse("""
+                transfer:
+                  network:
+                    path-particles:
+                      dot-size: 0.8
+                """, warnings);
+        assertEquals(0.8, cfg.pathParticleDotSize(), 1e-9);
+        assertTrue(warnings.isEmpty());
+
+        List<String> clamped = new ArrayList<>();
+        SourceTransferConfig zero = parse("""
+                transfer:
+                  network:
+                    path-particles:
+                      dot-size: 0.0
+                """, clamped);
+        assertTrue(zero.pathParticleDotSize() > 0.0,
+                "0 は「見えない」ではなくクライアント側の描画が壊れる値");
+        assertEquals(1, clamped.size(), "クランプは黙って行わない: " + clamped);
+    }
+
+    @Test
+    @DisplayName("割合排出は 0〜1 の外を書くとクランプされ、0 は「従来どおりの定額」として通る")
+    void drainRatioIsClampedToUnitRange() {
+        List<String> warnings = new ArrayList<>();
+        SourceTransferConfig off = parse("""
+                transfer:
+                  sourcelink:
+                    drain-ratio: 0.0
+                """, warnings);
+        assertEquals(0.0, off.sourcelinkDrainRatio(), 1e-9);
+        assertTrue(warnings.isEmpty(), "0 は「割合排出を止める」意味なので警告しない: " + warnings);
+
+        List<String> clamped = new ArrayList<>();
+        SourceTransferConfig over = parse("""
+                transfer:
+                  sourcelink:
+                    drain-ratio: 3.0
+                """, clamped);
+        assertEquals(1.0, over.sourcelinkDrainRatio(), 1e-9);
+        assertEquals(1, clamped.size(), "クランプは黙って行わない: " + clamped);
     }
 
     // ---- バッファのオーバーフロー ----

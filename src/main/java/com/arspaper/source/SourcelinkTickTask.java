@@ -153,6 +153,22 @@ public class SourcelinkTickTask implements Listener {
             .add(location.getBlock().getLocation());
     }
 
+    /**
+     * 追跡中のソースリンク座標のスナップショット。可視化など<b>読み取り専用</b>の用途向け。
+     *
+     * <p>W-105（ドミニオンワンド所持中に「どのジャーへ流れているか」を見えるようにする）で
+     * 使う。ソースリンク→隣接ジャーの供給は<b>ワンドで結んだ経路ではない</b>ので
+     * {@code SourceNetwork} には1件も載らず、可視化の対象外だった。
+     * 全チャンク走査を避けるため、既にここが持っている設置位置キャッシュを使い回す。
+     */
+    public List<Location> trackedSourcelinks() {
+        List<Location> all = new ArrayList<>();
+        for (Set<Location> locations : sourcelinkLocations.values()) {
+            all.addAll(locations);
+        }
+        return all;
+    }
+
     public void removeSourcelink(Location location) {
         Location blockLoc = location.getBlock().getLocation();
         sourcelinkLocations.values().forEach(locs -> locs.remove(blockLoc));
