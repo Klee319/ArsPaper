@@ -47,7 +47,37 @@ public final class CastDurabilityPolicy {
     }
 
     /**
-     * この詠唱で実際に減らす耐久値。
+     * この詠唱で実際に減らす耐久値（触媒かどうかの門を含む版。<b>実装はこちらを呼ぶこと</b>）。
+     *
+     * <p><b>触媒(杖)以外は絶対に減らさない（2026-08-25）</b>: {@code SpellBindListener#canBind} は
+     * ArsPaper のカスタムアイテム以外なら<b>何にでも</b>スペルをバインドできる。この機能は
+     * 「詠唱でしか使わない杖に耐久を効かせる」ために入れたものなので、門が無いと
+     * <b>ネザライトの剣・ツルハシ・防具にバインドしただけで、詠唱するたびにその道具が磨耗する</b>
+     * （＝バインドが実質デメリットになり、素材を剣系へ移した杖と見分けもつかない）。
+     *
+     * <p>「触媒か」の判定は {@code TrinityForgeBridge#isCatalystItem} 一本に寄せてある
+     * （{@code use-skill: ARS_MAGIC} または {@code catalysts.yml} 登録品）。魔法のステ供給元
+     * （{@code MagicStatSourcePolicy}）とアチーブメントの {@code catalyst_cast} と<b>同じ定義</b>で、
+     * 杖を1本足すたびに直す場所を増やさないため。
+     *
+     * @param catalystItem    減らす対象のアイテムが触媒(杖)か。false なら常に 0
+     * @param unbreakingLevel 耐久力エンチャントのレベル（未付与なら 0）
+     * @param roll            {@code [0.0, 1.0)} の乱数。テストから決定的に渡せるよう引数にしている
+     * @return 減らす耐久値。0 なら今回は減らさない
+     */
+    public int damageFor(boolean catalystItem, int unbreakingLevel, double roll) {
+        if (!catalystItem) {
+            return 0;
+        }
+        return damageFor(unbreakingLevel, roll);
+    }
+
+    /**
+     * 消費量と耐久力エンチャントだけを見た「触媒だった場合の」消費値。
+     *
+     * <p>触媒の門は含まないので、実装から直接呼ばない
+     * （{@link #damageFor(boolean, int, double)} を使う）。門と乱数の効き方を別々にテストできるよう
+     * 残してある。
      *
      * @param unbreakingLevel 耐久力エンチャントのレベル（未付与なら 0）
      * @param roll            {@code [0.0, 1.0)} の乱数。テストから決定的に渡せるよう引数にしている

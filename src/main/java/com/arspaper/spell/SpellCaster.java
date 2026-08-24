@@ -493,6 +493,12 @@ public class SpellCaster {
      *
      * <p>最大耐久0の素材（魔導書の BOOK、旧素材の BLAZE_ROD）は自動的に無視される。
      * つまり<b>剣系へ移した杖だけが減る</b>ので、配布済みの旧杖を壊してしまうこともない。
+     *
+     * <p><b>減るのは触媒(杖)だけ（2026-08-25 のユーザー報告）</b>: バインドは任意アイテムに効くので、
+     * 「最大耐久0でなければ減らす」だけでは<b>剣・ツルハシ・防具にバインドした瞬間からそれが磨耗する</b>。
+     * 触媒かどうかは {@code TrinityForgeBridge#isCatalystItem}（{@code use-skill: ARS_MAGIC} または
+     * {@code catalysts.yml} 登録）で判定し、判定は {@link CastDurabilityPolicy#damageFor(boolean, int, double)}
+     * に渡して1か所で決める。
      */
     private void consumeCastDurability(Player caster, org.bukkit.inventory.ItemStack castItem) {
         CastDurabilityPolicy policy = castDurability;
@@ -527,6 +533,7 @@ public class SpellCaster {
             return; // BOOK / BLAZE_ROD など耐久を持たない素材
         }
         int amount = policy.damageFor(
+            com.arspaper.integration.TrinityForgeBridge.isCatalystItem(held),
             held.getEnchantmentLevel(org.bukkit.enchantments.Enchantment.UNBREAKING),
             java.util.concurrent.ThreadLocalRandom.current().nextDouble());
         if (amount <= 0) {

@@ -447,6 +447,30 @@ public final class TrinityForgeBridge {
     }
 
     /**
+     * このアイテム<b>自体</b>が触媒(杖)か(2026-08-25)。
+     *
+     * <p>{@link #isCatalystCast} は「その詠唱が触媒由来か」(castItem と catalyst のどちらかが
+     * 通れば true)なので、<b>「この1本を触媒として扱ってよいか」には使えない</b> ──
+     * 魔導書を触媒引数に持つバインド詠唱でも、別の引数が通れば true になってしまう。
+     * 耐久消費のように「対象アイテムを名指しで加工する」判定はこちらを使う。
+     *
+     * <p>定義は {@link #resolveMagicStatSource} / {@link #isCatalystCast} と同じ
+     * ({@code use-skill: ARS_MAGIC} または {@code catalysts.yml} 登録品)。
+     * TF 未ロードでも {@code catalysts.yml} 側の判定だけは生きるので、
+     * 「TF が落ちている間だけ普通の剣の耐久が減る」ことは無い。
+     */
+    public static boolean isCatalystItem(ItemStack item) {
+        if (item == null || item.getType().isAir()) {
+            return false;
+        }
+        try {
+            return acceptsAsMagicStatSource(item);
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /**
      * {@code item} を魔法のステ供給元として認めるか。TF の {@code use-skill}(=item-stats.yml が真源)が
      * {@code ARS_MAGIC} なら認める。{@code use-skill} が引けない品
      * ({@code catalysts.yml} の動的登録のみで item-stats.yml にエントリが無い触媒など)は、

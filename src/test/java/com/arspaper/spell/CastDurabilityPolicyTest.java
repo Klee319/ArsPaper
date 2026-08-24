@@ -61,6 +61,34 @@ class CastDurabilityPolicyTest {
     }
 
     @Test
+    @DisplayName("触媒(杖)でないアイテムは、どんな設定・どんな乱数でも一切減らない")
+    void aNonCatalystItemNeverLosesDurability() {
+        // 2026-08-25 のユーザー報告: 耐久を持つアイテム(剣・ツルハシ・防具)にスペルをバインドすると、
+        // 詠唱するたびにそのアイテムの耐久が減っていた。SpellBindListener#canBind は
+        // ArsPaper のカスタムアイテム以外なら何にでもバインドを許すので、「最大耐久0でなければ減らす」
+        // だけの判定ではバインド自体がデメリットになる。
+        CastDurabilityPolicy respecting = new CastDurabilityPolicy(true, 1, true);
+        assertEquals(0, respecting.damageFor(false, 0, 0.0),
+                "耐久力エンチャント無し・必ず減る乱数でも、触媒でなければ減らしてはいけない");
+        assertEquals(0, respecting.damageFor(false, 3, 0.0));
+
+        CastDurabilityPolicy ignoring = new CastDurabilityPolicy(true, 5, false);
+        assertEquals(0, ignoring.damageFor(false, 0, 0.99),
+                "respect-unbreaking:false は耐久力を無視する設定であって、触媒の門を外す設定ではない");
+    }
+
+    @Test
+    @DisplayName("触媒(杖)なら従来どおり amount ぶん減る(門を足しても杖の消費は生きている)")
+    void aCatalystStillLosesDurability() {
+        CastDurabilityPolicy policy = new CastDurabilityPolicy(true, 1, true);
+
+        assertEquals(1, policy.damageFor(true, 0, 0.0));
+        assertEquals(1, policy.damageFor(true, 0, 0.99));
+        assertEquals(1, policy.damageFor(true, 3, 0.0));
+        assertEquals(0, policy.damageFor(true, 3, 0.25), "耐久力エンチャントの効き方は門の前後で変わらない");
+    }
+
+    @Test
     @DisplayName("セクションが無いときは無効側へ倒す")
     void aMissingSectionFallsBackToDisabled() {
         // config.yml が丸ごと別ファイルで上書きされる事故が実際に起きている(config.yml 冒頭のコメント)。
@@ -114,6 +142,26 @@ class CastDurabilityPolicyTest {
         assertTrue(consume > cancelled,
                 "キャンセルされた詠唱ではマナを返すのと同じ理屈で耐久も減らしてはいけない。"
                         + "呼び出しは isCancelled ブロックより後に置くこと");
+    }
+
+    /**
+     * 門を通す配線が外れたら黙って「全部のアイテムが減る」へ戻るので、呼び出しの形だけ固定する。
+     * 判定そのものは上の2件（触媒/非触媒）で挙動として固定してある。
+     */
+    @Test
+    @DisplayName("SpellCaster は「そのアイテムが触媒か」を damageFor へ渡す(門を素通りさせない)")
+    void spellCasterPassesTheCatalystGateIntoThePolicy() throws Exception {
+        String caster = withoutLineComments(
+                Files.readString(Path.of("src/main/java/com/arspaper/spell/SpellCaster.java")));
+
+        assertTrue(caster.contains(
+                        "com.arspaper.integration.TrinityForgeBridge.isCatalystItem(held)"),
+                "減らす対象(手に持っている実体)が触媒かどうかを TrinityForgeBridge へ問い合わせる必要がある");
+        int gate = caster.indexOf("isCatalystItem(held)");
+        int call = caster.indexOf("policy.damageFor(");
+        assertTrue(call >= 0 && gate > call && gate - call < 200,
+                "触媒判定は policy.damageFor(...) の第1引数として渡すこと"
+                        + "(別の場所で判定して捨てると、非触媒でも減る状態へ黙って戻る)");
     }
 
     /** 行コメント({@code //} 以降)を落とす。コメントアウトされた呼び出しを「有る」と誤認しないため。 */

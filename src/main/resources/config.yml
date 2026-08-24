@@ -92,6 +92,9 @@ mob-drops:
   warden-echo-shard-max: 1
 pvp:
   enabled: true
+# 詠唱1回あたりの耐久消費。減るのは触媒(杖)だけで、スペルをバインドしただけの
+# 剣・ツルハシ・防具は減らない(2026-08-25)。触媒の判定は use-skill: ARS_MAGIC または
+# spellbooks.yml の catalysts: 登録。
 cast-durability:
   enabled: true
   amount: 1
