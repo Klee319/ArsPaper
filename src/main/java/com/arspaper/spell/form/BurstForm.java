@@ -36,7 +36,11 @@ public class BurstForm implements SpellForm {
     private static final String META_BURST = "ars_burst_form";
     private static final double BASE_SPEED = 1.2;
     private static final int BASE_FUSE_TICKS = 40; // 2秒
-    private static final double BASE_BURST_RADIUS = 2.0;
+    // 出荷 glyphs.yml と同じ値にすること。glyphs.yml は saveResource(..., false) で書かれるため
+    // 【配備済みサーバの yml は更新されない】＝キーが無い環境ではこの既定値がそのまま実挙動になる。
+    // 2026-08-25 ユーザー決定「素の炸裂は半径1(3×3)、増幅1段あたりの伸びしろは0.5のまま」。
+    private static final double BASE_BURST_RADIUS = 1.0;
+    private static final double RADIUS_PER_AOE = 0.5;
     private static final double SPREAD_ANGLE_STEP = 0.15;
 
     private final JavaPlugin plugin;
@@ -49,13 +53,27 @@ public class BurstForm implements SpellForm {
         this.config = config;
     }
 
+    /**
+     * 炸裂の実効半径を解決する唯一の入口。
+     *
+     * <p>投射経由の起爆（{@code ProjectileHitListener}）と炸裂フォーム自身の詠唱で
+     * 同じ式を使う。**以前は両方が同じ2つのキーを別々のリテラル既定値で読んでおり
+     * （フォーム側 2.0/1.5、投射側 2.0/1.5 に対し出荷 yml は 1.0/0.5）、
+     * 配備先の yml にキーが無い環境では出荷値と違う半径で動いていた。**
+     * 既定値を足す場所が2つある限り必ずまた割れるので、ここへ寄せてある。
+     */
+    public static double resolveBurstRadius(GlyphConfig config, SpellContext context) {
+        double baseBurstRadius = config.getParam("burst", "base-burst-radius", BASE_BURST_RADIUS);
+        double radiusPerAoe = config.getParam("burst", "radius-per-aoe", RADIUS_PER_AOE);
+        return baseBurstRadius + context.getAoeRadiusLevel() * radiusPerAoe;
+    }
+
     @Override
     public void cast(Player caster, SpellContext context) {
         SpellFxUtil.playCastSound(caster);
 
         double baseSpeed = config.getParam("burst", "base-speed", BASE_SPEED);
         int baseFuseTicks = (int) config.getParam("burst", "base-fuse-ticks", (double) BASE_FUSE_TICKS);
-        double baseBurstRadius = config.getParam("burst", "base-burst-radius", BASE_BURST_RADIUS);
 
         // 延伸: 弾速UP（信管据え置き）→ 遠くで爆発（距離ベース炸裂）
         double reachSpeedBonus = config.getParam("burst", "reach-speed-bonus", 0.5);
@@ -65,8 +83,7 @@ public class BurstForm implements SpellForm {
         // 延長: 信管延長（弾速据え置き）→ 遅く爆発（時間ベース炸裂）
         int fusePerDuration = (int) config.getParam("burst", "fuse-per-duration-level", 10.0);
         int fuseTicks = baseFuseTicks + context.getDurationLevel() * fusePerDuration;
-        double radiusPerAoe = config.getParam("burst", "radius-per-aoe", 1.5);
-        double burstRadius = baseBurstRadius + context.getAoeRadiusLevel() * radiusPerAoe;
+        double burstRadius = resolveBurstRadius(config, context);
 
         Vector baseDirection = caster.getLocation().getDirection();
 

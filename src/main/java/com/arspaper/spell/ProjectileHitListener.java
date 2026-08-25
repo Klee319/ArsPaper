@@ -56,9 +56,7 @@ public class ProjectileHitListener implements Listener {
                 : event.getEntity().getLocation();
             Player shooter = event.getEntity().getShooter() instanceof Player p ? p : null;
             GlyphConfig gc = com.arspaper.ArsPaper.getInstance().getGlyphConfig();
-            double baseBurstRadius = gc.getParam("burst", "base-burst-radius", 2.0);
-            double radiusPerAoe = gc.getParam("burst", "radius-per-aoe", 1.5);
-            double burstRadius = baseBurstRadius + context.getAoeRadiusLevel() * radiusPerAoe;
+            double burstRadius = BurstForm.resolveBurstRadius(gc, context);
             BurstForm.detonate(detonationPoint, context, burstRadius, shooter);
             event.getEntity().remove();
             return;
