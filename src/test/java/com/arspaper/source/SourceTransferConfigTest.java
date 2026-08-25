@@ -52,6 +52,47 @@ class SourceTransferConfigTest {
     }
 
     @Test
+    @DisplayName("網の割合排出は既定0.25で、隣接供給と同じ値に揃っている")
+    void networkDrainRatioDefaultsToTheSameShareAsAdjacentSupply() {
+        // 2026-08-25: 割合排出(2026-08-24)は隣接供給にしか効いておらず、網だけ定額100 ÷ 40tick
+        // ＝毎秒2.5点に取り残されていた(報告「ソースリンクの転送速度がまだ100ずつ」)。
+        // 網は階梯倍率もコア倍率も掛からないので、ここが定額のままだと上位リンクにしても速くならない。
+        SourceTransferConfig cfg = SourceTransferConfig.defaults();
+
+        assertEquals(0.25, cfg.networkDrainRatio(), 1e-9);
+        assertEquals(cfg.sourcelinkDrainRatio(), cfg.networkDrainRatio(), 1e-9,
+                "隣接に置くか網で繋ぐかで「溜まった量の何割が動くか」が変わってはいけない");
+
+        // 定額と割合の大きい方。小口(残量400未満)は定額が勝つので少量の速度は変わらない。
+        assertEquals(100, SourceDrainPolicy.allowance(
+                cfg.networkMaxPerTransfer(), 100, cfg.networkDrainRatio()));
+        assertEquals(7_500_000, SourceDrainPolicy.allowance(
+                cfg.networkMaxPerTransfer(), 30_000_000, cfg.networkDrainRatio()));
+    }
+
+    @Test
+    @DisplayName("網の drain-ratio は yml から上書きでき、範囲外は警告付きでクランプする")
+    void networkDrainRatioIsConfigurableAndClamped() {
+        List<String> warnings = new ArrayList<>();
+        SourceTransferConfig cfg = parse("""
+                transfer:
+                  network:
+                    drain-ratio: 0.5
+                """, warnings);
+        assertEquals(0.5, cfg.networkDrainRatio(), 1e-9);
+        assertTrue(warnings.isEmpty(), "範囲内の値で警告が出てはいけない: " + warnings);
+
+        List<String> tooBig = new ArrayList<>();
+        SourceTransferConfig clamped = parse("""
+                transfer:
+                  network:
+                    drain-ratio: 5.0
+                """, tooBig);
+        assertEquals(1.0, clamped.networkDrainRatio(), 1e-9, "1.0(全量)より大きくはできない");
+        assertFalse(tooBig.isEmpty(), "クランプしたら理由を通知する必要がある");
+    }
+
+    @Test
     @DisplayName("経路パーティクルの既定値は「細い線を近くだけ」で固定する(毎秒の粒子数の見積り付き)")
     void particleDefaultsStayConservative() {
         SourceTransferConfig cfg = SourceTransferConfig.defaults();

@@ -24,8 +24,9 @@ import java.util.function.Consumer;
  *       転送速度 = <b>max({@code max-per-transfer}, バッファ × {@code drain-ratio})</b> ÷ {@code interval-ticks}。
  *       検知半径 = バイタリック(mob討伐) / ボタニカル(作物成長)がイベントを拾う範囲。</li>
  *   <li><b>network</b>: ドミニオンワンドで結んだソースリレー網({@link SourceNetwork})。
- *       転送速度 = {@code max-per-transfer} ÷ {@code interval-ticks}、
- *       転送範囲 = {@code max-link-range}(1本のリンクを張れる最大距離)。</li>
+ *       転送速度 = <b>max({@code max-per-transfer}, 残量 × {@code drain-ratio})</b> ÷ {@code interval-ticks}、
+ *       転送範囲 = {@code max-link-range}(1本のリンクを張れる最大距離)。
+ *       <b>割合ぶんは 2026-08-25 に追加</b>(それまで網だけ定額のままだった)。</li>
  * </ul>
  */
 public record SourceTransferConfig(
@@ -37,6 +38,7 @@ public record SourceTransferConfig(
         int botanicalDetectionRadius,
         int networkIntervalTicks,
         int networkMaxPerTransfer,
+        double networkDrainRatio,
         int networkMaxLinkRange,
         boolean pathParticlesEnabled,
         int pathParticleIntervalTicks,
@@ -82,6 +84,26 @@ public record SourceTransferConfig(
     public static final int DEFAULT_BOTANICAL_DETECTION_RADIUS = 10;
     public static final int DEFAULT_NETWORK_INTERVAL_TICKS = 40;
     public static final int DEFAULT_NETWORK_MAX_PER_TRANSFER = 100;
+    /**
+     * 網の1リンク・1周期で送れる量のうち「残量に対する割合」ぶん(定額 {@code max-per-transfer}
+     * との大きい方を採る)。判定は隣接供給と同じ {@link SourceDrainPolicy}。
+     *
+     * <p>⚠ 2026-08-25 追加。{@code sourcelink.drain-ratio}(2026-08-24)は<b>隣接供給の経路にしか
+     * 効いていなかった</b>ため、ドミニオンワンドで結んだ網の転送だけ定額 100 ÷ 40tick
+     * ＝毎秒2.5点に取り残されていた（ユーザー報告「ソースリンクの転送速度がまだ100ずつ」）。
+     * 網は階梯倍率もコア倍率も掛からないので、<b>上位リンクにしても上位ジャーにしても永久に
+     * 毎秒2.5点</b>で、ソース機関1個(3,000万)を運ぶのに約7日(60万秒)かかる計算だった。
+     *
+     * <p>同じ 0.25 を既定にするのは、隣接供給と網で「溜まった量の何割が1周期で動くか」を
+     * 揃えるため(片方だけ速いと、ジャーを隣に置くか網で繋ぐかで速度が桁違いになる)。
+     * 別のキーにしてあるのは周期が違う(隣接100tick / 網40tick)ため ——
+     * 同じ割合でも網のほうが2.5倍速いので、後から別々に絞れる必要がある。
+     *
+     * <p>⚠ <b>配備先の yml にこのキーが無くてもこの既定値で動く</b>。ArsPaper の yml は
+     * {@code saveResource(..., false)} なので jar を差し替えても配備先には現れないが、
+     * {@code clampDouble} が未定義キーを既定値で埋めるので配備は jar だけで足りる。
+     */
+    public static final double DEFAULT_NETWORK_DRAIN_RATIO = 0.25;
     public static final int DEFAULT_NETWORK_MAX_LINK_RANGE = 30;
 
     // --- 経路パーティクル(2026-08-01 新規。既定ON) ---
@@ -151,6 +173,7 @@ public record SourceTransferConfig(
                 DEFAULT_BOTANICAL_DETECTION_RADIUS,
                 DEFAULT_NETWORK_INTERVAL_TICKS,
                 DEFAULT_NETWORK_MAX_PER_TRANSFER,
+                DEFAULT_NETWORK_DRAIN_RATIO,
                 DEFAULT_NETWORK_MAX_LINK_RANGE,
                 DEFAULT_PATH_PARTICLES_ENABLED,
                 DEFAULT_PATH_PARTICLE_INTERVAL_TICKS,
@@ -194,6 +217,8 @@ public record SourceTransferConfig(
                         1, 72000, "transfer.network.interval-ticks", warn),
                 clampInt(net, "max-per-transfer", DEFAULT_NETWORK_MAX_PER_TRANSFER,
                         1, Integer.MAX_VALUE, "transfer.network.max-per-transfer", warn),
+                clampDouble(net, "drain-ratio", DEFAULT_NETWORK_DRAIN_RATIO,
+                        0.0, 1.0, "transfer.network.drain-ratio", warn),
                 clampInt(net, "max-link-range", DEFAULT_NETWORK_MAX_LINK_RANGE,
                         1, MAX_LINK_RANGE, "transfer.network.max-link-range", warn),
                 fx == null ? DEFAULT_PATH_PARTICLES_ENABLED

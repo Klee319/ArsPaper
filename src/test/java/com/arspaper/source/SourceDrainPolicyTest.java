@@ -102,4 +102,53 @@ class SourceDrainPolicyTest {
         assertTrue(huge < small * 5L,
                 "量が13,700倍でも所要時間は5倍未満に収まること: " + small + "秒 → " + huge + "秒");
     }
+
+    @Test
+    @DisplayName("網の所要時間も定額のままだと桁が違う（網に割合を入れた根拠）")
+    void theNetworkHopWasTheRemainingFlatPath() {
+        // 網は周期40tick(=2秒)・定額100。階梯倍率もコア倍率も掛からないので、
+        // 上位リンク・上位ジャーにしても永久にこの速度だった。
+        final int networkFlat = 100;
+        final int networkInterval = 40;
+        long flatOnlyCycles = 30_000_000L / networkFlat;
+        assertEquals(600_000L, flatOnlyCycles * networkInterval / 20L,
+                "ソース機関1個(3,000万)を網で運ぶと定額のままなら60万秒＝約7日");
+
+        // 割合を入れると、隣接供給と同じく量に対して対数的になる。
+        long cycles = 0;
+        long remaining = 30_000_000L;
+        while (remaining > 0 && cycles < 100_000_000L) {
+            int visible = (int) Math.min(remaining, (long) Integer.MAX_VALUE);
+            remaining -= Math.min(remaining, SourceDrainPolicy.allowance(networkFlat, visible, RATIO));
+            cycles++;
+        }
+        long seconds = cycles * networkInterval / 20L;
+        assertTrue(seconds < 200L, "割合を入れれば3分半以内に運び切れること: " + seconds + "秒");
+    }
+
+    @Test
+    @DisplayName("SourceNetwork は1リンクの上限を SourceDrainPolicy で引き直す（定額を直接使わない）")
+    void networkTransferGoesThroughThePolicy() throws Exception {
+        String source = withoutLineComments(java.nio.file.Files.readString(
+                java.nio.file.Path.of("src/main/java/com/arspaper/source/SourceNetwork.java")));
+
+        assertTrue(source.contains(
+                        "SourceDrainPolicy.allowance(flatPerTransfer, available, drainRatio)"),
+                "網の1リンクの上限は送信元の残量から引き直す必要がある"
+                        + "(ここが定額に戻ると、上位リンクにしても毎秒2.5点のままになる)");
+        assertTrue(source.contains("transferConfig().networkDrainRatio()"),
+                "割合は transfer.network.drain-ratio から読むこと(コードに焼くと config で絞れない)");
+        assertTrue(source.contains("Math.min(allowance, Math.min(available, space))"),
+                "上限・残量・受け側の空きの3つで必ず切ること(空きを超えて送るとソースが消える)");
+    }
+
+    /** 行コメント({@code //} 以降)を落とす。コメントアウトされた呼び出しを「有る」と誤認しないため。 */
+    private static String withoutLineComments(String source) {
+        StringBuilder out = new StringBuilder(source.length());
+        for (String line : source.split("\n", -1)) {
+            int marker = line.indexOf("//");
+            out.append(marker >= 0 ? line.substring(0, marker) : line).append('\n');
+        }
+        return out.toString();
+    }
 }

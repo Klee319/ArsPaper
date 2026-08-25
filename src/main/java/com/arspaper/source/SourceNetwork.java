@@ -196,7 +196,13 @@ public class SourceNetwork {
     }
 
     private void tickTransfer() {
-        final int transferAmount = transferConfig().networkMaxPerTransfer();
+        // ⚠ 1リンク・1周期の上限は「定額」と「送信元の残量に対する割合」の大きい方
+        // ({@link SourceDrainPolicy}。隣接供給とまったく同じ判定)。
+        // 定額だけだと残量がいくらあっても毎周期100点しか動かず、網には階梯倍率もコア倍率も
+        // 掛からないので「上位リンクにしても上位ジャーにしても毎秒2.5点」で固定されていた
+        // (2026-08-25 のユーザー報告「ソースリンクの転送速度がまだ100ずつ」の真因)。
+        final int flatPerTransfer = transferConfig().networkMaxPerTransfer();
+        final double drainRatio = transferConfig().networkDrainRatio();
         // フェーズ1: 全転送を計算（net flowで相殺を回避）
         // ペアごとの正味転送量を計算
         Map<LocationKey, Map<LocationKey, Integer>> pendingTransfers = new LinkedHashMap<>();
@@ -209,10 +215,14 @@ public class SourceNetwork {
 
             Block fromBlock = fromLoc.getBlock();
             if (!(fromBlock.getState() instanceof TileState fromTile)) continue;
-            if (!fromTile.getPersistentDataContainer().has(BlockKeys.CUSTOM_BLOCK_ID)) continue;
 
-            int available = fromTile.getPersistentDataContainer()
-                .getOrDefault(BlockKeys.SOURCE_AMOUNT, PersistentDataType.INTEGER, 0);
+            // ⚠ W-104: 貯蔵先はブロック種別で違う（ジャー=source_amount / ソースリンク=sourcelink_buffer）。
+            // 以前はここで source_amount 決め打ちだったため、ソースリンクを送信元にすると
+            // 残量が常に0と判定され、接続は成立しているのに一度も転送されなかった。
+            SourceStorage fromStorage = storageAt(fromTile);
+            if (!fromStorage.canSend()) continue;
+
+            int available = storedSource(fromTile, fromStorage);
             if (available <= 0) continue;
 
             for (LocationKey toKey : entry.getValue()) {
@@ -222,19 +232,24 @@ public class SourceNetwork {
 
                 Block toBlock = toLoc.getBlock();
                 if (!(toBlock.getState() instanceof TileState toTile)) continue;
-                if (!toTile.getPersistentDataContainer().has(BlockKeys.CUSTOM_BLOCK_ID)) continue;
 
-                int toAmount = toTile.getPersistentDataContainer()
-                    .getOrDefault(BlockKeys.SOURCE_AMOUNT, PersistentDataType.INTEGER, 0);
-                int toMax = SourceJar.MAX_SOURCE;
+                // ソースを保持しないブロックへ送ると、誰も読まないPDCへ書くだけで送信元からは減る
+                // ＝ソースが黙って消える。受け取れるのはジャーだけ。
+                if (!storageAt(toTile).canReceive()) continue;
 
                 // 無限ソースジャーへの転送はスキップ
-                if (com.arspaper.block.impl.SourceJar.isInfinite(toTile)) continue;
+                if (SourceJar.isInfinite(toTile)) continue;
 
-                int space = toMax - toAmount;
+                // ⚠ 容量は上位ジャーごとに違う。static な MAX_SOURCE（＝設定未読込時のフォールバック
+                // 10,000）を見ていたため、上位ジャーは網経由だと 10,000 で頭打ちになっていた。
+                int space = SourceJar.maxSource(toTile) - SourceJar.getSourceAmount(toTile);
                 if (space <= 0) continue;
 
-                int transfer = Math.min(transferAmount, Math.min(available, space));
+                // 上限は「今の残量」から毎リンク引き直す。リンクが複数ある送信元では
+                // available が減るほど1本あたりの上限も下がるので、定額時代と同じ
+                // 「1リンクにつき上限1つ」の意味を保ったまま残量に追随する。
+                int allowance = SourceDrainPolicy.allowance(flatPerTransfer, available, drainRatio);
+                int transfer = Math.min(allowance, Math.min(available, space));
                 if (transfer <= 0) continue;
 
                 pendingTransfers.computeIfAbsent(fromKey, k -> new LinkedHashMap<>())
@@ -254,8 +269,10 @@ public class SourceNetwork {
             Block fromBlock = fromLoc.getBlock();
             if (!(fromBlock.getState() instanceof TileState fromTile)) continue;
 
-            int fromAmount = fromTile.getPersistentDataContainer()
-                .getOrDefault(BlockKeys.SOURCE_AMOUNT, PersistentDataType.INTEGER, 0);
+            SourceStorage fromStorage = storageAt(fromTile);
+            if (!fromStorage.canSend()) continue;
+
+            int fromAmount = storedSource(fromTile, fromStorage);
 
             for (var toEntry : fromEntry.getValue().entrySet()) {
                 LocationKey toKey = toEntry.getKey();
@@ -270,24 +287,56 @@ public class SourceNetwork {
 
                 Block toBlock = toLoc.getBlock();
                 if (!(toBlock.getState() instanceof TileState toTile)) continue;
+                if (!storageAt(toTile).canReceive()) continue;
 
-                int toAmount = toTile.getPersistentDataContainer()
-                    .getOrDefault(BlockKeys.SOURCE_AMOUNT, PersistentDataType.INTEGER, 0);
+                // 実際に入った分だけ送信元から引く。ジャー個体の容量で切り詰められても消えない。
+                int added = SourceJar.addSource(toTile, transfer);
+                if (added <= 0) continue;
 
-                fromTile.getPersistentDataContainer().set(
-                    BlockKeys.SOURCE_AMOUNT, PersistentDataType.INTEGER, fromAmount - transfer
-                );
-                fromTile.update();
+                setStoredSource(fromTile, fromStorage, fromAmount - added);
 
-                toTile.getPersistentDataContainer().set(
-                    BlockKeys.SOURCE_AMOUNT, PersistentDataType.INTEGER, toAmount + transfer
-                );
-                toTile.update();
-
-                fromAmount -= transfer;
+                fromAmount -= added;
                 if (fromAmount <= 0) break;
             }
         }
+    }
+
+    /**
+     * その端点がソースを<b>どこに</b>持っているか。判定は custom_block_id から引く。
+     * ソースリンクかどうかはブロックレジストリの実体で見る（sourcelinks.yml に足した
+     * カスタムソースリンクも {@code Sourcelink} として登録されるので追随する）。
+     */
+    private static SourceStorage storageAt(TileState tile) {
+        String blockId = tile.getPersistentDataContainer()
+            .get(BlockKeys.CUSTOM_BLOCK_ID, PersistentDataType.STRING);
+        if (blockId == null) return SourceStorage.NONE;
+        return SourceStorage.of(SourceJar.isSourceJarId(blockId), isSourcelinkId(blockId));
+    }
+
+    private static boolean isSourcelinkId(String blockId) {
+        com.arspaper.ArsPaper ars = com.arspaper.ArsPaper.getInstance();
+        if (ars == null || ars.getBlockRegistry() == null) return false;
+        return ars.getBlockRegistry().get(blockId).orElse(null)
+            instanceof com.arspaper.source.sourcelink.Sourcelink;
+    }
+
+    /** 貯蔵種別に応じたPDCキー。ここを間違えると「残量0」で無言に読み飛ばされる（W-104）。 */
+    private static org.bukkit.NamespacedKey amountKey(SourceStorage storage) {
+        return storage == SourceStorage.SOURCELINK
+            ? com.arspaper.source.sourcelink.Sourcelink.SOURCE_BUFFER
+            : BlockKeys.SOURCE_AMOUNT;
+    }
+
+    private static int storedSource(TileState tile, SourceStorage storage) {
+        return tile.getPersistentDataContainer()
+            .getOrDefault(amountKey(storage), PersistentDataType.INTEGER, 0);
+    }
+
+    private static void setStoredSource(TileState tile, SourceStorage storage, int amount) {
+        tile.getPersistentDataContainer().set(
+            amountKey(storage), PersistentDataType.INTEGER, Math.max(0, amount)
+        );
+        tile.update();
     }
 
     public void shutdown() {
