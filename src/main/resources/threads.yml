@@ -20,8 +20,11 @@
 #   regen-percent: マナ回復速度の割合上昇（%）。固定値の regen-bonus の割合版。
 #   slots: バックパックスロット数。⚠ これは **lore の表示専用**（ThreadConfig#getBackpackSlots を
 #     読むのは説明文の生成1箇所だけ）。実際の容量は BackpackGui が
-#     「装着しているバックパックスレッドの本数（max: 2 が上限）× 3行 × 9 = 27 or 54」で決めるので、
-#     ここには **1本あたりの枠数（=27）** を書く。0 を書くと説明文が「追加インベントリ 0スロット」と嘘をつく。
+#     「**その防具1点に**装着しているバックパックスレッドの本数（2本が上限）× 3行 × 9 = 27 or 54」で
+#     決めるので、ここには **1本あたりの枠数（=27）** を書く。
+#     0 を書くと説明文が「追加インベントリ 0スロット」と嘘をつく。
+#     ⚠ 数えるのは【1つの防具の PDC だけ】。別の部位に挿した本数は合算されない。だから
+#       backpack だけは 2026-08-25 (W-254) の「1装備1本」から除外して max: 2 を残してある。
 #   potion-effect: 装備中常時付与するポーション効果（バニラ PotionEffectType 名を小文字にしたid）。
 #     省略時は ThreadType enum の既定値を使う（後方互換）。"none" と書くと明示的に無効化できる。
 #     ⚠ 指定できるのは有益効果18種のみ:
@@ -42,18 +45,19 @@
 # ⚠ display_name: は【誰も読んでいない】。表示名は ThreadType enum が正で、ここの値は飾り。
 #   ここを直しても実機の名前は変わらないので、名前を変えるときは enum を直すこと。
 #
-# stackable: 同じ装備に同じスレッドを複数セットできるか
-#   ★2026-08-18 に【既定が true（重複可）へ反転】した（ユーザー確定要件「同一のスレッドを
-#     重複で入れられるようにしてほしい」）。旧既定 false のままだと thread-sets.yml の
-#     6段のしきい値が【物理的に発動しない】（1装備1本 × キャリア5 = 上限5本）。
-#   true / 未記載: 重複可能（max で1装備あたりの上限を指定）
-#   false: 1つの装備に1つまで（明示したときだけ）
-#   ※ 飛行/耐火/暗視のような常時効果は重複しても強くならない（ポーションは最大レベル採用・
-#     飛行は真偽値）が、厳選ステと thread-sets のセット効果は本数ぶん効くので重複は無駄ではない。
-# max: 1つの装備にセットできる最大数（未設定 = ThreadApplicationPolicy.DEFAULT_MAX_STACK = 2）
-#   ⚠ 未設定を「無制限」にしてはいけない。防具のスレッド枠は帯ごとに 2/3/4 枠（合計 8/12/16）で、
-#     TF 側 ShippedThreadBandIndependenceTest の帯目標（+39%/+49%/+59%）は「1種へ全枠を
-#     集中できない」前提で較正されている。上限を外すと最良編成が最強1種への全振りに化ける。
+# stackable / max: 【2026-08-25 (W-254) に廃止】
+#   ★ユーザー確定要件「同じスレッドは同じ部位に1つまでしか付けられないように修正する」。
+#     ThreadApplicationPolicy.DEFAULT_MAX_STACK を 1 にしたので、この2キーは書かなくても
+#     全スレッドが「1装備につき同種1本」になる。出荷 yml からは backpack を除いて全部落とした。
+#   ⚠ 例外は backpack の max: 2 だけ。戦闘ステを持たないので上限張り付きの問題が無く、
+#     かつ 1本に絞ると 54スロットのバックパックが到達不能になる(理由は backpack の項)。
+#   ⚠ なぜ上限を1にしたか: 回避率・ダメージ軽減率のような割合ステは、同じ種を枠へ集中させると
+#     合計が上限(0.9)へ張り付き、そこから先の装備更新が一切効かなくなる(=バランスが壊れる)。
+#     1装備1本にすると同種の総数はキャリア数(着用防具4部位＋メインハンド＝5)で頭打ちになる。
+#   ⚠ この変更で thread-sets.yml の到達可能な最大しきい値は 10 → 【5】になった。
+#     6段以上を書くと物理的に発動しない(ThreadSetThresholdReachabilityTest が落ちる)。
+#   ⚠ 2キーはコード側にまだ残してある(ThreadConfig が読む)。特定の種だけ重複を許したく
+#     なったときに yml から復活できるが、上の理由を読んでから足すこと。
 # ============================================================
 
 # 設定リファレンス(本文コメント移設先): docs/config-reference/arspaper/threads.md
@@ -63,35 +67,29 @@ threads:
     display_name: 空のスレッド
   mana_regen:
     display_name: マナ回復速度上昇のスレッド
-    stackable: true
-    max: 3
   mana_boost:
     display_name: マナ最大値上昇のスレッド
-    stackable: true
-    max: 3
   health_boost:
     display_name: 体力増強のスレッド
-    stackable: true
-    max: 3
     potion-effect: health_boost
     potion-level: 2
   hit_mana_recovery:
     display_name: 被弾マナ回復のスレッド
-    stackable: true
-    max: 2
   damage_mana_recovery:
     display_name: 攻撃マナ回復のスレッド
-    stackable: true
-    max: 2
   spell_cost_down:
     display_name: 詠唱効率のスレッド
-    stackable: true
-    max: 1
   backpack:
     display_name: バックパックのスレッド
-    stackable: true
-    max: 2
     slots: 27
+    # 【W-254 の唯一の例外】1装備2本まで。
+    #   全スレッドを1装備1本にした理由は「割合ステが上限へ張り付くのを防ぐ」ことなので、
+    #   戦闘ステを1つも持たないバックパックには当てはまらない。一方で
+    #   BackpackGui#countBackpackThreads は【1つの防具の PDC だけ】を数えるので、
+    #   1本に絞ると 54スロット(2段)が二度と作れなくなる ── 既存機能が黙って消える。
+    #   ⚠ ここを1へ下げるなら BackpackGui の「最大2段」も一緒に落とすこと(片方だけ直すと
+    #     到達不能な仕様が説明文だけ残る)。
+    max: 2
   speed:
     display_name: 迅速のスレッド
     potion-effect: speed
@@ -104,6 +102,16 @@ threads:
     display_name: 暗視のスレッド
     potion-effect: night_vision
     potion-level: 1
+  stealth:
+    display_name: 隠密のスレッド
+    potion-effect: invisibility
+    potion-level: 1
+    # 2026-08-25 (W-256) 追加。透明化は防具に挿したときだけ走る
+    # (ThreadApplicationPolicy#isAmbientOnlyEffect が常時ポーション効果を防具限定にしている)。
+    # ⚠ potion-level は 1 のまま。透明化に強度の概念は無く、2以上にしても効果は変わらないのに
+    #   lore だけ「II」と出て嘘になる。
+    lore:
+      - 気配を断ち、姿を消す
   fire_resistance:
     display_name: 耐火のスレッド
     potion-effect: fire_resistance
@@ -116,14 +124,11 @@ threads:
     display_name: コンジットパワーのスレッド
     potion-effect: conduit_power
     potion-level: 1
-  # ⚠ 村の英雄だけ max: 1（=同一装備に1本まで。装備が違えばキャリア5個ぶん重複できる）。
-  #   このスレッドは percent-bonus-damage を1本あたり +6% 配る唯一の突出枠で、次点(棘の +2.5%)の
-  #   2.4倍ある。既定の max: 2 を許すと防具4部位で8本になり、TF 側
-  #   ShippedThreadBandIndependenceTest の帯目標(+39%/+49%/+59%)を全帯で +22.0pt 超過する
-  #   （実測。目標値は 2026-08-14 の戦闘リワークで「1装備1本」前提に較正されている）。
-  #   ここを 2 以上にしたいなら、先に item-stats.yml の1本あたりの割合ダメージを下げること。
+  # ⚠ 村の英雄は percent-bonus-damage を1本あたり +6% 配る突出枠で、次点(棘の +2.5%)の
+  #   2.4倍ある。2026-08-25 (W-254) に【全スレッドが1装備1本まで】へ変わったので個別の
+  #   max: 1 は不要になったが、この枠が帯目標(+39%/+49%/+59%)の上限を決めているという事実は
+  #   変わらない ── 値を上げるなら先に TF 側 ShippedThreadBandIndependenceTest を通すこと。
   hero_of_the_village:
-    max: 1
     display_name: 村の英雄のスレッド
     potion-effect: hero_of_the_village
     potion-level: 1
@@ -132,12 +137,8 @@ threads:
     flight: true
   mana_amplify:
     display_name: マナ増幅のスレッド
-    stackable: true
-    max: 3
   mana_circulate:
     display_name: 循環のスレッド
-    stackable: true
-    max: 3
   source_thrift:
     display_name: 源流節約のスレッド
   artisan:

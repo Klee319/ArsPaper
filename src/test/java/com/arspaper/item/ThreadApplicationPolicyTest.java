@@ -5,6 +5,7 @@ import org.bukkit.Material;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -101,26 +102,34 @@ class ThreadApplicationPolicyTest {
     }
 
     @Test
-    @DisplayName("同一スレッドの重複セットは既定で許可される(2026-08-18 ユーザー確定要件)")
-    void duplicateSocketingIsAllowedByDefault() {
-        assertTrue(ThreadApplicationPolicy.DEFAULT_STACKABLE,
-                "既定が重複不可に戻ると thread-sets.yml の6段が『1装備1本 × キャリア5 = 上限5』で"
-                        + "また到達不能になる(role_luck / role_effeciency が実際にその状態だった)");
+    @DisplayName("同じスレッドは1装備につき1本まで(2026-08-25 W-254 ユーザー確定要件)")
+    void duplicateSocketingIsCappedAtOnePerItem() {
+        // ユーザー確定要件:
+        //   「同じスレッドは同じ部位に1つまでしか付けられないように修正する。これにより
+        //     回避率やダメージ軽減等の一部100%に達成するとバランスの壊れるステータスを防ぐ」
+        // 割合ステ(dodge-chance / damage-reduction / armor-strength / 各耐性)は
+        // combat/damage.yml の上限(0.9 / 0.9 / 1.0)へ張り付くと、そこから先の装備更新が
+        // 一切効かなくなる。1装備1本にすると同種の総数はキャリア5で頭打ちになる。
+        assertEquals(1, ThreadApplicationPolicy.DEFAULT_MAX_STACK,
+                "1装備1本が崩れると割合ステを1種へ集中できてしまう(上限張り付き)");
 
-        // 既定の上限は DEFAULT_MAX_STACK。ここまでは挿せて、そこから先は挿せない。
-        for (int already = 0; already < ThreadApplicationPolicy.DEFAULT_MAX_STACK; already++) {
-            assertTrue(ThreadApplicationPolicy.canSocketAnother(
-                            true, ThreadApplicationPolicy.DEFAULT_MAX_STACK, already),
-                    already + "本目まで挿せるはず");
-        }
+        assertTrue(ThreadApplicationPolicy.canSocketAnother(
+                        true, ThreadApplicationPolicy.DEFAULT_MAX_STACK, 0),
+                "1本目は挿せる");
         assertFalse(ThreadApplicationPolicy.canSocketAnother(
-                        true, ThreadApplicationPolicy.DEFAULT_MAX_STACK,
-                        ThreadApplicationPolicy.DEFAULT_MAX_STACK),
-                "max に達したら止める(無制限にすると1種へ全枠集中でき、TF の帯目標が壊れる)");
+                        true, ThreadApplicationPolicy.DEFAULT_MAX_STACK, 1),
+                "2本目は挿せない(これが W-254 の本体)");
 
-        // 既定の上限 × キャリア5 が、現行 thread-sets.yml の最上位ティア6 を超えていること。
-        assertTrue(ThreadApplicationPolicy.DEFAULT_MAX_STACK * 5 >= 6,
-                "既定の上限 × キャリア5 が6未満だと role_luck の6段がまた死ぬ");
+        // ⚠ 上限を上げるなら thread-sets.yml の最上段も一緒に見ること。到達可能な最大本数は
+        //   DEFAULT_MAX_STACK × キャリア5 で、現行の最上段は 5(6段は 2026-08-25 に畳んだ)。
+        //   到達可能性そのものは ThreadSetThresholdReachabilityTest が出荷 yml で検査する。
+        assertTrue(ThreadApplicationPolicy.DEFAULT_MAX_STACK * 5 >= 5,
+                "既定の上限 × キャリア5 が5未満だと thread-sets.yml の最上段が死ぬ");
+
+        // stackable の既定は true のままだが、上限が1なので true/false で結果は変わらない。
+        // 「重複可否は stackable ではなく max で読む」ことを固定する。
+        assertTrue(ThreadApplicationPolicy.DEFAULT_STACKABLE,
+                "既定は true のまま(上限1なので挙動は同じ。片方だけ直して迷わないための固定)");
     }
 
     @Test

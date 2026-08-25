@@ -21,16 +21,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>縛っている失敗は2種類ある(どちらも例外もログも出ないので、実機で気づけない):
  * <ol>
  *   <li><b>到達不能なしきい値</b>。同種スレッドの合計個数は
- *       {@code threads.yml} の {@code max}(= 装備1点あたりの上限。{@code stackable}/{@code max}
- *       未指定なら {@link ThreadApplicationPolicy#DEFAULT_MAX_STACK}。2026-08-18 に既定が
- *       「重複不可(=1本)」から「重複可」へ反転した)
+ *       {@code threads.yml} の {@code max}(= 装備1点あたりの上限。出荷 yml では
+ *       2026-08-25 (W-254) に全削除したので、実際に効くのは
+ *       {@link ThreadApplicationPolicy#DEFAULT_MAX_STACK} の側)
  *       × キャリア数で頭打ちになる。キャリアは<b>着用防具4部位 + メインハンド + オフハンド</b>だが、
  *       オフハンドは TrinityForge {@code item-stats.yml} の {@code offhand-stats-apply: true} の品だけで、
  *       出荷 yml には該当が0件 → <b>実キャリア数は 5</b>。
  *       上限を超えるしきい値を書くと、そのティアは物理的に発動しない。
- *       (設計書 §3-A-5 の「2/4 段 → 3/6 段」は旧既定での上限 5 を見落としていた。
- *       2026-08-18 に重複セットを既定で許可したので上限は 2 × 5 = 10 になり、
- *       {@code role_luck} / {@code role_effeciency} の6段は到達可能な形へ戻してある。)</li>
+ *       <p>既定の変遷(そのたびに thread-sets.yml の最上段を畳んだり戻したりしている):
+ *       <ul>
+ *         <li>〜2026-08-18: 既定は重複不可(1本) → 上限 5。設計書 §3-A-5 の「3/6 段」が到達不能だった。</li>
+ *         <li>2026-08-18: ユーザー要件で重複可(既定 2 本)へ反転 → 上限 10。6段を復活。</li>
+ *         <li>2026-08-25 (W-254): ユーザー要件「同じスレッドは同じ部位に1つまで」で既定 1 本へ。
+ *             上限は再び 5 なので、{@code role_luck} / {@code role_effeciency} の6段は
+ *             <b>値を5段へ足し込んで</b>畳んである(捨てていない)。</li>
+ *       </ul></li>
  *   <li><b>死に値</b>。セット効果は「同種を N 枠捧げる」対価なので、最終ティアまでの累計が
  *       そのキーの<b>スレッド1本の抽選最小値</b>(TrinityForge {@code item-stats.yml} のスレッド項目
  *       (CMD帯 300000-300099、items.<MATERIAL#CMD>.random.<key>.min)が持つ値のうち、全スレッド中の
@@ -81,9 +86,12 @@ class ThreadSetThresholdReachabilityTest {
     /**
      * スレッド種別 → 1装備あたりの装着上限。
      *
-     * <p>2026-08-18: 既定が {@link ThreadApplicationPolicy#DEFAULT_STACKABLE}(=重複可)へ
-     * 反転したので、未記載は「1個まで」ではなく {@link ThreadApplicationPolicy#DEFAULT_MAX_STACK}
-     * になる。さらに1装備に挿せるのはスレッド枠の数までなので {@link #SLOTS_PER_ITEM} で押さえる。
+     * <p>未記載は {@link ThreadApplicationPolicy#DEFAULT_MAX_STACK}。さらに1装備に挿せるのは
+     * スレッド枠の数までなので {@link #SLOTS_PER_ITEM} で押さえる。
+     *
+     * <p>⚠ 2026-08-25 (W-254): 出荷 threads.yml から {@code stackable}/{@code max} を全部落とした
+     * ので、この読み取りは<b>常に既定値へ落ちる</b>。キー自体はコード側に残してあるため
+     * (将来「この種だけ2本まで」を書けるように)、読み取り経路もそのまま残している。
      */
     private static Map<String, Integer> perItemLimits() {
         ConfigurationSection threads = section(load("threads.yml"), "threads", "threads.yml の threads:");
@@ -364,6 +372,32 @@ class ThreadSetThresholdReachabilityTest {
         assertEquals(java.util.List.of(), flat,
                 "attack-power のセット効果が固定値のまま(低帯だけ極端に強くなる)。"
                         + "{ mode: multiply, value: 0.05 } のように割合で書くこと");
+    }
+
+    @Test
+    @DisplayName("W-254: 出荷 threads.yml で重複を許しているのは backpack だけ(1装備1本の徹底)")
+    void onlyBackpackKeepsAPerItemStackAllowance() {
+        ConfigurationSection threads = section(load("threads.yml"), "threads", "threads.yml の threads:");
+        java.util.List<String> exceptions = new java.util.ArrayList<>();
+        for (String id : threads.getKeys(false)) {
+            ConfigurationSection entry = threads.getConfigurationSection(id);
+            if (entry == null) {
+                continue;
+            }
+            if (entry.contains("stackable") || entry.getInt("max", 1) > 1) {
+                exceptions.add(id + " (stackable=" + entry.get("stackable")
+                        + ", max=" + entry.get("max") + ")");
+            }
+        }
+        // ユーザー確定要件は「同じスレッドは同じ部位に1つまで」。既定(DEFAULT_MAX_STACK=1)で
+        // 全種が1本になるので、yml 側に上書きが残っていたらそこだけ要件から漏れる。
+        //
+        // backpack だけは意図的な例外。BackpackGui#countBackpackThreads が数えるのは
+        // 【1つの防具の PDC だけ】なので、1本に絞ると 54スロット(2段)が到達不能になり、
+        // 既存機能が黙って消える。戦闘ステを1つも持たないため「割合ステが上限へ張り付く」
+        // という W-254 の動機は当てはまらない。
+        assertEquals(java.util.List.of("backpack (stackable=null, max=2)"), exceptions,
+                "1装備1本の例外は backpack のみ。増やすなら『割合ステを持たない』ことを確認すること");
     }
 
     @Test

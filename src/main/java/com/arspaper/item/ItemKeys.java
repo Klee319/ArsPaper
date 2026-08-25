@@ -84,4 +84,37 @@ public final class ItemKeys {
 
     /** スペルブックの所有者UUID */
     public static final NamespacedKey SPELL_BOOK_OWNER = new NamespacedKey(NAMESPACE, "spell_book_owner");
+
+    /**
+     * 魂縛スレッドの所有者UUID（2026-08-25 W-259）。
+     *
+     * <p>対象は構造物のルートチェスト専属のトレジャースレッドだけ
+     * （判定は {@link TreasureThreadSoulbindPolicy}）。刻印は「最初に拾った人」で決まる。
+     *
+     * <p>⚠ TrinityForge の {@code ItemData#owner()} とは<b>別の台帳</b>。TF 側は
+     * PDC に {@code bind_type} と {@code roll_seed} がある品にしか刻印しないので、
+     * {@code external-source: arspaper} のスレッドには一度も発火しない。
+     * TF の所有者が入っている品ではそちらが正なので、読むときは
+     * {@code TrinityForgeBridge.tfOwnerId} を先に見ること
+     * （2本の台帳がずれると「lore に自分の名前が出ているのに弾かれる」になる。
+     *   魔導書で実際に起きた事故 W-100 と同じ形）。
+     */
+    public static final NamespacedKey THREAD_SOULBOUND_OWNER =
+        new NamespacedKey(NAMESPACE, "thread_soulbound_owner");
+
+    /**
+     * 装着済みスレッドの所有者UUID（スロット添字ごとのJSON配列／2026-08-25 W-259）。
+     * {@link #THREAD_SLOTS} と<b>同じ添字</b>で並ぶ。所有者が居ない枠は空文字。
+     *
+     * <p><b>なぜ装備側にも持つのか</b>: スレッド単体を弾くだけでは
+     * 「自分で挿してから装備ごと渡す」で素通りする ── ユーザーが最初に指摘した抜け道
+     * 「他の人にスレッド付きの武器とかが渡された場合にどうやって対処しよう」がこれ。
+     * さらに取り外しでスレッドを作り直す({@code ThreadGui#createThreadItemStack})ので、
+     * ここに残しておかないと<b>挿して外すだけで所有者が消える</b>(洗浄できてしまう)。
+     *
+     * <p>{@link #THREAD_SLOT_ROLLS} と同じく、全部空なら<b>書かない</b>
+     * (魂縛スレッドを一度も挿していない装備は導入前と同じPDC形状のまま)。
+     */
+    public static final NamespacedKey THREAD_SLOT_OWNERS =
+        new NamespacedKey(NAMESPACE, "thread_slot_owners");
 }

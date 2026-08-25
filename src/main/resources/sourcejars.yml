@@ -4,6 +4,9 @@
 # jars.<id>:
 #   material / display-name / custom-model-data / lore : item-catalog 相当の見た目
 #   capacity : 蓄積可能なソース量。-1 で無限（クリエイティブ用）
+#   transfer-multiplier : 網（ドミニオンワンドで結んだ経路）でこのジャーが送信元になったときの
+#              転送量倍率。未設定は 1.0。⚠ 隣接供給（ソースリンク→隣のジャー）には効かない
+#              ── あちらは sourcelinks.yml の items.<id>.transfer-multiplier が担う。
 #   recipe   : 作業台 / 儀式レシピ（UnifiedRecipeLoader が読む。Ars Nouveau 既定を踏襲）
 # =============================================================================
 
@@ -23,6 +26,9 @@ jars:
     display-name: ソースジャー
     custom-model-data: 200002
     capacity: 20000
+    # 網（ドミニオンワンド）でこのジャーが送信元になったときの転送量倍率(2026-08-25 / W-257)。
+    # 階梯1段ごとに x5。実効レート = transfer.network.max-per-transfer x この値 ÷ interval-ticks。
+    transfer-multiplier: 1.0
     lore:
       - 魔法のソースエネルギーを貯蔵
     # バニラ Ars: Archwood Slab + Glass。本ポートでは Sourcestone 系素材に置換した作業台レシピ。
@@ -43,6 +49,9 @@ jars:
     display-name: クリエイティブソースジャー
     custom-model-data: 200003
     capacity: -1
+    # 網（ドミニオンワンド）でこのジャーが送信元になったときの転送量倍率(2026-08-25 / W-257)。
+    # 階梯1段ごとに x5。実効レート = transfer.network.max-per-transfer x この値 ÷ interval-ticks。
+    transfer-multiplier: 1953125.0
     lore:
       - 無限のソースエネルギーを供給
     # クリエイティブ専用 — クラフトレシピなし
@@ -96,6 +105,9 @@ jars:
     display-name: "&b蒼片の壺"
     custom-model-data: 200004
     capacity: 50000
+    # 網（ドミニオンワンド）でこのジャーが送信元になったときの転送量倍率(2026-08-25 / W-257)。
+    # 階梯1段ごとに x5。実効レート = transfer.network.max-per-transfer x この値 ÷ interval-ticks。
+    transfer-multiplier: 5.0
     lore:
       - 欠片を砕いて練り込んだ壺
       - 容量 50,000
@@ -121,6 +133,9 @@ jars:
     display-name: "&b重ね片の甕"
     custom-model-data: 200009
     capacity: 150000
+    # 網（ドミニオンワンド）でこのジャーが送信元になったときの転送量倍率(2026-08-25 / W-257)。
+    # 階梯1段ごとに x5。実効レート = transfer.network.max-per-transfer x この値 ÷ interval-ticks。
+    transfer-multiplier: 25.0
     lore:
       - 欠片を層状に重ねて厚みを出した甕
       - 容量 150,000
@@ -139,6 +154,9 @@ jars:
     display-name: "&3結晶の大甕"
     custom-model-data: 200005
     capacity: 250000
+    # 網（ドミニオンワンド）でこのジャーが送信元になったときの転送量倍率(2026-08-25 / W-257)。
+    # 階梯1段ごとに x5。実効レート = transfer.network.max-per-transfer x この値 ÷ interval-ticks。
+    transfer-multiplier: 125.0
     lore:
       - 内側を結晶で張った大甕
       - 容量 250,000
@@ -161,6 +179,9 @@ jars:
     display-name: "&3晶脈の水槽"
     custom-model-data: 200010
     capacity: 700000
+    # 網（ドミニオンワンド）でこのジャーが送信元になったときの転送量倍率(2026-08-25 / W-257)。
+    # 階梯1段ごとに x5。実効レート = transfer.network.max-per-transfer x この値 ÷ interval-ticks。
+    transfer-multiplier: 625.0
     lore:
       - 結晶が脈のように走る水槽
       - 容量 700,000
@@ -179,6 +200,9 @@ jars:
     display-name: "&9ソース貯水槽"
     custom-model-data: 200006
     capacity: 2000000
+    # 網（ドミニオンワンド）でこのジャーが送信元になったときの転送量倍率(2026-08-25 / W-257)。
+    # 階梯1段ごとに x5。実効レート = transfer.network.max-per-transfer x この値 ÷ interval-ticks。
+    transfer-multiplier: 3125.0
     lore:
       - ひとつで小さな湖ほどのソースを抱える
       - 容量 2,000,000
@@ -199,6 +223,9 @@ jars:
     display-name: "&9凝縮の深槽"
     custom-model-data: 200011
     capacity: 5000000
+    # 網（ドミニオンワンド）でこのジャーが送信元になったときの転送量倍率(2026-08-25 / W-257)。
+    # 階梯1段ごとに x5。実効レート = transfer.network.max-per-transfer x この値 ÷ interval-ticks。
+    transfer-multiplier: 15625.0
     lore:
       - 底に凝縮物を沈めて密度を上げた深槽
       - 容量 5,000,000
@@ -226,6 +253,9 @@ jars:
     display-name: "&1深淵の櫃"
     custom-model-data: 200008
     capacity: 10000000
+    # 網（ドミニオンワンド）でこのジャーが送信元になったときの転送量倍率(2026-08-25 / W-257)。
+    # 階梯1段ごとに x5。実効レート = transfer.network.max-per-transfer x この値 ÷ interval-ticks。
+    transfer-multiplier: 78125.0
     lore:
       - 底の見えない櫃。注いだ端から沈んでいく
       - 容量 10,000,000
@@ -248,6 +278,9 @@ jars:
     display-name: "&1機関渦の櫃"
     custom-model-data: 200012
     capacity: 25000000
+    # 網（ドミニオンワンド）でこのジャーが送信元になったときの転送量倍率(2026-08-25 / W-257)。
+    # 階梯1段ごとに x5。実効レート = transfer.network.max-per-transfer x この値 ÷ interval-ticks。
+    transfer-multiplier: 390625.0
     lore:
       - 機関がいくつも沈み、渦を巻いたまま止まらない櫃
       - 容量 25,000,000
@@ -266,6 +299,9 @@ jars:
     display-name: "&5特異点の壺"
     custom-model-data: 200007
     capacity: 50000000
+    # 網（ドミニオンワンド）でこのジャーが送信元になったときの転送量倍率(2026-08-25 / W-257)。
+    # 階梯1段ごとに x5。実効レート = transfer.network.max-per-transfer x この値 ÷ interval-ticks。
+    transfer-multiplier: 1953125.0
     lore:
       - 内側が外側より広い。覗き込まないこと
       - 容量 50,000,000

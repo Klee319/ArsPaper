@@ -48,20 +48,34 @@ public final class ThreadApplicationPolicy {
      * ({@code role_luck} / {@code role_effeciency} が実際にその状態だった)。
      */
     public static final boolean DEFAULT_STACKABLE = true;
+    // ⚠ 2026-08-25 (W-254): この既定は true のままだが、DEFAULT_MAX_STACK が 1 になったので
+    //   実効は「1装備につき同種1本」。true/false のどちらでも結果は同じになるため、
+    //   上限の意味は max の側だけで読むこと(true を false へ変えても挙動は変わらない)。
 
     /**
      * {@code max:} を書かなかったときの1装備あたりの上限。
      *
-     * <p><b>「無制限」にはしない</b>。防具のスレッド枠は帯ごとに 2/3/4 枠(合計 8/12/16)で、
-     * TrinityForge {@code ShippedThreadBandIndependenceTest} の帯目標(+39%/+49%/+59%)は
-     * 「1種に全枠を集中できない」ことを前提に較正されている。無制限にすると最良編成が
-     * 最強の1種へ全振りする形に化けて、割合ダメージ寄与が設計目標を超える。
+     * <p><b>2026-08-25 (W-254): 2 → 1。</b>ユーザー確定要件
+     * 「同じスレッドは同じ部位に1つまでしか付けられないように修正する。これにより回避率や
+     * ダメージ軽減等の一部100%に達成するとバランスの壊れるステータスを防ぐ」。
      *
-     * <p>2 にしたのは、セット効果の最上位ティア(現行最大 6)を
-     * {@code 2 × キャリア5 = 10} で確実に到達可能にしつつ、集中を抑える最小値だから。
-     * それ以上に積ませたい種は {@code threads.yml} に {@code max:} を明示する。
+     * <p><b>なぜ上限を絞るのが効くのか</b>: 回避率・ダメージ軽減率・会心軽減率(防具強度)・
+     * 各耐性は<b>割合</b>なので、同じ種を枠へ集中させると合計が上限
+     * ({@code combat/damage.yml} の {@code max-mitigation-rate} 0.9 /
+     * {@code max-dodge-chance} 0.9 / {@code max-crit-reduction} 1.0)へ張り付く。
+     * 張り付いた後は装備を更新しても一切効かなくなる ── 上限に触れる編成が1つあるだけで
+     * 「その先の育成が無意味」という壊れ方をする。1装備1本にすると同種の総数は
+     * キャリア数(着用防具4部位 + メインハンド = 5)で頭打ちになる。
+     *
+     * <p>⚠ <b>この値を2以上へ戻すと、{@code thread-sets.yml} の到達可能な最大しきい値も動く</b>
+     * (1本なら 1 x 5 = 5、2本なら 10)。しきい値の側を先に確認すること
+     * ({@code ThreadSetThresholdReachabilityTest})。
+     *
+     * <p>※かつては「セット効果の最上位ティア(6)を 2 x 5 = 10 で到達可能にするため 2」と
+     * 説明していた。2026-08-25 に上限を 1 へ絞ったので、6段だった
+     * {@code role_luck} / {@code role_effeciency} は 5 段へ畳んである。
      */
-    public static final int DEFAULT_MAX_STACK = 2;
+    public static final int DEFAULT_MAX_STACK = 1;
 
     /**
      * 同じ装備へ同じスレッドをもう1本挿せるか(純関数)。

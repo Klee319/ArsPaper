@@ -34,7 +34,14 @@ public final class SourceJarConfig {
             String displayName,
             int customModelData,
             int capacity,
-            List<String> lore) {
+            List<String> lore,
+            double transferMultiplier) {
+
+        /** 旧来の6引数呼び出し（{@code transfer-multiplier} 未指定 = 1.0）。 */
+        public JarDef(String id, Material material, String displayName,
+                      int customModelData, int capacity, List<String> lore) {
+            this(id, material, displayName, customModelData, capacity, lore, 1.0);
+        }
 
         /** capacity &lt; 0 → 無限。 */
         public boolean infinite() {
@@ -79,7 +86,8 @@ public final class SourceJarConfig {
                             sec.getString("display-name", id),
                             sec.getInt("custom-model-data", 0),
                             capacity,
-                            List.copyOf(sec.getStringList("lore"))));
+                            List.copyOf(sec.getStringList("lore")),
+                            readTransferMultiplier(sec, id, log)));
                 } catch (IllegalArgumentException ex) {
                     log.warning("[sourcejars.yml] jar '" + id + "' invalid: " + ex.getMessage());
                 }
@@ -101,6 +109,37 @@ public final class SourceJarConfig {
 
     public int capacityOf(String id) {
         return get(id).map(JarDef::effectiveCapacity).orElse(FALLBACK_CAPACITY);
+    }
+
+    /**
+     * {@code jars.<id>.transfer-multiplier} — <b>網（ドミニオンワンドで結んだ経路）で
+     * このジャーが送信元になったときの転送量倍率</b>（2026-08-25 / W-257）。
+     *
+     * <p>未設定・不正値は 1.0。それまで網には階梯倍率が一切掛からず、
+     * <b>上位ジャーにしても毎秒2.5点で固定</b>だった（隣接供給の
+     * {@code items.<id>.transfer-multiplier} は「ソースリンク→隣のジャー」にしか効かない）。
+     * 容量だけが階梯で伸びて速度が伸びないと、上位ジャーは「大きいだけで遅い箱」になる。
+     */
+    public double transferMultiplierOf(String id) {
+        return get(id).map(JarDef::transferMultiplier).orElse(1.0);
+    }
+
+    /**
+     * 倍率の読み取り。0以下・非有限は設定ミスとして警告のうえ 1.0 へ倒す
+     * （{@code SourcelinkConfig#readTransferMultiplier} と同じ方針 —— 壊す方向の typo を
+     * 黙って通すと「なぜか転送が止まった」になり原因が追えない）。
+     */
+    private static double readTransferMultiplier(ConfigurationSection sec, String id, Logger log) {
+        if (!sec.isSet("transfer-multiplier")) {
+            return 1.0;
+        }
+        double raw = sec.getDouble("transfer-multiplier", 1.0);
+        if (!Double.isFinite(raw) || raw <= 0) {
+            log.warning("[sourcejars.yml] jar '" + id + "'.transfer-multiplier=" + raw
+                    + " is invalid (must be > 0) — falling back to 1.0");
+            return 1.0;
+        }
+        return raw;
     }
 
     public Map<String, JarDef> all() {

@@ -17,7 +17,11 @@ class SourceDrainPolicyTest {
 
     /** 既定の周期(100tick = 5秒)。所要時間を秒で語るために使う。 */
     private static final int INTERVAL_TICKS = 100;
-    /** 既定の定額(無印ソースリンクの基準値)。 */
+    /**
+     * このクラスの表で使う定額。<b>設定の既定値ではない</b>（2026-08-25 に既定は 250 へ上がった）。
+     * ここは「割合が入ると所要時間がどう変わるか」という純粋な性質を固定する場所なので、
+     * 出荷値に追随させると表の意味だけが変わって回帰の役に立たなくなる。
+     */
     private static final int FLAT = 50;
 
     /** {@code buffer} を空にするまでの秒数。 */
@@ -133,9 +137,12 @@ class SourceDrainPolicyTest {
                 java.nio.file.Path.of("src/main/java/com/arspaper/source/SourceNetwork.java")));
 
         assertTrue(source.contains(
-                        "SourceDrainPolicy.allowance(flatPerTransfer, available, drainRatio)"),
-                "網の1リンクの上限は送信元の残量から引き直す必要がある"
-                        + "(ここが定額に戻ると、上位リンクにしても毎秒2.5点のままになる)");
+                        "SourceDrainPolicy.allowance(tieredPerTransfer, available, drainRatio)"),
+                "網の1リンクの上限は「定額x階梯倍率」と残量の両方から引き直す必要がある"
+                        + "(定額そのものに戻すと、上位リンクにしても毎秒2.5点のままになる)");
+        assertTrue(source.contains("NetworkTierMultiplier.forBlockId(blockIdOf(fromTile))"),
+                "階梯倍率は【送信元】のブロックidから引くこと(2026-08-25 / W-257。"
+                        + "受信側で決めると貧弱なジャーから上位ジャーへ吸うだけで最高速になる)");
         assertTrue(source.contains("transferConfig().networkDrainRatio()"),
                 "割合は transfer.network.drain-ratio から読むこと(コードに焼くと config で絞れない)");
         assertTrue(source.contains("Math.min(allowance, Math.min(available, space))"),

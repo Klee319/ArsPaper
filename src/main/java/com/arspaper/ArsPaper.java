@@ -723,6 +723,9 @@ public class ArsPaper extends JavaPlugin {
         pluginManager.registerEvents(new ThreadGuiOpenListener(this), this);
         // 装備を手に持って真上+スニーク → 装着スレッドの内訳をチャットへ(lore は1行要約だけにした分の受け皿)。
         pluginManager.registerEvents(new com.arspaper.item.ThreadStatChatListener(), this);
+        // 魂縛(W-259): ダンジョン産スレッドを最初に拾った人へ焼き付ける。
+        // 実効ゲート(装着の拒否)は ThreadGui 側にある ── ここは刻印だけ。
+        pluginManager.registerEvents(new com.arspaper.item.ThreadSoulbindListener(), this);
         pluginManager.registerEvents(new SourceBerryListener(this), this);
         pluginManager.registerEvents(new PhantomBlockListener(), this);
         pluginManager.registerEvents(new SummonedMobListener(this), this);

@@ -191,6 +191,20 @@ public final class ThreadType {
         0, 0, null, 0, 0, 0, 0, Material.STRING);
 
     // ================================================================
+    // 【隠密のスレッド】(2026-08-25 W-256 追加・ユーザー依頼「透明化エフェクトのつく
+    //   隠密のスレッドの追加」)
+    //
+    // ⚠ ポーション効果を持つスレッドは【組み込み定数】として書くこと。
+    //   threads.yml だけに書くと ThreadType.register() 経由の実行時登録になり、
+    //   そちらは「効果の数値を一切持たせない」方針なので potion が enum 側に乗らない。
+    //   (ThreadConfig の potion-effect: 上書きは効くが、上書き元が無い状態になる)
+    //
+    // ⚠ INVISIBILITY は防具スロット限定で走る(ThreadApplicationPolicy#isAmbientOnlyEffect)。
+    //   手に持っただけで透明になると PvP が成立しないので、この境界は動かさないこと。
+    public static final ThreadType STEALTH = new ThreadType("stealth", "隠密のスレッド", 300080, NamedTextColor.DARK_GRAY,
+        0, 0, PotionEffectType.INVISIBILITY, 0, 0, 0, 0, Material.STRING);
+
+    // ================================================================
     // 【TFステ専用スレッド 6種】(2026-08-18 追加)
     //
     // ■ なぜ後から足したのか

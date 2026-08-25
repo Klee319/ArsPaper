@@ -196,11 +196,15 @@ public class SourceNetwork {
     }
 
     private void tickTransfer() {
-        // ⚠ 1リンク・1周期の上限は「定額」と「送信元の残量に対する割合」の大きい方
-        // ({@link SourceDrainPolicy}。隣接供給とまったく同じ判定)。
-        // 定額だけだと残量がいくらあっても毎周期100点しか動かず、網には階梯倍率もコア倍率も
-        // 掛からないので「上位リンクにしても上位ジャーにしても毎秒2.5点」で固定されていた
-        // (2026-08-25 のユーザー報告「ソースリンクの転送速度がまだ100ずつ」の真因)。
+        // ⚠ 1リンク・1周期の上限は「定額 x 送信元の階梯倍率」と「残量に対する割合」の大きい方
+        // ({@link SourceDrainPolicy})。
+        //
+        // 2026-08-25 (W-257): 定額だけの時代は「上位リンクにしても上位ジャーにしても毎秒2.5点」で
+        // 固定だった(網には階梯倍率が1つも掛からなかった)。いったん割合排出で速度を出したが、
+        // 割合は (1) 速度が残量で変わる (2) 定額側と大きい方を採るので階梯倍率を無意味にする
+        // の2点でユーザー要件に反していたため、割合を既定0にして
+        // **送信元の階梯倍率**(NetworkTierMultiplier)で速度を出す形へ移した。
+        // 割合ぶんは yml から再有効化できるので判定そのものは残してある。
         final int flatPerTransfer = transferConfig().networkMaxPerTransfer();
         final double drainRatio = transferConfig().networkDrainRatio();
         // フェーズ1: 全転送を計算（net flowで相殺を回避）
@@ -225,6 +229,10 @@ public class SourceNetwork {
             int available = storedSource(fromTile, fromStorage);
             if (available <= 0) continue;
 
+            // 送信元の階梯倍率。上位リンク・上位ジャーほど1周期に多く送れる(W-257)。
+            final int tieredPerTransfer = NetworkTierMultiplier.scale(
+                flatPerTransfer, NetworkTierMultiplier.forBlockId(blockIdOf(fromTile)));
+
             for (LocationKey toKey : entry.getValue()) {
                 Location toLoc = toKey.toLocation();
                 if (toLoc == null) continue;
@@ -248,7 +256,7 @@ public class SourceNetwork {
                 // 上限は「今の残量」から毎リンク引き直す。リンクが複数ある送信元では
                 // available が減るほど1本あたりの上限も下がるので、定額時代と同じ
                 // 「1リンクにつき上限1つ」の意味を保ったまま残量に追随する。
-                int allowance = SourceDrainPolicy.allowance(flatPerTransfer, available, drainRatio);
+                int allowance = SourceDrainPolicy.allowance(tieredPerTransfer, available, drainRatio);
                 int transfer = Math.min(allowance, Math.min(available, space));
                 if (transfer <= 0) continue;
 
@@ -307,10 +315,15 @@ public class SourceNetwork {
      * カスタムソースリンクも {@code Sourcelink} として登録されるので追随する）。
      */
     private static SourceStorage storageAt(TileState tile) {
-        String blockId = tile.getPersistentDataContainer()
-            .get(BlockKeys.CUSTOM_BLOCK_ID, PersistentDataType.STRING);
+        String blockId = blockIdOf(tile);
         if (blockId == null) return SourceStorage.NONE;
         return SourceStorage.of(SourceJar.isSourceJarId(blockId), isSourcelinkId(blockId));
+    }
+
+    /** 設置ブロックの {@code custom_block_id}。未設定なら null。 */
+    private static String blockIdOf(TileState tile) {
+        return tile.getPersistentDataContainer()
+            .get(BlockKeys.CUSTOM_BLOCK_ID, PersistentDataType.STRING);
     }
 
     private static boolean isSourcelinkId(String blockId) {

@@ -31,13 +31,16 @@ class SourceTransferConfigTest {
     }
 
     @Test
-    @DisplayName("transfer: 節が無ければ config 化前のハードコード値と厳密に一致する")
+    @DisplayName("transfer: 節が無ければ出荷 yml と同じ既定値へ埋まる")
     void absentSectionKeepsLegacyBehaviour() {
         List<String> warnings = new ArrayList<>();
         SourceTransferConfig cfg = parse("other: 1", warnings);
 
         assertEquals(100, cfg.sourcelinkIntervalTicks());
-        assertEquals(50, cfg.sourcelinkMaxPerTransfer());
+        // 2026-08-25 (W-257): 50 → 250。最下段の階梯倍率2.0と合わせて 100/20tick になる値。
+        // ⚠ ArsPaper の yml は saveResource(..., false) なので、キーが無い環境では
+        //   この既定値がそのまま実挙動になる。出荷 yml とズレたら shippedYamlMatchesDefaults が落ちる。
+        assertEquals(250, cfg.sourcelinkMaxPerTransfer());
         assertEquals(10, cfg.vitalicDetectionRadius());
         assertEquals(10, cfg.botanicalDetectionRadius());
         assertEquals(40, cfg.networkIntervalTicks());
@@ -52,22 +55,42 @@ class SourceTransferConfigTest {
     }
 
     @Test
-    @DisplayName("網の割合排出は既定0.25で、隣接供給と同じ値に揃っている")
-    void networkDrainRatioDefaultsToTheSameShareAsAdjacentSupply() {
-        // 2026-08-25: 割合排出(2026-08-24)は隣接供給にしか効いておらず、網だけ定額100 ÷ 40tick
-        // ＝毎秒2.5点に取り残されていた(報告「ソースリンクの転送速度がまだ100ずつ」)。
-        // 網は階梯倍率もコア倍率も掛からないので、ここが定額のままだと上位リンクにしても速くならない。
+    @DisplayName("割合排出は既定で切ってあり、速度は残量で変わらない（W-257）")
+    void drainRatiosAreOffByDefaultSoSpeedIsConstant() {
+        // ユーザー確定要件「転送速度が一定じゃないのが気持ち悪い。割合ではなく階梯ごとに増やす」。
+        // ⚠ ここを 0 以外へ戻すと、定額と割合の大きい方を採る判定のせいで
+        //   「バッファが多いときは階梯倍率が一切効かない」状態が再発する(下の回帰も参照)。
         SourceTransferConfig cfg = SourceTransferConfig.defaults();
 
-        assertEquals(0.25, cfg.networkDrainRatio(), 1e-9);
-        assertEquals(cfg.sourcelinkDrainRatio(), cfg.networkDrainRatio(), 1e-9,
-                "隣接に置くか網で繋ぐかで「溜まった量の何割が動くか」が変わってはいけない");
+        assertEquals(0.0, cfg.sourcelinkDrainRatio(), 1e-9);
+        assertEquals(0.0, cfg.networkDrainRatio(), 1e-9);
 
-        // 定額と割合の大きい方。小口(残量400未満)は定額が勝つので少量の速度は変わらない。
-        assertEquals(100, SourceDrainPolicy.allowance(
+        // 割合が 0 なら、残量が 100 でも 3,000万でも1周期の上限は定額のまま = 速度が一定。
+        assertEquals(cfg.networkMaxPerTransfer(), SourceDrainPolicy.allowance(
                 cfg.networkMaxPerTransfer(), 100, cfg.networkDrainRatio()));
-        assertEquals(7_500_000, SourceDrainPolicy.allowance(
+        assertEquals(cfg.networkMaxPerTransfer(), SourceDrainPolicy.allowance(
                 cfg.networkMaxPerTransfer(), 30_000_000, cfg.networkDrainRatio()));
+    }
+
+    @Test
+    @DisplayName("割合排出を戻すと階梯倍率が無意味になる（0にした理由そのものの回帰）")
+    void reintroducingTheDrainRatioWouldMakeTierMultipliersIrrelevant() {
+        // ユーザー報告「現状の x2 が効いていない可能性」の機構: 定額と割合の大きい方を採るので、
+        // バッファが「定額 x 階梯倍率 ÷ ratio」を超えると常に割合が勝ち、階梯を上げても
+        // 1周期の排出量が1点も変わらない。高価値燃料を焼べれば必ずこの領域に入る。
+        int flatTier1 = 250 * 2;      // 最下段(倍率2.0)
+        int flatTier2 = 250 * 10;     // 1段上(倍率10.0)
+        int bigBuffer = 30_000_000;
+
+        assertEquals(
+                SourceDrainPolicy.allowance(flatTier1, bigBuffer, 0.25),
+                SourceDrainPolicy.allowance(flatTier2, bigBuffer, 0.25),
+                "割合が勝つ領域では階梯を上げても排出量が変わらない(=これが直したかった症状)");
+
+        // 割合を切れば階梯どおり x5 で伸びる。
+        assertEquals(flatTier1, SourceDrainPolicy.allowance(flatTier1, bigBuffer, 0.0));
+        assertEquals(flatTier2, SourceDrainPolicy.allowance(flatTier2, bigBuffer, 0.0));
+        assertEquals(5 * flatTier1, flatTier2);
     }
 
     @Test
@@ -123,24 +146,18 @@ class SourceTransferConfigTest {
     }
 
     @Test
-    @DisplayName("割合排出の既定は 0.25（定額だけだと高価値燃料ほど不利になる）")
-    void drainRatioDefaultBoundsWorstCaseDrainTime() {
+    @DisplayName("階梯を1段上げると転送量がちょうど x5 になる（tier1=100/20tick, tier2=500/20tick）")
+    void tierLadderIsFiveTimesPerStep() {
+        // ユーザー確定要件の実数そのもの。定額 x 階梯倍率 ÷ 周期 で 20tick あたりへ換算する。
         SourceTransferConfig cfg = SourceTransferConfig.defaults();
-        assertEquals(0.25, cfg.sourcelinkDrainRatio(), 1e-9);
+        int flat = cfg.sourcelinkMaxPerTransfer();
+        int interval = cfg.sourcelinkIntervalTicks();
 
-        // 割合排出があると、どれだけ溜まっていても指数的に減衰する。
-        // ソース機関1個(3,000万)でも「定額のみなら約35日」→「割合込みなら数分」。
-        long buffer = 30_000_000L;
-        int cycles = 0;
-        while (buffer > 0 && cycles < 10_000) {
-            long drain = Math.max(50L, (long) Math.ceil(buffer * cfg.sourcelinkDrainRatio()));
-            buffer -= Math.min(buffer, drain);
-            cycles++;
-        }
-        assertEquals(0L, buffer, "吐き切れずに残ってはいけない");
-        long seconds = (long) cycles * cfg.sourcelinkIntervalTicks() / 20L;
-        assertTrue(seconds <= 900,
-                "3,000万でも15分以内に吐き切ること(定額のみなら約35日かかっていた): " + seconds + "秒");
+        long tier1Per20 = (long) flat * 2L * 20L / interval;      // 最下段の倍率 2.0
+        long tier2Per20 = (long) flat * 10L * 20L / interval;     // 1段上の倍率 10.0
+
+        assertEquals(100L, tier1Per20, "最下段は 20tick あたり 100");
+        assertEquals(500L, tier2Per20, "1段上は 20tick あたり 500");
     }
 
     @Test

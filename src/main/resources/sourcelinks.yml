@@ -46,7 +46,11 @@ transfer:
     #   未設定は 1.0(挙動不変)。下の items.*_ii / *_iii がこのレバーの実例。
     #   容量(buffer-cap)は既に int上限=実質無制限なのでボトルネックはレート側だけ、という前提で
     #   buffer-cap 側には階梯倍率を掛けていない。
-    max-per-transfer: 50
+    # ■ 2026-08-25 (W-257): 50 → 250。ユーザー確定要件「割合ではなく階梯ごとに転送量を増やす。
+    #   tier1 が 20tick ごとに 100 なら tier2 は 20tick ごとに 500」。
+    #   最下段の階梯倍率が 2.0 なので、250 x 2.0 / 100tick = 500/100tick = 【100/20tick】。
+    #   1段上げるごとに倍率が x5 になるので tier2 は 500/20tick。
+    max-per-transfer: 250
 
     # バッファ(ソースリンク内部の未排出分)の上限。
     # ⚠ 以前は上限が無く int の加算だったため、約2.1億を超えると
@@ -59,33 +63,19 @@ transfer:
 
     # 1周期に「バッファの何割まで」出せるか(0.0〜1.0)。実際の排出量は
     #   max(max-per-transfer x 階梯倍率 x コア倍率, バッファ x drain-ratio)
-    # の大きい方。0 にすると従来どおりの完全定額になる。
+    # の大きい方。0 にすると完全定額(=速度が一定)になる。
     #
-    # ■ 2026-08-24 追加の理由(生成量に対して転送が遅すぎた)
-    #   定額だけだと「1点あたり 100tick ÷ 50 = 2tick = 0.1秒」が燃料の価値に関係なく固定になる。
-    #   階梯の transfer-multiplier と yield-multiplier は同じ倍率で伸びるので、
-    #   上位ソースリンクにしてもこの比率は一切改善しない。結果:
-    #     圧縮薪(custom:oak_wood_3x = 2,187) → 1個あたり約3分40秒
-    #     ソースの欠片(custom:source_shard_1x = 4,500) → 7分30秒
-    #     ソース機関(custom:source_engine = 3,000万) → 約35日
-    #   ＝ 高価値燃料ほど不利で、実質「焼べても入り切らない」状態だった。
-    #   割合排出を足すと、溜まっている量が多いほど1周期の排出も増える(指数的に減衰する)。
-    #
-    # ■ 既定 0.25 の根拠(定額50・周期100tick での実測。バッファを空にするまでの秒数)
-    #     投入量               定額のみ    0.10     0.25
-    #     100 (溶岩バケツ)           10       10       10  ← 小口は定額が勝つので変わらない
-    #     2,187 (圧縮薪 3x)         220      120       65
-    #     4,500 (ソースの欠片)       450      155       75
-    #     140,000 (圧縮薪1スタック) 14,000     320      135
-    #     30,000,000 (ソース機関) 3,000,000    575      230
-    #   0.10 だと単品の改善が2倍弱(圧縮薪1個で2分)にとどまるので 0.25 を採った。
-    #
-    # ⚠ 割合の項には階梯倍率を掛けていない。掛けると生成量倍率と再び同率で伸びて、
-    #   「階梯を上げても比率が変わらない」元の構造に戻る。
-    # ⚠ ジャーの空きより多く出しても損失にはならない。注ぎ切れなかった分のうち
-    #   バッファ由来はバッファへ戻る(受動生成分だけは従来どおり捨てられる)。
-    #   つまりこのレバーは「ジャーの容量が上限として働く」設計を壊さない。
-    drain-ratio: 0.25
+    # ■ 2026-08-25 (W-257): 0.25 → 【0.0】。ユーザー指摘「転送速度が一定じゃないのが気持ち悪い」。
+    #   割合排出には2つの弊害があった:
+    #     (1) 速度が残量で変わるので、同じ設備でも見ていて速さが安定しない。
+    #     (2) **階梯倍率を無意味にする**。定額と割合の大きい方を採るので、バッファが
+    #         「定額x階梯倍率 ÷ 0.25」を超えると常に割合が勝つ。最下段(定額50x2=100)なら
+    #         残量400以上で割合側が勝ち、そこから先は階梯を上げても排出量が1点も変わらない。
+    #         高価値燃料を焼べると必ずこの領域に入るので、実質「階梯を上げても速くならない」
+    #         状態だった(ユーザー報告「現状の x2 が効いていない可能性」の正体)。
+    #   → 割合を切り、代わりに定額と階梯倍率(x5刻み)の側で速度を出す。
+    # ⚠ 0 以外へ戻すときは、上の (2) を必ず読むこと。0.25 に戻すと階梯倍率が再び死ぬ。
+    drain-ratio: 0.0
 
     # イベント検知半径(ブロック)。0 にするとその種別のイベント蓄積を止める。
     detection-radius:
@@ -100,15 +90,17 @@ transfer:
     interval-ticks: 40
     # 1周期・1リンクあたりの転送量の「定額ぶん」。
     max-per-transfer: 100
-    # 同じく「割合ぶん」。1周期に送れる量 = max(max-per-transfer, 送信元の残量 x drain-ratio)。
-    # 実効レート = その量 ÷ interval-ticks。
+    # 網の「割合ぶん」。0 で完全定額(=速度が一定)。
     #
-    # ⚠ 2026-08-25 追加。網には階梯倍率もコア倍率も掛からないので、定額だけだと
-    #   上位リンク・上位ジャーにしても毎秒2.5点(100 ÷ 40tick)で固定され、
-    #   ソース機関1個(3,000万)を運ぶのに約7日(60万秒)かかっていた。
-    #   隣接供給の transfer.sourcelink.drain-ratio と同じ判定・同じ既定値。
-    #   小口(残量400未満)は定額が勝つので、少量の転送速度は変わらない。
-    drain-ratio: 0.25
+    # ■ 2026-08-25 (W-257): 0.25 → 【0.0】。隣接供給と同じ理由(上の
+    #   transfer.sourcelink.drain-ratio のコメント参照)。あわせて **網にも送信元の階梯倍率を
+    #   掛けるようにした** ── それまで網には階梯倍率もコア倍率も一切掛からず、
+    #   上位リンクにしても上位ジャーにしても毎秒2.5点(定額100 ÷ 40tick)で固定だった。
+    #   1周期に送れる量 = max-per-transfer x 送信元の階梯倍率。
+    #   送信元がソースリンクなら sourcelinks.yml の items.<id>.transfer-multiplier、
+    #   ソースジャーなら sourcejars.yml の jars.<id>.transfer-multiplier を引く。
+    #   最下段のジャー(source_jar)は 1.0 なので 100 / 40tick = 【50/20tick】が最低速度。
+    drain-ratio: 0.0
     # 1本のリンクを張れる最大距離(ブロック)。ワールドを跨ぐ接続は距離に関係なく不可。
     # ⚠ ここを縮めても「既に張られている長いリンク」は消えない(新規接続だけが弾かれる)。
     max-link-range: 30
@@ -241,6 +233,13 @@ volcanic:
     "custom:coal_block_1x": 405
     "custom:coal_block_2x": 3645
     "custom:coal_block_3x": 32805
+    # 木炭ブロック4段(2026-08-25 / W-252)。素の木炭 5 点 x 圧縮倍率で厳密に比例。
+    # 木炭ブロック(=木炭9)が 45 で、バニラの COAL_BLOCK と同値になるのは意図どおり
+    # (石炭と木炭は素で同値 5 なので、束ねても同値でなければ辻褄が合わない)。
+    "custom:charcoal_block": 45
+    "custom:charcoal_block_1x": 405
+    "custom:charcoal_block_2x": 3645
+    "custom:charcoal_block_3x": 32805
     "custom:blaze_rod_1x": 40
     "custom:blaze_rod_2x": 160
     "custom:blaze_rod_3x": 640
@@ -514,15 +513,18 @@ items:
   #        毎周期ソースが増える無限増殖になる(理由の全文は SourceGenerationScaling の javadoc)。
   #   どちらも未設定なら 1.0 = 無印と完全に同じ挙動。0以下/非有限値は警告のうえ 1.0 へ落とす。
   #
-  # 【段の設計 2026-08-24 改定】<b>2つの倍率とも 2 の階梯乗</b>に張り替えた(ユーザー指示)。
-  #   無印を tier1 とみなして 2 / 4 / 8 / 16 / 32 / 64 / 128 / 256 / 512。転送も生成も同じ値。
-  #   ⚠ <b>無印にも倍率が乗るようになった</b>(両方 2.0)。以前は「無印は倍率キーを持たない=1.0」を
-  #     不変条件として ShippedSourceLadderTest が固定していたので、そちらも同時に緩めてある。
+  # 【段の設計 2026-08-25 (W-257) 改定】<b>転送は 5 の階梯乗、生成は 2 の階梯乗</b>。
+  #   転送: 無印 2 → 10 / 50 / 250 / 1250 / 6250 / 31250 / 156250 / 781250
+  #   生成: 無印 2 → 4 / 8 / 16 / 32 / 64 / 128 / 256 / 512(2026-08-24 のまま据え置き)
+  #   ⚠ <b>無印にも倍率が乗る</b>(両方 2.0)。「無印は倍率キーを持たない=1.0」を固定していた
+  #     ShippedSourceLadderTest は 2026-08-24 に緩めてある。
   #
-  #   以前は「生成量は素材効率そのもの(=無限資源に近づく)なので、速度より伸びを抑える」設計で
-  #   生成側を緩くしていた。その前提は捨てた。2つを同率にしたので
-  #   <b>階梯を上げても『生成と排出の釣り合い』は変わらない</b> ── 詰まりやすさは全段で同じで、
-  #   上げたぶんがそのまま素材効率と回収速度の両方になる。
+  #   ユーザー確定要件は「tier1 が 20tick ごとに 100 なら tier2 は 20tick ごとに 500」=
+  #   <b>転送だけを1段 x5</b>。生成を同率にすると素材効率が段ごとに5倍になって
+  #   資源が意味を失うので、生成側は x2 のまま分離した。
+  #   結果として<b>階梯を上げるほど「詰まりにくくなる」</b>(排出が生成より速く伸びる)。
+  #   これは 2026-08-24 の「釣り合いは全段で同じ」から意図的に外した点。
+  #   不変条件は ShippedSourceLadderTest#transferOutgrowsYieldAtEveryRung が固定している。
   #
   #   ⚠ 最上段では int の上限に当たりうる。ソース機関(custom:source_engine = 3,000万)を
   #     スニークで1スタック(64個)焼べると 19.2億 x 512 ≒ 9,800億で、
@@ -530,10 +532,15 @@ items:
   #     つまり最上段で機関を一括投入すると <b>投入分の大半は捨てられる</b>。
   #     高階梯では安い燃料を回す方が効率がよい、という逆転が起きる点に注意。
   #
-  #   ⚠ 転送側の実効レート = transfer.sourcelink.max-per-transfer(50) x 倍率 ÷ interval-ticks(100)。
-  #     無印で 1.0/tick = 86,400/日、最上段で 256/tick ≒ 2,212万/日(1台あたり)。
+  #   ⚠ 転送側の実効レート = transfer.sourcelink.max-per-transfer(250) x 倍率 ÷ interval-ticks(100)。
+  #     無印(x2)で 5/tick = 100/20tick、次段(x10)で 25/tick = 500/20tick ── これが
+  #     ユーザー要件の「tier1=100、tier2=500(20tickあたり)」。最上段(x781250)は
+  #     195万/tick で、単体では int 上限に触れない(触れる場合は scaleCap が切り詰める)。
   #     インフィニティコアの範囲内ならさらに x2。基準値(max-per-transfer)を動かすと
   #     全段が線形に動くので、全体を調整したいときは倍率ではなくそちらを触る。
+  #     ⚠ <b>drain-ratio(割合排出)は 0.0 に切ってある</b>。割合が残っていると
+  #       「バッファが多いほど速い」= 階梯倍率が無意味になる領域が生まれ、
+  #       ユーザー報告の「x2 が効いていない」「速度が一定じゃない」がそこで起きていた。
   #
   # 【2026-08-23 (W-189) に 4段 → 8段へ細分化】それまで触媒は
   #   欠片(_ii) / 結晶(_iii) / 凝縮物(_iv) / 機関(_v) と1段ずつしか無く、
@@ -542,8 +549,10 @@ items:
   #   触媒ごとに「同じ触媒で届く2段目」を1つずつ足して 8段にした:
   #     _ii(欠片x4) → _ii_b(欠片x8) → _iii(結晶x4) → _iii_b(結晶x8)
   #     → _iv(凝縮物x4) → _iv_b(凝縮物x8) → _v(機関x2) → _vi(機関x3+深淵の延べ棒)
-  #   倍率: 転送・生成とも x4/x8/x16/x32/x64/x128/x256/x512(無印は x2)。
-  #   (2026-08-24 に 2の階梯乗へ張り替え。旧値は 転送 x2/x4/x6/x8/x12/x16/x24/x32 ・
+  #   倍率: 転送 x10/x50/x250/x1250/x6250/x31250/x156250/x781250(無印は x2)。
+  #         生成 x4/x8/x16/x32/x64/x128/x256/x512(無印は x2)。
+  #   (2026-08-24 に両方とも2の階梯乗へ張り替え、2026-08-25 (W-257) に転送だけ5の階梯乗へ。
+  #    さらに旧値は 転送 x2/x4/x6/x8/x12/x16/x24/x32 ・
   #    生成 x1.5/x2/x2.5/x3/x3.5/x4/x5/x6、無印は両方とも倍率なし=1.0 だった)。
   #   ⚠ <b>既存の段は誰も弱くしていない</b> ── 新段は上へ伸ばして空いた位置に入れてあり、
   #     _iii は x4.0/x2.0 → x6.0/x2.5 と<b>上がって</b>いる。既存プレイヤーの設置済み
@@ -573,7 +582,7 @@ items:
     lore:
       - "焔を喰らって育った燃料炉"
       - "転送レート x4.0 / 生成量 x4.0"
-    transfer-multiplier: 4.0
+    transfer-multiplier: 10.0
     yield-multiplier: 4.0
     recipe:
       method: ritual
@@ -590,7 +599,7 @@ items:
     lore:
       - "熾火を絶やさず溜め込む炉"
       - "転送レート x8.0 / 生成量 x8.0"
-    transfer-multiplier: 8.0
+    transfer-multiplier: 50.0
     yield-multiplier: 8.0
     recipe:
       method: ritual
@@ -607,7 +616,7 @@ items:
     lore:
       - "溶岩の心臓を埋めた大炉"
       - "転送レート x16.0 / 生成量 x16.0"
-    transfer-multiplier: 16.0
+    transfer-multiplier: 250.0
     yield-multiplier: 16.0
     recipe:
       method: ritual
@@ -624,7 +633,7 @@ items:
     lore:
       - "灼熱の脈が走り続ける大炉"
       - "転送レート x32.0 / 生成量 x32.0"
-    transfer-multiplier: 32.0
+    transfer-multiplier: 1250.0
     yield-multiplier: 32.0
     recipe:
       method: ritual
@@ -641,7 +650,7 @@ items:
     lore:
       - "火の霊が住み着いた溶炉"
       - "転送レート x64.0 / 生成量 x64.0"
-    transfer-multiplier: 64.0
+    transfer-multiplier: 6250.0
     yield-multiplier: 64.0
     recipe:
       method: ritual
@@ -658,7 +667,7 @@ items:
     lore:
       - "煉獄へ口を開けた溶炉"
       - "転送レート x128.0 / 生成量 x128.0"
-    transfer-multiplier: 128.0
+    transfer-multiplier: 31250.0
     yield-multiplier: 128.0
     recipe:
       method: ritual
@@ -675,7 +684,7 @@ items:
     lore:
       - "星の焔で焚く煉炉"
       - "転送レート x256.0 / 生成量 x256.0"
-    transfer-multiplier: 256.0
+    transfer-multiplier: 156250.0
     yield-multiplier: 256.0
     recipe:
       method: ritual
@@ -692,7 +701,7 @@ items:
     lore:
       - "星が砕けるたびに焔が増す煉炉"
       - "転送レート x512.0 / 生成量 x512.0"
-    transfer-multiplier: 512.0
+    transfer-multiplier: 781250.0
     yield-multiplier: 512.0
     recipe:
       method: ritual
@@ -711,7 +720,7 @@ items:
     lore:
       - "菌糸を織り込んだ燻製器"
       - "転送レート x4.0 / 生成量 x4.0"
-    transfer-multiplier: 4.0
+    transfer-multiplier: 10.0
     yield-multiplier: 4.0
     recipe:
       method: ritual
@@ -728,7 +737,7 @@ items:
     lore:
       - "菌が輪を描いて広がる燻製器"
       - "転送レート x8.0 / 生成量 x8.0"
-    transfer-multiplier: 8.0
+    transfer-multiplier: 50.0
     yield-multiplier: 8.0
     recipe:
       method: ritual
@@ -745,7 +754,7 @@ items:
     lore:
       - "胞子の雨が降り続く大燻炉"
       - "転送レート x16.0 / 生成量 x16.0"
-    transfer-multiplier: 16.0
+    transfer-multiplier: 250.0
     yield-multiplier: 16.0
     recipe:
       method: ritual
@@ -762,7 +771,7 @@ items:
     lore:
       - "霧のような胞子が満ちる大燻炉"
       - "転送レート x32.0 / 生成量 x32.0"
-    transfer-multiplier: 32.0
+    transfer-multiplier: 1250.0
     yield-multiplier: 32.0
     recipe:
       method: ritual
@@ -779,7 +788,7 @@ items:
     lore:
       - "腐海をまるごと抱えた培養炉"
       - "転送レート x64.0 / 生成量 x64.0"
-    transfer-multiplier: 64.0
+    transfer-multiplier: 6250.0
     yield-multiplier: 64.0
     recipe:
       method: ritual
@@ -796,7 +805,7 @@ items:
     lore:
       - "腐海の中心を切り取った培養炉"
       - "転送レート x128.0 / 生成量 x128.0"
-    transfer-multiplier: 128.0
+    transfer-multiplier: 31250.0
     yield-multiplier: 128.0
     recipe:
       method: ritual
@@ -813,7 +822,7 @@ items:
     lore:
       - "すべての菌糸が還る母菌床"
       - "転送レート x256.0 / 生成量 x256.0"
-    transfer-multiplier: 256.0
+    transfer-multiplier: 156250.0
     yield-multiplier: 256.0
     recipe:
       method: ritual
@@ -830,7 +839,7 @@ items:
     lore:
       - "すべての菌の始まりを飼う大炉"
       - "転送レート x512.0 / 生成量 x512.0"
-    transfer-multiplier: 512.0
+    transfer-multiplier: 781250.0
     yield-multiplier: 512.0
     recipe:
       method: ritual
@@ -849,7 +858,7 @@ items:
     lore:
       - "見習いでも扱える坩堝"
       - "転送レート x4.0 / 生成量 x4.0"
-    transfer-multiplier: 4.0
+    transfer-multiplier: 10.0
     yield-multiplier: 4.0
     recipe:
       method: ritual
@@ -866,7 +875,7 @@ items:
     lore:
       - "錬金士が日々使い込む坩堝"
       - "転送レート x8.0 / 生成量 x8.0"
-    transfer-multiplier: 8.0
+    transfer-multiplier: 50.0
     yield-multiplier: 8.0
     recipe:
       method: ritual
@@ -883,7 +892,7 @@ items:
     lore:
       - "賢者が使い込んだ坩堝"
       - "転送レート x16.0 / 生成量 x16.0"
-    transfer-multiplier: 16.0
+    transfer-multiplier: 250.0
     yield-multiplier: 16.0
     recipe:
       method: ritual
@@ -900,7 +909,7 @@ items:
     lore:
       - "賢者の石を沈めた坩堝"
       - "転送レート x32.0 / 生成量 x32.0"
-    transfer-multiplier: 32.0
+    transfer-multiplier: 1250.0
     yield-multiplier: 32.0
     recipe:
       method: ritual
@@ -917,7 +926,7 @@ items:
     lore:
       - "第五元素を溶かす坩堝"
       - "転送レート x64.0 / 生成量 x64.0"
-    transfer-multiplier: 64.0
+    transfer-multiplier: 6250.0
     yield-multiplier: 64.0
     recipe:
       method: ritual
@@ -934,7 +943,7 @@ items:
     lore:
       - "虚無すら溶かし込む坩堝"
       - "転送レート x128.0 / 生成量 x128.0"
-    transfer-multiplier: 128.0
+    transfer-multiplier: 31250.0
     yield-multiplier: 128.0
     recipe:
       method: ritual
@@ -951,7 +960,7 @@ items:
     lore:
       - "万物を溶かし尽くす大坩堝"
       - "転送レート x256.0 / 生成量 x256.0"
-    transfer-multiplier: 256.0
+    transfer-multiplier: 156250.0
     yield-multiplier: 256.0
     recipe:
       method: ritual
@@ -968,7 +977,7 @@ items:
     lore:
       - "原初の元素を煮出す大坩堝"
       - "転送レート x512.0 / 生成量 x512.0"
-    transfer-multiplier: 512.0
+    transfer-multiplier: 781250.0
     yield-multiplier: 512.0
     recipe:
       method: ritual
@@ -987,7 +996,7 @@ items:
     lore:
       - "息吹を溜め込む樽"
       - "転送レート x4.0 / 生成量 x4.0"
-    transfer-multiplier: 4.0
+    transfer-multiplier: 10.0
     yield-multiplier: 4.0
     recipe:
       method: ritual
@@ -1004,7 +1013,7 @@ items:
     lore:
       - "中で鼓動が響き続ける樽"
       - "転送レート x8.0 / 生成量 x8.0"
-    transfer-multiplier: 8.0
+    transfer-multiplier: 50.0
     yield-multiplier: 8.0
     recipe:
       method: ritual
@@ -1021,7 +1030,7 @@ items:
     lore:
       - "生命の律動を刻む樽"
       - "転送レート x16.0 / 生成量 x16.0"
-    transfer-multiplier: 16.0
+    transfer-multiplier: 250.0
     yield-multiplier: 16.0
     recipe:
       method: ritual
@@ -1038,7 +1047,7 @@ items:
     lore:
       - "魂を繋ぎ止める樽"
       - "転送レート x32.0 / 生成量 x32.0"
-    transfer-multiplier: 32.0
+    transfer-multiplier: 1250.0
     yield-multiplier: 32.0
     recipe:
       method: ritual
@@ -1055,7 +1064,7 @@ items:
     lore:
       - "輪廻を閉じ込めた霊樽"
       - "転送レート x64.0 / 生成量 x64.0"
-    transfer-multiplier: 64.0
+    transfer-multiplier: 6250.0
     yield-multiplier: 64.0
     recipe:
       method: ritual
@@ -1072,7 +1081,7 @@ items:
     lore:
       - "転生の炉を組み込んだ霊樽"
       - "転送レート x128.0 / 生成量 x128.0"
-    transfer-multiplier: 128.0
+    transfer-multiplier: 31250.0
     yield-multiplier: 128.0
     recipe:
       method: ritual
@@ -1089,7 +1098,7 @@ items:
     lore:
       - "灰から蘇り続ける霊樽"
       - "転送レート x256.0 / 生成量 x256.0"
-    transfer-multiplier: 256.0
+    transfer-multiplier: 156250.0
     yield-multiplier: 256.0
     recipe:
       method: ritual
@@ -1106,7 +1115,7 @@ items:
     lore:
       - "生命樹の根を張らせた霊樽"
       - "転送レート x512.0 / 生成量 x512.0"
-    transfer-multiplier: 512.0
+    transfer-multiplier: 781250.0
     yield-multiplier: 512.0
     recipe:
       method: ritual
@@ -1125,7 +1134,7 @@ items:
     lore:
       - "芽吹きが絶えない巣"
       - "転送レート x4.0 / 生成量 x4.0"
-    transfer-multiplier: 4.0
+    transfer-multiplier: 10.0
     yield-multiplier: 4.0
     recipe:
       method: ritual
@@ -1142,7 +1151,7 @@ items:
     lore:
       - "花が絶えず冠のように咲く巣"
       - "転送レート x8.0 / 生成量 x8.0"
-    transfer-multiplier: 8.0
+    transfer-multiplier: 50.0
     yield-multiplier: 8.0
     recipe:
       method: ritual
@@ -1159,7 +1168,7 @@ items:
     lore:
       - "万緑を呼び込む巣"
       - "転送レート x16.0 / 生成量 x16.0"
-    transfer-multiplier: 16.0
+    transfer-multiplier: 250.0
     yield-multiplier: 16.0
     recipe:
       method: ritual
@@ -1176,7 +1185,7 @@ items:
     lore:
       - "千本の樹を呼び寄せる巣"
       - "転送レート x32.0 / 生成量 x32.0"
-    transfer-multiplier: 32.0
+    transfer-multiplier: 1250.0
     yield-multiplier: 32.0
     recipe:
       method: ritual
@@ -1193,7 +1202,7 @@ items:
     lore:
       - "世界樹の枝を挿した苗床"
       - "転送レート x64.0 / 生成量 x64.0"
-    transfer-multiplier: 64.0
+    transfer-multiplier: 6250.0
     yield-multiplier: 64.0
     recipe:
       method: ritual
@@ -1210,7 +1219,7 @@ items:
     lore:
       - "天へ伸びる輪樹の苗床"
       - "転送レート x128.0 / 生成量 x128.0"
-    transfer-multiplier: 128.0
+    transfer-multiplier: 31250.0
     yield-multiplier: 128.0
     recipe:
       method: ritual
@@ -1227,7 +1236,7 @@ items:
     lore:
       - "豊穣の女神が宿る苗床"
       - "転送レート x256.0 / 生成量 x256.0"
-    transfer-multiplier: 256.0
+    transfer-multiplier: 156250.0
     yield-multiplier: 256.0
     recipe:
       method: ritual
@@ -1244,7 +1253,7 @@ items:
     lore:
       - "原初の森をそのまま抱えた苗床"
       - "転送レート x512.0 / 生成量 x512.0"
-    transfer-multiplier: 512.0
+    transfer-multiplier: 781250.0
     yield-multiplier: 512.0
     recipe:
       method: ritual

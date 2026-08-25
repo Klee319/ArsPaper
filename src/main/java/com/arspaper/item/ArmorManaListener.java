@@ -380,6 +380,17 @@ public class ArmorManaListener implements Listener {
         // javadoc/報告参照)。
         for (SocketedThreads.Entry equipped : SocketedThreads.read(pdc, effectiveSlotCap)) {
             ThreadType thread = equipped.type();
+
+            // 魂縛(2026-08-25 W-259): ダンジョン産スレッドは所有者以外には【何も配らない】。
+            // ユーザーが最初に指摘した抜け道「他の人にスレッド付きの武器とかが渡された場合に
+            // どうやって対処しよう」への答えがここ ── ThreadGui のゲートは
+            // 「他人のスレッドを挿す」しか止められず、【自分で挿してから装備ごと渡す】は素通りする。
+            // ⚠ continue の位置に注意: counts への加算より【前】。数えてしまうと
+            //   thread-sets.yml のセット効果だけが他人にも乗る。
+            if (TreasureThreadSoulbindPolicy.isSoulbound(thread)
+                    && !TreasureThreadSoulbindPolicy.mayUse(equipped.owner(), player.getUniqueId())) {
+                continue;
+            }
             totals.threadMana += threadConfig.getManaBonus(thread);
             totals.threadRegen += threadConfig.getRegenBonus(thread);
             totals.costReduction += threadConfig.getCostReduction(thread);

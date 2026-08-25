@@ -125,6 +125,37 @@ materials:
         type: shapeless
         ingredients: []
         amount: 9
+      # --- 木炭ブロック版(2026-08-25 / W-252) ---
+      # 上の石炭ブロック版と同じ比率。木炭ブロック4個 = 木炭36 = 欠片36、
+      # アメジストは 1個につき欠片4 なので 9個 = 9倍圧縮アメジスト1個。
+      - method: ritual
+        core-item: custom:amethyst_shard_1x
+        pedestal-items:
+          - custom:charcoal_block x4
+        source: 900
+        result: custom:source_shard
+        result-amount: 36
+        type: shapeless
+        ingredients: []
+        amount: 9
+      # --- 圧縮木炭ブロック版: 【圧縮ソースの欠片】がそのまま出る(2026-08-25 / W-252) ---
+      # ユーザー要望「木炭ブロックを圧縮ソースの欠片の素材として使えるように」。
+      # 9倍圧縮木炭ブロック4個 = 木炭324 = 欠片324 = 9倍圧縮ソースの欠片36個。
+      # アメジスト側も 324/4 = 81個 = 9倍圧縮アメジスト9個(core 1 + 台座 8)で比率どおり。
+      # ⚠ これより上(81倍・729倍圧縮木炭ブロック)の一括版は【作れない】:
+      #   比率を保つには9倍圧縮アメジストが81個・729個要り、台座1つのスタック上限(64)を超える。
+      #   足すなら先に「81倍圧縮アメジストの欠片」を新設して階梯を1段伸ばすこと。
+      - method: ritual
+        core-item: custom:amethyst_shard_1x
+        pedestal-items:
+          - custom:charcoal_block_1x x4
+          - custom:amethyst_shard_1x x8
+        source: 8100
+        result: custom:source_shard_1x
+        result-amount: 36
+        type: shapeless
+        ingredients: []
+        amount: 81
   amethyst_shard_1x:
     base_material: AMETHYST_SHARD
     custom_model_data: 5447
@@ -969,6 +1000,93 @@ materials:
       type: shaped
       ingredients:
         i: custom:coal_block_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  # ==========================================================================
+  # 木炭ブロックと圧縮木炭ブロック 4段 (2026-08-25 / W-252)
+  # ==========================================================================
+  # ユーザー要望「木炭ブロックと、圧縮木炭ブロックの追加(x3まで)」。
+  # バニラには【木炭のブロックが存在しない】(石炭だけ COAL_BLOCK がある)ので、
+  # 石炭側の coal_block_1x〜3x に対応する入れ物が木炭には無く、木炭は圧縮できなかった。
+  #
+  # ⚠ base_material は CHARCOAL（COAL_BLOCK ではない）。
+  #   ユーザー確定要件は「設置できないアイテム4段」。COAL_BLOCK を土台にすると
+  #   置けてしまい、置いた瞬間に CMD が落ちて普通の石炭ブロックに化ける
+  #   (圧縮薪が OAK_LOG 土台で抱えている既知の癖)。CHARCOAL は設置できない素材なので
+  #   その経路自体が無い。
+  # ⚠ 見た目は素の木炭のまま(リソースパックのモデルは足していない)。これは既存の
+  #   coal_block_1x〜3x / oak_wood_1x〜3x と同じ扱いで、圧縮素材は表示名で区別する慣習。
+  #   テクスチャを足すなら CHARCOAL#5490〜5493 に対して items/charcoal.json を新設する。
+  # ⚠ 個数の対応: 木炭ブロック=木炭9 / 1x=81 / 2x=729 / 3x=6561。
+  #   ソースリンクの燃料値(sourcelinks.yml)はこの倍率で厳密に比例させてある
+  #   ── 崩すと「圧縮するだけでソースが増える/減る」経路になる。
+  charcoal_block:
+    base_material: CHARCOAL
+    custom_model_data: 5490
+    enchant_glow: true
+    display_name: "&8木炭ブロック"
+    lore:
+      - "&7木炭 9 個ぶん。"
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: CHARCOAL
+      shape:
+        - iii
+        - iii
+        - iii
+  charcoal_block_1x:
+    base_material: CHARCOAL
+    custom_model_data: 5491
+    enchant_glow: true
+    display_name: "&f9倍圧縮木炭ブロック"
+    lore:
+      - "&7木炭ブロック 9 個ぶん(木炭 81)。"
+      - "&7圧縮ソースの欠片の一括生成に使える。"
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:charcoal_block
+      shape:
+        - iii
+        - iii
+        - iii
+  charcoal_block_2x:
+    base_material: CHARCOAL
+    custom_model_data: 5492
+    enchant_glow: true
+    display_name: "&781倍圧縮木炭ブロック"
+    lore:
+      - "&7木炭 729 個ぶん。"
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:charcoal_block_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  charcoal_block_3x:
+    base_material: CHARCOAL
+    custom_model_data: 5493
+    enchant_glow: true
+    display_name: "&7729倍圧縮木炭ブロック"
+    lore:
+      - "&7木炭 6,561 個ぶん。"
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:charcoal_block_2x
       shape:
         - iii
         - iii

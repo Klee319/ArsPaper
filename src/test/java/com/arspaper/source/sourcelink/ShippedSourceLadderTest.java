@@ -140,29 +140,40 @@ class ShippedSourceLadderTest {
     }
 
     @Test
-    @DisplayName("転送レート倍率も生成量倍率も段ごとにちょうど2倍(=2^tier)になっている")
-    void bothMultipliersDoubleAtEveryRung() {
+    @DisplayName("生成量倍率は段ごとにちょうど2倍、転送レート倍率は段ごとにちょうど5倍")
+    void multipliersFollowTheirOwnLadders() {
+        // 2026-08-25 (W-257): 2つの倍率を同率(x2)で伸ばすのをやめた。
+        // 同率だと「生成に対して排出が何倍か」が階梯で一切変わらないので、
+        // 上位リンクにしても“焼べても入り切らない”比率が永久に残る。
+        // ユーザー確定要件は「割合ではなく階梯ごとに転送量を増やす(tier1=100/20tick なら
+        // tier2=500/20tick)」＝転送だけ x5 にして、生成は既存の x2 のまま据え置く。
         ConfigurationSection items = items();
         for (String key : List.of("transfer-multiplier", "yield-multiplier")) {
+            double step = "transfer-multiplier".equals(key) ? 5.0 : 2.0;
             for (String type : TYPES) {
                 double expected = BASE_MULTIPLIER;
                 String base = type + "_sourcelink";
                 assertEquals(expected, items.getDouble(base + "." + key), 1e-9,
                         base + " (無印) の " + key + " がずれている");
                 for (String tier : TIERS) {
-                    expected *= 2.0;
+                    expected *= step;
                     String id = base + "_" + tier;
                     assertEquals(expected, items.getDouble(id + "." + key), 1e-9,
-                            id + " の " + key + " が 2^tier からずれている。"
-                                    + "1段でも外すと階梯全体の伸びが崩れる(上限は _vi の 512.0)");
+                            id + " の " + key + " が 1段ごとに x" + step + " の並びからずれている。"
+                                    + "1段でも外すと階梯全体の伸びが崩れる");
                 }
             }
         }
     }
 
     @Test
-    @DisplayName("転送レート倍率と生成量倍率が全段で一致する(片方だけ動かすと詰まり方が段で変わる)")
-    void theTwoMultipliersStayEqualAtEveryRung() {
+    @DisplayName("転送レート倍率は生成量倍率より速く伸びる(段を上げるほど詰まりが解消される)")
+    void transferOutgrowsYieldAtEveryRung() {
+        // ※かつては「2つを同率にして、階梯を上げても生成と排出の釣り合いを変えない」ことを
+        //   固定していた(2026-08-24)。しかしその釣り合いこそが問題で、無印でも上位でも
+        //   「高価値燃料を焼べると入り切らない」比率が変わらなかった(K-16 の残り)。
+        //   2026-08-25 (W-257) に転送だけ x5 へ変えたので、不変条件は
+        //   「同率」ではなく【転送のほうが速く伸びる】へ置き換えた。
         ConfigurationSection items = items();
         for (String type : TYPES) {
             List<String> ids = new ArrayList<>();
@@ -170,13 +181,18 @@ class ShippedSourceLadderTest {
             for (String tier : TIERS) {
                 ids.add(type + "_sourcelink_" + tier);
             }
+            double previousRatio = 0.0;
             for (String id : ids) {
-                assertEquals(items.getDouble(id + ".transfer-multiplier"),
-                        items.getDouble(id + ".yield-multiplier"), 1e-9,
-                        id + " の転送レート倍率と生成量倍率が食い違っている。"
-                                + "2026-08-24 の設計は『2つを同率にして、階梯を上げても"
-                                + "生成と排出の釣り合いを変えない』こと。"
-                                + "片方だけ上げると、その段だけバッファが詰まる/空になる");
+                double transfer = items.getDouble(id + ".transfer-multiplier");
+                double yield = items.getDouble(id + ".yield-multiplier");
+                assertTrue(transfer >= yield,
+                        id + " の転送レート倍率が生成量倍率を下回っている。"
+                                + "下回るとその段は生成が排出を追い越して永久にバッファが詰まる");
+                double ratio = transfer / yield;
+                assertTrue(ratio >= previousRatio,
+                        id + " で「排出÷生成」の比が前の段より下がっている。"
+                                + "階梯を上げるほど詰まりが解消される並びであること");
+                previousRatio = ratio;
             }
         }
     }

@@ -73,6 +73,11 @@ public class ThreadGui extends BaseGui {
      * 従来形式では、厳選した個体を装着した瞬間に個体差が消えていた。
      */
     private final List<String> threadSlotRolls;
+    /**
+     * スロット添字ごとの魂縛所有者UUID(空文字 = 未刻印)。2026-08-25 (W-259)。
+     * ここに残さないと【挿して外すだけで所有者が消える】= 洗浄できてしまう。
+     */
+    private final List<String> threadSlotOwners;
 
     /**
      * レガシーコンストラクタ（後方互換）。
@@ -118,6 +123,8 @@ public class ThreadGui extends BaseGui {
 
         this.threadSlots = loadThreadSlots(targetItem);
         this.threadSlotRolls = loadThreadSlotRolls(targetItem, this.threadSlots.size());
+        this.threadSlotOwners = loadSlotStrings(targetItem, ItemKeys.THREAD_SLOT_OWNERS,
+                this.threadSlots.size());
     }
 
     /**
@@ -250,6 +257,7 @@ public class ThreadGui extends BaseGui {
                 // 無限リロールになる。
                 ItemStack threadItem = createThreadItemStack(threadType);
                 restoreRoll(threadItem, rollAt(slotIndex));
+                restoreSoulboundOwner(threadItem, ownerAt(slotIndex));
                 if (threadType.isBackpackThread()) {
                     BackpackGui.transferDataToThread(targetItem, threadItem);
                 }
@@ -261,6 +269,7 @@ public class ThreadGui extends BaseGui {
             }
             threadSlots.set(slotIndex, null);
             setRollAt(slotIndex, "");
+            setOwnerAt(slotIndex, "");
             saveThreadSlots();
             player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.5f, 1.2f);
             render();
@@ -295,6 +304,23 @@ public class ThreadGui extends BaseGui {
 
             if (threadType == null || !threadType.hasEffect()) {
                 player.sendMessage(Component.text("効果付きスレッドをセットしてください！", NamedTextColor.RED));
+                return;
+            }
+
+            // 魂縛(2026-08-25 W-259): ダンジョン産スレッドは最初に拾った人しか装着できない。
+            // ユーザー確定要件「ダンジョンドロップ品のみ魂縛し、それ以外はしない」。
+            // ⚠ ここが唯一の実効ゲート。刻印(ThreadSoulbindListener)だけでは
+            //   「他人の個体を挿す」を止められない ── 挿してしまうと装備ごと譲渡できるので、
+            //   上級者が集めたスレッドが新規へ無尽蔵に流れるのを防げない。
+            java.util.UUID threadOwner = com.arspaper.item.ThreadSoulbindListener.readOwner(threadStack);
+            if (com.arspaper.item.TreasureThreadSoulbindPolicy.isSoulbound(threadType)
+                && !com.arspaper.item.TreasureThreadSoulbindPolicy.mayUse(threadOwner, player.getUniqueId())) {
+                player.sendMessage(Component.text(
+                    "このスレッドは他の人に魂縛されています（構造物の宝箱から自分で拾った個体だけ装着できます）",
+                    NamedTextColor.RED));
+                player.sendActionBar(Component.text(
+                    "魂縛: 所有者ではないため装着できません", NamedTextColor.RED));
+                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
                 return;
             }
 
@@ -342,6 +368,9 @@ public class ThreadGui extends BaseGui {
 
             threadSlots.set(slotIndex, threadType.getId());
             setRollAt(slotIndex, socketedRoll);
+            // 魂縛の所有者は装備側にも写す。ここを省くと「挿して外す」だけで所有者が消え、
+            // 洗浄した個体を配れてしまう(W-259)。
+            setOwnerAt(slotIndex, threadOwner == null ? "" : threadOwner.toString());
             saveThreadSlots();
             player.playSound(player.getLocation(), Sound.BLOCK_ENCHANTMENT_TABLE_USE, 0.5f, 1.5f);
             render();
@@ -488,6 +517,48 @@ public class ThreadGui extends BaseGui {
     }
 
     /**
+     * 取り外して返すスレッドへ魂縛の所有者を書き戻す。
+     *
+     * <p>{@code createThreadItemStack} は<b>新品</b>を作るので所有者PDCを持たない。
+     * 書き戻さないと「挿して外す」だけで未刻印の個体が手に入る = 魂縛を洗浄できる。
+     * lore 行も同時に戻す(見て分かる状態を保つ)。
+     */
+    private static void restoreSoulboundOwner(ItemStack threadItem, String ownerUuid) {
+        if (threadItem == null || ownerUuid == null || ownerUuid.isBlank()) {
+            return;
+        }
+        java.util.UUID owner;
+        try {
+            owner = java.util.UUID.fromString(ownerUuid);
+        } catch (IllegalArgumentException malformed) {
+            return; // 壊れた値は「未刻印」として扱う(永久に使えない個体を作るより安全側)
+        }
+        org.bukkit.OfflinePlayer holder = org.bukkit.Bukkit.getOfflinePlayer(owner);
+        String name = holder.getName() == null ? owner.toString() : holder.getName();
+        threadItem.editMeta(meta -> {
+            meta.getPersistentDataContainer()
+                    .set(ItemKeys.THREAD_SOULBOUND_OWNER, PersistentDataType.STRING, ownerUuid);
+            List<Component> lore = meta.lore() == null ? new ArrayList<>() : new ArrayList<>(meta.lore());
+            lore.add(Component.text("魂縛: " + name, NamedTextColor.LIGHT_PURPLE)
+                    .decoration(TextDecoration.ITALIC, false));
+            meta.lore(lore);
+        });
+    }
+
+    /** 魂縛の所有者を添字で読む（範囲外/未刻印は空文字）。 */
+    private String ownerAt(int index) {
+        return (index >= 0 && index < threadSlotOwners.size() && threadSlotOwners.get(index) != null)
+                ? threadSlotOwners.get(index) : "";
+    }
+
+    private void setOwnerAt(int index, String ownerUuid) {
+        while (threadSlotOwners.size() <= index) {
+            threadSlotOwners.add("");
+        }
+        threadSlotOwners.set(index, ownerUuid == null ? "" : ownerUuid);
+    }
+
+    /**
      * 返却するスレッドへ、装着時の厳選値と lore を書き戻す。
      * {@code createThreadItemStack} は新品として新規 rollSeed(quality=0)を刻んでしまうので、
      * 装着時に保存していた識別子(rollSeed/quality)で上書きする ── そうしないと「外して付け直す
@@ -521,25 +592,32 @@ public class ThreadGui extends BaseGui {
     }
 
     private static List<String> loadThreadSlotRolls(ItemStack armor, int slotCount) {
-        List<String> rolls = new ArrayList<>();
+        // 壊れていれば「厳選なし」として扱う。装着済みスレッド自体は THREAD_SLOTS 側に残る。
+        return loadSlotStrings(armor, ItemKeys.THREAD_SLOT_ROLLS, slotCount);
+    }
+
+    /** スロット添字と並ぶ文字列JSON配列を読む。足りない添字は空文字で埋める。 */
+    private static List<String> loadSlotStrings(ItemStack armor, org.bukkit.NamespacedKey key,
+                                                int slotCount) {
+        List<String> values = new ArrayList<>();
         if (armor != null && armor.hasItemMeta()) {
             String json = armor.getItemMeta().getPersistentDataContainer()
-                    .get(ItemKeys.THREAD_SLOT_ROLLS, PersistentDataType.STRING);
+                    .get(key, PersistentDataType.STRING);
             if (json != null) {
                 try {
                     List<String> parsed = GSON.fromJson(json, new TypeToken<List<String>>(){}.getType());
                     if (parsed != null) {
-                        rolls.addAll(parsed);
+                        values.addAll(parsed);
                     }
                 } catch (Exception ignored) {
-                    // 壊れていれば「厳選なし」として扱う。装着済みスレッド自体は THREAD_SLOTS 側に残る。
+                    // 壊れた値は「未設定」として扱う(fail-open)。
                 }
             }
         }
-        while (rolls.size() < slotCount) {
-            rolls.add("");
+        while (values.size() < slotCount) {
+            values.add("");
         }
-        return rolls;
+        return values;
     }
 
     private void saveThreadSlots() {
@@ -554,6 +632,13 @@ public class ThreadGui extends BaseGui {
             } else {
                 // 全部空なら書かない ＝ 厳選導入前の防具とまったく同じ PDC 形状に戻す。
                 pdc.remove(ItemKeys.THREAD_SLOT_ROLLS);
+            }
+            // 魂縛の所有者も同じ規約: 全部空なら書かない(導入前と同じPDC形状に戻す)。
+            if (threadSlotOwners.stream().anyMatch(entry -> entry != null && !entry.isBlank())) {
+                pdc.set(ItemKeys.THREAD_SLOT_OWNERS, PersistentDataType.STRING,
+                        GSON.toJson(threadSlotOwners));
+            } else {
+                pdc.remove(ItemKeys.THREAD_SLOT_OWNERS);
             }
             pdc.set(ItemKeys.THREAD_LORE, PersistentDataType.STRING, serializeThreadLore(nextOwned));
             pdc.remove(ItemKeys.THREAD_TYPE);

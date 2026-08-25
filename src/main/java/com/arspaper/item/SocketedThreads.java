@@ -29,8 +29,12 @@ public final class SocketedThreads {
 
     private static final Gson GSON = new Gson();
 
-    /** 装着スレッド1個ぶん: PDC上のスロット番号(0始まり) + 種類 + そのスロットの厳選(rollSeed/quality)。 */
-    public record Entry(int slotIndex, ThreadType type, long rollSeed, int quality) {
+    /**
+     * 装着スレッド1個ぶん: PDC上のスロット番号(0始まり) + 種類 + そのスロットの厳選(rollSeed/quality)
+     * + 魂縛の所有者({@code null} = 未刻印。2026-08-25 W-259)。
+     */
+    public record Entry(int slotIndex, ThreadType type, long rollSeed, int quality,
+                        java.util.UUID owner) {
     }
 
     private SocketedThreads() {
@@ -58,7 +62,7 @@ public final class SocketedThreads {
             if (oldThreadId != null) {
                 ThreadType thread = ThreadType.fromId(oldThreadId);
                 if (thread != null && thread.hasEffect()) {
-                    result.add(new Entry(0, thread, 0L, 0));
+                    result.add(new Entry(0, thread, 0L, 0, null));
                 }
             }
             return result;
@@ -70,6 +74,7 @@ public final class SocketedThreads {
                 return result;
             }
             List<String> rolls = readRolls(pdc);
+            List<String> owners = readList(pdc, ItemKeys.THREAD_SLOT_OWNERS);
             int cappedSize = Math.min(slots.size(), effectiveSlots);
             for (int i = 0; i < cappedSize; i++) {
                 String threadId = slots.get(i);
@@ -82,7 +87,8 @@ public final class SocketedThreads {
                 }
                 ThreadSlotIdentity identity = i < rolls.size()
                         ? ThreadSlotIdentity.decode(rolls.get(i)) : ThreadSlotIdentity.NONE;
-                result.add(new Entry(i, thread, identity.rollSeed(), identity.quality()));
+                result.add(new Entry(i, thread, identity.rollSeed(), identity.quality(),
+                        parseUuid(i < owners.size() ? owners.get(i) : null)));
             }
         } catch (Exception malformed) {
             // 壊れたJSONは「装着スレッド無し」として扱う(fail-open)。装備自体は使える。
@@ -112,15 +118,33 @@ public final class SocketedThreads {
 
     /** {@link ItemKeys#THREAD_SLOT_ROLLS} の生JSON配列を読む。壊れている/未設定なら空リスト。 */
     private static List<String> readRolls(PersistentDataContainer pdc) {
-        String json = pdc.get(ItemKeys.THREAD_SLOT_ROLLS, PersistentDataType.STRING);
+        return readList(pdc, ItemKeys.THREAD_SLOT_ROLLS);
+    }
+
+    /** スロット添字と並ぶ文字列JSON配列を読む。壊れている/未設定なら空リスト。 */
+    private static List<String> readList(PersistentDataContainer pdc,
+                                         org.bukkit.NamespacedKey key) {
+        String json = pdc.get(key, PersistentDataType.STRING);
         if (json == null || json.isBlank()) {
             return List.of();
         }
         try {
-            List<String> rolls = GSON.fromJson(json, new TypeToken<List<String>>(){}.getType());
-            return rolls != null ? rolls : List.of();
+            List<String> values = GSON.fromJson(json, new TypeToken<List<String>>(){}.getType());
+            return values != null ? values : List.of();
         } catch (Exception malformed) {
             return List.of();
+        }
+    }
+
+    /** 壊れた値は「未刻印」として扱う(永久に効かない装備を作るより安全側)。 */
+    private static java.util.UUID parseUuid(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return java.util.UUID.fromString(raw);
+        } catch (IllegalArgumentException malformed) {
+            return null;
         }
     }
 }

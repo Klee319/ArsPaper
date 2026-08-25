@@ -52,7 +52,16 @@ public record SourceTransferConfig(
 
     // --- 既定値 = 2026-08-01 以前のハードコード値(挙動不変) ---
     public static final int DEFAULT_SOURCELINK_INTERVAL_TICKS = 100;
-    public static final int DEFAULT_SOURCELINK_MAX_PER_TRANSFER = 50;
+    /**
+     * 1周期にバッファから吐き出せる「定額」ぶん。
+     *
+     * <p><b>2026-08-25 (W-257): 50 → 250。</b>出荷 {@code sourcelinks.yml} と同じ値にしてある
+     * ── ArsPaper の yml は {@code saveResource(..., false)} なので<b>キーが無い環境では
+     * この定数がそのまま実挙動になる</b>（同じ形の食い違いを炸裂半径と戦闘レベルで2件踏んだ）。
+     * 最下段の階梯倍率 2.0 と合わせて 250 x 2.0 / 100tick = <b>100/20tick</b>、
+     * 1段ごとに x5 なので tier2 は 500/20tick（ユーザー確定要件）。
+     */
+    public static final int DEFAULT_SOURCELINK_MAX_PER_TRANSFER = 250;
     /** バッファ上限。既定は int の上限＝「事実上無制限だがオーバーフローはしない」。 */
     public static final int DEFAULT_SOURCELINK_BUFFER_CAP = Integer.MAX_VALUE;
     /**
@@ -75,11 +84,20 @@ public record SourceTransferConfig(
      *   140,000(1スタック) 14,000    320      135
      *   30,000,000(機関) 3,000,000  575      230
      * </pre>
-     * 0.10 だと単品の改善が2倍弱にとどまる(圧縮薪1個で2分)ので 0.25 を採る。
-     * 上げても損失は生まれない —— ジャーの空きを超えた分はバッファへ戻るので、
-     * 「ジャーの容量が実質的な上限」という元設計は保たれる。
+     * <p><b>⚠ 2026-08-25 (W-257) に既定を 0.0（=完全定額）へ戻した。</b>上の表は
+     * 「割合排出が転送時間を縮める」ことは正しく示しているが、<b>副作用を2つ見落としていた</b>:
+     * <ol>
+     *   <li>速度が残量で変わるので、同じ設備でも見ていて速さが安定しない
+     *       （ユーザー指摘「転送速度が一定じゃないのが気持ち悪い」）。</li>
+     *   <li><b>階梯倍率を無意味にする</b>。定額と割合の大きい方を採るので、バッファが
+     *       {@code 定額 x 階梯倍率 ÷ drain-ratio} を超えると常に割合が勝つ。旧値なら
+     *       最下段(50x2=100)で残量400以上、つまり<b>高価値燃料を焼べたら必ずその領域</b>で、
+     *       そこから先は階梯を上げても排出量が1点も変わらない
+     *       （ユーザー報告「現状の x2 が効いていない可能性」の正体はこれ）。</li>
+     * </ol>
+     * 速度は代わりに「定額 x 階梯倍率(x5刻み)」の側で出す。<b>0 以外へ戻すと (2) が再発する。</b>
      */
-    public static final double DEFAULT_SOURCELINK_DRAIN_RATIO = 0.25;
+    public static final double DEFAULT_SOURCELINK_DRAIN_RATIO = 0.0;
     public static final int DEFAULT_VITALIC_DETECTION_RADIUS = 10;
     public static final int DEFAULT_BOTANICAL_DETECTION_RADIUS = 10;
     public static final int DEFAULT_NETWORK_INTERVAL_TICKS = 40;
@@ -94,16 +112,17 @@ public record SourceTransferConfig(
      * 網は階梯倍率もコア倍率も掛からないので、<b>上位リンクにしても上位ジャーにしても永久に
      * 毎秒2.5点</b>で、ソース機関1個(3,000万)を運ぶのに約7日(60万秒)かかる計算だった。
      *
-     * <p>同じ 0.25 を既定にするのは、隣接供給と網で「溜まった量の何割が1周期で動くか」を
-     * 揃えるため(片方だけ速いと、ジャーを隣に置くか網で繋ぐかで速度が桁違いになる)。
-     * 別のキーにしてあるのは周期が違う(隣接100tick / 網40tick)ため ——
-     * 同じ割合でも網のほうが2.5倍速いので、後から別々に絞れる必要がある。
+     * <p><b>⚠ 2026-08-25 (W-257) に既定を 0.0（=完全定額）へ戻した。</b>理由は隣接供給側
+     * （{@link #DEFAULT_SOURCELINK_DRAIN_RATIO}）と同じ。<b>代わりに網へ「送信元の階梯倍率」を
+     * 掛けるようにした</b>ので、上位リンク・上位ジャーにした効果がここで初めて出る
+     * （倍率の解決は {@link NetworkTierMultiplier}）。キーは隣接供給と別のまま残してある ——
+     * 周期が違う(隣接100tick / 網40tick)ので、後から片方だけ絞れる必要があるため。
      *
      * <p>⚠ <b>配備先の yml にこのキーが無くてもこの既定値で動く</b>。ArsPaper の yml は
      * {@code saveResource(..., false)} なので jar を差し替えても配備先には現れないが、
      * {@code clampDouble} が未定義キーを既定値で埋めるので配備は jar だけで足りる。
      */
-    public static final double DEFAULT_NETWORK_DRAIN_RATIO = 0.25;
+    public static final double DEFAULT_NETWORK_DRAIN_RATIO = 0.0;
     public static final int DEFAULT_NETWORK_MAX_LINK_RANGE = 30;
 
     // --- 経路パーティクル(2026-08-01 新規。既定ON) ---
