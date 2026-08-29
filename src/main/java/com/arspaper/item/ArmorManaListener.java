@@ -398,6 +398,8 @@ public class ArmorManaListener implements Listener {
             totals.regenPercent += threadConfig.getRegenPercent(thread);
             totals.hitRecovery += threadConfig.getHitManaRecovery(thread);
             totals.damageRecovery += threadConfig.getDamageManaRecovery(thread);
+            // 上の getters は threads.yml に書いた値だけ。ThreadType コンストラクタの
+            // マナ数値は 0 固定で、editor(item-stats) に無い値は乗らない。
             if (ambient) {
                 // config優先(ThreadConfig#getPotionEffect)で解決する。潜在的な型は
                 // ThreadConfig#allPotionTypes() が超集合として持つので、ここで見つかった型は

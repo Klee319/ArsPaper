@@ -5,6 +5,8 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 
+import com.arspaper.spell.SpellManaCost;
+
 /**
  * 装着スレッドの item-stats から出てきたステのうち、<b>マナ系だけを別の受け皿へ振り分ける</b>
  * 純粋な仕分け (2026-08-03)。
@@ -106,17 +108,55 @@ public final class ThreadManaStatRouting {
         int manaRegen = takeRounded(stats, KEY_MANA_REGEN, 1.0);
         int hitRecovery = takeRounded(stats, KEY_HIT_MANA_RECOVERY, 1.0);
         int damageRecovery = takeRounded(stats, KEY_DAMAGE_MANA_RECOVERY, 1.0);
-        // item-stats は割合キーを分数で持つ(0.06 = 6%)。スレッドのカウンタは threads.yml の
-        // cost-reduction と同じ整数%なので、ここで単位を合わせる。
-        int costReduction = takeRounded(stats, KEY_MANA_COST_REDUCTION_PERCENT, 100.0);
+        // item-stats は割合キーを分数で持つ(0.15 = 15%)。スレッドのカウンタは threads.yml の
+        // cost-reduction と同じ整数%。エディタが 15 と書いた percent-point 誤記は
+        // |v|>1 ならすでに%とみなす(15×100=1500 → キャップ100%＝消費マナ1 の事故防止)。
+        int costReduction = takeCostReductionPercent(stats);
         return new Deltas(manaBonus, manaRegen, hitRecovery, damageRecovery, costReduction);
     }
 
+    /**
+     * 分数 0.15 もパーセントポイント 15 も整数 15% に揃える。ハイフン／アンダースコアの両方を取り除く。
+     */
+    static int takeCostReductionPercent(Map<String, Double> stats) {
+        Double raw = takeAliased(stats, KEY_MANA_COST_REDUCTION_PERCENT);
+        if (raw == null || !Double.isFinite(raw)) {
+            return 0;
+        }
+        return SpellManaCost.toPercent(raw);
+    }
+
     private static int takeRounded(Map<String, Double> stats, String key, double scale) {
-        Double raw = stats.remove(key);
+        Double raw = takeAliased(stats, key);
         if (raw == null || !Double.isFinite(raw)) {
             return 0;
         }
         return (int) Math.round(raw * scale);
+    }
+
+    private static Double takeAliased(Map<String, Double> stats, String canonicalUnderscore) {
+        if (stats.containsKey(canonicalUnderscore)) {
+            return stats.remove(canonicalUnderscore);
+        }
+        String hyphen = canonicalUnderscore.replace('_', '-');
+        if (stats.containsKey(hyphen)) {
+            return stats.remove(hyphen);
+        }
+        Double found = null;
+        java.util.Iterator<Map.Entry<String, Double>> it = stats.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<String, Double> entry = it.next();
+            String key = entry.getKey();
+            if (key == null) {
+                continue;
+            }
+            if (key.replace('-', '_').equalsIgnoreCase(canonicalUnderscore)) {
+                if (found == null) {
+                    found = entry.getValue();
+                }
+                it.remove();
+            }
+        }
+        return found;
     }
 }

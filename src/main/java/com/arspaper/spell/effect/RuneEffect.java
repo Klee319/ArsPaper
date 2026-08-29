@@ -55,7 +55,14 @@ public class RuneEffect implements SpellEffect {
         double radiusPerAoe = config.getParam("rune", "radius-per-aoe", 1.0);
         double trigRadius = baseTrigRadius + context.getAoeRadiusLevel() * radiusPerAoe;
 
-        int lifetime = Math.max(1, baseLifetime + context.getDurationLevel() * lifetimePerDur);
+        // 短縮(2026-08-19 / W-152): 「罠を残さず短時間で消す」用。共通軸(短縮2個で-1レベル)は
+        // max-augments.duration_down = 1 のこの呪文では一度も効かないので、短縮だけ独立軸にした。
+        // 延長は getExtendOnlyDurationLevel() で受ける(素の durationLevel だと二重計上)。
+        int lifetimePerDown = (int) config.getParam("rune", "lifetime-per-duration-down", 100.0);
+        int minLifetime = Math.max(1, (int) config.getParam("rune", "min-lifetime", 60.0));
+        int lifetime = com.arspaper.spell.SpellDurationMath.resolve(baseLifetime,
+                context.getExtendOnlyDurationLevel(), lifetimePerDur,
+                context.getDurationDownStacks(), lifetimePerDown, minLifetime);
         Location runeLoc = blockLocation.clone().add(0.5, 0.1, 0.5);
         double triggerRadiusSq = trigRadius * trigRadius;
 

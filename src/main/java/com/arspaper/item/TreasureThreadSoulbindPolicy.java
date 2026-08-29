@@ -3,36 +3,25 @@ package com.arspaper.item;
 import java.util.UUID;
 
 /**
- * <b>ダンジョン(構造物のルートチェスト)産のスレッドだけを魂縛する</b>判定 —— 2026-08-25 (W-259)。
+ * スレッド魂縛の判定 —— 2026-08-25 (W-259)、2026-08-29 に catalog {@code bind-type} へ移した。
  *
  * <h2>何を解こうとしているのか</h2>
  * ユーザーの本質的な要求はこう述べられた:
  * <blockquote>「どうやって初心者に上級者が集めたスレッドが無尽蔵に供給され
  * 収集コンテンツをつぶされることを防ぐかが本質」</blockquote>
  *
- * <p>最初はスレッドに<b>レベル制限</b>を掛ける案だったが、ユーザー自身が
- * 「そもそも他の人にスレッド付きの武器とかが渡された場合にどうやって対処しよう」と
- * 抜け道を指摘し、案は撤回された。確定した方針は
- * <b>「ダンジョンドロップ品のみ魂縛し、それ以外はしない」</b>。
- *
  * <p>魂縛は「レベルで制限する」より素直に効く: 譲渡そのものを止めるので、
  * 装備に挿してから渡す抜け道も同時に塞がる(挿す時点で所有者判定が走るため)。
- * 一方で儀式で作れるスレッドは<b>今までどおり自由に譲渡できる</b> ── 収集コンテンツを
- * 守りたいのは「拾うしか入手経路が無い」枠だけで、作れる枠まで縛ると交易が死ぬ。
  *
- * <h2>なぜ TrinityForge 側の魂縛機構を使わないのか</h2>
- * TF には {@code bind-type: SOULBOUND} と {@code PickupQualityListener#stampOwnerIfEligible}
- * があるが、あれは<b>PDC に {@code bind_type} と {@code roll_seed} がある品にしか発火しない</b>。
- * 対象10種は TF の catalog で {@code external-source: arspaper} と宣言されていて
- * <b>実体を Ars が作る</b>ため、その2つの PDC を持たない ── つまり TF 側の機構は
- * 何も起きないまま素通りする(ログも出ない)。だから所有者の刻印と装着ゲートは
- * <b>フォーク側に置くしかない</b>。
+ * <h2>対象の決め方は catalog の {@code bind-type: SOULBOUND}</h2>
+ * 2026-08-29 の確定要件は「ハードコードではなく設定エディタのバインド種別」。
+ * {@link com.arspaper.integration.TrinityForgeBridge#catalogAutoStampsOwner} が
+ * {@code items/catalog.yml} の {@code thread_<id>} を読む。作業台/儀式で作れる ID は
+ * TRADEABLE（入手経路がドロップでも縛らない）。レシピの無い ID は SOULBOUND で
+ * 入手時に所有者が付く。
  *
- * <h2>対象の決め方は「id の一覧」ではなく CMD の帯</h2>
- * 許可リスト方式は<b>リスト自体が誤ると検査ごと無効化される</b>(実在しない id を
- * 書いて壊れを見逃した前例がある)。ここでは
- * {@link #TREASURE_CMD_MIN}..{@link #TREASURE_CMD_MAX} の帯で判定するので、
- * トレジャースレッドを増やす = 帯の中に CMD を採る、というだけで自動的に対象へ入る。
+ * <p>TrinityForge 未ロード時だけ、後方互換として {@link #isSoulboundCmd} の
+ * トレジャー帯(300070-300079)へ落ちる。本番は catalog が正。
  */
 public final class TreasureThreadSoulbindPolicy {
 
@@ -48,16 +37,23 @@ public final class TreasureThreadSoulbindPolicy {
     /**
      * このスレッドが魂縛の対象か。
      *
-     * <p>⚠ 儀式で作れるスレッドは対象外。ユーザー確定要件が
-     * 「ダンジョンドロップ品のみ魂縛し、それ以外はしない」なので、
-     * ここを広げる = 要件を超えた変更になる。
+     * <p>正は TrinityForge catalog の {@code bind-type}。TF が居ない構成だけ
+     * {@link #isSoulboundCmd} のトレジャー帯へフォールバックする。
      */
     public static boolean isSoulbound(ThreadType type) {
-        return type != null && isSoulboundCmd(type.getCustomModelData());
+        if (type == null) {
+            return false;
+        }
+        Boolean fromCatalog = com.arspaper.integration.TrinityForgeBridge
+                .catalogAutoStampsOwner("thread_" + type.getId());
+        if (fromCatalog != null) {
+            return fromCatalog;
+        }
+        return isSoulboundCmd(type.getCustomModelData());
     }
 
     /**
-     * CustomModelData だけで見る版。
+     * CustomModelData だけで見る版。TrinityForge 未ロード時のフォールバック専用。
      *
      * <p>⚠ 判定の実体を<b>こちら</b>に置いているのは、{@link ThreadType} が
      * {@code PotionEffectType} の静的初期化を踏むため<b>サーバ無しではクラスロードできない</b>から。

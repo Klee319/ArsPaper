@@ -219,7 +219,7 @@ public class RitualManager {
                 Block revalidateBlock = coreLocation.getBlock();
                 if (!(revalidateBlock.getState() instanceof TileState revalidateCore)) {
                     player.sendMessage(Component.text("儀式が中断されました！", NamedTextColor.RED));
-                    refundSource(coreLocation, reservedSource);
+                    refundSource(player, coreLocation, reservedSource);
                     return;
                 }
                 RitualIngredient revalidateCoreItem = RitualCore.getCoreIngredient(revalidateCore);
@@ -231,7 +231,7 @@ public class RitualManager {
                 Optional<RitualRecipe> revalidateMatch = recipeRegistry.findMatch(revalidateCoreItem, revalidateIngredients);
                 if (revalidateMatch.isEmpty() || !revalidateMatch.get().equals(recipe)) {
                     player.sendMessage(Component.text("素材が変更されたため儀式が失敗しました！", NamedTextColor.RED));
-                    refundSource(coreLocation, reservedSource);
+                    refundSource(player, coreLocation, reservedSource);
                     return;
                 }
 
@@ -242,18 +242,18 @@ public class RitualManager {
                     if (preValidateEffect.isEmpty()) {
                         player.sendMessage(Component.text(
                             "不明な儀式タイプ: " + recipe.effectType(), NamedTextColor.RED));
-                        refundSource(coreLocation, reservedSource);
+                        refundSource(player, coreLocation, reservedSource);
                         return;
                     }
                     if (!preValidateEffect.get().validate(coreLocation, player, recipe)) {
-                        refundSource(coreLocation, reservedSource);
+                        refundSource(player, coreLocation, reservedSource);
                         return;
                     }
                 } else {
                     craftResult = resolveResult(recipe, player);
                     if (craftResult == null) {
                         player.sendMessage(Component.text("儀式の結果が無効です！", NamedTextColor.RED));
-                        refundSource(coreLocation, reservedSource);
+                        refundSource(player, coreLocation, reservedSource);
                         return;
                     }
                 }
@@ -302,16 +302,17 @@ public class RitualManager {
                     ItemStack result = craftResult;
 
                     // コアアイテムを消費（レシピがコアアイテムを要求する場合）
+                    ItemStack oldCore = null;
                     if (recipe.coreItem() != null) {
-                        // アップグレード儀式: 旧アイテムのデータを結果に転送
+                        // アップグレード儀式: 旧コアの個体データを結果へ写す。
+                        // mage_ / spell_book_ 接頭辞に限らず、武器・触媒・魔導書も同じ経路。
+                        // 品質と rollSeed は下の finalize が実行者基準で新規ロールするので写さない。
                         if (recipe.isCustomResult()) {
-                            // tfcatalog: 経由(カタログ儀式)でも同じ転送処理が効くようプレフィックスを剥がす
-                            String rid = recipe.resultId();
-                            if (rid.startsWith(CatalogRitualRegistrar.RESULT_PREFIX)) {
-                                rid = rid.substring(CatalogRitualRegistrar.RESULT_PREFIX.length());
-                            }
-                            if (rid.startsWith("spell_book_") || rid.startsWith("wand_")) {
-                                // スペルブック/ワンド: スペルデータ転送
+                            oldCore = RitualCore.getStoredItem(revalidateCore);
+                            if (oldCore != null) {
+                                TrinityForgeBridge.carryOverUpgradePersistent(oldCore, result);
+                            } else {
+                                // 旧形式コア（バイト配列が無い）: スペルスロットだけブロック PDC に残っている
                                 String oldSpellSlots = RitualCore.getStoredSpellSlots(revalidateCore);
                                 Integer oldSpellSlot = RitualCore.getStoredSpellSlot(revalidateCore);
                                 if (oldSpellSlots != null || oldSpellSlot != null) {
@@ -323,48 +324,6 @@ public class RitualManager {
                                         if (oldSpellSlot != null) {
                                             pdc.set(ItemKeys.SPELL_SLOT, PersistentDataType.INTEGER, oldSpellSlot);
                                         }
-                                    });
-                                }
-                            } else if (rid.startsWith("mage_")) {
-                                // 防具アップグレード: 旧アイテムの全PDCデータ+エンチャントを転送
-                                ItemStack oldItem = RitualCore.getStoredItem(revalidateCore);
-                                if (oldItem != null && oldItem.hasItemMeta()) {
-                                    var oldMeta = oldItem.getItemMeta();
-                                    var oldPdc = oldMeta.getPersistentDataContainer();
-
-                                    // 転送対象のPDCキー
-                                    org.bukkit.NamespacedKey[] transferKeys = {
-                                        ItemKeys.THREAD_SLOTS,
-                                        ItemKeys.THREAD_LORE,
-                                        com.arspaper.mana.ManaKeys.THREAD_MANA_BONUS,
-                                        com.arspaper.mana.ManaKeys.THREAD_REGEN_BONUS,
-                                        com.arspaper.mana.ManaKeys.THREAD_COST_REDUCTION,
-                                    };
-
-                                    // エンチャント転送（バニラ + カスタム両方）
-                                    var enchants = oldMeta.getEnchants();
-
-                                    result.editMeta(meta -> {
-                                        var dstPdc = meta.getPersistentDataContainer();
-                                        // PDCキー転送
-                                        for (var key : transferKeys) {
-                                            // String型
-                                            String strVal = oldPdc.get(key, PersistentDataType.STRING);
-                                            if (strVal != null) {
-                                                dstPdc.set(key, PersistentDataType.STRING, strVal);
-                                                continue;
-                                            }
-                                            // Integer型
-                                            Integer intVal = oldPdc.get(key, PersistentDataType.INTEGER);
-                                            if (intVal != null) {
-                                                dstPdc.set(key, PersistentDataType.INTEGER, intVal);
-                                            }
-                                        }
-                                        // エンチャント転送
-                                        for (var entry : enchants.entrySet()) {
-                                            meta.addEnchant(entry.getKey(), entry.getValue(), true);
-                                        }
-                                        // Ars所有のthread loreもPDCで転送され、TF再構築後に末尾へ復元される。
                                     });
                                 }
                             }
@@ -411,16 +370,42 @@ public class RitualManager {
                         }
                     }
 
-                    // 結果をドロップ
-                    coreLocation.getWorld().dropItemNaturally(
-                        coreLocation.clone().add(0.5, 1.5, 0.5), result
-                    );
+                    // 品質 stamp が tool-enchant 由来でプレイヤー付与エンチャントを剥がすので、
+                    // stamp の後に max で戻す。PDC 側は stamp 前に写済み。
+                    if (oldCore != null) {
+                        TrinityForgeBridge.carryOverUpgradeEnchantments(oldCore, result);
+                    }
+
+                    // 結果はコアへ載せ、右クリックで回収させる(2026-08-18 W-85)。
+                    //
+                    // 旧実装はコアの上へ dropItemNaturally していた。ドロップアイテムは<b>近くにいる
+                    // 誰でも歩くだけで拾える</b>ため、儀式を行った本人より先に他のプレイヤーが拾う事故が
+                    // 実サーバで起きた。コアに載せておけば拾得は明示的な右クリックだけになり、
+                    // コアが壊されても RitualCore#onBlockBroken が中身を落とすのでロストもしない。
+                    // (品質と SOULBOUND 所有者は上の finalize... で既に実行者基準で確定済みなので、
+                    //  誰が回収しても中身は変わらない ── ユーザ決定「誰でも回収可・品質は実行者基準」。)
+                    boolean placedOnCore = false;
+                    if (RitualCore.getStoredItem(revalidateCore) == null) {
+                        RitualCore.setStoredItem(revalidateCore, result);
+                        placedOnCore = true;
+                    } else {
+                        // コアに別のアイテムが載っている(コア非消費レシピで素材を置いたまま等)。
+                        // 上書きすると其れを消してしまうので、この場合だけ従来どおり落とす。
+                        coreLocation.getWorld().dropItemNaturally(
+                            coreLocation.clone().add(0.5, 1.5, 0.5), result
+                        );
+                    }
 
                     // 完了エフェクト
                     playRitualCompleteEffects(coreLocation);
 
                     player.sendMessage(Component.text(
                         "儀式完了: " + recipe.name() + "！", NamedTextColor.GREEN));
+                    if (placedOnCore) {
+                        player.sendMessage(Component.text(
+                            "成果物はコアの上にあります。右クリックで回収してください。",
+                            NamedTextColor.YELLOW));
+                    }
                 }
             }
         }.runTaskTimer(ArsPaper.getInstance(), 1L, 1L);
@@ -537,8 +522,14 @@ public class RitualManager {
 
     /**
      * 儀式失敗時にSourceを返還する。最寄りのSourceJarに追加。
+     *
+     * <p><b>返し切れないぶんは消える。</b>予約したときと同じジャー群へ返すので普段は必ず入るが、
+     * アニメーション中にジャーが壊された(壊れたジャーは中身ごとドロップするので容量が減る)、
+     * あるいはソースリンクが満たしてしまった場合には行き場が無くなる。
+     * ソースはアイテムとして落とせないので<b>ここで消える以外の選択肢が無い</b> ——
+     * せめて黙って消さず、消えた量をプレイヤーへ伝える(2026-08-18 の点検で追加)。
      */
-    private void refundSource(Location center, int amount) {
+    private void refundSource(Player player, Location center, int amount) {
         if (amount <= 0) return;
         int remaining = amount;
         int searchRadius = 5;
@@ -555,6 +546,11 @@ public class RitualManager {
                     remaining -= added;
                 }
             }
+        }
+        if (remaining > 0 && player != null && player.isOnline()) {
+            player.sendMessage(Component.text(
+                "近くのソースジャーに空きが無いため、" + remaining + " ソースを返せませんでした。",
+                NamedTextColor.RED));
         }
     }
 
@@ -616,10 +612,18 @@ public class RitualManager {
                         ? storedItem.asOne()
                         : resolveIngredientAsItemStack(pedestal.ingredient);
                     if (refundStack != null) {
-                        var overflow = player.getInventory().addItem(refundStack);
-                        if (!overflow.isEmpty()) {
-                            overflow.values().forEach(item ->
-                                player.getWorld().dropItemNaturally(player.getLocation(), item));
+                        // アニメーション中(3秒)にログアウトされていることがある。オフラインの
+                        // Player へ addItem しても保存されず<b>素材が黙って消える</b>ので、
+                        // その場合は台座の位置へ落とす(2026-08-18 の点検で追加)。
+                        if (!player.isOnline()) {
+                            pedestal.block.getWorld().dropItemNaturally(
+                                pedestal.block.getLocation().add(0.5, 1.0, 0.5), refundStack);
+                        } else {
+                            var overflow = player.getInventory().addItem(refundStack);
+                            if (!overflow.isEmpty()) {
+                                overflow.values().forEach(item ->
+                                    player.getWorld().dropItemNaturally(player.getLocation(), item));
+                            }
                         }
                     }
                 }

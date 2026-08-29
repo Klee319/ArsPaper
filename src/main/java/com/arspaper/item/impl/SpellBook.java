@@ -175,6 +175,19 @@ public class SpellBook extends BaseCustomItem {
         if (!item.hasItemMeta()) return null;
         String owner = item.getItemMeta().getPersistentDataContainer()
             .get(ItemKeys.SPELL_BOOK_OWNER, PersistentDataType.STRING);
+        String authoritative = trinityForgeOwner(item);
+        if (authoritative != null) {
+            // TF が所有者を刻印している(儀式品・SOULBOUND 等)。こちらが唯一の正なので、
+            // 先に誰が右クリックしたかに関係なく Ars 側の台帳をそれへ揃える(W-100)。
+            if (!authoritative.equals(owner)) {
+                item.editMeta(meta ->
+                    meta.getPersistentDataContainer().set(
+                        ItemKeys.SPELL_BOOK_OWNER, PersistentDataType.STRING, authoritative
+                    )
+                );
+            }
+            return authoritative;
+        }
         if (owner == null) {
             owner = player.getUniqueId().toString();
             String finalOwner = owner;
@@ -185,6 +198,23 @@ public class SpellBook extends BaseCustomItem {
             );
         }
         return owner;
+    }
+
+    /**
+     * TrinityForge が刻印した所有者(文字列化した UUID)。無ければ {@code null}。
+     *
+     * <p>W-100(実サーバ報告「儀式で作成した魔導書が所有者名の人が使えない」)の対応点。
+     * <b>所有者台帳が2本ある</b>のが真因だった —— アイテムの lore に出る「所有者:」は
+     * TF の {@code ItemData#owner()} だが、装着/GUI の可否は Ars 独自の
+     * {@code arspaper:spell_book_owner}(=<b>最初に右クリックした人</b>)で決めていた。
+     * 儀式品を別の人が先に一度右クリックすると2本がずれ、
+     * <b>lore に自分の名前が出ているのに所有者ではないと言われる</b>状態になる。
+     * TF 側の刻印があるときはそちらを正とする。TF が居ない構成では null が返り、
+     * 従来どおり「初回使用者が所有者」で動く。
+     */
+    private static String trinityForgeOwner(ItemStack item) {
+        java.util.UUID tfOwner = com.arspaper.integration.TrinityForgeBridge.tfOwnerId(item);
+        return tfOwner == null ? null : tfOwner.toString();
     }
 
     /**

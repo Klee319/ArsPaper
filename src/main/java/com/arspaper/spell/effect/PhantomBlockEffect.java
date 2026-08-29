@@ -81,7 +81,14 @@ public class PhantomBlockEffect implements SpellEffect {
             // 一時ブロック: 一定時間後に除去
             int baseRemoval = (int) config.getParam("phantom_block", "base-removal-ticks", BASE_REMOVAL_TICKS);
             int durationBonus = (int) config.getParam("phantom_block", "duration-bonus-ticks", DURATION_BONUS_TICKS);
-            int removalTicks = baseRemoval + context.getDurationLevel() * durationBonus;
+            // 短縮(2026-08-19 / W-152): 「一時足場をすぐ消す」用。共通軸(短縮2個で-1レベル)は
+            // max-augments.duration_down = 1 のこの呪文では一度も効かないので、短縮だけ独立軸にした。
+            // 下限が無いと runTaskLater へ負値が渡り、置いた瞬間に消える。
+            int removalPerDown = (int) config.getParam("phantom_block", "removal-ticks-per-duration-down", 60.0);
+            int minRemovalTicks = Math.max(1, (int) config.getParam("phantom_block", "min-removal-ticks", 40.0));
+            int removalTicks = com.arspaper.spell.SpellDurationMath.resolve(baseRemoval,
+                    context.getExtendOnlyDurationLevel(), durationBonus,
+                    context.getDurationDownStacks(), removalPerDown, minRemovalTicks);
             activePhantomBlocks.add(savedLocation);
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 removePhantomBlock(savedLocation);

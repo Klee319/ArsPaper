@@ -393,10 +393,9 @@ class ThreadSetThresholdReachabilityTest {
         // 全種が1本になるので、yml 側に上書きが残っていたらそこだけ要件から漏れる。
         //
         // backpack だけは意図的な例外。BackpackGui#countBackpackThreads が数えるのは
-        // 【1つの防具の PDC だけ】なので、1本に絞ると 54スロット(2段)が到達不能になり、
-        // 既存機能が黙って消える。戦闘ステを1つも持たないため「割合ステが上限へ張り付く」
-        // という W-254 の動機は当てはまらない。
-        assertEquals(java.util.List.of("backpack (stackable=null, max=2)"), exceptions,
+        // 【1つの防具の PDC だけ】なので、複数本にしないと max-inventory-slots(108) に届かない。
+        // 戦闘ステを1つも持たないため「割合ステが上限へ張り付く」という W-254 の動機は当てはまらない。
+        assertEquals(java.util.List.of("backpack (stackable=null, max=4)"), exceptions,
                 "1装備1本の例外は backpack のみ。増やすなら『割合ステを持たない』ことを確認すること");
     }
 

@@ -246,6 +246,32 @@ public class SpellContext {
         }
     }
 
+    /**
+     * 積まれた「短縮」の<b>生の個数</b>（2026-08-19 / W-152）。
+     *
+     * <p><b>なぜ要るか（実バグ）</b>: 上の {@link #applyDurationDown()} は「短縮は延長の半分」という
+     * 設計のため<b>2個積んで初めて -1 レベル</b>になる。ところが {@code glyphs.yml} の
+     * {@code max-augments.duration_down} が <b>1</b> の呪文が 14 件あり、そこでは短縮が
+     * <b>一度も効かない</b>（付けられるのに何も起きない無言死）。実サーバ報告
+     * 「炸裂魔法の炸裂までの時間が短縮とかで変わってない気がする」の真因がこれ。
+     *
+     * <p>ユーザー判断（2026-08-19）で、短縮に実用があると棚卸しできた6呪文
+     * （炸裂・仮想ブロック・水生成・罠術・滑空・浮遊）だけは
+     * <b>「短縮1個ごとに固定 tick 縮む」専用の軸</b>へ移した。その呪文はこの生の個数を読み、
+     * 延長ぶんは {@link #getExtendOnlyDurationLevel()} で受ける（両方を素の
+     * {@code durationLevel} から取ると、短縮2個目で「専用の短縮量 × 2」と
+     * 「durationLevel -1 ぶんの短縮」が<b>二重に</b>掛かる）。
+     */
+    public int getDurationDownStacks() { return durationDownAccum; }
+
+    /**
+     * 延長ぶんだけの持続レベル（負にならない、2026-08-19 / W-152）。
+     *
+     * <p>{@link #getDurationDownStacks()} で短縮を別軸として扱う呪文専用。素の
+     * {@link #getDurationLevel()} は短縮の -1 も含むので、そちらと混ぜて使うと二重計上になる。
+     */
+    public int getExtendOnlyDurationLevel() { return Math.max(0, durationLevel); }
+
     /** 後方互換: 旧durationTicks互換。各Effectが自分で解釈すべき。 */
     public int getDurationTicks() { return durationLevel * 200; }
 

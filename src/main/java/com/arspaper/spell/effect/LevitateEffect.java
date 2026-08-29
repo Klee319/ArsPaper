@@ -40,8 +40,14 @@ public class LevitateEffect implements SpellEffect {
         int level = Math.max(0, baseLevel + context.getAmplifyLevel());
         int baseDurationTicks = (int) config.getParam("levitate", "base-duration-ticks", DEFAULT_BASE_DURATION_TICKS);
         int durationBonusTicks = (int) config.getParam("levitate", "duration-bonus-ticks", DEFAULT_DURATION_BONUS_TICKS);
-        int durationTicks = Math.max(1,
-            baseDurationTicks + context.getDurationLevel() * durationBonusTicks);
+        // 短縮(2026-08-19 / W-152): 「打ち上げを低く抑える」用。共通軸(短縮2個で-1レベル)は
+        // max-augments.duration_down = 1 のこの呪文では一度も効かないので、短縮だけ独立軸にした。
+        // 延長は getExtendOnlyDurationLevel() で受ける(素の durationLevel だと二重計上)。
+        int durationPerDown = (int) config.getParam("levitate", "duration-ticks-per-duration-down", 25.0);
+        int minDurationTicks = Math.max(1, (int) config.getParam("levitate", "min-duration-ticks", 20.0));
+        int durationTicks = com.arspaper.spell.SpellDurationMath.resolve(baseDurationTicks,
+            context.getExtendOnlyDurationLevel(), durationBonusTicks,
+            context.getDurationDownStacks(), durationPerDown, minDurationTicks);
 
         target.addPotionEffect(
             new PotionEffect(PotionEffectType.LEVITATION, durationTicks, level, false, true, true));

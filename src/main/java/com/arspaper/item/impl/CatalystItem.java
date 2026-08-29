@@ -64,7 +64,11 @@ public class CatalystItem extends BaseCustomItem {
 
             List<Component> lore = new ArrayList<>();
             for (String line : data.lore()) {
-                lore.add(Component.text(line, NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                // yml の色指定(& / MiniMessage)を尊重し、無ければ従来どおり灰色。
+                // 素の Component.text(生文字列) で包むとタグがそのまま画面に出る(2026-08-18 W-96)。
+                lore.add(com.arspaper.util.DisplayText.component(line)
+                        .colorIfAbsent(NamedTextColor.GRAY)
+                        .decoration(TextDecoration.ITALIC, false));
             }
             lore.add(Component.text("最大バインドティア: " + data.maxBindTier(), NamedTextColor.DARK_GRAY)
                 .decoration(TextDecoration.ITALIC, false));

@@ -139,29 +139,29 @@ class ShippedSourceLadderTest {
         }
     }
 
+    /** 無印を含む生成量倍率。2026-08-29 (W-277) の指定列。転送は W-257 の ×5 のまま。 */
+    private static final double[] YIELD_LADDER = {2.0, 3.0, 6.0, 9.0, 18.0, 27.0, 54.0, 81.0, 162.0};
+
     @Test
-    @DisplayName("生成量倍率は段ごとにちょうど2倍、転送レート倍率は段ごとにちょうど5倍")
+    @DisplayName("生成量倍率は指定列、転送レート倍率は段ごとにちょうど5倍")
     void multipliersFollowTheirOwnLadders() {
-        // 2026-08-25 (W-257): 2つの倍率を同率(x2)で伸ばすのをやめた。
-        // 同率だと「生成に対して排出が何倍か」が階梯で一切変わらないので、
-        // 上位リンクにしても“焼べても入り切らない”比率が永久に残る。
-        // ユーザー確定要件は「割合ではなく階梯ごとに転送量を増やす(tier1=100/20tick なら
-        // tier2=500/20tick)」＝転送だけ x5 にして、生成は既存の x2 のまま据え置く。
+        // 2026-08-25 (W-257): 転送だけ x5。2026-08-29 (W-277): 生成は 2,3,6,9,…,162。
+        // ※一時的に転送も同列へ寄せた版が出たが、転送＝生成だとバッファが再び詰まるので戻した。
         ConfigurationSection items = items();
-        for (String key : List.of("transfer-multiplier", "yield-multiplier")) {
-            double step = "transfer-multiplier".equals(key) ? 5.0 : 2.0;
-            for (String type : TYPES) {
-                double expected = BASE_MULTIPLIER;
-                String base = type + "_sourcelink";
-                assertEquals(expected, items.getDouble(base + "." + key), 1e-9,
-                        base + " (無印) の " + key + " がずれている");
-                for (String tier : TIERS) {
-                    expected *= step;
-                    String id = base + "_" + tier;
-                    assertEquals(expected, items.getDouble(id + "." + key), 1e-9,
-                            id + " の " + key + " が 1段ごとに x" + step + " の並びからずれている。"
-                                    + "1段でも外すと階梯全体の伸びが崩れる");
-                }
+        for (String type : TYPES) {
+            String base = type + "_sourcelink";
+            assertEquals(BASE_MULTIPLIER, items.getDouble(base + ".transfer-multiplier"), 1e-9,
+                    base + " (無印) の transfer-multiplier がずれている");
+            assertEquals(YIELD_LADDER[0], items.getDouble(base + ".yield-multiplier"), 1e-9,
+                    base + " (無印) の yield-multiplier がずれている");
+            double expectedTransfer = BASE_MULTIPLIER;
+            for (int i = 0; i < TIERS.size(); i++) {
+                expectedTransfer *= 5.0;
+                String id = base + "_" + TIERS.get(i);
+                assertEquals(expectedTransfer, items.getDouble(id + ".transfer-multiplier"), 1e-9,
+                        id + " の transfer-multiplier が 1段ごとに x5 の並びからずれている");
+                assertEquals(YIELD_LADDER[i + 1], items.getDouble(id + ".yield-multiplier"), 1e-9,
+                        id + " の yield-multiplier が指定列 2,3,6,9,18,27,54,81,162 からずれている");
             }
         }
     }
@@ -193,6 +193,39 @@ class ShippedSourceLadderTest {
                         id + " で「排出÷生成」の比が前の段より下がっている。"
                                 + "階梯を上げるほど詰まりが解消される並びであること");
                 previousRatio = ratio;
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("説明文の倍率が transfer/yield の実値と一致する")
+    void loreMultipliersMatchConfigValues() {
+        // 2026-08-29: yield を張り替えたあと lore が旧 2^n 表記のままだった。
+        ConfigurationSection items = items();
+        Pattern loreRate = Pattern.compile("転送レート x([0-9.]+) / 生成量 x([0-9.]+)");
+        for (String type : TYPES) {
+            List<String> ids = new ArrayList<>();
+            ids.add(type + "_sourcelink");
+            for (String tier : TIERS) {
+                ids.add(type + "_sourcelink_" + tier);
+            }
+            for (String id : ids) {
+                ConfigurationSection entry = items.getConfigurationSection(id);
+                assertNotNull(entry, id + " が無い");
+                String matchLine = null;
+                for (String line : entry.getStringList("lore")) {
+                    if (loreRate.matcher(line).find()) {
+                        matchLine = line;
+                        break;
+                    }
+                }
+                assertNotNull(matchLine, id + " の lore に転送レート行が無い");
+                var m = loreRate.matcher(matchLine);
+                assertTrue(m.find());
+                assertEquals(entry.getDouble("transfer-multiplier"), Double.parseDouble(m.group(1)), 1e-9,
+                        id + " の lore 転送倍率が transfer-multiplier と違う: " + matchLine);
+                assertEquals(entry.getDouble("yield-multiplier"), Double.parseDouble(m.group(2)), 1e-9,
+                        id + " の lore 生成倍率が yield-multiplier と違う: " + matchLine);
             }
         }
     }

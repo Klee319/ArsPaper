@@ -46,10 +46,11 @@ public final class ThreadType {
         0, 0, null, 0, 0, 0, 0, Material.STRING);
 
     // === マナ系 ===
+    // 数値の実体は TF item-stats。ここへ書くと editor に無い値がグレー lore と実行時に二重に乗る。
     public static final ThreadType MANA_REGEN = new ThreadType("mana_regen", "マナ回復速度上昇のスレッド", 300002, NamedTextColor.AQUA,
-        1, 0, null, 0, 0, 0, 0, Material.STRING);
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
     public static final ThreadType MANA_BOOST = new ThreadType("mana_boost", "マナ最大値上昇のスレッド", 300003, NamedTextColor.BLUE,
-        0, 20, null, 0, 0, 0, 0, Material.STRING);
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
 
     // === ポーション効果系 ===
     public static final ThreadType SPEED = new ThreadType("speed", "迅速のスレッド", 300004, NamedTextColor.WHITE,
@@ -71,13 +72,17 @@ public final class ThreadType {
 
     // === マナ回復系 ===
     public static final ThreadType HIT_MANA_RECOVERY = new ThreadType("hit_mana_recovery", "被弾マナ回復のスレッド", 300012, NamedTextColor.GOLD,
-        0, 0, null, 0, 0, 3, 0, Material.STRING);
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
     public static final ThreadType DAMAGE_MANA_RECOVERY = new ThreadType("damage_mana_recovery", "攻撃マナ回復のスレッド", 300013, NamedTextColor.DARK_RED,
-        0, 0, null, 0, 0, 0, 2, Material.STRING);
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
 
     // === 特殊系 ===
+    // costReduction は 0。軽減率の実体は TF item-stats (STRING#300014) が持ち、
+    // ArmorManaListener が ThreadManaStatRouting 経由で整数%へ写す。
+    // ここに 10 を残すと item-stats の 15% と二重に乗り、さらに percent-point 誤記(15)を
+    // ×100 すると 100% キャップ＝消費マナ1 になる。
     public static final ThreadType SPELL_COST_DOWN = new ThreadType("spell_cost_down", "詠唱効率のスレッド", 300014, NamedTextColor.YELLOW,
-        0, 0, null, 0, 10, 0, 0, Material.STRING);
+        0, 0, null, 0, 0, 0, 0, Material.STRING);
     public static final ThreadType FLIGHT = new ThreadType("flight", "飛行のスレッド", 300015, NamedTextColor.WHITE,
         0, 0, null, 0, 0, 0, 0, Material.STRING);
     public static final ThreadType BACKPACK = new ThreadType("backpack", "バックパックのスレッド", 300016, NamedTextColor.DARK_GREEN,
@@ -356,15 +361,10 @@ public final class ThreadType {
 
     /**
      * このスレッドの効果説明をComponent Loreとして返す。
+     * マナ数値は TF item-stats が持つのでここには出さない。
      */
     public List<Component> getEffectLore() {
         List<Component> lore = new ArrayList<>();
-        if (regenBonus > 0) {
-            lore.add(loreText("マナ回復速度 +" + regenBonus + "/tick", NamedTextColor.AQUA));
-        }
-        if (manaBonus > 0) {
-            lore.add(loreText("マナ最大値 +" + manaBonus, NamedTextColor.BLUE));
-        }
         if (potionEffect != null) {
             String effectName = switch (id) {
                 case "speed" -> "移動速度上昇";
@@ -380,15 +380,6 @@ public final class ThreadType {
                 default -> "ポーション効果";
             };
             lore.add(loreText(effectName + " (装備中常時)", NamedTextColor.GREEN));
-        }
-        if (hitManaRecovery > 0) {
-            lore.add(loreText("被弾時マナ回復 +" + hitManaRecovery, NamedTextColor.GOLD));
-        }
-        if (damageManaRecovery > 0) {
-            lore.add(loreText("攻撃時マナ回復 +" + damageManaRecovery, NamedTextColor.DARK_RED));
-        }
-        if (costReductionPercent > 0) {
-            lore.add(loreText("マナコスト -" + costReductionPercent + "%", NamedTextColor.YELLOW));
         }
         if (this == FLIGHT) {
             lore.add(loreText("エリトラ飛行 (装備中常時)", NamedTextColor.WHITE));

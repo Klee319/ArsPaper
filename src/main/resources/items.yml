@@ -25,35 +25,18 @@
 #     設定エディタの本ファイル用画面は ritual_effects: しか描画しないため、
 #     items: に置いたエントリは editor から見ることも編集することもできなかった
 #     (ユーザー報告「回生とマナ関連のエンチャント本の儀式レシピが消えている」の正体)。
-#     残る items: の2件(trident / エンチャントされた金リンゴ)も同じ理由で editor 非表示。
-#     どちらもバニラアイテムを結果に持つレシピで「特殊アイテム」画面の対象外なので、
-#     移設せず reports/ACTIVE_RECORD.md の残タスクとして追跡する。
-
-items:
-  trident:
-    recipe:
-      method: workbench
-      type: shaped
-      shape:
-        - " CP"
-        - " AC"
-        - "D  "
-      ingredients:
-        P: PRISMARINE_SHARD
-        C: PRISMARINE_CRYSTALS
-        D: DIAMOND_BLOCK
-        A: COPPER_BLOCK
-      result: TRIDENT
-  エンチャントされた金リンゴ:
-    recipe:
-      method: ritual
-      core-item: APPLE
-      pedestal-items:
-        - GOLD_BLOCK x4
-        - TOTEM_OF_UNDYING x2
-        - NETHERITE_INGOT x2
-      source: 3000
-      result: ENCHANTED_GOLDEN_APPLE
+#
+# 注(2026-08-25): items: に最後まで残っていた2件(trident / エンチャントされた金リンゴ)は
+#     TrinityForge 側 progression/crafting-features.yml の added-recipes: (「その他のギミック」＝
+#     バニラレシピ追加の枠)へ移設した。同じ理由(editor が items: を描画できない)に加えて、
+#     どちらもバニラの Material 結果でカタログ識別を持たないため added-recipes の対象そのものだった
+#     (ArsPaper 独自のカタログ/儀式システムを使う理由が無かった)。
+#     ⚠ items: キー自体は消さないこと。空マップ({}) にしておかないと
+#     UnifiedRecipeLoader#loadItemsYml は getConfigurationSection("items") が null になり
+#     単に読み飛ばすだけで実害は無いが、EnchantBookDisplayOverrideTest 等いくつかのテストは
+#     items.yml の items: セクションが「マップとして存在する」前提で読んでいるため、
+#     キーごと消すとそちらが壊れる。
+items: {}
 ritual_effects:
   weather_clear:
     name: 晴天の儀式

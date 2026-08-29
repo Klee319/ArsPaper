@@ -89,7 +89,11 @@ public class ThreadItem extends BaseCustomItem {
             meta.getPersistentDataContainer().set(
                 ItemKeys.THREAD_ITEM_TYPE, PersistentDataType.STRING, threadType.getId()
             );
+            // catalog の bind-type を PDC へ写す(rollSeed は書かない ── W-53)。
+            // SOULBOUND なら PickupQualityListener / ThreadSoulbindListener が入手時に所有者を付ける。
+            TrinityForgeBridge.applyCatalogBindType(meta, getItemId());
             meta.lore(fullLore(meta, threadType, identity));
+            meta.setMaxStackSize(1);
         });
         return item;
     }
@@ -122,6 +126,39 @@ public class ThreadItem extends BaseCustomItem {
         item.editMeta(meta -> {
             TrinityForgeBridge.writeItemRoll(meta, rollSeed, quality);
             meta.lore(fullLore(meta, threadType, identity));
+            meta.setMaxStackSize(1);
+        });
+        return true;
+    }
+
+    /**
+     * 既存スレッドの lore を、今の {@code item-stats.yml} / セット効果表で組み直す。
+     * {@link #restampWithQuality} と違い <b>rollSeed も quality も新規発番しない</b>
+     * （品質と pt を維持したまま、主軸変更やセット閾値の折り込みを既存個体へ届ける）。
+     *
+     * <p>TF {@code ItemRefreshListener} が reflection で呼ぶ契約。汎用
+     * {@code ItemAssembler#assemble} をスレッドへ通すと専用 lore が壊れるので、
+     * テーブル世代が古くなったときの更新は必ずこちらへ委譲する。
+     *
+     * @return lore を組み直したら {@code true}。未刻印・効果なし・メタ無しは {@code false}。
+     */
+    public boolean refreshLoreKeepingIdentity(ItemStack item) {
+        if (item == null || !item.hasItemMeta() || !threadType.hasEffect()) {
+            return false;
+        }
+        com.trinityforge.pdc.ItemData data;
+        try {
+            data = com.trinityforge.pdc.ItemData.of(item.getItemMeta());
+        } catch (Throwable tfMissing) {
+            return false;
+        }
+        if (!data.hasRollSeed()) {
+            return false;
+        }
+        ThreadIdentity identity = new ThreadIdentity(data.rollSeed().orElse(0L), data.quality());
+        item.editMeta(meta -> {
+            meta.lore(fullLore(meta, threadType, identity));
+            meta.setMaxStackSize(1);
         });
         return true;
     }
@@ -129,7 +166,8 @@ public class ThreadItem extends BaseCustomItem {
     /**
      * スレッドアイテムの lore <b>全体</b>を組む。スレッドの lore を書き換える経路は
      * 生成({@link #createItemStack(Player)})・返却({@code ThreadGui#restoreRoll})・
-     * 振り直し({@code ThreadRerollRitualEffect})の3つあり、<b>全部この1本でまるごと組み直す</b>。
+     * 振り直し({@code ThreadRerollRitualEffect})・表更新({@link #refreshLoreKeepingIdentity})の
+     * 4つあり、<b>全部この1本でまるごと組み直す</b>。
      *
      * <p><b>部分書き換え(「前回の行を内容一致で消してから足す」)へ戻さないこと</b>:
      * ステ部分は装備と同じ体裁になり幅可変の区切り線を含む(2026-08-05 の要望)。区切り線の幅は
@@ -217,8 +255,8 @@ public class ThreadItem extends BaseCustomItem {
      * 設定エディタで lore を手書きして補う運用は<b>採らない</b> —— 手書きは thread-sets.yml を
      * 直した瞬間に嘘になり、しかも嘘になったことに誰も気づけないため。ここで毎回<b>設定から生成</b>する。
      *
-     * <p>体裁: しきい値ごとに「N個以上」の見出し + そのしきい値<b>単体</b>のステ行
-     * (累積合計ではない ── 累積を出すと読み手が段差を暗算する羽目になる)。ステ行の整形は
+     * <p>体裁: 「セット効果」見出しのあと、しきい値ごとに「Nセット」と
+     * 全角スペースでインデントしたステ行（累積合計ではない）。ステ行の整形は
      * {@link TrinityForgeBridge#threadSetStatLore} 経由で TF の {@code LoreComposer} へ丸投げするので、
      * 表示名・アイコン・桁数・単位・色・カテゴリ順・乗算行({@code x1.10})はすべて装備 lore と一致する。
      *
@@ -249,17 +287,19 @@ public class ThreadItem extends BaseCustomItem {
             if (statLines.isEmpty()) {
                 continue;
             }
-            body.add(Component.text("  " + count + "個以上", NamedTextColor.YELLOW)
+            body.add(Component.text(count + "セット", NamedTextColor.YELLOW)
                 .decoration(TextDecoration.ITALIC, false));
-            body.addAll(statLines);
+            for (Component line : statLines) {
+                body.add(Component.text("　")
+                    .decoration(TextDecoration.ITALIC, false)
+                    .append(line));
+            }
         }
         if (body.isEmpty()) {
             return List.of();
         }
         lore.add(Component.text("セット効果", NamedTextColor.GOLD)
-            .decoration(TextDecoration.ITALIC, false)
-            .append(Component.text(" (同じ種類を装備した合計本数)", NamedTextColor.DARK_GRAY)
-                .decoration(TextDecoration.ITALIC, false)));
+            .decoration(TextDecoration.ITALIC, false));
         lore.addAll(body);
         return lore;
     }

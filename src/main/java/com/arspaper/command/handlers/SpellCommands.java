@@ -3,6 +3,7 @@ package com.arspaper.command.handlers;
 import com.arspaper.ArsPaper;
 import com.arspaper.item.ItemKeys;
 import com.arspaper.spell.GlyphNames;
+import com.arspaper.spell.SpellBindTargeting;
 import com.arspaper.spell.SpellAugment;
 import com.arspaper.spell.SpellComponent;
 import com.arspaper.spell.SpellEffect;
@@ -28,8 +29,8 @@ public final class SpellCommands {
     private SpellCommands() {}
 
     public static int executeSpellBind(ArsPaper plugin, Player player, int slot) {
-        // オフハンドまたはホットバー9番スロットからバインド対象を検索
-        ItemStack offhand = findBindTarget(player);
+        // オフハンドに何かあれば常にオフハンド。空のときだけホットバー9枠目。
+        ItemStack offhand = SpellBindTargeting.occupiedTarget(player);
         if (offhand == null) {
             player.sendMessage(Component.text("オフハンドまたはホットバー9番スロットにバインド先のアイテムを持ってください", NamedTextColor.RED));
             return 0;
@@ -67,31 +68,13 @@ public final class SpellCommands {
         return com.arspaper.spell.SpellBindListener.bindSpell(player, offhand, mainHand, idx, slots.get(idx)) ? 1 : 0;
     }
 
-    /**
-     * バインド対象アイテムを検索。オフハンド → ホットバースロット8(固定)。
-     */
-    private static ItemStack findBindTarget(Player player) {
-        ItemStack offhand = player.getInventory().getItemInOffHand();
-        if (!offhand.getType().isAir()) return offhand;
-        ItemStack slot8 = player.getInventory().getItem(8);
-        if (slot8 != null && !slot8.getType().isAir()) {
-            if (!slot8.hasItemMeta()) return slot8;
-            String customId = slot8.getItemMeta().getPersistentDataContainer()
-                .get(com.arspaper.item.ItemKeys.CUSTOM_ITEM_ID, org.bukkit.persistence.PersistentDataType.STRING);
-            if (customId == null || (!customId.contains("spell_book") && !customId.contains("wand"))) {
-                return slot8;
-            }
-        }
-        return null;
-    }
-
     public static int executeSpellUnbind(Player player) {
-        ItemStack mainHand = player.getInventory().getItemInMainHand();
-        if (mainHand.getType().isAir()) {
-            player.sendMessage(Component.text("バインド解除するアイテムを手に持ってください", NamedTextColor.RED));
+        ItemStack target = com.arspaper.spell.SpellBindTargeting.occupiedTarget(player);
+        if (target == null) {
+            player.sendMessage(Component.text("オフハンドまたはホットバー9番スロットにバインド解除するアイテムを持ってください", NamedTextColor.RED));
             return 0;
         }
-        return com.arspaper.spell.SpellBindListener.unbindSpell(player, mainHand) ? 1 : 0;
+        return com.arspaper.spell.SpellBindListener.unbindSpell(player, target) ? 1 : 0;
     }
 
     public static int executeSpellList(ArsPaper plugin, Player player) {

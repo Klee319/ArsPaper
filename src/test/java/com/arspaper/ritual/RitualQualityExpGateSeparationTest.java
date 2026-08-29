@@ -80,33 +80,54 @@ class RitualQualityExpGateSeparationTest {
     }
 
     /**
-     * 2026-08-04 実サーバ報告「Ars鍛冶で作ったものが手に持つまでステータスがつかない」の回帰テスト。
+     * 2026-08-18 実サーバ報告 W-85「儀式で作成者より先に他のプレイヤーが拾うと所有権が最初に拾った
+     * プレイヤーになる」の回帰テスト。
      *
-     * <p><b>真因</b>: {@code stampCraftedQuality} は儀式時点で rollSeed+quality を PDC へ
-     * {@code writeItemRoll} で書くだけで、TF の {@code ItemFactory#stamp}(lore/属性のフル再組み立て)を
-     * 呼んでいなかった。そのため「品質は入っているのにステータスが表示されない」まま台座にドロップされ、
-     * 手に持って別の refresh 経路が走るまでステータスが出なかった。さらに台座の成果物は
-     * <b>誰が回収するか儀式時点では確定しない</b>ので、儀式実行者のステで焼き込むのは仕様としても誤り。
+     * <p><b>経緯</b>: 2026-08-04 版は「品質未決定」マーカーだけを刻んで台座へドロップし、実際の
+     * 品質ロールと SOULBOUND 所有者を TF の {@code PickupQualityListener} が<b>最初にインベントリへ
+     * 入ったプレイヤー</b>で決めていた。ドロップアイテムは近くにいる誰でも歩くだけで拾えるため、
+     * 実サーバでは儀式を行った本人より先に他人が拾い、他人の魔法鍛冶レベルで品質が決まっていた。
      *
-     * <p>修正後は「品質未決定」マーカーだけを刻み、TF の {@code PickupQualityListener} が
-     * 最初にインベントリへ入ったプレイヤーのステでロールしてフル再組み立てする。
-     * ここでは<b>境界の向き</b>(儀式時点で焼かない／マーカーを刻む)だけを固定する。
+     * <p><b>現在の仕様</b>(ユーザ決定 2026-08-18「誰でも回収可・品質は実行者基準」): 品質と所有者は
+     * 儀式完了時に<b>実行者のステータスで確定</b>させる({@code RitualCraftFinalizer})。回収は
+     * コアの右クリックで誰でもできるが、中身はもう変わらない。実行者は儀式を発動した直後なので
+     * 必ずオンラインで、決定を後回しにする理由が無い。
+     *
+     * <p>2026-08-04 の「手に持つまでステータスがつかない」不具合の再発防止
+     * ({@code writeItemRoll} で PDC だけ書かない)も併せて維持する。
      */
     @Test
-    @DisplayName("儀式時点では品質を焼かず「未決定」マーカーだけ刻む(品質は回収者のステで決まる)")
-    void ritualDefersQualityRollToThePicker() throws Exception {
+    @DisplayName("儀式の品質・所有者は実行者のステータスでその場で確定する(拾い主では決めない)")
+    void ritualResolvesQualityFromThePerformer() throws Exception {
         String source = flattened("src/main/java/com/arspaper/integration/TrinityForgeBridge.java");
 
         int start = source.indexOf("public static void stampCraftedQuality(");
         assertTrue(start >= 0, "stampCraftedQuality が見つからない");
-        String body = source.substring(start, Math.min(source.length(), start + 700));
+        String body = source.substring(start, Math.min(source.length(), start + 2000));
 
-        assertTrue(body.contains("markPendingCraftQuality"),
-                "儀式成果物に「品質未決定」マーカーを刻んでいない。刻まないと回収者のステで"
-                        + "品質を決める TF 側経路(PickupQualityListener)が起動しない。");
+        assertTrue(body.contains("finalizeForPerformer(item, crafter)"),
+                "儀式成果物を実行者(crafter)基準で確定させていない。TF の RitualCraftFinalizer へ"
+                        + "crafter を渡さないと、品質と SOULBOUND 所有者が「最初に拾ったプレイヤー」で"
+                        + "決まる W-85 が再発する。");
         assertFalse(body.contains("writeItemRoll"),
                 "儀式時点で rollSeed+quality を焼いている。PDCだけ書いても lore/属性は再組み立て"
                         + "されないので「手に持つまでステータスがつかない」不具合が再発する。");
+    }
+
+    /**
+     * W-85 の後半: 成果物を<b>ドロップせずコアへ載せて</b>右クリック回収させる。ドロップのままだと
+     * 品質を実行者で固定しても「作った本人が受け取れない」体験が残る(近くにいた別プレイヤーが
+     * 歩くだけで持って行ける)。コアに載っていればロストもしない ──
+     * {@code RitualCore#onBlockBroken} がコアの中身を落とすため。
+     */
+    @Test
+    @DisplayName("craft儀式の成果物はコアへ載せて右クリック回収させる(ドロップ一本道にしない)")
+    void ritualCraftResultIsPlacedOnTheCore() throws Exception {
+        String source = flattened("src/main/java/com/arspaper/ritual/RitualManager.java");
+
+        assertTrue(source.contains("RitualCore.setStoredItem(revalidateCore, result)"),
+                "儀式の成果物をコアへ載せていない。dropItemNaturally のままだと近くの別プレイヤーが"
+                        + "歩くだけで拾えてしまう(W-85)。");
     }
 
     private static String flattened(String relativePath) throws Exception {

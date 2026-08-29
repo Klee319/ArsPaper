@@ -63,7 +63,10 @@ public class CreativeSourceJar extends CustomBlock {
         Optional<SourceJarConfig.JarDef> def = jarDef();
         if (def.isPresent() && !def.get().lore().isEmpty()) {
             for (String line : def.get().lore()) {
-                lore.add(Component.text(line, NamedTextColor.LIGHT_PURPLE)
+                // yml の色指定(& / MiniMessage)を尊重し、無ければ従来どおり LIGHT_PURPLE。
+                // 素の Component.text(生文字列) で包むとタグがそのまま画面に出る(2026-08-18 W-96)。
+                lore.add(com.arspaper.util.DisplayText.component(line)
+                        .colorIfAbsent(NamedTextColor.LIGHT_PURPLE)
                         .decoration(TextDecoration.ITALIC, false));
             }
         } else {

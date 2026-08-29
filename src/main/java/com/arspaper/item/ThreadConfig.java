@@ -100,6 +100,8 @@ public class ThreadConfig {
     private final Map<String, Integer> manaMaxPercent = new HashMap<>();
     private final Map<String, Integer> regenPercent = new HashMap<>();
     private final Map<String, Integer> backpackSlots = new HashMap<>();
+    /** threads.yml の {@code max-inventory-slots:}（1装備あたりのバックパック総枠上限）。 */
+    private final Map<String, Integer> backpackMaxInventorySlots = new HashMap<>();
     /** threads.yml の {@code potion-effect:}(明示指定)。"none" はここに入れず {@link #potionNone} へ。 */
     private final Map<String, PotionEffectType> potionEffectOverride = new HashMap<>();
     /** threads.yml で {@code potion-effect: none} と明示されたスレッド(効果なしの明示)。 */
@@ -132,6 +134,7 @@ public class ThreadConfig {
         manaMaxPercent.clear();
         regenPercent.clear();
         backpackSlots.clear();
+        backpackMaxInventorySlots.clear();
         potionEffectOverride.clear();
         potionNone.clear();
         potionLevel.clear();
@@ -197,6 +200,9 @@ public class ThreadConfig {
             }
             if (section.contains("slots")) {
                 backpackSlots.put(key, section.getInt("slots"));
+            }
+            if (section.contains("max-inventory-slots")) {
+                backpackMaxInventorySlots.put(key, Math.max(1, section.getInt("max-inventory-slots")));
             }
             // potion-effect: バニラ PotionEffectType 名を小文字にしたid。"none" は明示的な無効化、
             // 未知/有害/即時系のidは警告ログを出してenum既定値へフォールバックする(起動は止めない)。
@@ -304,29 +310,29 @@ public class ThreadConfig {
         return maxStack.getOrDefault(threadId, ThreadApplicationPolicy.DEFAULT_MAX_STACK);
     }
 
-    /** マナリジェンボーナス */
+    /** マナリジェンボーナス。yml 未記載なら 0（enum 既定へ落とさない）。 */
     public int getRegenBonus(ThreadType type) {
-        return regenBonus.getOrDefault(type.getId(), type.getRegenBonus());
+        return regenBonus.getOrDefault(type.getId(), 0);
     }
 
-    /** マナボーナス */
+    /** マナボーナス。yml 未記載なら 0（enum 既定へ落とさない）。 */
     public int getManaBonus(ThreadType type) {
-        return manaBonus.getOrDefault(type.getId(), type.getManaBonus());
+        return manaBonus.getOrDefault(type.getId(), 0);
     }
 
-    /** 被弾マナ回復 */
+    /** 被弾マナ回復。yml 未記載なら 0（enum 既定へ落とさない）。 */
     public int getHitManaRecovery(ThreadType type) {
-        return hitRecovery.getOrDefault(type.getId(), type.getHitManaRecovery());
+        return hitRecovery.getOrDefault(type.getId(), 0);
     }
 
-    /** 攻撃マナ回復 */
+    /** 攻撃マナ回復。yml 未記載なら 0（enum 既定へ落とさない）。 */
     public int getDamageManaRecovery(ThreadType type) {
-        return damageRecovery.getOrDefault(type.getId(), type.getDamageManaRecovery());
+        return damageRecovery.getOrDefault(type.getId(), 0);
     }
 
-    /** マナコスト削減% */
+    /** マナコスト削減%。yml 未記載なら 0（enum 既定へ落とさない）。 */
     public int getCostReduction(ThreadType type) {
-        return costReduction.getOrDefault(type.getId(), type.getCostReductionPercent());
+        return costReduction.getOrDefault(type.getId(), 0);
     }
 
     /** マナ最大値%上昇（threads.yml mana-max-percent, 未設定=0） */
@@ -339,9 +345,21 @@ public class ThreadConfig {
         return regenPercent.getOrDefault(type.getId(), 0);
     }
 
-    /** バックパックスロット数 */
+    /** バックパックスロット数（1本あたり。未設定=27）。 */
     public int getBackpackSlots(ThreadType type) {
         return backpackSlots.getOrDefault(type.getId(), 27);
+    }
+
+    /**
+     * 1装備あたりのバックパック総枠上限。未設定なら {@code slots × max}（従来の 27×2=54）。
+     */
+    public int getBackpackMaxInventorySlots(ThreadType type) {
+        Integer configured = backpackMaxInventorySlots.get(type.getId());
+        if (configured != null) {
+            return Math.max(1, configured);
+        }
+        int per = getBackpackSlots(type);
+        return Math.max(per, per * Math.max(1, getMaxStack(type.getId())));
     }
 
     /**
@@ -412,29 +430,15 @@ public class ThreadConfig {
 
     /**
      * ThreadConfigの値を反映したloreを生成する。
-     * ThreadType.getEffectLore()はEnum定数値を使うため、YAMLオーバーライドが反映されない。
+     * マナ数値のグレー行は出さない（TF item-stats の装備体裁が正）。
+     * フレーバーは threads.yml {@code lore:} の先頭1行を紫で固定する。
      */
     public java.util.List<net.kyori.adventure.text.Component> getEffectLore(ThreadType type) {
         java.util.List<net.kyori.adventure.text.Component> lore = new java.util.ArrayList<>();
 
-        int regen = getRegenBonus(type);
-        if (regen > 0) {
-            lore.add(loreText("マナ回復速度 +" + regen + "/tick"));
-        }
-        int mana = getManaBonus(type);
-        if (mana > 0) {
-            lore.add(loreText("マナ最大値 +" + mana));
-        }
-        // mana-max-percent / regen-percent は ThreadConfig も ManaManager も配線済みなのに
-        // lore を1行も出していなかった(＝出荷 threads.yml に1件も無かったので露見しなかった)。
-        // 割合版スレッドを入れる以上、ここを書かないと「効いているのに説明が無い」ままになる。
-        int manaPercent = getManaMaxPercent(type);
-        if (manaPercent > 0) {
-            lore.add(loreText("マナ最大値 +" + manaPercent + "%"));
-        }
-        int regenPct = getRegenPercent(type);
-        if (regenPct > 0) {
-            lore.add(loreText("マナ回復速度 +" + regenPct + "%"));
+        java.util.List<String> extra = getExtraLore(type);
+        if (!extra.isEmpty()) {
+            lore.add(flavorLine(extra.get(0)));
         }
         // config優先(getPotionEffect)で解決する: potion-effect: none 明示ならここは何も出さず、
         // potion-effect: <id> 明示ならその型で、どちらも無ければ ThreadType enum の既定値で出す。
@@ -447,18 +451,6 @@ public class ThreadConfig {
             String levelSuffix = level >= 2 ? " " + romanNumeral(level) : "";
             lore.add(loreText(effectName + levelSuffix + " (装備中常時)"));
         }
-        int hit = getHitManaRecovery(type);
-        if (hit > 0) {
-            lore.add(loreText("被弾時マナ回復 +" + hit));
-        }
-        int dmg = getDamageManaRecovery(type);
-        if (dmg > 0) {
-            lore.add(loreText("攻撃時マナ回復 +" + dmg));
-        }
-        int cost = getCostReduction(type);
-        if (cost > 0) {
-            lore.add(loreText("マナコスト -" + cost + "%"));
-        }
         if (isFlightThread(type)) {
             lore.add(loreText("エリトラ飛行 (装備中常時)"));
         }
@@ -466,13 +458,20 @@ public class ThreadConfig {
             int slots = getBackpackSlots(type);
             lore.add(loreText("追加インベントリ " + slots + "スロット"));
         }
-        // 汎用フォールバック: 効果の実体が thread-sets.yml 側にあるスレッドは上のどの分岐にも
-        // 引っかからないので、ここで threads.yml の lore: をそのまま出す。これが無いと
-        // 「説明文が1行も無いスレッド」になり、種類を増やすたびに Java の switch を足す羽目になる。
-        for (String line : getExtraLore(type)) {
-            lore.add(loreText(line));
-        }
         return lore;
+    }
+
+    /**
+     * フレーバー1行。色は紫固定。yml の MiniMessage / レガシー色は剥がす。
+     */
+    private static net.kyori.adventure.text.Component flavorLine(String text) {
+        String plain = DisplayText.plain(text);
+        if (plain == null || plain.isBlank()) {
+            return net.kyori.adventure.text.Component.empty();
+        }
+        return net.kyori.adventure.text.Component.text(plain,
+                        net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE)
+                .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false);
     }
 
     /**
@@ -493,9 +492,8 @@ public class ThreadConfig {
      * これは「yml の生文字列を Component にする唯一の入口」として既にあるもので、
      * レガシー {@code &} 記法と MiniMessage のどちらで書かれていても壊さない。
      *
-     * <p>灰色は {@code colorIfAbsent} で当てる。ハードコードされた効果説明(色指定なし)は従来どおり
-     * 灰色になり、yml 側が明示した色はそのまま生きる。<b>{@code color()} で塗ると
-     * yml の色指定を上書きしてしまう</b>ので使わないこと。
+     * <p>灰色は {@code colorIfAbsent} で当てる。ポーション／飛行／バックパックの機構行専用。
+     * フレーバーは {@link #flavorLine} が紫で塗る。
      */
     private static net.kyori.adventure.text.Component loreText(String text) {
         return DisplayText.component(text)

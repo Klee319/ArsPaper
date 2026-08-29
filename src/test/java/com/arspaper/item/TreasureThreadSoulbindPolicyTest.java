@@ -13,7 +13,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * W-259「ダンジョン産スレッドだけを魂縛する」の判定と<b>配線</b>を固定する。
+ * W-259 スレッド魂縛の判定と<b>配線</b>を固定する。対象は catalog の bind-type
+ * （作れる種は TRADEABLE、作れない種は SOULBOUND）。CMD 帯は TF 未ロード時のフォールバック。
  *
  * <p>純関数の検査だけだと「policy は正しいが誰も呼んでいない」で緑になる ──
  * 実際、TF 側の {@code PickupQualityListener} は PDC の都合でこの10種に一度も発火しない。
@@ -33,19 +34,18 @@ class TreasureThreadSoulbindPolicyTest {
      * {@code ThreadType.java} のソース走査で代替する。
      */
     @Test
-    @DisplayName("魂縛はトレジャースレッド(CMD 300070-300079)だけ ── 儀式で作れる枠は縛らない")
+    @DisplayName("CMD フォールバックはトレジャー帯(300070-300079)だけ — TF 未ロード時用")
     void onlyTreasureThreadsAreSoulbound() {
-        // ユーザー確定要件「ダンジョンドロップ品のみ魂縛し、それ以外はしない」。
-        // 儀式で作れる枠まで縛ると交易が死ぬので、ここを広げるのは要件超過。
+        // catalog の bind-type が正。こちらは TrinityForge が居ないときの後方互換。
         assertTrue(TreasureThreadSoulbindPolicy.isSoulboundCmd(300070), "渦動 = 帯の下限(含む)");
         assertTrue(TreasureThreadSoulbindPolicy.isSoulboundCmd(300079), "護法 = 帯の上限(含む)");
 
         assertFalse(TreasureThreadSoulbindPolicy.isSoulboundCmd(300069),
-                "剛靭(300069)は儀式で作れる枠。帯の1つ手前という境界でもある");
+                "剛靭(300069)はトレジャー帯の外。帯の1つ手前という境界でもある");
         assertFalse(TreasureThreadSoulbindPolicy.isSoulboundCmd(300080),
-                "隠密(300080)は儀式で作れる枠。帯の1つ先という境界でもある");
+                "隠密(300080)はトレジャー帯の外。帯の1つ先という境界でもある");
         assertFalse(TreasureThreadSoulbindPolicy.isSoulboundCmd(300006),
-                "暗視(300006)は儀式で作れる枠なので縛らない");
+                "暗視(300006)はトレジャー帯の外");
         assertFalse(TreasureThreadSoulbindPolicy.isSoulbound(null),
                 "未知の id は縛らない(未知を弾くと設定ミスで装着不能になる)");
     }
@@ -78,6 +78,15 @@ class TreasureThreadSoulbindPolicyTest {
         assertTrue(plugin.contains("new com.arspaper.item.ThreadSoulbindListener()"),
                 "刻印リスナーが registerEvents されていない = 所有者が永久に付かない"
                         + "(ゲートは通るが誰も縛られない、という無言の無効化)");
+
+        String listener = read("src/main/java/com/arspaper/item/ThreadSoulbindListener.java");
+        assertTrue(listener.contains("InventoryCloseEvent"),
+                "チェスト取り出しは EntityPickupItemEvent を飛ばすので、閉じたときに刻印する経路が要る");
+        assertTrue(listener.contains("applyCatalogBindType")
+                        || listener.contains("catalogAutoStampsOwner")
+                        || read("src/main/java/com/arspaper/item/TreasureThreadSoulbindPolicy.java")
+                                .contains("catalogAutoStampsOwner"),
+                "魂縛対象は catalog の bind-type を読むこと(CMD 帯のハードコードだけだとエディタ設定が効かない)");
     }
 
     @Test
@@ -101,8 +110,11 @@ class TreasureThreadSoulbindPolicyTest {
         // 取り外しは createThreadItemStack で新品を作るので、書き戻さないと
         // 「挿して外す」だけで未刻印の個体が手に入る(魂縛の洗浄)。
         String gui = read("src/main/java/com/arspaper/gui/ThreadGui.java");
-        assertTrue(gui.contains("restoreSoulboundOwner(threadItem, ownerAt(slotIndex))"),
-                "取り外し時に所有者を書き戻していない = 挿して外すだけで魂縛を洗浄できる");
+        assertTrue(gui.contains("ownerAt(slotIndex)"),
+                "取り外し時に所有者を渡していない = 挿して外すだけで魂縛を洗浄できる");
+        String restore = read("src/main/java/com/arspaper/gui/SocketedThreadReturn.java");
+        assertTrue(restore.contains("restoreSoulboundOwner(threadItem, ownerUuid)"),
+                "SocketedThreadReturn が所有者を書き戻していない");
         assertTrue(gui.contains("setOwnerAt(slotIndex, threadOwner == null"),
                 "装着時に所有者を装備側へ写していない = 書き戻す元が無い");
     }

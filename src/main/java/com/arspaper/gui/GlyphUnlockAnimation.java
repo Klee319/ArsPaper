@@ -52,7 +52,10 @@ public class GlyphUnlockAnimation {
      * @param materials    消費する素材マップ（tryPayUnlockCostで検証済み）
      * @param levelCost    消費する経験値レベル
      * @param unlocked     現在のアンロック済みグリフセット（変更可能）
-     * @param saveCallback アンロック済みグリフを保存するコールバック
+     * @param saveCallback アンロック済みグリフを保存するコールバック。
+     *                     <b>解放が成立したときだけ {@code true} を返すこと。</b>
+     *                     経験値レベルの再検証などで失敗した場合に {@code false} を返させないと、
+     *                     解放していないのに最大マナだけ増える（2026-08-18 の点検で発見）。
      */
     public static void play(
             ArsPaper plugin,
@@ -62,7 +65,7 @@ public class GlyphUnlockAnimation {
             Map<com.arspaper.item.ItemCostRef, Integer> materials,
             int levelCost,
             Set<String> unlocked,
-            Runnable saveCallback
+            java.util.function.BooleanSupplier saveCallback
     ) {
         // 二重解放防止: アニメーション中は拒否
         if (!animatingPlayers.add(player.getUniqueId())) {
@@ -127,8 +130,16 @@ public class GlyphUnlockAnimation {
 
             @Override
             public void run() {
-                // エッジケース: プレイヤーがオフラインまたは遠すぎる → 素材返還
-                if (!player.isOnline() || player.getLocation().distanceSquared(center) > 400) {
+                // エッジケース: プレイヤーがオフライン / 別ワールドへ移動 / 遠すぎる → 素材返還
+                //
+                // ワールド判定を距離より先に置くのは必須。Location#distanceSquared は
+                // <b>ワールドが違うと IllegalArgumentException を投げる</b>ので、ネザーポータルを
+                // くぐられただけで毎tick例外になり、cancel も animatingPlayers の解除も
+                // ArmorStand の後始末も走らなくなる(素材は消費済みのまま、そのプレイヤーは
+                // 二度とグリフを解放できなくなる)。2026-08-18 の点検で発見。
+                if (!player.isOnline()
+                        || !center.getWorld().equals(player.getWorld())
+                        || player.getLocation().distanceSquared(center) > 400) {
                     // オンラインなら素材をインベントリ/足元に返還
                     if (player.isOnline()) {
                         for (var entry : materials.entrySet()) {
@@ -258,15 +269,22 @@ public class GlyphUnlockAnimation {
             Player player,
             SpellComponent component,
             Set<String> unlocked,
-            Runnable saveCallback
+            java.util.function.BooleanSupplier saveCallback
     ) {
-        // 経験値レベル消費はtryPayUnlockCostで既に行われている
+        // 経験値レベルの消費と再検証は saveCallback の中で行われる。
 
         // グリフをアンロック済みに追加。
         // 実際の永続化(saveCallback)は最新PDCを読み直してマージするため、ここでのsnapshot更新に依存しない
         // （アニメーション中の並行書込みを上書きしないようにするため）。
         unlocked.add(component.getId().toString());
-        saveCallback.run();
+        // 2026-08-18 の点検で発見: 保存側は経験値レベルの再検証に失敗すると素材を返して中断するが、
+        // 戻り値が無かったため、ここから下の「最大マナ+5」と「解放しました」が
+        // <b>解放していないのに毎回走っていた</b>。素材は返ってくるので、
+        // レベル不足のまま解放を押し続けるだけで最大マナを無限に増やせる経路になっていた。
+        if (!saveCallback.getAsBoolean()) {
+            unlocked.remove(component.getId().toString());
+            return;
+        }
 
         // グリフキャッシュを即時無効化（古いキャッシュで発動拒否されるのを防止）
         if (plugin.getSpellCaster() != null) {

@@ -111,7 +111,14 @@ public class ConjureWaterEffect implements SpellEffect {
                 // 一定時間後に水を消滅させる
                 int baseLifetime = (int) config.getParam("conjure_water", "base-water-lifetime", BASE_WATER_LIFETIME);
                 int lifetimePerDuration = (int) config.getParam("conjure_water", "water-lifetime-per-duration", WATER_LIFETIME_PER_DURATION);
-                int waterLifetime = baseLifetime + context.getDurationLevel() * lifetimePerDuration;
+                // 短縮(2026-08-19 / W-152): 「一時的に水を出してすぐ引かせる」用。共通軸(短縮2個で-1レベル)は
+                // max-augments.duration_down = 1 のこの呪文では一度も効かないので、短縮だけ独立軸にした。
+                // 延長は getExtendOnlyDurationLevel() で受ける(素の durationLevel だと二重計上)。
+                int lifetimePerDown = (int) config.getParam("conjure_water", "water-lifetime-per-duration-down", 60.0);
+                int minLifetime = Math.max(1, (int) config.getParam("conjure_water", "min-water-lifetime", 40.0));
+                int waterLifetime = com.arspaper.spell.SpellDurationMath.resolve(baseLifetime,
+                        context.getExtendOnlyDurationLevel(), lifetimePerDuration,
+                        context.getDurationDownStacks(), lifetimePerDown, minLifetime);
                 Location waterLoc = block.getLocation();
                 new BukkitRunnable() {
                     @Override

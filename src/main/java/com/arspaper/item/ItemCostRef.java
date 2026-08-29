@@ -75,7 +75,30 @@ public record ItemCostRef(String id, boolean custom) {
     }
 
     public boolean matches(ItemStack stack) {
-        return fromStack(stack).filter(this::equals).isPresent();
+        if (!fromStack(stack).filter(this::equals).isPresent()) {
+            return false;
+        }
+        // バニラ素材コストはプレーンな同材質だけ。エンチャント本やエンチャント付き装備を
+        // 筆記台が吸い込まないようにする（2026-08-29 実サーバ報告）。
+        return custom || isPlainVanillaIngredient(stack);
+    }
+
+    /**
+     * エンチャント（装備エンチャント／本の格納エンチャント）が付いているスタックは
+     * バニラ素材コストの支払い対象にしない。
+     */
+    static boolean vanillaCostRejectsEnchanted(boolean customCost, boolean hasEnchants,
+                                               boolean hasStoredEnchants) {
+        if (customCost) {
+            return false;
+        }
+        return hasEnchants || hasStoredEnchants;
+    }
+
+    private static boolean isPlainVanillaIngredient(ItemStack stack) {
+        boolean stored = stack.getItemMeta() instanceof org.bukkit.inventory.meta.EnchantmentStorageMeta meta
+                && !meta.getStoredEnchants().isEmpty();
+        return !vanillaCostRejectsEnchanted(false, !stack.getEnchantments().isEmpty(), stored);
     }
 
     /** 表示・返却用スタック。解決不能なら AIR。 */
@@ -121,9 +144,10 @@ public record ItemCostRef(String id, boolean custom) {
         return id;
     }
 
+    /** ホットバー＋メインのみ。装着中の防具・オフハンドは IRON_CHESTPLATE 等のコストに数えない。 */
     public int countIn(PlayerInventory inv) {
         int count = 0;
-        for (ItemStack slot : inv.getContents()) {
+        for (ItemStack slot : inv.getStorageContents()) {
             if (matches(slot)) {
                 count += slot.getAmount();
             }
@@ -131,15 +155,51 @@ public record ItemCostRef(String id, boolean custom) {
         return count;
     }
 
+    /**
+     * プレイヤーが実質保持している全数を数える。
+     *
+     * <p>ホットバー＋メインの36枠に加え、<b>カーソル上のアイテム</b>と
+     * <b>クラフト結果枠（作業台・インベントリクラフト）</b>も走査する。
+     * これらを見逃すと「結果枠に出したまま再度クラフト」でスレッドが重複作成できてしまう（W-269）。
+     */
     public int countIn(Player player) {
-        return countIn(player.getInventory());
+        int count = countIn(player.getInventory());
+
+        // カーソル上のアイテム(GUIドラッグ中 / インベントリ外に持ち出した状態)
+        ItemStack cursor = player.getItemOnCursor();
+        if (matches(cursor)) {
+            count += cursor.getAmount();
+        }
+
+        // 作業台/インベントリクラフトの結果枠(slot 0 of top inventory in CRAFTING/WORKBENCH view)
+        org.bukkit.inventory.InventoryView view = player.getOpenInventory();
+        if (view != null) {
+            org.bukkit.event.inventory.InventoryType topType = view.getTopInventory().getType();
+            if (topType == org.bukkit.event.inventory.InventoryType.CRAFTING
+                    || topType == org.bukkit.event.inventory.InventoryType.WORKBENCH) {
+                ItemStack resultSlot = view.getTopInventory().getItem(0);
+                if (matches(resultSlot)) {
+                    count += resultSlot.getAmount();
+                }
+            }
+            // 金床の出力スロット(slot 2)も見る
+            if (topType == org.bukkit.event.inventory.InventoryType.ANVIL) {
+                ItemStack anvilOut = view.getTopInventory().getItem(2);
+                if (matches(anvilOut)) {
+                    count += anvilOut.getAmount();
+                }
+            }
+        }
+
+        return count;
     }
 
-    /** インベントリから一致スタックを消費する。不足しても可能な分だけ減らす。 */
+    /** インベントリから一致スタックを消費する。不足しても可能な分だけ減らす。装着中の防具・オフハンドは対象外。 */
     public void removeFrom(PlayerInventory inv, int amount) {
         int remaining = amount;
-        for (int i = 0; i < inv.getSize() && remaining > 0; i++) {
-            ItemStack slot = inv.getItem(i);
+        ItemStack[] storage = inv.getStorageContents();
+        for (int i = 0; i < storage.length && remaining > 0; i++) {
+            ItemStack slot = storage[i];
             if (!matches(slot)) {
                 continue;
             }

@@ -3,6 +3,7 @@ package com.arspaper.gui;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
@@ -15,6 +16,35 @@ public class GuiListener implements Listener {
 
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
+        if (event.getInventory().getHolder(false) instanceof BackpackSelectHolder select) {
+            event.setCancelled(true);
+            if (event.getClickedInventory() == event.getInventory()
+                    && event.getWhoClicked() instanceof Player player) {
+                org.bukkit.inventory.ItemStack piece = select.pieceAt(event.getSlot());
+                if (piece != null) {
+                    BackpackGui.open(player, piece);
+                }
+            }
+            return;
+        }
+        if (event.getInventory().getHolder(false) instanceof BackpackHolder holder) {
+            ClickType click = event.getClick();
+            // プレイヤーインベントリ側のダブルクリック吸引は、clickedInventory が下段でも
+            // 上段のガラス／ナビを吸い取る。ロック枠クリック以外ではキャンセルしていなかった。
+            // COLLECT_TO_CURSOR は Paper 新しめの別名。Ars のコンパイル対象 API には無い。
+            if (click == ClickType.DOUBLE_CLICK || "COLLECT_TO_CURSOR".equals(click.name())) {
+                event.setCancelled(true);
+                return;
+            }
+            if (event.getClickedInventory() == event.getInventory()
+                    && BackpackGui.isLockedSlot(holder, event.getSlot())) {
+                event.setCancelled(true);
+                if (event.getWhoClicked() instanceof Player player) {
+                    BackpackGui.handleLockedClick(holder, player, event.getSlot());
+                }
+            }
+            return;
+        }
         if (!(event.getInventory().getHolder(false) instanceof BaseGui gui)) return;
         if (!(event.getWhoClicked() instanceof Player player)) return;
 
@@ -73,6 +103,15 @@ public class GuiListener implements Listener {
 
     @EventHandler
     public void onInventoryDrag(InventoryDragEvent event) {
+        if (event.getInventory().getHolder(false) instanceof BackpackHolder holder) {
+            for (int raw : event.getRawSlots()) {
+                if (BackpackGui.isLockedSlot(holder, raw)) {
+                    event.setCancelled(true);
+                    return;
+                }
+            }
+            return;
+        }
         if (event.getInventory().getHolder(false) instanceof BaseGui) {
             event.setCancelled(true);
         }
@@ -89,26 +128,22 @@ public class GuiListener implements Listener {
 
         // バックパックGUI: holder型（BackpackHolder）で判別し、装備中の防具PDCにデータ保存。
         // タイトル文字列一致は脆弱なため、holderにより堅牢に識別する。
-        if (event.getInventory().getHolder(false) instanceof BackpackHolder
+        if (event.getInventory().getHolder(false) instanceof BackpackHolder holder
                 && event.getPlayer() instanceof Player player) {
-            // getArmorContents()はコピーを返すため、直接スロットを参照して書き戻す
+            if (holder.isCloseSaveSuppressed()) {
+                return;
+            }
+            BackpackGui.saveFromHolder(holder, player);
+            org.bukkit.inventory.ItemStack armor = holder.getArmorItem();
             org.bukkit.inventory.PlayerInventory inv = player.getInventory();
-            org.bukkit.inventory.ItemStack[] armorSlots = {
-                inv.getHelmet(), inv.getChestplate(), inv.getLeggings(), inv.getBoots()
-            };
-            for (int s = 0; s < armorSlots.length; s++) {
-                org.bukkit.inventory.ItemStack armor = armorSlots[s];
-                if (armor != null && BackpackGui.countBackpackThreads(armor) > 0) {
-                    BackpackGui.saveBackpackContents(armor, event.getInventory());
-                    // editMetaで変更されたItemStackを装備スロットに書き戻す
-                    switch (s) {
-                        case 0 -> inv.setHelmet(armor);
-                        case 1 -> inv.setChestplate(armor);
-                        case 2 -> inv.setLeggings(armor);
-                        case 3 -> inv.setBoots(armor);
-                    }
-                    break;
-                }
+            if (inv.getHelmet() == armor) {
+                inv.setHelmet(armor);
+            } else if (inv.getChestplate() == armor) {
+                inv.setChestplate(armor);
+            } else if (inv.getLeggings() == armor) {
+                inv.setLeggings(armor);
+            } else if (inv.getBoots() == armor) {
+                inv.setBoots(armor);
             }
         }
     }

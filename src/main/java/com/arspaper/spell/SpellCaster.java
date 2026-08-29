@@ -380,7 +380,7 @@ public class SpellCaster {
         manaFlatReduction += (int) Math.round(com.arspaper.integration.TrinityForgeBridge.tfNonItemStatTotal(
                 caster, "mana_cost_reduction_flat"));
         int afterFlatReduction = Math.max(0, baseCost - manaFlatReduction);
-        int cost = Math.max(1, afterFlatReduction - (int) Math.round(afterFlatReduction * costReductionPercent / 100.0));
+        int cost = SpellManaCost.afterPercent(afterFlatReduction, costReductionPercent);
         if (!manaManager.consumeMana(caster, cost)) {
             // マナ不足通知が無効化されていなければメッセージ表示
             int notifyOff = caster.getPersistentDataContainer()
@@ -541,7 +541,10 @@ public class SpellCaster {
         }
         int next = damageable.getDamage() + amount;
         if (next >= maxDurability) {
+            org.bukkit.inventory.ItemStack broken = held.clone();
             setHeld(inventory, slot, null);
+            caster.getServer().getPluginManager().callEvent(
+                    new org.bukkit.event.player.PlayerItemBreakEvent(caster, broken));
             caster.playSound(caster, org.bukkit.Sound.ENTITY_ITEM_BREAK, 1.0f, 1.0f);
             return;
         }

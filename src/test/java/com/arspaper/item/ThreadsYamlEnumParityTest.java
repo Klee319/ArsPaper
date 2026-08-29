@@ -98,9 +98,7 @@ class ThreadsYamlEnumParityTest {
     @Test
     @DisplayName("数値キーを1つも持たないスレッドは threads.yml に lore を書いている")
     void effectlessThreadsCarryExplicitLore() {
-        // ThreadType#getEffectLore は regen-bonus/mana-bonus 等の数値からしか行を作らないので、
-        // 効果の実体が別所(thread-sets.yml のセット効果 / TF の item-stats.yml)にあるスレッドは
-        // lore: を書かないと説明文が0行になる。
+        // フレーバーは threads.yml の lore: 1行。empty 以外は必ず書く。
         ConfigurationSection threads = threadsSection();
         List<String> missing = new ArrayList<>();
         for (String key : threads.getKeys(false)) {
@@ -111,6 +109,12 @@ class ThreadsYamlEnumParityTest {
             }
             if (entry.getString("display_name") == null) {
                 missing.add(key + "(display_name が無い)");
+            }
+            if ("empty".equals(key)) {
+                continue;
+            }
+            if (!entry.contains("lore")) {
+                missing.add(key + "(lore が無い)");
             }
         }
         assertEquals(List.of(), missing, "threads.yml のエントリに最低限の情報が無い");

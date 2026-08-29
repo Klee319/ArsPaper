@@ -78,6 +78,12 @@ public final class ManaKeys {
      */
     public static final NamespacedKey SPELL_SCALE_END = new NamespacedKey(NAMESPACE, "spell_scale_end");
 
+    /**
+     * 拘束の終了時刻（エポックミリ秒）。跳躍・移動を属性修飾子で 0 にするため、
+     * スケール魔法と同じく参加時に読み直す（W-191）。
+     */
+    public static final NamespacedKey SPELL_SNARE_END = new NamespacedKey(NAMESPACE, "spell_snare_end");
+
     /** 累計マナ消費量（統計用） */
     public static final NamespacedKey TOTAL_MANA_CONSUMED = new NamespacedKey(NAMESPACE, "total_mana_consumed");
 

@@ -86,7 +86,6 @@ block-datapack-enchant-books: true
 
 pools:
 
-
   # ----------------------------------------------------------------------
   # T10_極上 — 18 本 (既存戦利品スコア 46.8〜84.1)
   # 既存の中身が最も豪華な帯。要塞跡の宝物庫・洋館・エンドの塔・上位ヴォールトなど。現実の芯と深部の鍵が最も厚い。
@@ -127,16 +126,14 @@ pools:
         chance: 0.055
       - item: custom:key_nether_wastes
         chance: 0.055
-      # --- 品質系スレッド。看板は等倍、隣接ティアは 1/3。ここに無い種はこのティアでは出ない
       - item: custom:thread_artisan
-        chance: 0.015
+        chance: 0.05
       - item: custom:thread_ritualist
-        chance: 0.005
-      # --- リセット系(極低確率)。2026-08-23: 1本につき2ティアまで
+        chance: 0.05
       - item: custom:skill_node_lock
-        chance: 0.008
+        chance: 0.01
       - item: custom:stat_reroll_ticket
-        chance: 0.008
+        chance: 0.01
       # --- モブ素材(浅/中/深の3帯へ分割済み)・ソース
       - item: custom:ravager_hide
         chance: 0.022
@@ -215,11 +212,10 @@ pools:
         chance: 0.045
       - item: custom:key_nether_bell
         chance: 0.045
-      # --- 品質系スレッド。看板は等倍、隣接ティアは 1/3。ここに無い種はこのティアでは出ない
       - item: custom:thread_artisan
-        chance: 0.004
+        chance: 0.03
       - item: custom:thread_ritualist
-        chance: 0.012
+        chance: 0.03
       # --- リセット系(極低確率)。2026-08-23: 1本につき2ティアまで
       - item: custom:skill_tree_reset
         chance: 0.006
@@ -315,11 +311,10 @@ pools:
         chance: 0.048
       - item: custom:key_fireworks
         chance: 0.048
-      # --- 品質系スレッド。看板は等倍、隣接ティアは 1/3。ここに無い種はこのティアでは出ない
       - item: custom:thread_appraiser
-        chance: 0.01
+        chance: 0.05
       - item: custom:thread_scholar
-        chance: 0.003
+        chance: 0.05
       # --- リセット系(極低確率)。2026-08-23: 1本につき2ティアまで
       - item: custom:skill_node_lock
         chance: 0.004
@@ -415,11 +410,10 @@ pools:
         chance: 0.04
       - item: custom:key_palace
         chance: 0.04
-      # --- 品質系スレッド。看板は等倍、隣接ティアは 1/3。ここに無い種はこのティアでは出ない
       - item: custom:thread_appraiser
-        chance: 0.003
+        chance: 0.03
       - item: custom:thread_scholar
-        chance: 0.008
+        chance: 0.03
       # --- リセット系(極低確率)。2026-08-23: 1本につき2ティアまで
       - item: custom:skill_tree_reset
         chance: 0.003
@@ -516,9 +510,8 @@ pools:
         chance: 0.033
       - item: custom:key_fireworks
         chance: 0.033
-      # --- 品質系スレッド。看板は等倍、隣接ティアは 1/3。ここに無い種はこのティアでは出ない
       - item: custom:thread_perfumer
-        chance: 0.006
+        chance: 0.05
       - item: custom:thread_better_fortune
         chance: 0.002
       # --- モブ素材(浅/中/深の3帯へ分割済み)・ソース
@@ -616,11 +609,10 @@ pools:
         chance: 0.04
       - item: custom:key_steamworks
         chance: 0.04
-      # --- 品質系スレッド。看板は等倍、隣接ティアは 1/3。ここに無い種はこのティアでは出ない
       - item: custom:thread_perfumer
-        chance: 0.002
+        chance: 0.05
       - item: custom:thread_better_fortune
-        chance: 0.005
+        chance: 0.05
       # --- モブ素材(浅/中/深の3帯へ分割済み)・ソース
       - item: custom:pillager_plate
         chance: 0.015
@@ -719,11 +711,10 @@ pools:
         chance: 0.033
       - item: custom:key_city
         chance: 0.033
-      # --- 品質系スレッド。看板は等倍、隣接ティアは 1/3。ここに無い種はこのティアでは出ない
       - item: custom:thread_gacha
-        chance: 0.004
+        chance: 0.05
       - item: custom:thread_role_luck
-        chance: 0.001
+        chance: 0.05
       # --- モブ素材(浅/中/深の3帯へ分割済み)・ソース
       - item: custom:stray_cloth
         chance: 0.013
@@ -817,11 +808,10 @@ pools:
         chance: 0.026
       - item: custom:key_sewer_maze
         chance: 0.026
-      # --- 品質系スレッド。看板は等倍、隣接ティアは 1/3。ここに無い種はこのティアでは出ない
       - item: custom:thread_gacha
-        chance: 0.001
+        chance: 0.03
       - item: custom:thread_role_luck
-        chance: 0.003
+        chance: 0.03
       - item: custom:thread_role_effeciency
         chance: 0.001
       # --- モブ素材(浅/中/深の3帯へ分割済み)・ソース
@@ -915,11 +905,10 @@ pools:
         chance: 0.018
       - item: custom:key_steamworks
         chance: 0.018
-      # --- 品質系スレッド。看板は等倍、隣接ティアは 1/3。ここに無い種はこのティアでは出ない
       - item: custom:thread_role_effeciency
-        chance: 0.002
+        chance: 0.05
       - item: custom:thread_angler
-        chance: 0.001
+        chance: 0.05
       # --- モブ素材(浅/中/深の3帯へ分割済み)・ソース
       - item: custom:stray_cloth
         chance: 0.009
@@ -1004,10 +993,9 @@ pools:
     entries:
       # --- ★このティア専属のスレッド: 精射(弓精度)。他のどのティアにも出ない
       - item: custom:thread_truesight
-        chance: 0.004
-      # --- 品質系スレッド。看板は等倍、隣接ティアは 1/3。ここに無い種はこのティアでは出ない
+        chance: 0.05
       - item: custom:thread_angler
-        chance: 0.002
+        chance: 0.05
       # --- モブ素材(浅/中/深の3帯へ分割済み)・ソース
       - item: custom:stray_cloth
         chance: 0.005

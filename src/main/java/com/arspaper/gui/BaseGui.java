@@ -79,6 +79,38 @@ public abstract class BaseGui implements InventoryHolder {
         return item;
     }
 
+    /**
+     * 既存アイテムの<b>見た目をそのまま流用して</b>ボタンを作る（名前と lore だけ差し替える）。
+     *
+     * <p>{@link #createButton(Material, Component, java.util.List)} は Material から新品を組むので、
+     * <b>CustomModelData / item_model / 防具トリム / 染色が全部落ちる</b>。TF・フォークのカスタム品は
+     * 見た目を CMD で持っているため、GUI に「そのアイテム」を出したい場面でそちらを使うと
+     * 素のバニラ材質で表示されてしまう（2026-08-18 実サーバ報告「スレッドスロットGUIに
+     * その装備のテクスチャが反映されていない」の原因）。
+     *
+     * <p>ツールチップは lore だけ見せたいので、属性・エンチャント・付加情報の行は隠す
+     * （見た目＝アイコンだけを借りる、という意図）。glint は残るのでエンチャント済みは光ったまま。
+     */
+    protected ItemStack createButtonFrom(ItemStack base, Component name, java.util.List<Component> lore) {
+        if (base == null || base.getType().isAir()) {
+            return createButton(Material.BARRIER, name, lore);
+        }
+        ItemStack item = base.clone();
+        item.setAmount(1);
+        item.editMeta(meta -> {
+            if (name != null) {
+                meta.displayName(name.decoration(TextDecoration.ITALIC, false));
+            }
+            meta.lore(lore.stream()
+                .map(l -> l.decoration(TextDecoration.ITALIC, false))
+                .toList());
+            meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ADDITIONAL_TOOLTIP,
+                org.bukkit.inventory.ItemFlag.HIDE_ATTRIBUTES,
+                org.bukkit.inventory.ItemFlag.HIDE_ENCHANTS);
+        });
+        return item;
+    }
+
     protected void fillBorder(Material material) {
         ItemStack filler = createButton(material, Component.text(""));
         int size = inventory.getSize();

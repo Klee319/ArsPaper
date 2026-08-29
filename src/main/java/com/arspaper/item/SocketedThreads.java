@@ -97,6 +97,15 @@ public final class SocketedThreads {
     }
 
     /**
+     * 枠上限を見ない全装着スレッド。装備が壊れて返すときは perk で効いていなかった枠も返す。
+     * {@link #read} の {@code effectiveSlots} 打ち切りは「効く範囲」用で、壊れた品から取り出すと
+     * 超過分が装備と一緒に消える。
+     */
+    public static List<Entry> readAll(PersistentDataContainer pdc) {
+        return read(pdc, Integer.MAX_VALUE);
+    }
+
+    /**
      * 装着スレッド1件の要約行 {@code ・<スレッド名>【品質】}。
      *
      * <p>装備の lore({@code ThreadGui#buildThreadLore})とチャット出力

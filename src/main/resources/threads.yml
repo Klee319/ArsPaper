@@ -18,13 +18,13 @@
 #   mana-max-percent: 最大マナの割合上昇（%）。固定値の mana-bonus と違い、素の最大マナが
 #     大きいビルドほど効く。ThreadConfig / ManaManager とも配線済み。
 #   regen-percent: マナ回復速度の割合上昇（%）。固定値の regen-bonus の割合版。
-#   slots: バックパックスロット数。⚠ これは **lore の表示専用**（ThreadConfig#getBackpackSlots を
-#     読むのは説明文の生成1箇所だけ）。実際の容量は BackpackGui が
-#     「**その防具1点に**装着しているバックパックスレッドの本数（2本が上限）× 3行 × 9 = 27 or 54」で
-#     決めるので、ここには **1本あたりの枠数（=27）** を書く。
+#   slots: バックパック1本あたりの枠数。BackpackGui が本数×この値を容量にする。
 #     0 を書くと説明文が「追加インベントリ 0スロット」と嘘をつく。
+#   max-inventory-slots: 1装備あたりの総枠上限。未記載なら slots × max。
+#     54 を超える分は最下段のページ送りで見る。容量を超えた PDC の中身は消さない。
 #     ⚠ 数えるのは【1つの防具の PDC だけ】。別の部位に挿した本数は合算されない。だから
-#       backpack だけは 2026-08-25 (W-254) の「1装備1本」から除外して max: 2 を残してある。
+#       backpack だけは 2026-08-25 (W-254) の「1装備1本」から除外して max: 4 を残してある
+#       （4×slots=108 で max-inventory-slots に届く。54超はページ送り）。
 #   potion-effect: 装備中常時付与するポーション効果（バニラ PotionEffectType 名を小文字にしたid）。
 #     省略時は ThreadType enum の既定値を使う（後方互換）。"none" と書くと明示的に無効化できる。
 #     ⚠ 指定できるのは有益効果18種のみ:
@@ -38,7 +38,7 @@
 #     amplifier の最大値（=最高レベル）が採用される。
 #   flight: 装備中ずっとエリトラ飛行を許可するか（true/false）。省略時は ThreadType enum の
 #     既定値（flight スレッドのみ true）を使う。
-#   lore: 説明文（文字列 or 文字列のリスト）。ここに書いた行はそのままアイテムの lore に出る。
+#   lore: 説明文1行。色は Java が紫で塗るのでタグは不要。2行以上書いても先頭以外は出ない。
 #     ⚠ 効果の実体が thread-sets.yml のセット効果側にあるスレッドは、上の数値キーを1つも
 #       持たないため【何も書かないと説明文が0行になる】。必ず lore: を書くこと。
 #
@@ -49,8 +49,8 @@
 #   ★ユーザー確定要件「同じスレッドは同じ部位に1つまでしか付けられないように修正する」。
 #     ThreadApplicationPolicy.DEFAULT_MAX_STACK を 1 にしたので、この2キーは書かなくても
 #     全スレッドが「1装備につき同種1本」になる。出荷 yml からは backpack を除いて全部落とした。
-#   ⚠ 例外は backpack の max: 2 だけ。戦闘ステを持たないので上限張り付きの問題が無く、
-#     かつ 1本に絞ると 54スロットのバックパックが到達不能になる(理由は backpack の項)。
+#   ⚠ 例外は backpack の max: 4 だけ。戦闘ステを持たないので上限張り付きの問題が無い。
+#     1本あたりの枠は slots、総枠天井は max-inventory-slots。4本で 108 に届き、54超はページ送り。
 #   ⚠ なぜ上限を1にしたか: 回避率・ダメージ軽減率のような割合ステは、同じ種を枠へ集中させると
 #     合計が上限(0.9)へ張り付き、そこから先の装備更新が一切効かなくなる(=バランスが壊れる)。
 #     1装備1本にすると同種の総数はキャリア数(着用防具4部位＋メインハンド＝5)で頭打ちになる。
@@ -67,61 +67,85 @@ threads:
     display_name: 空のスレッド
   mana_regen:
     display_name: マナ回復速度上昇のスレッド
+    lore:
+      - マナの巡りを速める
   mana_boost:
     display_name: マナ最大値上昇のスレッド
+    lore:
+      - 器を広げる
   health_boost:
     display_name: 体力増強のスレッド
+    lore:
+      - 体の器を底上げする
     potion-effect: health_boost
     potion-level: 2
   hit_mana_recovery:
     display_name: 被弾マナ回復のスレッド
+    lore:
+      - 痛みをマナに還す
   damage_mana_recovery:
     display_name: 攻撃マナ回復のスレッド
+    lore:
+      - 一撃ごとにマナを汲む
   spell_cost_down:
     display_name: 詠唱効率のスレッド
+    lore:
+      - 詠唱の浪費を抑える
   backpack:
     display_name: バックパックのスレッド
+    lore:
+      - 持ち物を増やす
     slots: 27
-    # 【W-254 の唯一の例外】1装備2本まで。
-    #   全スレッドを1装備1本にした理由は「割合ステが上限へ張り付くのを防ぐ」ことなので、
-    #   戦闘ステを1つも持たないバックパックには当てはまらない。一方で
-    #   BackpackGui#countBackpackThreads は【1つの防具の PDC だけ】を数えるので、
-    #   1本に絞ると 54スロット(2段)が二度と作れなくなる ── 既存機能が黙って消える。
-    #   ⚠ ここを1へ下げるなら BackpackGui の「最大2段」も一緒に落とすこと(片方だけ直すと
-    #     到達不能な仕様が説明文だけ残る)。
-    max: 2
+    # 1装備あたりの総枠上限。slots × 本数がこれを超えたらここで切る。54超はページ送り。
+    max-inventory-slots: 108
+    # 【W-254 の例外】戦闘ステを持たないので1装備複数本を許可。
+    #   本数の上限はここ、1本あたりの枠は slots、総枠の天井は max-inventory-slots。
+    #   4本 × 27 = 108 で天井に届く。54超はページ送り。
+    max: 4
   speed:
     display_name: 迅速のスレッド
+    lore:
+      - 足元を軽くする
     potion-effect: speed
     potion-level: 2
   jump_boost:
     display_name: 跳躍のスレッド
+    lore:
+      - 踏切を高くする
     potion-effect: jump_boost
     potion-level: 2
   night_vision:
     display_name: 暗視のスレッド
+    lore:
+      - 闇を見通す
     potion-effect: night_vision
     potion-level: 1
   stealth:
     display_name: 隠密のスレッド
+    lore:
+      - 気配を断ち、姿を消す
     potion-effect: invisibility
     potion-level: 1
     # 2026-08-25 (W-256) 追加。透明化は防具に挿したときだけ走る
     # (ThreadApplicationPolicy#isAmbientOnlyEffect が常時ポーション効果を防具限定にしている)。
     # ⚠ potion-level は 1 のまま。透明化に強度の概念は無く、2以上にしても効果は変わらないのに
     #   lore だけ「II」と出て嘘になる。
-    lore:
-      - 気配を断ち、姿を消す
   fire_resistance:
     display_name: 耐火のスレッド
+    lore:
+      - 炎を受け流す
     potion-effect: fire_resistance
     potion-level: 1
   dolphins_grace:
     display_name: イルカの好意のスレッド
+    lore:
+      - 水中を泳ぐように進む
     potion-effect: dolphins_grace
     potion-level: 1
   conduit_power:
     display_name: コンジットパワーのスレッド
+    lore:
+      - 海の加護を纏う
     potion-effect: conduit_power
     potion-level: 1
   # ⚠ 村の英雄は percent-bonus-damage を1本あたり +6% 配る突出枠で、次点(棘の +2.5%)の
@@ -130,80 +154,141 @@ threads:
   #   変わらない ── 値を上げるなら先に TF 側 ShippedThreadBandIndependenceTest を通すこと。
   hero_of_the_village:
     display_name: 村の英雄のスレッド
+    lore:
+      - 村に歓迎される
     potion-effect: hero_of_the_village
     potion-level: 1
   flight:
     display_name: 飛行のスレッド
+    lore:
+      - 空を渡る
     flight: true
   mana_amplify:
     display_name: マナ増幅のスレッド
+    lore:
+      - マナの器を膨らませる
   mana_circulate:
     display_name: 循環のスレッド
+    lore:
+      - マナを循環させる
   source_thrift:
     display_name: 源流節約のスレッド
+    lore:
+      - 源流を無駄にしない
   artisan:
     display_name: 匠のスレッド
+    lore:
+      - 手仕事を研ぎ澄ます
   ritualist:
     display_name: 儀式師のスレッド
+    lore:
+      - 儀式を円滑にする
   thrift:
     display_name: 倹約のスレッド
+    lore:
+      - 材料を大切にする
   salvage:
     display_name: 解体のスレッド
+    lore:
+      - 残骸から価値を拾う
   scholar:
     display_name: 選書のスレッド
+    lore:
+      - 本を選ぶ目を持つ
   miner:
     display_name: 豊鉱のスレッド
+    lore:
+      - 鉱脈を読み取る
   angler:
     display_name: 潮読みのスレッド
+    lore:
+      - 潮目を読む
   harvest:
     display_name: 実りのスレッド
+    lore:
+      - 実りを待つ
   timber:
     display_name: 年輪のスレッド
+    lore:
+      - 年輪を読む
   diligence:
     display_name: 研鑽のスレッド
+    lore:
+      - 研鑽を重ねる
   endurance:
     display_name: 持久のスレッド
+    lore:
+      - 長く持ちこたえる
   gourmet:
     display_name: 美食のスレッド
+    lore:
+      - 食の味わいを深める
   slow_falling:
     display_name: 浮遊のスレッド
+    lore:
+      - 落ち方をゆるめる
     potion-effect: slow_falling
     potion-level: 1
   spoils:
     display_name: 戦利品のスレッド
+    lore:
+      - 戦利を多くする
   experience:
     display_name: 経験のスレッド
+    lore:
+      - 経験を積みやすくする
   mending_flesh:
     display_name: 治癒のスレッド
+    lore:
+      - 傷を癒やす
   thorn:
     display_name: 棘のスレッド
+    lore:
+      - 触れれば刺す
   concussion:
     display_name: 昏倒のスレッド
+    lore:
+      - 意識を揺らす
   swiftcast:
     display_name: 速攻のスレッド
+    lore:
+      - 詠唱を速める
   marksman:
     display_name: 射手のスレッド
+    lore:
+      - 狙いを定める
   luck:
     display_name: 幸運のスレッド
+    lore:
+      - 運を呼び込む
     potion-effect: luck
     potion-level: 1
   perfumer:
     display_name: 調香のスレッド
+    lore:
+      - 香りを調える
   apiarist:
     display_name: 養蜂のスレッド
+    lore:
+      - 蜂の世話をする
   herder:
     display_name: 牧人のスレッド
+    lore:
+      - 群れを導く
   appraiser:
     display_name: 鑑識のスレッド
+    lore:
+      - 真贋を見分ける
   excavation:
     display_name: 削岩のスレッド
+    lore:
+      - 岩を削り進む
 
   # ============================================================
   # TFステ専用スレッド 6種 (2026-08-18)
   # ============================================================
   # 効果の実体は TrinityForge 側 stats/item-stats.yml の STRING#100023〜100028 にある。
-  # ここには数値キーを1つも書かない(書くと Ars 側とTF側で二重に効く)。
-  # そのため getEffectLore() は0行になるので、説明文は必ず lore: で書く。
+  # 数値キーは書かない(書くと Ars 側とTF側で二重に効く)。フレーバーは lore: 1行。
   #
   # ⚠ blindness / translate は以前ここに `{}` だけで置かれていたが、ThreadType に定数が
   #   無かったため ThreadGui#isEffectThread の ThreadType.fromId が null を返し、
@@ -211,33 +296,27 @@ threads:
   better_fortune:
     display_name: 開運のスレッド
     lore:
-      - <gold>幸運が上がる</gold>
-      - <color:dark_purple>いいことがおきますように</color>
+      - いいことがおきますように
   gacha:
     display_name: ガチャスレッド
     lore:
-      - <gold>ガチャの当たり確率が上がる</gold>
-      - <color:dark_purple>7777777</color>
+      - 7777777
   role_luck:
     display_name: ロール運のスレッド
     lore:
-      - <gold>クラフト時のステータス上振れが増える</gold>
-      - <color:dark_purple>レッツ上振れ！</color>
+      - レッツ上振れ！
   role_effeciency:
     display_name: ロール効率のスレッド
     lore:
-      - <gold>クラフト時のステータス下振れが減る</gold>
-      - <color:dark_purple>効率よく生きよう</color>
+      - 効率よく生きよう
   blindness:
     display_name: 崩命のスレッド
     lore:
-      - <gold>移動速度が上がる</gold>
-      - <color:dark_purple>虫の息の君は何を望む？</color>
+      - 虫の息の君は何を望む？
   translate:
     display_name: 流転のスレッド
     lore:
-      - <gold>隠し満腹度の回復が増える</gold>
-      - <color:dark_purple>直りやすくなっただろう？</color>
+      - 直りやすくなっただろう？
 
   # ==========================================================================
   # 2026-08-21: 戦闘系スレッド24種(武器アーキタイプ14 + 汎用10)。
@@ -247,148 +326,148 @@ threads:
   # ==========================================================================
   swordsman:
     display_name: 剣士のスレッド
+    lore:
+      - 剣向けに組まれた戦闘用スレッド
     custom-model-data: 300046
     material: STRING
-    lore:
-      - <gold>剣向けに組まれた戦闘用スレッド</gold>
   berserker:
     display_name: 狂戦士のスレッド
+    lore:
+      - 戦斧向けに組まれた戦闘用スレッド
     custom-model-data: 300047
     material: STRING
-    lore:
-      - <gold>戦斧向けに組まれた戦闘用スレッド</gold>
   lancer:
     display_name: 槍衾のスレッド
+    lore:
+      - 槍向けに組まれた戦闘用スレッド
     custom-model-data: 300048
     material: STRING
-    lore:
-      - <gold>槍向けに組まれた戦闘用スレッド</gold>
   reaper:
     display_name: 刈り手のスレッド
+    lore:
+      - 鎌向けに組まれた戦闘用スレッド
     custom-model-data: 300049
     material: STRING
-    lore:
-      - <gold>鎌向けに組まれた戦闘用スレッド</gold>
   crusher:
     display_name: 打擲のスレッド
+    lore:
+      - ウォーハンマー向けに組まれた戦闘用スレッド
     custom-model-data: 300050
     material: STRING
-    lore:
-      - <gold>ウォーハンマー向けに組まれた戦闘用スレッド</gold>
   assassin:
     display_name: 暗殺者のスレッド
+    lore:
+      - 短剣向けに組まれた戦闘用スレッド
     custom-model-data: 300051
     material: STRING
-    lore:
-      - <gold>短剣向けに組まれた戦闘用スレッド</gold>
   duelist:
     display_name: 決闘者のスレッド
+    lore:
+      - レイピア向けに組まれた戦闘用スレッド
     custom-model-data: 300052
     material: STRING
-    lore:
-      - <gold>レイピア向けに組まれた戦闘用スレッド</gold>
   titan:
     display_name: 巨戟のスレッド
+    lore:
+      - 大斧向けに組まれた戦闘用スレッド
     custom-model-data: 300053
     material: STRING
-    lore:
-      - <gold>大斧向けに組まれた戦闘用スレッド</gold>
   greatsword:
     display_name: 大剣士のスレッド
+    lore:
+      - 大剣向けに組まれた戦闘用スレッド
     custom-model-data: 300054
     material: STRING
-    lore:
-      - <gold>大剣向けに組まれた戦闘用スレッド</gold>
   longshot:
     display_name: 遠矢のスレッド
+    lore:
+      - 弓向けに組まれた戦闘用スレッド
     custom-model-data: 300055
     material: STRING
-    lore:
-      - <gold>弓向けに組まれた戦闘用スレッド</gold>
   tidecaller:
     display_name: 潮呼びのスレッド
+    lore:
+      - トライデント向けに組まれた戦闘用スレッド
     custom-model-data: 300056
     material: STRING
-    lore:
-      - <gold>トライデント向けに組まれた戦闘用スレッド</gold>
   earthshaker:
     display_name: 震撼のスレッド
+    lore:
+      - メイス向けに組まれた戦闘用スレッド
     custom-model-data: 300057
     material: STRING
-    lore:
-      - <gold>メイス向けに組まれた戦闘用スレッド</gold>
   bolter:
     display_name: 弩手のスレッド
+    lore:
+      - クロスボウ向けに組まれた戦闘用スレッド
     custom-model-data: 300058
     material: STRING
-    lore:
-      - <gold>クロスボウ向けに組まれた戦闘用スレッド</gold>
   spellblade:
     display_name: 呪刃のスレッド
+    lore:
+      - 杖・触媒向けに組まれた戦闘用スレッド
     custom-model-data: 300059
     material: STRING
-    lore:
-      - <gold>杖・触媒向けに組まれた戦闘用スレッド</gold>
   onslaught:
     display_name: 猛攻のスレッド
+    lore:
+      - 汎用の戦闘用スレッド
     custom-model-data: 300060
     material: STRING
-    lore:
-      - <gold>汎用の戦闘用スレッド</gold>
   precision:
     display_name: 精確のスレッド
+    lore:
+      - 汎用の戦闘用スレッド
     custom-model-data: 300061
     material: STRING
-    lore:
-      - <gold>汎用の戦闘用スレッド</gold>
   execution:
     display_name: 追撃のスレッド
+    lore:
+      - 汎用の戦闘用スレッド
     custom-model-data: 300062
     material: STRING
-    lore:
-      - <gold>汎用の戦闘用スレッド</gold>
   piercer:
     display_name: 穿孔のスレッド
+    lore:
+      - 汎用の戦闘用スレッド
     custom-model-data: 300063
     material: STRING
-    lore:
-      - <gold>汎用の戦闘用スレッド</gold>
   hemorrhage:
     display_name: 流血のスレッド
+    lore:
+      - 汎用の戦闘用スレッド
     custom-model-data: 300064
     material: STRING
-    lore:
-      - <gold>汎用の戦闘用スレッド</gold>
   bulwark:
     display_name: 堅陣のスレッド
+    lore:
+      - 汎用の戦闘用スレッド
     custom-model-data: 300065
     material: STRING
-    lore:
-      - <gold>汎用の戦闘用スレッド</gold>
   aegis:
     display_name: 抗魔のスレッド
+    lore:
+      - 汎用の戦闘用スレッド
     custom-model-data: 300066
     material: STRING
-    lore:
-      - <gold>汎用の戦闘用スレッド</gold>
   ironhide:
     display_name: 鉄皮のスレッド
+    lore:
+      - 汎用の戦闘用スレッド
     custom-model-data: 300067
     material: STRING
-    lore:
-      - <gold>汎用の戦闘用スレッド</gold>
   evasion:
     display_name: 疾影のスレッド
+    lore:
+      - 汎用の戦闘用スレッド
     custom-model-data: 300068
     material: STRING
-    lore:
-      - <gold>汎用の戦闘用スレッド</gold>
   resilience:
     display_name: 剛靭のスレッド
+    lore:
+      - 汎用の戦闘用スレッド
     custom-model-data: 300069
     material: STRING
-    lore:
-      - <gold>汎用の戦闘用スレッド</gold>
 
   # ==========================================================================
   # 2026-08-23 (W-187): トレジャーチェスト専用スレッド10種。
@@ -411,71 +490,61 @@ threads:
   # ==========================================================================
   maelstrom:
     display_name: 渦動のスレッド
+    lore:
+      - 宝物庫の底でしか見つからない糸
     custom-model-data: 300070
     material: STRING
-    lore:
-      - <gold>範囲攻撃の威力が上がる</gold>
-      - <color:dark_purple>宝物庫の底でしか見つからない糸</color>
   exsanguinate:
     display_name: 瀉血のスレッド
+    lore:
+      - 宝物庫の底でしか見つからない糸
     custom-model-data: 300071
     material: STRING
-    lore:
-      - <gold>出血のダメージ量が上がる</gold>
-      - <color:dark_purple>宝物庫の底でしか見つからない糸</color>
   skyfall:
     display_name: 墜撃のスレッド
+    lore:
+      - 宝物庫の底でしか見つからない糸
     custom-model-data: 300072
     material: STRING
-    lore:
-      - <gold>空中からの攻撃が強くなる</gold>
-      - <color:dark_purple>宝物庫の底でしか見つからない糸</color>
   farsight:
     display_name: 遠見のスレッド
+    lore:
+      - 宝物庫の底でしか見つからない糸
     custom-model-data: 300073
     material: STRING
-    lore:
-      - <gold>遠くから当てるほど威力が上がる</gold>
-      - <color:dark_purple>宝物庫の底でしか見つからない糸</color>
   truesight:
     display_name: 精射のスレッド
+    lore:
+      - 宝物庫の底でしか見つからない糸
     custom-model-data: 300074
     material: STRING
-    lore:
-      - <gold>矢のブレが小さくなる</gold>
-      - <color:dark_purple>宝物庫の底でしか見つからない糸</color>
   swiftarrow:
     display_name: 疾矢のスレッド
+    lore:
+      - 宝物庫の底でしか見つからない糸
     custom-model-data: 300075
     material: STRING
-    lore:
-      - <gold>矢が速く飛ぶ</gold>
-      - <color:dark_purple>宝物庫の底でしか見つからない糸</color>
   piercingshot:
     display_name: 貫矢のスレッド
+    lore:
+      - 宝物庫の底でしか見つからない糸
     custom-model-data: 300076
     material: STRING
-    lore:
-      - <gold>矢が貫通する数が増える</gold>
-      - <color:dark_purple>宝物庫の底でしか見つからない糸</color>
   rampart:
     display_name: 城塞のスレッド
+    lore:
+      - 宝物庫の底でしか見つからない糸
     custom-model-data: 300077
     material: STRING
-    lore:
-      - <gold>受けるダメージの割合が減る</gold>
-      - <color:dark_purple>宝物庫の底でしか見つからない糸</color>
   bastion:
     display_name: 鉄壁のスレッド
+    lore:
+      - 宝物庫の底でしか見つからない糸
     custom-model-data: 300078
     material: STRING
-    lore:
-      - <gold>物理の守備力が上がる</gold>
-      - <color:dark_purple>宝物庫の底でしか見つからない糸</color>
   wardstone:
     display_name: 護法のスレッド
+    lore:
+      - 宝物庫の底でしか見つからない糸
     custom-model-data: 300079
     material: STRING
-    lore:
-      - <gold>魔法の守備力が上がる</gold>
-      - <color:dark_purple>宝物庫の底でしか見つからない糸</color>

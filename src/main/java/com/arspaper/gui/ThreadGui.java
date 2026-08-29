@@ -255,17 +255,10 @@ public class ThreadGui extends BaseGui {
                 // 取り外しでは【装着時の厳選値をそのまま返す】。createThreadItemStack は新品を作るので
                 // 中で改めて抽選されてしまう ── 上書きしないと「外して付け直すだけで厳選し直せる」
                 // 無限リロールになる。
-                ItemStack threadItem = createThreadItemStack(threadType);
-                restoreRoll(threadItem, rollAt(slotIndex));
-                restoreSoulboundOwner(threadItem, ownerAt(slotIndex));
-                if (threadType.isBackpackThread()) {
-                    BackpackGui.transferDataToThread(targetItem, threadItem);
-                }
-                if (player.getInventory().firstEmpty() == -1) {
-                    player.getWorld().dropItemNaturally(player.getLocation(), threadItem);
-                } else {
-                    player.getInventory().addItem(threadItem);
-                }
+                ItemStack threadItem = SocketedThreadReturn.restore(
+                        targetItem, threadType, rollAt(slotIndex), ownerAt(slotIndex),
+                        threadType.isBackpackThread());
+                SocketedThreadReturn.giveOrDrop(player, java.util.List.of(threadItem));
             }
             threadSlots.set(slotIndex, null);
             setRollAt(slotIndex, "");
@@ -307,8 +300,8 @@ public class ThreadGui extends BaseGui {
                 return;
             }
 
-            // 魂縛(2026-08-25 W-259): ダンジョン産スレッドは最初に拾った人しか装着できない。
-            // ユーザー確定要件「ダンジョンドロップ品のみ魂縛し、それ以外はしない」。
+            // 魂縛(W-259): catalog が SOULBOUND のスレッドは最初に拾った人しか装着できない。
+            // 作業台/儀式で作れる ID は TRADEABLE なのでここを通らない。
             // ⚠ ここが唯一の実効ゲート。刻印(ThreadSoulbindListener)だけでは
             //   「他人の個体を挿す」を止められない ── 挿してしまうと装備ごと譲渡できるので、
             //   上級者が集めたスレッドが新規へ無尽蔵に流れるのを防げない。
@@ -316,7 +309,7 @@ public class ThreadGui extends BaseGui {
             if (com.arspaper.item.TreasureThreadSoulbindPolicy.isSoulbound(threadType)
                 && !com.arspaper.item.TreasureThreadSoulbindPolicy.mayUse(threadOwner, player.getUniqueId())) {
                 player.sendMessage(Component.text(
-                    "このスレッドは他の人に魂縛されています（構造物の宝箱から自分で拾った個体だけ装着できます）",
+                    "このスレッドは他の人に魂縛されています（自分で入手した個体だけ装着できます）",
                     NamedTextColor.RED));
                 player.sendActionBar(Component.text(
                     "魂縛: 所有者ではないため装着できません", NamedTextColor.RED));
@@ -459,15 +452,8 @@ public class ThreadGui extends BaseGui {
 
         // アイコンは【実物のスレッドを組んで】複製する。getBaseMaterial() から作ると CMD が無く、
         // どのスレッドも素の鍛冶型/陶器の欠片という同じ見た目になる(2026-08-18 報告)。
-        return createButtonFrom(createThreadItemStack(type),
+        return createButtonFrom(SocketedThreadReturn.createThreadItemStack(type),
             Component.text(type.getDisplayName(), type.getColor()), lore);
-    }
-
-    private ItemStack createThreadItemStack(ThreadType type) {
-        return ArsPaper.getInstance().getItemRegistry()
-            .get("thread_" + type.getId())
-            .map(item -> item.createItemStack())
-            .orElse(new ItemStack(type.getBaseMaterial()));
     }
 
     /**
@@ -516,35 +502,6 @@ public class ThreadGui extends BaseGui {
         threadSlotRolls.set(index, encoded == null ? "" : encoded);
     }
 
-    /**
-     * 取り外して返すスレッドへ魂縛の所有者を書き戻す。
-     *
-     * <p>{@code createThreadItemStack} は<b>新品</b>を作るので所有者PDCを持たない。
-     * 書き戻さないと「挿して外す」だけで未刻印の個体が手に入る = 魂縛を洗浄できる。
-     * lore 行も同時に戻す(見て分かる状態を保つ)。
-     */
-    private static void restoreSoulboundOwner(ItemStack threadItem, String ownerUuid) {
-        if (threadItem == null || ownerUuid == null || ownerUuid.isBlank()) {
-            return;
-        }
-        java.util.UUID owner;
-        try {
-            owner = java.util.UUID.fromString(ownerUuid);
-        } catch (IllegalArgumentException malformed) {
-            return; // 壊れた値は「未刻印」として扱う(永久に使えない個体を作るより安全側)
-        }
-        org.bukkit.OfflinePlayer holder = org.bukkit.Bukkit.getOfflinePlayer(owner);
-        String name = holder.getName() == null ? owner.toString() : holder.getName();
-        threadItem.editMeta(meta -> {
-            meta.getPersistentDataContainer()
-                    .set(ItemKeys.THREAD_SOULBOUND_OWNER, PersistentDataType.STRING, ownerUuid);
-            List<Component> lore = meta.lore() == null ? new ArrayList<>() : new ArrayList<>(meta.lore());
-            lore.add(Component.text("魂縛: " + name, NamedTextColor.LIGHT_PURPLE)
-                    .decoration(TextDecoration.ITALIC, false));
-            meta.lore(lore);
-        });
-    }
-
     /** 魂縛の所有者を添字で読む（範囲外/未刻印は空文字）。 */
     private String ownerAt(int index) {
         return (index >= 0 && index < threadSlotOwners.size() && threadSlotOwners.get(index) != null)
@@ -556,39 +513,6 @@ public class ThreadGui extends BaseGui {
             threadSlotOwners.add("");
         }
         threadSlotOwners.set(index, ownerUuid == null ? "" : ownerUuid);
-    }
-
-    /**
-     * 返却するスレッドへ、装着時の厳選値と lore を書き戻す。
-     * {@code createThreadItemStack} は新品として新規 rollSeed(quality=0)を刻んでしまうので、
-     * 装着時に保存していた識別子(rollSeed/quality)で上書きする ── そうしないと「外して付け直す
-     * だけで厳選し直せる」無限リロールになる。
-     *
-     * <p>PDC上書きは {@link TrinityForgeBridge#writeItemRoll}(rollSeed/qualityのみ書く軽量経路)を
-     * 使う ── {@code createThreadItemStack} 経由で既に一度フル組み立て済みなので、ここでは
-     * 識別子とloreだけを差し替えれば十分。
-     */
-    private static void restoreRoll(ItemStack threadItem, String encodedRoll) {
-        ThreadSlotIdentity slotIdentity = ThreadSlotIdentity.decode(encodedRoll);
-        ThreadType type = threadTypeOf(threadItem);
-        ThreadIdentity saved = new ThreadIdentity(slotIdentity.rollSeed(), slotIdentity.quality());
-        threadItem.editMeta(meta -> {
-            TrinityForgeBridge.writeItemRoll(meta, saved.rollSeed(), saved.quality());
-            // まるごと組み直す(2026-08-05)。旧実装は「新しい厳選の行と内容一致した行を消してから足す」
-            // 方式で、ステ部分が装備と同じ体裁(幅可変の区切り線を含む)になった以上、桁が変わると
-            // 古い区切り線が一致せず溜まり続ける。組み直しなら桁が変わっても溜まらない。
-            meta.lore(ThreadItem.fullLore(meta, type, saved));
-        });
-    }
-
-    /** {@code item} のPDC({@code ItemKeys.THREAD_ITEM_TYPE})からスレッド種別を復元する。未設定/不明なら null。 */
-    private static ThreadType threadTypeOf(ItemStack item) {
-        if (item == null || !item.hasItemMeta()) {
-            return null;
-        }
-        String typeId = item.getItemMeta().getPersistentDataContainer()
-                .get(ItemKeys.THREAD_ITEM_TYPE, PersistentDataType.STRING);
-        return ThreadType.fromId(typeId);
     }
 
     private static List<String> loadThreadSlotRolls(ItemStack armor, int slotCount) {

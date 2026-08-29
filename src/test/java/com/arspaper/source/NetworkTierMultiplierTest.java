@@ -74,12 +74,12 @@ class NetworkTierMultiplierTest {
     }
 
     @Test
-    @DisplayName("出荷 sourcelinks.yml の階梯（転送）も 1段ごとに x5")
-    void shippedSourcelinkLadderIsFiveTimesPerStep() throws Exception {
+    @DisplayName("出荷 sourcelinks.yml の転送倍率は 1段ごとに x5 で並んでいる")
+    void shippedSourcelinkLadderMatchesUnifiedSequence() throws Exception {
+        // 転送は W-257 の ×5。生成量だけが W-277 の 2,3,6,…,162（このテストは転送を見る）。
         YamlConfiguration yaml = new YamlConfiguration();
         yaml.load(new File("src/main/resources/sourcelinks.yml"));
 
-        // ヴォルカニックを代表に取る（5種すべて同じ並びで書いてある）。
         List<String> ladder = List.of(
                 "volcanic_sourcelink", "volcanic_sourcelink_ii", "volcanic_sourcelink_ii_b",
                 "volcanic_sourcelink_iii", "volcanic_sourcelink_iii_b", "volcanic_sourcelink_iv",
@@ -92,8 +92,7 @@ class NetworkTierMultiplierTest {
             multipliers.add(yaml.getDouble("items." + id + ".transfer-multiplier"));
         }
 
-        assertEquals(2.0, multipliers.get(0), 1e-9,
-                "最下段は 2.0（定額250 x 2.0 / 100tick = 100/20tick になる値）");
+        assertEquals(2.0, multipliers.get(0), 1e-9, "無印は 2.0");
         for (int i = 1; i < multipliers.size(); i++) {
             assertEquals(multipliers.get(i - 1) * 5.0, multipliers.get(i), 1e-6,
                     ladder.get(i) + " は1段前のちょうど5倍であること");

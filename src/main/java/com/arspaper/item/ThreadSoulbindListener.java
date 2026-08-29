@@ -9,6 +9,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityPickupItemEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 
@@ -17,14 +18,12 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * <b>ダンジョン産スレッドを「最初に拾った人」へ焼き付ける</b> —— 2026-08-25 (W-259)。
+ * <b>SOULBOUND スレッドを「最初に拾った人」へ焼き付ける</b> —— 2026-08-25 (W-259)。
  *
- * <p>ユーザー確定要件は「ダンジョンドロップ品のみ魂縛し、それ以外はしない」。
- * 経緯と対象の決め方は {@link TreasureThreadSoulbindPolicy} の Javadoc を参照。
- *
- * <h2>なぜ「拾った瞬間」なのか</h2>
- * 生成時(ルートチェストへ入る時)には所有者が居ない。チェストを開けた人＝拾った人なので、
- * 拾得が「持ち主が決まる」唯一の自然な瞬間になる。
+ * <p>対象は {@link TreasureThreadSoulbindPolicy#isSoulbound}（catalog の bind-type。
+ * 作業台/儀式で作れる ID は TRADEABLE なので対象外）。
+ * 拾得だけでなく、チェストからインベントリへ移したときも刻印する
+ * （{@code EntityPickupItemEvent} はコンテナ取り出しでは飛ばない）。
  *
  * <p>⚠ 刻印すると PDC が変わるので<b>同種でもスタックが分かれる</b>。これは仕様
  * ── 別人の個体が1スタックに混ざると、どちらの所有者を残すかを決められない。
@@ -58,6 +57,31 @@ public class ThreadSoulbindListener implements Listener {
         player.sendActionBar(Component.text(
             type.getDisplayName() + " があなたに魂縛されました(他の人は装着できません)",
             NamedTextColor.LIGHT_PURPLE));
+    }
+
+    /**
+     * チェスト等から取り出した個体は pickup を飛ばすので、閉じたときにインベントリを見る。
+     */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onClose(InventoryCloseEvent event) {
+        if (!(event.getPlayer() instanceof Player player)) {
+            return;
+        }
+        for (ItemStack stack : player.getInventory().getContents()) {
+            stampUnownedSoulbound(stack, player);
+        }
+        stampUnownedSoulbound(player.getItemOnCursor(), player);
+    }
+
+    private static void stampUnownedSoulbound(ItemStack stack, Player player) {
+        ThreadType type = threadTypeOf(stack);
+        if (!TreasureThreadSoulbindPolicy.isSoulbound(type)) {
+            return;
+        }
+        if (readOwner(stack) != null) {
+            return;
+        }
+        stampOwner(stack, player);
     }
 
     /** PDC からスレッド種別を引く。スレッドでないアイテムは {@code null}。 */
@@ -102,6 +126,7 @@ public class ThreadSoulbindListener implements Listener {
         stack.editMeta(meta -> {
             meta.getPersistentDataContainer()
                 .set(ItemKeys.THREAD_SOULBOUND_OWNER, PersistentDataType.STRING, owner.toString());
+            com.arspaper.integration.TrinityForgeBridge.bindSoulbound(meta, owner);
             List<Component> lore = meta.lore() == null ? new ArrayList<>() : new ArrayList<>(meta.lore());
             lore.add(Component.text(LORE_MARK + name, NamedTextColor.LIGHT_PURPLE)
                 .decoration(TextDecoration.ITALIC, false));

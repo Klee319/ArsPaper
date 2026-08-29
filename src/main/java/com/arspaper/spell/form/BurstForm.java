@@ -82,7 +82,18 @@ public class BurstForm implements SpellForm {
         int totalProjectiles = 1 + Math.min(context.getSplitCount(), 8);
         // 延長: 信管延長（弾速据え置き）→ 遅く爆発（時間ベース炸裂）
         int fusePerDuration = (int) config.getParam("burst", "fuse-per-duration-level", 10.0);
-        int fuseTicks = baseFuseTicks + context.getDurationLevel() * fusePerDuration;
+        // 短縮: 信管短縮（2026-08-19 / W-152）。実サーバ報告「炸裂までの時間が短縮で変わっていない」の修正。
+        // 素の getDurationLevel() は「短縮2個で -1 レベル」しか返さず、炸裂の
+        // max-augments.duration_down は 1 だったので【短縮は一度も効いていなかった】。
+        // ここだけ短縮を独立した軸にし、1個ごとに fuse-per-duration-down tick 縮める。
+        // 延長ぶんは getExtendOnlyDurationLevel() で受ける —— 素の durationLevel を使うと、
+        // 短縮2個目で「専用の短縮量×2」と「durationLevel -1 ぶん」が二重に掛かる。
+        int fusePerDown = (int) config.getParam("burst", "fuse-per-duration-down", 8.0);
+        // 下限が無いと短縮で信管0＝発射した1tick後に足元で炸裂する（自爆）。
+        int minFuseTicks = Math.max(1, (int) config.getParam("burst", "min-fuse-ticks", 4.0));
+        int fuseTicks = com.arspaper.spell.SpellDurationMath.resolve(baseFuseTicks,
+                context.getExtendOnlyDurationLevel(), fusePerDuration,
+                context.getDurationDownStacks(), fusePerDown, minFuseTicks);
         double burstRadius = resolveBurstRadius(config, context);
 
         Vector baseDirection = caster.getLocation().getDirection();

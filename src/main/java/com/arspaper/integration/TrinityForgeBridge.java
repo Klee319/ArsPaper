@@ -19,6 +19,7 @@ import com.trinityforge.stats.StatKeys;
 import com.trinityforge.stats.CraftQualityService;
 import com.trinityforge.stats.CraftRollMods;
 import com.trinityforge.stats.RitualCraftFinalizer;
+import com.trinityforge.stats.ItemUpgradeCarryOver;
 import com.trinityforge.pdc.BindType;
 import com.trinityforge.pdc.ItemData;
 import com.trinityforge.pdc.PdcKeys;
@@ -858,6 +859,38 @@ public final class TrinityForgeBridge {
                     .orElse(null);
         } catch (Throwable t) {
             return null;
+        }
+    }
+
+    /**
+     * 儀式でコア装備が別の装備になるとき、品質／ロール以外の個体データ（スレッド・
+     * バックパック・パーティクルシード・所有者・スペルスロット等）を成果物へ写す。
+     * identity（catalog id / custom_item_id / ティア）は上書きしない。
+     * stamp より前に呼ぶこと。
+     */
+    public static void carryOverUpgradePersistent(ItemStack core, ItemStack result) {
+        if (core == null || result == null || core.getType().isAir() || result.getType().isAir()) {
+            return;
+        }
+        try {
+            ItemUpgradeCarryOver.copyPersistent(core, result);
+        } catch (Throwable t) {
+            // TF API mismatch: leave the identity item as-is.
+        }
+    }
+
+    /**
+     * {@link #carryOverUpgradePersistent} のあと、品質 stamp の後に呼ぶエンチャント転写。
+     * stamp の tool-enchant 適用がプレイヤー付与分を剥がすのを、max で戻す。
+     */
+    public static void carryOverUpgradeEnchantments(ItemStack core, ItemStack result) {
+        if (core == null || result == null || core.getType().isAir() || result.getType().isAir()) {
+            return;
+        }
+        try {
+            ItemUpgradeCarryOver.copyEnchantments(core, result);
+        } catch (Throwable t) {
+            // TF API mismatch: leave the stamped item as-is.
         }
     }
 
@@ -2091,6 +2124,49 @@ public final class TrinityForgeBridge {
     }
 
     /**
+     * catalog の {@code bind-type} が {@link BindType#autoStampsOwner()} かどうか。
+     *
+     * @return {@code true}/{@code false} = catalog を読めた。{@code null} = TF 未ロード
+     *         (呼び出し側は CMD 帯などへフォールバックする)
+     */
+    public static Boolean catalogAutoStampsOwner(String catalogId) {
+        try {
+            TrinityForge tf = TrinityForge.getInstance();
+            if (tf == null || tf.config() == null || tf.config().itemCatalog() == null) {
+                return null;
+            }
+            if (catalogId == null || catalogId.isBlank()) {
+                return Boolean.FALSE;
+            }
+            return tf.config().itemCatalog().template(catalogId)
+                    .map(t -> t.bindType().autoStampsOwner())
+                    .orElse(Boolean.FALSE);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /**
+     * catalog エントリの bind-type を PDC へ刻印する。未知 ID / TF 未ロードは no-op。
+     * rollSeed は書かない(W-53: 未刻印のまま拾わせて品質ロールへ到達させる)。
+     */
+    public static void applyCatalogBindType(ItemMeta meta, String catalogId) {
+        if (meta == null || catalogId == null || catalogId.isBlank()) {
+            return;
+        }
+        try {
+            TrinityForge tf = TrinityForge.getInstance();
+            if (tf == null || tf.config() == null || tf.config().itemCatalog() == null) {
+                return;
+            }
+            tf.config().itemCatalog().template(catalogId)
+                    .ifPresent(t -> ItemData.of(meta).setBindType(t.bindType()));
+        } catch (Throwable t) {
+            // TF未ロード: bindType はスキップ
+        }
+    }
+
+    /**
      * 触媒のbind-type(TrinityForge {@code BindType})をPDCへ刻印する。
      * 未指定({@code null}/空文字)・不明な値・TrinityForge未ロード時はno-op(fail-open)。
      *
@@ -2757,7 +2833,8 @@ public final class TrinityForgeBridge {
             }
             Map<String, Double> resolved = resolver.resolveFull(catalyst);
             int flat = (int) Math.floor(statValue(resolved, MANA_REDUCTION_FLAT_KEY));
-            int percent = (int) Math.floor(statValue(resolved, MANA_REDUCTION_PERCENT_KEY));
+            int percent = com.arspaper.spell.SpellManaCost.toPercent(
+                    statValue(resolved, MANA_REDUCTION_PERCENT_KEY));
             return new CatalystManaReduction(flat, percent);
         } catch (Throwable t) {
             return CatalystManaReduction.NONE;

@@ -90,11 +90,44 @@ public class PlaceBlockEffect implements SpellEffect {
 
         if (foundItem == null) return;
 
-        // BlockPlaceEvent を発火して保護互換チェック
+        java.util.List<String> namespaces = new java.util.ArrayList<>();
+        if (foundItem.hasItemMeta()) {
+            for (NamespacedKey key : foundItem.getItemMeta().getPersistentDataContainer().getKeys()) {
+                namespaces.add(key.getNamespace());
+            }
+        }
+        if (PlaceBlockPolicy.refuseVanillaPlaceholder(foundItem.getType(), namespaces)) {
+            // ドロワー等: setType すると基材の空コンテナになり中身が消える。復元できないので置かない。
+            caster.sendMessage(net.kyori.adventure.text.Component.text(
+                    "このブロックは設置魔法では置けません（中身が消えるため）。手で設置してください。",
+                    net.kyori.adventure.text.format.NamedTextColor.RED));
+            return;
+        }
+
+        // 先に設置してから BlockPlaceEvent を飛ばす。イベント→setType だと、ドロワー側が
+        // イベント中に書いた TileEntity を直後の setType が空の樽で上書きする。
+        // 向きの setBlockData はインベントリ転写より前。後だと中身と CustomBlockListener の TileState が消える。
+        org.bukkit.block.BlockState replaced = block.getState();
+        block.setType(foundItem.getType());
+        org.bukkit.inventory.meta.BlockStateMeta blockMeta = foundItem.getItemMeta() instanceof org.bukkit.inventory.meta.BlockStateMeta m
+                ? m : null;
+        if (blockMeta != null) {
+            block.setBlockData(blockMeta.getBlockState().getBlockData(), false);
+        }
+        applyPlacementFacing(block, context, caster);
+        if (blockMeta != null) {
+            org.bukkit.block.BlockState itemState = blockMeta.getBlockState();
+            if (itemState instanceof org.bukkit.inventory.InventoryHolder fromHolder
+                    && block.getState() instanceof org.bukkit.inventory.InventoryHolder toHolder) {
+                toHolder.getInventory().setContents(fromHolder.getInventory().getContents());
+                ((org.bukkit.block.BlockState) toHolder).update(true, false);
+            }
+        }
+
         Block blockBelow = block.getRelative(BlockFace.DOWN);
         BlockPlaceEvent placeEvent = new BlockPlaceEvent(
             block,
-            block.getState(),
+            replaced,
             blockBelow,
             foundItem,
             caster,
@@ -102,34 +135,9 @@ public class PlaceBlockEffect implements SpellEffect {
             EquipmentSlot.HAND
         );
         Bukkit.getPluginManager().callEvent(placeEvent);
-        if (placeEvent.isCancelled()) return;
-
-        // ブロックを設置
-        block.setType(foundItem.getType());
-
-        // 向き付きブロックの方向を設定（バニラ準拠）
-        org.bukkit.block.data.BlockData blockData = block.getBlockData();
-        if (blockData instanceof org.bukkit.block.data.Directional directional) {
-            // ヒット面がある場合はヒット面の方向、なければキャスターの向きの逆
-            org.bukkit.block.BlockFace placeFace = context.getHitFace();
-            if (placeFace == null) {
-                // キャスターの視線方向の逆（プレイヤーに向く）
-                org.bukkit.util.Vector look = caster.getLocation().getDirection().setY(0);
-                if (look.lengthSquared() > 0.01) {
-                    look.normalize();
-                    double absX = Math.abs(look.getX());
-                    double absZ = Math.abs(look.getZ());
-                    if (absX > absZ) {
-                        placeFace = look.getX() > 0 ? BlockFace.WEST : BlockFace.EAST;
-                    } else {
-                        placeFace = look.getZ() > 0 ? BlockFace.NORTH : BlockFace.SOUTH;
-                    }
-                }
-            }
-            if (placeFace != null && directional.getFaces().contains(placeFace)) {
-                directional.setFacing(placeFace);
-                block.setBlockData(directional);
-            }
+        if (placeEvent.isCancelled()) {
+            replaced.update(true, false);
+            return;
         }
 
         // インベントリから1個消費
@@ -171,4 +179,33 @@ public class PlaceBlockEffect implements SpellEffect {
 
     @Override
     public int getTier() { return config.getTier("place_block"); }
+
+    /**
+     * 向きは {@link BlockPlaceEvent} より前に決める。イベント後に {@code setBlockData} すると、
+     * {@code CustomBlockListener} が書いた TileState が空のバニラブロックに戻る。
+     */
+    private static void applyPlacementFacing(Block block, SpellContext context, Player caster) {
+        org.bukkit.block.data.BlockData blockData = block.getBlockData();
+        if (!(blockData instanceof org.bukkit.block.data.Directional directional)) {
+            return;
+        }
+        org.bukkit.block.BlockFace placeFace = context.getHitFace();
+        if (placeFace == null) {
+            org.bukkit.util.Vector look = caster.getLocation().getDirection().setY(0);
+            if (look.lengthSquared() > 0.01) {
+                look.normalize();
+                double absX = Math.abs(look.getX());
+                double absZ = Math.abs(look.getZ());
+                if (absX > absZ) {
+                    placeFace = look.getX() > 0 ? BlockFace.WEST : BlockFace.EAST;
+                } else {
+                    placeFace = look.getZ() > 0 ? BlockFace.NORTH : BlockFace.SOUTH;
+                }
+            }
+        }
+        if (placeFace != null && directional.getFaces().contains(placeFace)) {
+            directional.setFacing(placeFace);
+            block.setBlockData(directional);
+        }
+    }
 }

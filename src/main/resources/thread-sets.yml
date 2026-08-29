@@ -144,84 +144,66 @@ thread-sets:
       "5":
         skill-exp-bonus: 0.018
   backpack:
-    # バックパック: 物を蓄える → 醸造素材の節約
+    # バックパック: 常用の荷物 → 食料の持ち
     thresholds:
       "3":
-        ingredient-save-chance: 0.024
+        food-save-chance: 0.024
       "5":
-        ingredient-save-chance: 0.036
+        food-save-chance: 0.036
   mana_amplify:
     thresholds: {}
   mana_circulate:
-    thresholds: {}
+    thresholds: { "3": { mana-regen: 3 }, "5": { mana-regen: 5 } }
   source_thrift:
     thresholds:
-      "1":
-        source-cost-reduction: 0.02
       "3":
         source-cost-reduction: 0.03
       "5":
         source-cost-reduction: 0.03
   artisan:
     thresholds:
-      "1":
-        workbench-quality-bonus: 1
       "3":
         workbench-quality-bonus: 1
       "5":
         workbench-quality-bonus: 1
   ritualist:
     thresholds:
-      "1":
-        ritual-quality-bonus: 1
       "3":
         ritual-quality-bonus: 1
       "5":
         ritual-quality-bonus: 1
   thrift:
     thresholds:
-      "1":
-        material-refund-chance: 0.02
       "3":
         material-refund-chance: 0.02
       "5":
         material-refund-chance: 0.03
   salvage:
     thresholds:
-      "1":
-        disassembly-return-bonus: 0.05
       "3":
         disassembly-return-bonus: 0.05
       "5":
         disassembly-return-bonus: 0.05
   scholar:
     thresholds:
-      "1":
-        enchant-luck: 0.5
       "3":
-        enchant-cost-reduction: 0.02
+        enchant-cost-reduction: 0.05
       "5":
-        enchant-luck: 0.5
+        enchant-luck: 1
   miner:
     thresholds:
-      "1":
-        mining-fortune: 0.036
       "3":
         mining-fortune: 0.024
       "5":
         mining-fortune: 0.024
   angler:
     thresholds:
-      "1":
-        fishing-luck: 0.024
       "3":
         fishing-luck: 0.024
       "5":
         fishing-luck: 0.05
   harvest:
     thresholds:
-      "1":
-        harvest-extra-drop-chance: 0.035
       "3":
         planted-crop-growth-bonus: 0.5
       "5":
@@ -229,95 +211,73 @@ thread-sets:
         planted-crop-growth-bonus: 0.5
   timber:
     thresholds:
-      "1":
-        woodcutting-extra-drop-chance: 0.024
       "3":
         woodcutting-extra-drop-chance: 0.012
       "5":
         woodcutting-extra-drop-chance: 0.012
   diligence:
     thresholds:
-      "1":
-        skill-exp-bonus: 0.024
       "3":
         skill-exp-bonus: 0.012
       "5":
         skill-exp-bonus: 0.024
   endurance:
     thresholds:
-      "1":
-        hunger-save-chance: 0.036
       "3":
         hunger-save-chance: 0.024
       "5":
         hunger-save-chance: 0.024
   gourmet:
     thresholds:
-      "1":
-        food-restore-bonus: 0.12
       "3":
         hidden-saturation-bonus: 0.12
       "5":
         food-restore-bonus: 0.18
   slow_falling:
-    # 浮遊: 高所 → 養蜂
+    # 浮遊: 空中に留まる → 破壊EXP
     thresholds:
       "3":
-        hive-harvest-fortune: 0.024
+        break-vanilla-exp-bonus: 0.024
       "5":
-        hive-harvest-fortune: 0.036
+        break-vanilla-exp-bonus: 0.036
   spoils:
     thresholds:
-      "1":
-        mob-drop-bonus: 0.03
       "3":
         mob-drop-bonus: 0.015
       "5":
         mob-drop-bonus: 0.03
   experience:
     thresholds:
-      "1":
-        vanilla-exp-bonus: 0.045
       "3":
         vanilla-exp-bonus: 0.03
       "5":
         vanilla-exp-bonus: 0.03
   mending_flesh:
     thresholds:
-      "1":
-        health-regen-bonus: 0.03
       "3":
         health-regen-bonus: 0.015
       "5":
         health-regen-bonus: 0.03
   thorn:
     thresholds:
-      "1":
-        reflect-percent: 0.03
       "3":
         reflect-percent: 0.015
       "5":
         reflect-flat: 3
   concussion:
     thresholds:
-      "1":
-        stun-chance: 0.015
       "3":
         stun-duration-bonus: 6
       "5":
         stun-chance: 0.03
   swiftcast:
     thresholds:
-      "1":
-        cooldown-reduction: 0.03
       "3":
         cooldown-reduction: 0.015
       "5":
         cooldown-reduction: 0.03
   marksman:
     thresholds:
-      "1":
-        ammo-save-chance: 0.045
       "3":
         bow-accuracy: 0.03
       "5":
@@ -330,24 +290,18 @@ thread-sets:
         mob-drop-bonus: 0.045
   perfumer:
     thresholds:
-      "1":
-        potion-quality-bonus: 1
       "3":
         brew-speed-bonus: 0.06
       "5":
         potion-quality-bonus: 1
   apiarist:
     thresholds:
-      "1":
-        hive-harvest-fortune: 0.024
       "3":
-        hive-harvest-fortune: 0.012
+        hive-harvest-fortune: 0.025
       "5":
-        hive-harvest-fortune: 0.012
+        hive-harvest-fortune: 0.05
   herder:
     thresholds:
-      "1":
-        breeding-extra-child-chance: 0.05
       "3":
         bred-animal-growth-bonus: 0.5
       "5":
@@ -355,28 +309,22 @@ thread-sets:
         bred-animal-growth-bonus: 0.5
   appraiser:
     thresholds:
-      "1":
-        mob-drop-quality: 1
       "3":
         mob-drop-bonus: 0.03
       "5":
         mob-drop-quality: 1
   excavation:
     thresholds:
-      "1":
-        gathering-efficiency: 1
       "3":
         gathering-efficiency: 1
       "5":
         gathering-efficiency: 1
   gacha:
     thresholds:
-      "2":
-        gacha-rate-bonus: 0.01
-      "4":
-        gacha-rate-bonus: 0.01
+      "3":
+        gacha-rate-bonus: 0.02
       "5":
-        gacha-rate-bonus: 0.01
+        gacha-rate-bonus: 0.02
   # 【"6" 段は再び畳んだ ── 2026-08-25 (W-254)】
   # 到達可能な本数は「1装備あたりの上限 × キャリア5個」で決まる
   # (キャリア = 防具4部位 + メインハンド。オフハンドは offhand-stats-apply: true の品が
@@ -391,24 +339,16 @@ thread-sets:
   #   6段を書き足すときは先に ThreadApplicationPolicy.DEFAULT_MAX_STACK を確認すること。
   role_luck:
     thresholds:
-      "2":
-        craft-roll-up-bonus: 2
       "3":
-        craft-roll-up-bonus: 2
-      "4":
-        craft-roll-up-bonus: 2
+        craft-roll-up-bonus: 3
       "5":
-        craft-roll-up-bonus: 4
+        craft-roll-up-bonus: 7
   role_effeciency:
     thresholds:
-      "2":
-        craft-roll-down-reduction: 2
       "3":
-        craft-roll-down-reduction: 1
-      "4":
-        craft-roll-down-reduction: 5
+        craft-roll-down-reduction: 3
       "5":
-        craft-roll-down-reduction: 15
+        craft-roll-down-reduction: 7
   # 盲目のスレッド: 最大体力を削る代わりに攻撃力を大きく伸ばすピーキー品。
   # 2026-08-21: attack-power を固定値(+100/+150)から【乗算モード】へ移した。
   #   固定値だと Lv20 帯の最強武器(攻撃力 700 前後)をスレッド1本が上書きしてしまい、
@@ -421,10 +361,10 @@ thread-sets:
   blindness:
     thresholds:
       "1":
-        max-health: -4
+        max-health: -6
         attack-power: { mode: multiply, value: 0.25, layer: layer_1 }
       "5":
-        max-health: -6
+        max-health: -10
         damage-modifier: 0.3
         attack-power: { mode: multiply, value: 0.40, layer: layer_1 }
   translate:

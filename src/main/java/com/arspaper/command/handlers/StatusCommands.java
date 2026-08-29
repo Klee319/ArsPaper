@@ -153,15 +153,17 @@ public final class StatusCommands {
             return 0;
         }
 
-        // 装備中の防具からバックパックスレッドを検索
-        for (org.bukkit.inventory.ItemStack armor : player.getInventory().getArmorContents()) {
-            if (armor != null && BackpackGui.countBackpackThreads(armor) > 0) {
-                BackpackGui.open(player, armor);
-                return 1;
-            }
+        java.util.List<org.bukkit.inventory.ItemStack> pieces = BackpackGui.wornBackpacks(player);
+        if (pieces.isEmpty()) {
+            player.sendMessage(Component.text("バックパックスレッドが装備されていません", NamedTextColor.RED));
+            return 0;
         }
-        player.sendMessage(Component.text("バックパックスレッドが装備されていません", NamedTextColor.RED));
-        return 0;
+        if (pieces.size() == 1) {
+            BackpackGui.open(player, pieces.get(0));
+        } else {
+            BackpackGui.openSelector(player, pieces);
+        }
+        return 1;
     }
 
     /**

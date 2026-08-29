@@ -1,4 +1,4 @@
-# =============================================================================
+﻿# =============================================================================
 # Sourcelink Material Values Configuration
 # =============================================================================
 # Each sourcelink type has a "materials" section mapping item ids to
@@ -46,10 +46,9 @@ transfer:
     #   未設定は 1.0(挙動不変)。下の items.*_ii / *_iii がこのレバーの実例。
     #   容量(buffer-cap)は既に int上限=実質無制限なのでボトルネックはレート側だけ、という前提で
     #   buffer-cap 側には階梯倍率を掛けていない。
-    # ■ 2026-08-25 (W-257): 50 → 250。ユーザー確定要件「割合ではなく階梯ごとに転送量を増やす。
-    #   tier1 が 20tick ごとに 100 なら tier2 は 20tick ごとに 500」。
-    #   最下段の階梯倍率が 2.0 なので、250 x 2.0 / 100tick = 500/100tick = 【100/20tick】。
-    #   1段上げるごとに倍率が x5 になるので tier2 は 500/20tick。
+    # ■ 2026-08-25 (W-257): 50 → 250。ユーザー確定要件「割合ではなく階梯ごとに転送量を増やす」。
+    # ■ 2026-08-29 (W-277): 転送・生成倍率を統一列 2,3,6,9,18,27,54,81,162 へ張り替え。
+    #   旧 W-257 の転送 x5 階梯は廃止。tier1 基準 250 x 2.0 / 100tick = 5/秒。
     max-per-transfer: 250
 
     # バッファ(ソースリンク内部の未排出分)の上限。
@@ -373,9 +372,6 @@ alchemical:
     # ⚠ infinity_source_core はここに書かない。到達証明を焼べられるようにすると、
     #    第2目標の達成物が消費されてしまう(図鑑には残るが手元から消える)。
     "custom:source_shard": 500
-    "custom:source_crystal": 18000
-    "custom:source_condenser": 700000
-    "custom:source_engine": 30000000
 
     # --- 圧縮済みの触媒（2026-08-21 ユーザー要望「ソースリンク系の燃料に圧縮が
     #     実装されているものはそれにも対応してほしい」） ---
@@ -414,6 +410,8 @@ items:
         - custom:source_gem
       source: 300
       result: custom:volcanic_sourcelink
+      type: shapeless
+      ingredients: []
   mycelial_sourcelink:
     material: SMOKER
     display-name: "マイセリアルソースリンク"
@@ -435,6 +433,8 @@ items:
         - custom:source_gem x2
       source: 300
       result: custom:mycelial_sourcelink
+      type: shapeless
+      ingredients: []
   alchemical_sourcelink:
     material: BLAST_FURNACE
     display-name: "アルケミカルソースリンク"
@@ -454,6 +454,8 @@ items:
         - custom:source_gem x2
       source: 400
       result: custom:alchemical_sourcelink
+      type: shapeless
+      ingredients: []
   vitalic_sourcelink:
     material: BARREL
     display-name: "バイタリックソースリンク"
@@ -473,6 +475,8 @@ items:
         - custom:source_gem x2
       source: 400
       result: custom:vitalic_sourcelink
+      type: shapeless
+      ingredients: []
   botanical_sourcelink:
     material: BEEHIVE
     display-name: "ボタニカルソースリンク"
@@ -491,6 +495,8 @@ items:
         - custom:source_gem x2
       source: 300
       result: custom:botanical_sourcelink
+      type: shapeless
+      ingredients: []
 
   # ===========================================================================
   # 上位ソースリンク階梯 (2026-08-02 追加/2026-08-03 拡張)
@@ -513,9 +519,10 @@ items:
   #        毎周期ソースが増える無限増殖になる(理由の全文は SourceGenerationScaling の javadoc)。
   #   どちらも未設定なら 1.0 = 無印と完全に同じ挙動。0以下/非有限値は警告のうえ 1.0 へ落とす。
   #
-  # 【段の設計 2026-08-25 (W-257) 改定】<b>転送は 5 の階梯乗、生成は 2 の階梯乗</b>。
-  #   転送: 無印 2 → 10 / 50 / 250 / 1250 / 6250 / 31250 / 156250 / 781250
-  #   生成: 無印 2 → 4 / 8 / 16 / 32 / 64 / 128 / 256 / 512(2026-08-24 のまま据え置き)
+  # 【段の設計 2026-08-29 (W-277) 改定】<b>転送は 5 の階梯乗、生成は指定列</b>。
+  #   転送: 無印 2 → 10 / 50 / 250 / 1250 / 6250 / 31250 / 156250 / 781250（W-257 のまま）
+  #   生成: 無印 2 → 3 / 6 / 9 / 18 / 27 / 54 / 81 / 162
+  #   （旧生成は 2 の階梯乗 2 / 4 / 8 / … / 512。ユーザー指定で張り替えた）
   #   ⚠ <b>無印にも倍率が乗る</b>(両方 2.0)。「無印は倍率キーを持たない=1.0」を固定していた
   #     ShippedSourceLadderTest は 2026-08-24 に緩めてある。
   #
@@ -527,7 +534,7 @@ items:
   #   不変条件は ShippedSourceLadderTest#transferOutgrowsYieldAtEveryRung が固定している。
   #
   #   ⚠ 最上段では int の上限に当たりうる。ソース機関(custom:source_engine = 3,000万)を
-  #     スニークで1スタック(64個)焼べると 19.2億 x 512 ≒ 9,800億で、
+  #     スニークで1スタック(64個)焼べると 19.2億 x 162 ≒ 3,100億で、
   #     SourceGenerationScaling が int 上限(約21.4億)へ切り詰める(負値には化けない)。
   #     つまり最上段で機関を一括投入すると <b>投入分の大半は捨てられる</b>。
   #     高階梯では安い燃料を回す方が効率がよい、という逆転が起きる点に注意。
@@ -550,8 +557,9 @@ items:
   #     _ii(欠片x4) → _ii_b(欠片x8) → _iii(結晶x4) → _iii_b(結晶x8)
   #     → _iv(凝縮物x4) → _iv_b(凝縮物x8) → _v(機関x2) → _vi(機関x3+深淵の延べ棒)
   #   倍率: 転送 x10/x50/x250/x1250/x6250/x31250/x156250/x781250(無印は x2)。
-  #         生成 x4/x8/x16/x32/x64/x128/x256/x512(無印は x2)。
+  #         生成 x3/x6/x9/x18/x27/x54/x81/x162(無印は x2)。
   #   (2026-08-24 に両方とも2の階梯乗へ張り替え、2026-08-25 (W-257) に転送だけ5の階梯乗へ。
+  #    2026-08-29 (W-277) に生成だけ 2,3,6,9,18,27,54,81,162 へ。
   #    さらに旧値は 転送 x2/x4/x6/x8/x12/x16/x24/x32 ・
   #    生成 x1.5/x2/x2.5/x3/x3.5/x4/x5/x6、無印は両方とも倍率なし=1.0 だった)。
   #   ⚠ <b>既存の段は誰も弱くしていない</b> ── 新段は上へ伸ばして空いた位置に入れてあり、
@@ -581,9 +589,9 @@ items:
     display-name: "&c焔喰いの炉"
     lore:
       - "焔を喰らって育った燃料炉"
-      - "転送レート x4.0 / 生成量 x4.0"
+      - "転送レート x10.0 / 生成量 x3.0"
     transfer-multiplier: 10.0
-    yield-multiplier: 4.0
+    yield-multiplier: 3.0
     recipe:
       method: ritual
       core-item: custom:volcanic_sourcelink
@@ -593,14 +601,16 @@ items:
         - custom:source_shard x4
       source: 500
       result: custom:volcanic_sourcelink_ii
+      type: shapeless
+      ingredients: []
   volcanic_sourcelink_ii_b:
     material: FURNACE
     display-name: "&c熾火溜めの炉"
     lore:
       - "熾火を絶やさず溜め込む炉"
-      - "転送レート x8.0 / 生成量 x8.0"
+      - "転送レート x50.0 / 生成量 x6.0"
     transfer-multiplier: 50.0
-    yield-multiplier: 8.0
+    yield-multiplier: 6.0
     recipe:
       method: ritual
       core-item: custom:volcanic_sourcelink_ii
@@ -610,14 +620,16 @@ items:
         - custom:source_shard x8
       source: 3000
       result: custom:volcanic_sourcelink_ii_b
+      type: shapeless
+      ingredients: []
   volcanic_sourcelink_iii:
     material: FURNACE
     display-name: "&4溶岩心の大炉"
     lore:
       - "溶岩の心臓を埋めた大炉"
-      - "転送レート x16.0 / 生成量 x16.0"
+      - "転送レート x250.0 / 生成量 x9.0"
     transfer-multiplier: 250.0
-    yield-multiplier: 16.0
+    yield-multiplier: 9.0
     recipe:
       method: ritual
       core-item: custom:volcanic_sourcelink_ii_b
@@ -627,14 +639,16 @@ items:
         - custom:source_crystal x4
       source: 12000
       result: custom:volcanic_sourcelink_iii
+      type: shapeless
+      ingredients: []
   volcanic_sourcelink_iii_b:
     material: FURNACE
     display-name: "&4灼熱脈の大炉"
     lore:
       - "灼熱の脈が走り続ける大炉"
-      - "転送レート x32.0 / 生成量 x32.0"
+      - "転送レート x1250.0 / 生成量 x18.0"
     transfer-multiplier: 1250.0
-    yield-multiplier: 32.0
+    yield-multiplier: 18.0
     recipe:
       method: ritual
       core-item: custom:volcanic_sourcelink_iii
@@ -644,14 +658,16 @@ items:
         - custom:source_crystal x8
       source: 60000
       result: custom:volcanic_sourcelink_iii_b
+      type: shapeless
+      ingredients: []
   volcanic_sourcelink_iv:
     material: FURNACE
     display-name: "&6火霊王の溶炉"
     lore:
       - "火の霊が住み着いた溶炉"
-      - "転送レート x64.0 / 生成量 x64.0"
+      - "転送レート x6250.0 / 生成量 x27.0"
     transfer-multiplier: 6250.0
-    yield-multiplier: 64.0
+    yield-multiplier: 27.0
     recipe:
       method: ritual
       core-item: custom:volcanic_sourcelink_iii_b
@@ -661,14 +677,16 @@ items:
         - custom:source_condenser x4
       source: 300000
       result: custom:volcanic_sourcelink_iv
+      type: shapeless
+      ingredients: []
   volcanic_sourcelink_iv_b:
     material: FURNACE
     display-name: "&6煉獄門の溶炉"
     lore:
       - "煉獄へ口を開けた溶炉"
-      - "転送レート x128.0 / 生成量 x128.0"
+      - "転送レート x31250.0 / 生成量 x54.0"
     transfer-multiplier: 31250.0
-    yield-multiplier: 128.0
+    yield-multiplier: 54.0
     recipe:
       method: ritual
       core-item: custom:volcanic_sourcelink_iv
@@ -678,14 +696,16 @@ items:
         - custom:source_condenser x8
       source: 1000000
       result: custom:volcanic_sourcelink_iv_b
+      type: shapeless
+      ingredients: []
   volcanic_sourcelink_v:
     material: FURNACE
     display-name: "&4&l星焔の煉炉"
     lore:
       - "星の焔で焚く煉炉"
-      - "転送レート x256.0 / 生成量 x256.0"
+      - "転送レート x156250.0 / 生成量 x81.0"
     transfer-multiplier: 156250.0
-    yield-multiplier: 256.0
+    yield-multiplier: 81.0
     recipe:
       method: ritual
       core-item: custom:volcanic_sourcelink_iv_b
@@ -695,14 +715,16 @@ items:
         - custom:source_engine x2
       source: 3000000
       result: custom:volcanic_sourcelink_v
+      type: shapeless
+      ingredients: []
   volcanic_sourcelink_vi:
     material: FURNACE
     display-name: "&c&l超新星の煉炉"
     lore:
       - "星が砕けるたびに焔が増す煉炉"
-      - "転送レート x512.0 / 生成量 x512.0"
+      - "転送レート x781250.0 / 生成量 x162.0"
     transfer-multiplier: 781250.0
-    yield-multiplier: 512.0
+    yield-multiplier: 162.0
     recipe:
       method: ritual
       core-item: custom:volcanic_sourcelink_v
@@ -713,15 +735,17 @@ items:
         - custom:abyssal_ingot
       source: 8000000
       result: custom:volcanic_sourcelink_vi
+      type: shapeless
+      ingredients: []
 
   mycelial_sourcelink_ii:
     material: SMOKER
     display-name: "&a菌糸織りの燻製器"
     lore:
       - "菌糸を織り込んだ燻製器"
-      - "転送レート x4.0 / 生成量 x4.0"
+      - "転送レート x10.0 / 生成量 x3.0"
     transfer-multiplier: 10.0
-    yield-multiplier: 4.0
+    yield-multiplier: 3.0
     recipe:
       method: ritual
       core-item: custom:mycelial_sourcelink
@@ -731,14 +755,16 @@ items:
         - custom:source_shard x4
       source: 500
       result: custom:mycelial_sourcelink_ii
+      type: shapeless
+      ingredients: []
   mycelial_sourcelink_ii_b:
     material: SMOKER
     display-name: "&a菌輪の燻製器"
     lore:
       - "菌が輪を描いて広がる燻製器"
-      - "転送レート x8.0 / 生成量 x8.0"
+      - "転送レート x50.0 / 生成量 x6.0"
     transfer-multiplier: 50.0
-    yield-multiplier: 8.0
+    yield-multiplier: 6.0
     recipe:
       method: ritual
       core-item: custom:mycelial_sourcelink_ii
@@ -748,14 +774,16 @@ items:
         - custom:source_shard x8
       source: 3000
       result: custom:mycelial_sourcelink_ii_b
+      type: shapeless
+      ingredients: []
   mycelial_sourcelink_iii:
     material: SMOKER
     display-name: "&2胞子雨の大燻炉"
     lore:
       - "胞子の雨が降り続く大燻炉"
-      - "転送レート x16.0 / 生成量 x16.0"
+      - "転送レート x250.0 / 生成量 x9.0"
     transfer-multiplier: 250.0
-    yield-multiplier: 16.0
+    yield-multiplier: 9.0
     recipe:
       method: ritual
       core-item: custom:mycelial_sourcelink_ii_b
@@ -765,14 +793,16 @@ items:
         - custom:source_crystal x4
       source: 12000
       result: custom:mycelial_sourcelink_iii
+      type: shapeless
+      ingredients: []
   mycelial_sourcelink_iii_b:
     material: SMOKER
     display-name: "&2霧胞の大燻炉"
     lore:
       - "霧のような胞子が満ちる大燻炉"
-      - "転送レート x32.0 / 生成量 x32.0"
+      - "転送レート x1250.0 / 生成量 x18.0"
     transfer-multiplier: 1250.0
-    yield-multiplier: 32.0
+    yield-multiplier: 18.0
     recipe:
       method: ritual
       core-item: custom:mycelial_sourcelink_iii
@@ -782,14 +812,16 @@ items:
         - custom:source_crystal x8
       source: 60000
       result: custom:mycelial_sourcelink_iii_b
+      type: shapeless
+      ingredients: []
   mycelial_sourcelink_iv:
     material: SMOKER
     display-name: "&a腐海の培養炉"
     lore:
       - "腐海をまるごと抱えた培養炉"
-      - "転送レート x64.0 / 生成量 x64.0"
+      - "転送レート x6250.0 / 生成量 x27.0"
     transfer-multiplier: 6250.0
-    yield-multiplier: 64.0
+    yield-multiplier: 27.0
     recipe:
       method: ritual
       core-item: custom:mycelial_sourcelink_iii_b
@@ -799,14 +831,16 @@ items:
         - custom:source_condenser x4
       source: 300000
       result: custom:mycelial_sourcelink_iv
+      type: shapeless
+      ingredients: []
   mycelial_sourcelink_iv_b:
     material: SMOKER
     display-name: "&a腐海心の培養炉"
     lore:
       - "腐海の中心を切り取った培養炉"
-      - "転送レート x128.0 / 生成量 x128.0"
+      - "転送レート x31250.0 / 生成量 x54.0"
     transfer-multiplier: 31250.0
-    yield-multiplier: 128.0
+    yield-multiplier: 54.0
     recipe:
       method: ritual
       core-item: custom:mycelial_sourcelink_iv
@@ -816,14 +850,16 @@ items:
         - custom:source_condenser x8
       source: 1000000
       result: custom:mycelial_sourcelink_iv_b
+      type: shapeless
+      ingredients: []
   mycelial_sourcelink_v:
     material: SMOKER
     display-name: "&2&l母菌床の大炉"
     lore:
       - "すべての菌糸が還る母菌床"
-      - "転送レート x256.0 / 生成量 x256.0"
+      - "転送レート x156250.0 / 生成量 x81.0"
     transfer-multiplier: 156250.0
-    yield-multiplier: 256.0
+    yield-multiplier: 81.0
     recipe:
       method: ritual
       core-item: custom:mycelial_sourcelink_iv_b
@@ -833,14 +869,16 @@ items:
         - custom:source_engine x2
       source: 3000000
       result: custom:mycelial_sourcelink_v
+      type: shapeless
+      ingredients: []
   mycelial_sourcelink_vi:
     material: SMOKER
     display-name: "&a&l始原菌の大炉"
     lore:
       - "すべての菌の始まりを飼う大炉"
-      - "転送レート x512.0 / 生成量 x512.0"
+      - "転送レート x781250.0 / 生成量 x162.0"
     transfer-multiplier: 781250.0
-    yield-multiplier: 512.0
+    yield-multiplier: 162.0
     recipe:
       method: ritual
       core-item: custom:mycelial_sourcelink_v
@@ -851,15 +889,17 @@ items:
         - custom:abyssal_ingot
       source: 8000000
       result: custom:mycelial_sourcelink_vi
+      type: shapeless
+      ingredients: []
 
   alchemical_sourcelink_ii:
     material: BLAST_FURNACE
     display-name: "&d賢者見習いの坩堝"
     lore:
       - "見習いでも扱える坩堝"
-      - "転送レート x4.0 / 生成量 x4.0"
+      - "転送レート x10.0 / 生成量 x3.0"
     transfer-multiplier: 10.0
-    yield-multiplier: 4.0
+    yield-multiplier: 3.0
     recipe:
       method: ritual
       core-item: custom:alchemical_sourcelink
@@ -869,14 +909,16 @@ items:
         - custom:source_shard x4
       source: 500
       result: custom:alchemical_sourcelink_ii
+      type: shapeless
+      ingredients: []
   alchemical_sourcelink_ii_b:
     material: BLAST_FURNACE
     display-name: "&d錬金士の坩堝"
     lore:
       - "錬金士が日々使い込む坩堝"
-      - "転送レート x8.0 / 生成量 x8.0"
+      - "転送レート x50.0 / 生成量 x6.0"
     transfer-multiplier: 50.0
-    yield-multiplier: 8.0
+    yield-multiplier: 6.0
     recipe:
       method: ritual
       core-item: custom:alchemical_sourcelink_ii
@@ -886,14 +928,16 @@ items:
         - custom:source_shard x8
       source: 3000
       result: custom:alchemical_sourcelink_ii_b
+      type: shapeless
+      ingredients: []
   alchemical_sourcelink_iii:
     material: BLAST_FURNACE
     display-name: "&5賢者の坩堝"
     lore:
       - "賢者が使い込んだ坩堝"
-      - "転送レート x16.0 / 生成量 x16.0"
+      - "転送レート x250.0 / 生成量 x9.0"
     transfer-multiplier: 250.0
-    yield-multiplier: 16.0
+    yield-multiplier: 9.0
     recipe:
       method: ritual
       core-item: custom:alchemical_sourcelink_ii_b
@@ -903,14 +947,16 @@ items:
         - custom:source_crystal x4
       source: 12000
       result: custom:alchemical_sourcelink_iii
+      type: shapeless
+      ingredients: []
   alchemical_sourcelink_iii_b:
     material: BLAST_FURNACE
     display-name: "&5賢者石の坩堝"
     lore:
       - "賢者の石を沈めた坩堝"
-      - "転送レート x32.0 / 生成量 x32.0"
+      - "転送レート x1250.0 / 生成量 x18.0"
     transfer-multiplier: 1250.0
-    yield-multiplier: 32.0
+    yield-multiplier: 18.0
     recipe:
       method: ritual
       core-item: custom:alchemical_sourcelink_iii
@@ -920,14 +966,16 @@ items:
         - custom:source_crystal x8
       source: 60000
       result: custom:alchemical_sourcelink_iii_b
+      type: shapeless
+      ingredients: []
   alchemical_sourcelink_iv:
     material: BLAST_FURNACE
     display-name: "&d第五元素の坩堝"
     lore:
       - "第五元素を溶かす坩堝"
-      - "転送レート x64.0 / 生成量 x64.0"
+      - "転送レート x6250.0 / 生成量 x27.0"
     transfer-multiplier: 6250.0
-    yield-multiplier: 64.0
+    yield-multiplier: 27.0
     recipe:
       method: ritual
       core-item: custom:alchemical_sourcelink_iii_b
@@ -937,14 +985,16 @@ items:
         - custom:source_condenser x4
       source: 300000
       result: custom:alchemical_sourcelink_iv
+      type: shapeless
+      ingredients: []
   alchemical_sourcelink_iv_b:
     material: BLAST_FURNACE
     display-name: "&d虚無溶けの坩堝"
     lore:
       - "虚無すら溶かし込む坩堝"
-      - "転送レート x128.0 / 生成量 x128.0"
+      - "転送レート x31250.0 / 生成量 x54.0"
     transfer-multiplier: 31250.0
-    yield-multiplier: 128.0
+    yield-multiplier: 54.0
     recipe:
       method: ritual
       core-item: custom:alchemical_sourcelink_iv
@@ -954,14 +1004,16 @@ items:
         - custom:source_condenser x8
       source: 1000000
       result: custom:alchemical_sourcelink_iv_b
+      type: shapeless
+      ingredients: []
   alchemical_sourcelink_v:
     material: BLAST_FURNACE
     display-name: "&5&l万物溶解の大坩堝"
     lore:
       - "万物を溶かし尽くす大坩堝"
-      - "転送レート x256.0 / 生成量 x256.0"
+      - "転送レート x156250.0 / 生成量 x81.0"
     transfer-multiplier: 156250.0
-    yield-multiplier: 256.0
+    yield-multiplier: 81.0
     recipe:
       method: ritual
       core-item: custom:alchemical_sourcelink_iv_b
@@ -971,14 +1023,16 @@ items:
         - custom:source_engine x2
       source: 3000000
       result: custom:alchemical_sourcelink_v
+      type: shapeless
+      ingredients: []
   alchemical_sourcelink_vi:
     material: BLAST_FURNACE
     display-name: "&d&l原初元素の大坩堝"
     lore:
       - "原初の元素を煮出す大坩堝"
-      - "転送レート x512.0 / 生成量 x512.0"
+      - "転送レート x781250.0 / 生成量 x162.0"
     transfer-multiplier: 781250.0
-    yield-multiplier: 512.0
+    yield-multiplier: 162.0
     recipe:
       method: ritual
       core-item: custom:alchemical_sourcelink_v
@@ -989,15 +1043,17 @@ items:
         - custom:abyssal_ingot
       source: 8000000
       result: custom:alchemical_sourcelink_vi
+      type: shapeless
+      ingredients: []
 
   vitalic_sourcelink_ii:
     material: BARREL
     display-name: "&f息吹の樽"
     lore:
       - "息吹を溜め込む樽"
-      - "転送レート x4.0 / 生成量 x4.0"
+      - "転送レート x10.0 / 生成量 x3.0"
     transfer-multiplier: 10.0
-    yield-multiplier: 4.0
+    yield-multiplier: 3.0
     recipe:
       method: ritual
       core-item: custom:vitalic_sourcelink
@@ -1007,14 +1063,16 @@ items:
         - custom:source_shard x4
       source: 500
       result: custom:vitalic_sourcelink_ii
+      type: shapeless
+      ingredients: []
   vitalic_sourcelink_ii_b:
     material: BARREL
     display-name: "&f脈動の樽"
     lore:
       - "中で鼓動が響き続ける樽"
-      - "転送レート x8.0 / 生成量 x8.0"
+      - "転送レート x50.0 / 生成量 x6.0"
     transfer-multiplier: 50.0
-    yield-multiplier: 8.0
+    yield-multiplier: 6.0
     recipe:
       method: ritual
       core-item: custom:vitalic_sourcelink_ii
@@ -1024,14 +1082,16 @@ items:
         - custom:source_shard x8
       source: 3000
       result: custom:vitalic_sourcelink_ii_b
+      type: shapeless
+      ingredients: []
   vitalic_sourcelink_iii:
     material: BARREL
     display-name: "&7生命律の樽"
     lore:
       - "生命の律動を刻む樽"
-      - "転送レート x16.0 / 生成量 x16.0"
+      - "転送レート x250.0 / 生成量 x9.0"
     transfer-multiplier: 250.0
-    yield-multiplier: 16.0
+    yield-multiplier: 9.0
     recipe:
       method: ritual
       core-item: custom:vitalic_sourcelink_ii_b
@@ -1041,14 +1101,16 @@ items:
         - custom:source_crystal x4
       source: 12000
       result: custom:vitalic_sourcelink_iii
+      type: shapeless
+      ingredients: []
   vitalic_sourcelink_iii_b:
     material: BARREL
     display-name: "&7魂繋ぎの樽"
     lore:
       - "魂を繋ぎ止める樽"
-      - "転送レート x32.0 / 生成量 x32.0"
+      - "転送レート x1250.0 / 生成量 x18.0"
     transfer-multiplier: 1250.0
-    yield-multiplier: 32.0
+    yield-multiplier: 18.0
     recipe:
       method: ritual
       core-item: custom:vitalic_sourcelink_iii
@@ -1058,14 +1120,16 @@ items:
         - custom:source_crystal x8
       source: 60000
       result: custom:vitalic_sourcelink_iii_b
+      type: shapeless
+      ingredients: []
   vitalic_sourcelink_iv:
     material: BARREL
     display-name: "&f輪廻の霊樽"
     lore:
       - "輪廻を閉じ込めた霊樽"
-      - "転送レート x64.0 / 生成量 x64.0"
+      - "転送レート x6250.0 / 生成量 x27.0"
     transfer-multiplier: 6250.0
-    yield-multiplier: 64.0
+    yield-multiplier: 27.0
     recipe:
       method: ritual
       core-item: custom:vitalic_sourcelink_iii_b
@@ -1075,14 +1139,16 @@ items:
         - custom:source_condenser x4
       source: 300000
       result: custom:vitalic_sourcelink_iv
+      type: shapeless
+      ingredients: []
   vitalic_sourcelink_iv_b:
     material: BARREL
     display-name: "&f転生炉の霊樽"
     lore:
       - "転生の炉を組み込んだ霊樽"
-      - "転送レート x128.0 / 生成量 x128.0"
+      - "転送レート x31250.0 / 生成量 x54.0"
     transfer-multiplier: 31250.0
-    yield-multiplier: 128.0
+    yield-multiplier: 54.0
     recipe:
       method: ritual
       core-item: custom:vitalic_sourcelink_iv
@@ -1092,14 +1158,16 @@ items:
         - custom:source_condenser x8
       source: 1000000
       result: custom:vitalic_sourcelink_iv_b
+      type: shapeless
+      ingredients: []
   vitalic_sourcelink_v:
     material: BARREL
     display-name: "&7&l不死鳥の霊樽"
     lore:
       - "灰から蘇り続ける霊樽"
-      - "転送レート x256.0 / 生成量 x256.0"
+      - "転送レート x156250.0 / 生成量 x81.0"
     transfer-multiplier: 156250.0
-    yield-multiplier: 256.0
+    yield-multiplier: 81.0
     recipe:
       method: ritual
       core-item: custom:vitalic_sourcelink_iv_b
@@ -1109,14 +1177,16 @@ items:
         - custom:source_engine x2
       source: 3000000
       result: custom:vitalic_sourcelink_v
+      type: shapeless
+      ingredients: []
   vitalic_sourcelink_vi:
     material: BARREL
     display-name: "&f&l生命樹の霊樽"
     lore:
       - "生命樹の根を張らせた霊樽"
-      - "転送レート x512.0 / 生成量 x512.0"
+      - "転送レート x781250.0 / 生成量 x162.0"
     transfer-multiplier: 781250.0
-    yield-multiplier: 512.0
+    yield-multiplier: 162.0
     recipe:
       method: ritual
       core-item: custom:vitalic_sourcelink_v
@@ -1127,15 +1197,17 @@ items:
         - custom:abyssal_ingot
       source: 8000000
       result: custom:vitalic_sourcelink_vi
+      type: shapeless
+      ingredients: []
 
   botanical_sourcelink_ii:
     material: BEEHIVE
     display-name: "&e芽吹きの巣"
     lore:
       - "芽吹きが絶えない巣"
-      - "転送レート x4.0 / 生成量 x4.0"
+      - "転送レート x10.0 / 生成量 x3.0"
     transfer-multiplier: 10.0
-    yield-multiplier: 4.0
+    yield-multiplier: 3.0
     recipe:
       method: ritual
       core-item: custom:botanical_sourcelink
@@ -1145,14 +1217,16 @@ items:
         - custom:source_shard x4
       source: 500
       result: custom:botanical_sourcelink_ii
+      type: shapeless
+      ingredients: []
   botanical_sourcelink_ii_b:
     material: BEEHIVE
     display-name: "&e花冠の巣"
     lore:
       - "花が絶えず冠のように咲く巣"
-      - "転送レート x8.0 / 生成量 x8.0"
+      - "転送レート x50.0 / 生成量 x6.0"
     transfer-multiplier: 50.0
-    yield-multiplier: 8.0
+    yield-multiplier: 6.0
     recipe:
       method: ritual
       core-item: custom:botanical_sourcelink_ii
@@ -1162,14 +1236,16 @@ items:
         - custom:source_shard x8
       source: 3000
       result: custom:botanical_sourcelink_ii_b
+      type: shapeless
+      ingredients: []
   botanical_sourcelink_iii:
     material: BEEHIVE
     display-name: "&6万緑の巣"
     lore:
       - "万緑を呼び込む巣"
-      - "転送レート x16.0 / 生成量 x16.0"
+      - "転送レート x250.0 / 生成量 x9.0"
     transfer-multiplier: 250.0
-    yield-multiplier: 16.0
+    yield-multiplier: 9.0
     recipe:
       method: ritual
       core-item: custom:botanical_sourcelink_ii_b
@@ -1179,14 +1255,16 @@ items:
         - custom:source_crystal x4
       source: 12000
       result: custom:botanical_sourcelink_iii
+      type: shapeless
+      ingredients: []
   botanical_sourcelink_iii_b:
     material: BEEHIVE
     display-name: "&6千樹の巣"
     lore:
       - "千本の樹を呼び寄せる巣"
-      - "転送レート x32.0 / 生成量 x32.0"
+      - "転送レート x1250.0 / 生成量 x18.0"
     transfer-multiplier: 1250.0
-    yield-multiplier: 32.0
+    yield-multiplier: 18.0
     recipe:
       method: ritual
       core-item: custom:botanical_sourcelink_iii
@@ -1196,14 +1274,16 @@ items:
         - custom:source_crystal x8
       source: 60000
       result: custom:botanical_sourcelink_iii_b
+      type: shapeless
+      ingredients: []
   botanical_sourcelink_iv:
     material: BEEHIVE
     display-name: "&e世界樹の苗床"
     lore:
       - "世界樹の枝を挿した苗床"
-      - "転送レート x64.0 / 生成量 x64.0"
+      - "転送レート x6250.0 / 生成量 x27.0"
     transfer-multiplier: 6250.0
-    yield-multiplier: 64.0
+    yield-multiplier: 27.0
     recipe:
       method: ritual
       core-item: custom:botanical_sourcelink_iii_b
@@ -1213,14 +1293,16 @@ items:
         - custom:source_condenser x4
       source: 300000
       result: custom:botanical_sourcelink_iv
+      type: shapeless
+      ingredients: []
   botanical_sourcelink_iv_b:
     material: BEEHIVE
     display-name: "&e天輪樹の苗床"
     lore:
       - "天へ伸びる輪樹の苗床"
-      - "転送レート x128.0 / 生成量 x128.0"
+      - "転送レート x31250.0 / 生成量 x54.0"
     transfer-multiplier: 31250.0
-    yield-multiplier: 128.0
+    yield-multiplier: 54.0
     recipe:
       method: ritual
       core-item: custom:botanical_sourcelink_iv
@@ -1230,14 +1312,16 @@ items:
         - custom:source_condenser x8
       source: 1000000
       result: custom:botanical_sourcelink_iv_b
+      type: shapeless
+      ingredients: []
   botanical_sourcelink_v:
     material: BEEHIVE
     display-name: "&6&l豊穣女神の苗床"
     lore:
       - "豊穣の女神が宿る苗床"
-      - "転送レート x256.0 / 生成量 x256.0"
+      - "転送レート x156250.0 / 生成量 x81.0"
     transfer-multiplier: 156250.0
-    yield-multiplier: 256.0
+    yield-multiplier: 81.0
     recipe:
       method: ritual
       core-item: custom:botanical_sourcelink_iv_b
@@ -1247,14 +1331,16 @@ items:
         - custom:source_engine x2
       source: 3000000
       result: custom:botanical_sourcelink_v
+      type: shapeless
+      ingredients: []
   botanical_sourcelink_vi:
     material: BEEHIVE
     display-name: "&6&l原初森の苗床"
     lore:
       - "原初の森をそのまま抱えた苗床"
-      - "転送レート x512.0 / 生成量 x512.0"
+      - "転送レート x781250.0 / 生成量 x162.0"
     transfer-multiplier: 781250.0
-    yield-multiplier: 512.0
+    yield-multiplier: 162.0
     recipe:
       method: ritual
       core-item: custom:botanical_sourcelink_v
@@ -1265,3 +1351,5 @@ items:
         - custom:abyssal_ingot
       source: 8000000
       result: custom:botanical_sourcelink_vi
+      type: shapeless
+      ingredients: []

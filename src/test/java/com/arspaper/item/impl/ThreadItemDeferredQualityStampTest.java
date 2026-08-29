@@ -73,4 +73,24 @@ class ThreadItemDeferredQualityStampTest {
                         + "使っていない。ItemFactory#stampのような汎用組み立て経路を使うと"
                         + "スレッド専用lore(効果説明/スロット案内/バックパック行)が上書きされる。");
     }
+
+    @Test
+    void exposesAnIdentityPreservingLoreRefreshForExistingThreads() throws IOException {
+        String source = readSource();
+
+        assertTrue(source.contains("public boolean refreshLoreKeepingIdentity(ItemStack item)"),
+                "既存スレッドの表更新用 refreshLoreKeepingIdentity が無い。"
+                        + "restampWithQuality は rollSeed を新規発番するので品質と pt が消える。");
+        int restampAt = source.indexOf("public boolean restampWithQuality");
+        int refreshAt = source.indexOf("public boolean refreshLoreKeepingIdentity");
+        assertTrue(refreshAt > restampAt,
+                "refreshLoreKeepingIdentity の位置が取れない");
+        String refreshBody = source.substring(refreshAt, source.indexOf("public static List<Component> fullLore", refreshAt));
+        assertFalse(refreshBody.contains("ThreadLocalRandom.current().nextLong()"),
+                "表更新が新しい rollSeed を発番している。品質と pt を維持できない。");
+        assertFalse(refreshBody.contains("writeItemRoll"),
+                "表更新が writeItemRoll を呼ぶと seed/quality を書き換える余地が残る。");
+        assertTrue(refreshBody.contains("data.hasRollSeed()"),
+                "未刻印ドロップまで quality=0 で lore を焼いてはいけない(W-53)。");
+    }
 }

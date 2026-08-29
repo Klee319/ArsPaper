@@ -107,7 +107,14 @@ public class GlideEffect implements SpellEffect, Listener {
 
         int baseDuration = (int) config.getParam("glide", "base-duration", (double) BASE_DURATION);
         int durationPerLevel = (int) config.getParam("glide", "duration-per-level", (double) DURATION_PER_LEVEL);
-        int duration = Math.max(1, baseDuration + context.getDurationLevel() * durationPerLevel);
+        // 短縮(2026-08-19 / W-152): 「滑空を早く切って落下を制御する」用。共通軸(短縮2個で-1レベル)は
+        // max-augments.duration_down = 1 のこの呪文では一度も効かないので、短縮だけ独立軸にした。
+        // 延長は getExtendOnlyDurationLevel() で受ける(素の durationLevel だと二重計上)。
+        int durationPerDown = (int) config.getParam("glide", "duration-per-duration-down", 120.0);
+        int minDuration = Math.max(1, (int) config.getParam("glide", "min-duration", 100.0));
+        int duration = com.arspaper.spell.SpellDurationMath.resolve(baseDuration,
+                context.getExtendOnlyDurationLevel(), durationPerLevel,
+                context.getDurationDownStacks(), durationPerDown, minDuration);
 
         glidingPlayers.add(player.getUniqueId());
 

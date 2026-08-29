@@ -178,16 +178,19 @@ public class SpellSettingsGui extends BaseGui {
             return;
         }
 
-        ItemStack target = findBindTarget(player);
+        ItemStack target = SpellBindTargeting.occupiedTarget(player);
         if (target == null) {
-            // バインド先がない場合、アンバインド対象を探す（既バインド済みアイテム）
-            ItemStack unbindTarget = findUnbindTarget(player);
-            if (unbindTarget != null) {
-                SpellBindListener.unbindSpell(player, unbindTarget);
-                render();
-                return;
-            }
             player.sendMessage(Component.text("バインド可能なアイテムがオフハンド/ホットバー9番スロットにありません", NamedTextColor.RED));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
+            return;
+        }
+        if (isBoundItem(target)) {
+            SpellBindListener.unbindSpell(player, target);
+            render();
+            return;
+        }
+        if (!isValidBindTarget(target)) {
+            player.sendMessage(Component.text("オフハンド/ホットバー9番のアイテムにはバインドできません", NamedTextColor.RED));
             player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
             return;
         }
@@ -196,35 +199,12 @@ public class SpellSettingsGui extends BaseGui {
         render();
     }
 
-    /**
-     * アンバインド対象を検索（既にバインド済みのアイテム）。
-     * 検索対象: オフハンド → ホットバースロット8(固定)
-     */
-    private static ItemStack findUnbindTarget(Player player) {
-        ItemStack offhand = player.getInventory().getItemInOffHand();
-        if (isBoundItem(offhand)) return offhand;
-        ItemStack slot8 = player.getInventory().getItem(8);
-        if (isBoundItem(slot8)) return slot8;
-        return null;
-    }
-
     private static boolean isBoundItem(ItemStack item) {
-        if (item == null || item.getType().isAir() || !item.hasItemMeta()) return false;
+        if (item == null || item.getType().isAir() || !item.hasItemMeta()) {
+            return false;
+        }
         return item.getItemMeta().getPersistentDataContainer()
             .has(ItemKeys.BOUND_BOOK_UUID, org.bukkit.persistence.PersistentDataType.STRING);
-    }
-
-    /**
-     * バインド対象アイテムを検索する。
-     * 検索対象: オフハンド → ホットバースロット8(固定)
-     * スキップ対象: 空気、魔導書/ワンド、既に他のスペルがバインド済みのアイテム
-     */
-    private static ItemStack findBindTarget(Player player) {
-        ItemStack offhand = player.getInventory().getItemInOffHand();
-        if (isValidBindTarget(offhand)) return offhand;
-        ItemStack slot8 = player.getInventory().getItem(8);
-        if (isValidBindTarget(slot8)) return slot8;
-        return null;
     }
 
     private static boolean isValidBindTarget(ItemStack item) {

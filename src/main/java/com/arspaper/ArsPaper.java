@@ -191,6 +191,7 @@ public class ArsPaper extends JavaPlugin {
         GlideEffect.restoreAll();
         BounceEffect.cleanupAll();
         ScaleEffect.cleanupAll();
+        SnareEffect.cleanupAll();
         SpellTaskLimiter.cleanupAll();
         getLogger().info("ArsPaper disabled!");
     }
@@ -726,6 +727,8 @@ public class ArsPaper extends JavaPlugin {
         // 魂縛(W-259): ダンジョン産スレッドを最初に拾った人へ焼き付ける。
         // 実効ゲート(装着の拒否)は ThreadGui 側にある ── ここは刻印だけ。
         pluginManager.registerEvents(new com.arspaper.item.ThreadSoulbindListener(), this);
+        // 装備破壊で装着スレッドがスタックごと消える。GUI 取り外しと同じ組み直しで返す。
+        pluginManager.registerEvents(new ThreadBreakDropListener(), this);
         pluginManager.registerEvents(new SourceBerryListener(this), this);
         pluginManager.registerEvents(new PhantomBlockListener(), this);
         pluginManager.registerEvents(new SummonedMobListener(this), this);
@@ -739,6 +742,7 @@ public class ArsPaper extends JavaPlugin {
         // W-191: スケール魔法の解除はスケジューラだけでは足りない（属性修飾子は NBT に残る）。
         // 参加時・チャンク読み込み時に PDC の終了時刻を読み直して剥がす。
         pluginManager.registerEvents(new com.arspaper.spell.effect.ScaleRestoreListener(), this);
+        pluginManager.registerEvents(new com.arspaper.spell.effect.SnareRestoreListener(), this);
         lootTableListener = new com.arspaper.loot.LootTableListener(this);
         pluginManager.registerEvents(lootTableListener, this);
         // 要件⑥ ocean-thread-catch / ruins-thread-drop: TF側ドロップテーブル(2026-07-23
@@ -758,6 +762,7 @@ public class ArsPaper extends JavaPlugin {
         // W-191: 既にオンラインの全員を見直す。/reload や再有効化では PlayerJoinEvent が
         // 飛ばないので、ここを通さないと縮んだままの人が残る。
         com.arspaper.spell.effect.ScaleEffect.restoreAll();
+        com.arspaper.spell.effect.SnareEffect.restoreAll();
     }
 
     @SuppressWarnings("UnstableApiUsage")

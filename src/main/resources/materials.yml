@@ -138,24 +138,6 @@ materials:
         type: shapeless
         ingredients: []
         amount: 9
-      # --- 圧縮木炭ブロック版: 【圧縮ソースの欠片】がそのまま出る(2026-08-25 / W-252) ---
-      # ユーザー要望「木炭ブロックを圧縮ソースの欠片の素材として使えるように」。
-      # 9倍圧縮木炭ブロック4個 = 木炭324 = 欠片324 = 9倍圧縮ソースの欠片36個。
-      # アメジスト側も 324/4 = 81個 = 9倍圧縮アメジスト9個(core 1 + 台座 8)で比率どおり。
-      # ⚠ これより上(81倍・729倍圧縮木炭ブロック)の一括版は【作れない】:
-      #   比率を保つには9倍圧縮アメジストが81個・729個要り、台座1つのスタック上限(64)を超える。
-      #   足すなら先に「81倍圧縮アメジストの欠片」を新設して階梯を1段伸ばすこと。
-      - method: ritual
-        core-item: custom:amethyst_shard_1x
-        pedestal-items:
-          - custom:charcoal_block_1x x4
-          - custom:amethyst_shard_1x x8
-        source: 8100
-        result: custom:source_shard_1x
-        result-amount: 36
-        type: shapeless
-        ingredients: []
-        amount: 81
   amethyst_shard_1x:
     base_material: AMETHYST_SHARD
     custom_model_data: 5447
@@ -182,16 +164,25 @@ materials:
     lore:
       - "&7ソースの欠片 9 個ぶん。"
       - "&7ソース結晶の一括生成に使う。"
-    recipe:
-      method: workbench
-      reversible: true
-      type: shaped
-      ingredients:
-        i: custom:source_shard
-      shape:
-        - iii
-        - iii
-        - iii
+    recipes:
+      - method: workbench
+        reversible: true
+        type: shaped
+        ingredients:
+          i: custom:source_shard
+        shape:
+          - iii
+          - iii
+          - iii
+      - method: ritual
+        type: shapeless
+        ingredients: []
+        pedestal-items:
+          - custom:amethyst_shard_1x x8
+          - custom:charcoal_block_1x x4
+        core-item: custom:amethyst_shard_1x
+        source: 8100
+        amount: 9
   source_crystal:
     base_material: PRISMARINE_CRYSTALS
     custom_model_data: 5442
@@ -251,7 +242,7 @@ materials:
       core-item: custom:source_condenser
       pedestal-items:
         - custom:source_condenser x7
-        - NETHERITE_INGOT x4
+        - NETHERITE_INGOT x2
       source: 1000000
       result: custom:source_engine
       result-amount: 4
@@ -2585,6 +2576,104 @@ materials:
         - iii
         - iii
         - iii
+  pufferfish_1x:
+    base_material: PUFFERFISH
+    edible: true
+    custom_model_data: 264
+    display_name: "&e9倍圧縮フグ"
+    enchant_glow: true
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: PUFFERFISH
+      shape:
+        - iii
+        - iii
+        - iii
+  pufferfish_2x:
+    base_material: PUFFERFISH
+    custom_model_data: 265
+    display_name: "&e81倍圧縮フグ"
+    enchant_glow: true
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:pufferfish_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  pufferfish_3x:
+    base_material: PUFFERFISH
+    custom_model_data: 266
+    display_name: "&e729倍圧縮フグ"
+    enchant_glow: true
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:pufferfish_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  tropical_fish_1x:
+    base_material: TROPICAL_FISH
+    edible: true
+    custom_model_data: 267
+    display_name: "&c9倍圧縮熱帯魚"
+    enchant_glow: true
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: TROPICAL_FISH
+      shape:
+        - iii
+        - iii
+        - iii
+  tropical_fish_2x:
+    base_material: TROPICAL_FISH
+    custom_model_data: 268
+    display_name: "&c81倍圧縮熱帯魚"
+    enchant_glow: true
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:tropical_fish_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  tropical_fish_3x:
+    base_material: TROPICAL_FISH
+    custom_model_data: 269
+    display_name: "&c729倍圧縮熱帯魚"
+    enchant_glow: true
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:tropical_fish_2x
+      shape:
+        - iii
+        - iii
+        - iii
   hay_block_1x:
     base_material: HAY_BLOCK
     custom_model_data: 218
@@ -2629,6 +2718,54 @@ materials:
       type: shaped
       ingredients:
         i: custom:hay_block_2x
+      shape:
+        - iii
+        - iii
+        - iii
+  honey_block_1x:
+    base_material: HONEY_BLOCK
+    custom_model_data: 270
+    display_name: "&69倍圧縮ハチミツブロック"
+    enchant_glow: true
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: HONEY_BLOCK
+      shape:
+        - iii
+        - iii
+        - iii
+  honey_block_2x:
+    base_material: HONEY_BLOCK
+    custom_model_data: 271
+    display_name: "&681倍圧縮ハチミツブロック"
+    enchant_glow: true
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:honey_block_1x
+      shape:
+        - iii
+        - iii
+        - iii
+  honey_block_3x:
+    base_material: HONEY_BLOCK
+    custom_model_data: 272
+    display_name: "&6729倍圧縮ハチミツブロック"
+    enchant_glow: true
+    lore: []
+    recipe:
+      method: workbench
+      reversible: true
+      type: shaped
+      ingredients:
+        i: custom:honey_block_2x
       shape:
         - iii
         - iii
@@ -2908,7 +3045,7 @@ materials:
         - custom:iron_block_3x
         - custom:gold_block_3x
         - custom:lapis_block_3x
-        - custom:lapis_block_3x
+        - custom:netherite_block_1x
         - custom:redstone_block_3x
         - custom:quartz_block_3x
         - custom:diamond_block_3x
@@ -3969,6 +4106,9 @@ _editor:
           - coal_block_1x
           - coal_block_2x
           - coal_block_3x
+          - honey_block_1x
+          - honey_block_2x
+          - honey_block_3x
           - redstone_block_1x
           - redstone_block_2x
           - redstone_block_3x
@@ -4127,6 +4267,12 @@ _editor:
           - salmon_1x
           - salmon_2x
           - salmon_3x
+          - pufferfish_1x
+          - pufferfish_2x
+          - pufferfish_3x
+          - tropical_fish_1x
+          - tropical_fish_2x
+          - tropical_fish_3x
           - hay_block_1x
           - hay_block_2x
           - hay_block_3x
@@ -4295,6 +4441,9 @@ _editor:
       - coal_block_1x
       - coal_block_2x
       - coal_block_3x
+      - honey_block_1x
+      - honey_block_2x
+      - honey_block_3x
       - redstone_block_1x
       - redstone_block_2x
       - redstone_block_3x
@@ -4387,6 +4536,12 @@ _editor:
       - salmon_1x
       - salmon_2x
       - salmon_3x
+      - pufferfish_1x
+      - pufferfish_2x
+      - pufferfish_3x
+      - tropical_fish_1x
+      - tropical_fish_2x
+      - tropical_fish_3x
       - hay_block_1x
       - hay_block_2x
       - hay_block_3x
