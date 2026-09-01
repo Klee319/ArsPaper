@@ -44,21 +44,32 @@ public class EvaporateEffect implements SpellEffect {
 
     @Override
     public void applyToBlock(SpellContext context, Location blockLocation) {
-        Block block = blockLocation.getBlock();
         Player caster = context.getCaster();
         if (caster == null) return;
+
+        int radius = Math.max(0, context.getAoeRadiusLevel());
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dy = -radius; dy <= radius; dy++) {
+                for (int dz = -radius; dz <= radius; dz++) {
+                    evaporateAt(blockLocation.clone().add(dx, dy, dz), caster, context.getHitFace());
+                }
+            }
+        }
+    }
+
+    private void evaporateAt(Location location, Player caster, BlockFace hitFace) {
+        Block block = location.getBlock();
 
         if (isLiquid(block.getType())) {
             // 対象ブロックが液体 → 直接蒸発
             evaporateBlock(block, caster);
         } else if (isWaterlogged(block)) {
             // Waterloggedブロック → 水抜き
-            removeWaterlogging(block, blockLocation, caster);
+            removeWaterlogging(block, location, caster);
         } else {
             // 対象が固体 → ヒット面方向の液体のみ蒸発
             // （スペルが液体を貫通して背後のブロックに当たった場合）
             // AOEなしでは6方向全て蒸発すると過剰なため、ヒット面+上面のみ
-            BlockFace hitFace = context.getHitFace();
             BlockFace[] checkFaces = hitFace != null
                 ? new BlockFace[]{hitFace, BlockFace.UP}
                 : new BlockFace[]{BlockFace.UP};
@@ -72,6 +83,9 @@ public class EvaporateEffect implements SpellEffect {
             }
         }
     }
+
+    @Override
+    public boolean handlesAoeInternally() { return true; }
 
     private void evaporateBlock(Block block, Player caster) {
         BlockBreakEvent breakEvent = new BlockBreakEvent(block, caster);

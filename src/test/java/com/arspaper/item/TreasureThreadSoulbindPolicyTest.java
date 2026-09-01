@@ -75,13 +75,21 @@ class TreasureThreadSoulbindPolicyTest {
                 "ThreadGui が所有者判定を呼んでいない");
 
         String plugin = read("src/main/java/com/arspaper/ArsPaper.java");
-        assertTrue(plugin.contains("new com.arspaper.item.ThreadSoulbindListener()"),
+        assertTrue(plugin.contains("new com.arspaper.item.ThreadSoulbindListener(this)"),
                 "刻印リスナーが registerEvents されていない = 所有者が永久に付かない"
                         + "(ゲートは通るが誰も縛られない、という無言の無効化)");
 
         String listener = read("src/main/java/com/arspaper/item/ThreadSoulbindListener.java");
         assertTrue(listener.contains("InventoryCloseEvent"),
                 "チェスト取り出しは EntityPickupItemEvent を飛ばすので、閉じたときに刻印する経路が要る");
+        assertTrue(listener.contains("PlayerJoinEvent"),
+                "導入前からインベントリに居る個体は拾得も閉じるも飛ばないので、参加時に走査する");
+        assertTrue(listener.contains("PlayerInventorySlotChangeEvent"),
+                "HuskSync は参加直後は空で、あとからスロットへ直接書き込む。閉じるのを待たない");
+        assertTrue(listener.contains("getEnderChest()"),
+                "エンダーチェストの未刻印はインベントリ走査だけでは届かない");
+        assertTrue(listener.contains("JOIN_REFRESH_DELAY_TICKS = 40L"),
+                "参加直後は HuskSync が空のことがある。TF の join 再適用と同じ 40tick 後にもう一度走査する");
         assertTrue(listener.contains("applyCatalogBindType")
                         || listener.contains("catalogAutoStampsOwner")
                         || read("src/main/java/com/arspaper/item/TreasureThreadSoulbindPolicy.java")

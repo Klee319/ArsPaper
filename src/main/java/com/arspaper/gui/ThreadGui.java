@@ -382,6 +382,9 @@ public class ThreadGui extends BaseGui {
 
     private boolean isEffectThread(ItemStack item) {
         if (item == null || !item.hasItemMeta()) return false;
+        // TF が ArsPaper enable 前に登録した作業台レシピから生じた旧個体は、catalog_id だけで
+        // thread_item_type を持たない。ここで Ars 識別を復元すれば、既に配られた個体も装着できる。
+        ThreadItem.restoreFunctionalMetadata(item);
         String customId = item.getItemMeta().getPersistentDataContainer()
             .get(ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING);
         if (customId == null || !customId.startsWith("thread_")) return false;

@@ -24,6 +24,7 @@ import com.trinityforge.pdc.BindType;
 import com.trinityforge.pdc.ItemData;
 import com.trinityforge.pdc.PdcKeys;
 import com.trinityforge.progression.OwnerBindPolicy;
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -1830,6 +1831,29 @@ public final class TrinityForgeBridge {
      * @param meta  書込み対象の {@link ItemMeta}
      * @param owner 所有者UUID。未確定なら {@code null}（bindType のみ書き、owner は最初の取得者で確定）
      */
+    /**
+     * その個体が「魂縛解きの符で意図的に解かれた」状態かを返す。
+     *
+     * <p>TF の {@link ItemData} に bindType があり、それが所有者を自動で焼き付けない種別
+     * （= TRADEABLE）のときだけ {@code true}。判定を型（スレッドの種類）ではなく<b>個体</b>で
+     * 行うのが要点で、種類だけで見ると解いた直後に焼き直してしまう。
+     *
+     * <p>bindType が無い個体（この仕組みより前に配られたもの）と TF 未ロード時は
+     * {@code false} を返し、従来どおり焼き付ける（fail-safe）。
+     */
+    public static boolean isOwnershipReleased(ItemStack stack) {
+        if (stack == null || !stack.hasItemMeta()) {
+            return false;
+        }
+        try {
+            return ItemData.of(stack.getItemMeta()).bindType()
+                    .map(type -> !type.autoStampsOwner())
+                    .orElse(false);
+        } catch (Throwable tfMissing) {
+            return false;
+        }
+    }
+
     public static void bindSoulbound(ItemMeta meta, UUID owner) {
         if (meta == null) {
             return;
@@ -1856,6 +1880,28 @@ public final class TrinityForgeBridge {
             return ItemData.of(meta).owner().orElse(null);
         } catch (Throwable t) {
             return null;
+        }
+    }
+
+    /**
+     * Ars 専用 lore を組み直す途中で、TF が真実として持つ所有者行を追加する。
+     * TF 未ロード時は何もせず、Ars 単体の lore 生成を壊さない。
+     */
+    public static void appendOwnerLoreIfMissing(ItemMeta meta, java.util.List<Component> lore) {
+        if (meta == null || lore == null) {
+            return;
+        }
+        try {
+            TrinityForge tf = TrinityForge.getInstance();
+            if (tf != null && tf.itemFactory() != null) {
+                // ArsPaper は compileOnly の TF jar と別々に更新され得る。新しい List 版 API が
+                // 無い組合せでもロードを止めないよう reflection で呼ぶ（存在する最新版では必ず共有書式を使う）。
+                tf.itemFactory().getClass()
+                        .getMethod("appendOwnerLoreIfMissing", ItemMeta.class, java.util.List.class)
+                        .invoke(tf.itemFactory(), meta, lore);
+            }
+        } catch (ReflectiveOperationException ignored) {
+            // TF API mismatch / absent: Ars 専用 lore はそのまま使う。
         }
     }
 

@@ -130,7 +130,11 @@ public final class SocketedThreadReturn {
         threadItem.editMeta(meta -> {
             meta.getPersistentDataContainer()
                     .set(ItemKeys.THREAD_SOULBOUND_OWNER, PersistentDataType.STRING, ownerUuid);
+            // Ars 側の控えPDCだけでは、ThreadItem#fullLore が読む TF の所有者行を復元できない。
+            // 返却前と同じ真実台帳(ItemData)へも戻し、枠の出し入れで所有者表示と使用判定がずれないようにする。
+            TrinityForgeBridge.bindSoulbound(meta, owner);
             List<Component> lore = meta.lore() == null ? new ArrayList<>() : new ArrayList<>(meta.lore());
+            TrinityForgeBridge.appendOwnerLoreIfMissing(meta, lore);
             lore.add(Component.text("魂縛: " + name, NamedTextColor.LIGHT_PURPLE)
                     .decoration(TextDecoration.ITALIC, false));
             meta.lore(lore);

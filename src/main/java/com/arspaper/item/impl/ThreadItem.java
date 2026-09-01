@@ -5,6 +5,7 @@ import com.arspaper.integration.TrinityForgeBridge.ThreadIdentity;
 import com.arspaper.item.BaseCustomItem;
 import com.arspaper.item.ItemKeys;
 import com.arspaper.item.ThreadType;
+import com.arspaper.util.PdcHelper;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -93,9 +94,59 @@ public class ThreadItem extends BaseCustomItem {
             // SOULBOUND なら PickupQualityListener / ThreadSoulbindListener が入手時に所有者を付ける。
             TrinityForgeBridge.applyCatalogBindType(meta, getItemId());
             meta.lore(fullLore(meta, threadType, identity));
-            meta.setMaxStackSize(1);
+            // 効果付きは rollSeed/品質/所有者という個体差を持つので1個ずつしか置けない。
+            // EMPTY は儀式で型付きへ変える中間素材で個体差が無く、ここで1に固定すると
+            // 素材が1個ごとに枠を食って重ならなくなる(2026-09-02 報告の不具合)。
+            if (threadType.hasEffect()) {
+                meta.setMaxStackSize(1);
+            }
         });
         return item;
+    }
+
+    /**
+     * 旧いカタログ作業台レシピが作った「見た目だけスレッド」の識別情報を復元する。
+     *
+     * <p>ArsPaper の有効化前に TrinityForge が作業台レシピを登録すると、その結果が
+     * {@code trinityforge:catalog_id=thread_*} だけを持つ場合がある。通常は ArsPaper enable 後の
+     * レシピ再登録で防止するが、既にクラフト済みの個体には効かない。スレッドGUIへ渡された時点で
+     * Ars の2つの識別子を補い、同じ個体を安全に装着可能へ戻す。
+     *
+     * @return Ars の効果スレッドとして復元した場合のみ {@code true}
+     */
+    public static boolean restoreFunctionalMetadata(ItemStack item) {
+        if (item == null || item.getType().isAir() || !item.hasItemMeta()) {
+            return false;
+        }
+        String existingCustomId = item.getItemMeta().getPersistentDataContainer()
+                .get(ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING);
+        String existingTypeId = item.getItemMeta().getPersistentDataContainer()
+                .get(ItemKeys.THREAD_ITEM_TYPE, PersistentDataType.STRING);
+        if (existingCustomId != null && existingCustomId.startsWith("thread_")
+                && existingCustomId.substring("thread_".length()).equals(existingTypeId)) {
+            ThreadType existingType = ThreadType.fromId(existingTypeId);
+            if (existingType != null && existingType.hasEffect()) {
+                return false;
+            }
+        }
+        String itemId = PdcHelper.getCrossPluginItemId(item).orElse(null);
+        if (itemId == null || !itemId.startsWith("thread_")) {
+            return false;
+        }
+        ThreadType type = ThreadType.fromId(itemId.substring("thread_".length()));
+        if (type == null || !type.hasEffect()) {
+            return false;
+        }
+        item.editMeta(meta -> {
+            meta.getPersistentDataContainer().set(
+                    ItemKeys.CUSTOM_ITEM_ID, PersistentDataType.STRING, itemId);
+            meta.getPersistentDataContainer().set(
+                    ItemKeys.THREAD_ITEM_TYPE, PersistentDataType.STRING, type.getId());
+            TrinityForgeBridge.applyCatalogBindType(meta, itemId);
+            meta.lore(fullLore(meta, type, TrinityForgeBridge.readThreadIdentity(item)));
+            meta.setMaxStackSize(1);
+        });
+        return true;
     }
 
     /**
@@ -143,8 +194,13 @@ public class ThreadItem extends BaseCustomItem {
      * @return lore を組み直したら {@code true}。未刻印・効果なし・メタ無しは {@code false}。
      */
     public boolean refreshLoreKeepingIdentity(ItemStack item) {
-        if (item == null || !item.hasItemMeta() || !threadType.hasEffect()) {
+        if (item == null || !item.hasItemMeta()) {
             return false;
+        }
+        if (!threadType.hasEffect()) {
+            // 空のスレッドは個体差を持たない素材。過去の生成で max_stack_size=1 を焼かれた個体は
+            // アイテム側に上限が残るので、直しても配布済みの分が重ならない。持ち替え時に外す。
+            return clearSingleStackCap(item);
         }
         com.trinityforge.pdc.ItemData data;
         try {
@@ -160,6 +216,23 @@ public class ThreadItem extends BaseCustomItem {
             meta.lore(fullLore(meta, threadType, identity));
             meta.setMaxStackSize(1);
         });
+        return true;
+    }
+
+    /**
+     * 過去に焼き付けられた「1個までしか重ならない」上限を外す。
+     *
+     * <p>max_stack_size はアイテム側の components に残るので、生成コードを直しても
+     * 既に配ってしまった個体には効かない。表更新の経路を通ったときに1度だけ外す。
+     *
+     * @return 実際に外したときだけ {@code true}（2回目以降は false になり空振りしない）
+     */
+    private static boolean clearSingleStackCap(ItemStack item) {
+        org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
+        if (meta == null || !meta.hasMaxStackSize()) {
+            return false;
+        }
+        item.editMeta(m -> m.setMaxStackSize(null));
         return true;
     }
 
@@ -191,7 +264,32 @@ public class ThreadItem extends BaseCustomItem {
         lore.add(Component.text("防具のスレッドスロットにセット可能", NamedTextColor.DARK_GRAY)
             .decoration(TextDecoration.ITALIC, false));
         com.arspaper.gui.BackpackGui.appendItemDataLore(meta, lore);
+        // このメソッドは返却・品質更新・定期リフレッシュの全経路で lore を作り直す。
+        // 所有者PDCを表示へ戻さないと、PDCだけ残って「魂縛/所有者」行が定期的に消える。
+        TrinityForgeBridge.appendOwnerLoreIfMissing(meta, lore);
+        appendSoulboundLore(meta, lore);
         return lore;
+    }
+
+    /** Ars 側の控え台帳にも残る魂縛所有者を、専用 lore 再構築ごとに表示へ戻す。 */
+    private static void appendSoulboundLore(org.bukkit.inventory.meta.ItemMeta meta, List<Component> lore) {
+        if (meta == null || lore == null) {
+            return;
+        }
+        String raw = meta.getPersistentDataContainer().get(
+                ItemKeys.THREAD_SOULBOUND_OWNER, PersistentDataType.STRING);
+        if (raw == null || raw.isBlank()) {
+            return;
+        }
+        try {
+            java.util.UUID owner = java.util.UUID.fromString(raw);
+            org.bukkit.OfflinePlayer player = org.bukkit.Bukkit.getOfflinePlayer(owner);
+            String name = player.getName() == null ? owner.toString() : player.getName();
+            lore.add(Component.text("魂縛: " + name, NamedTextColor.LIGHT_PURPLE)
+                    .decoration(TextDecoration.ITALIC, false));
+        } catch (IllegalArgumentException ignored) {
+            // 壊れた控えPDCは表示しない。使用判定側も同じく未刻印として扱う。
+        }
     }
 
     /**

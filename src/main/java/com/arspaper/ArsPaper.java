@@ -726,7 +726,7 @@ public class ArsPaper extends JavaPlugin {
         pluginManager.registerEvents(new com.arspaper.item.ThreadStatChatListener(), this);
         // 魂縛(W-259): ダンジョン産スレッドを最初に拾った人へ焼き付ける。
         // 実効ゲート(装着の拒否)は ThreadGui 側にある ── ここは刻印だけ。
-        pluginManager.registerEvents(new com.arspaper.item.ThreadSoulbindListener(), this);
+        pluginManager.registerEvents(new com.arspaper.item.ThreadSoulbindListener(this), this);
         // 装備破壊で装着スレッドがスタックごと消える。GUI 取り外しと同じ組み直しで返す。
         pluginManager.registerEvents(new ThreadBreakDropListener(), this);
         pluginManager.registerEvents(new SourceBerryListener(this), this);
