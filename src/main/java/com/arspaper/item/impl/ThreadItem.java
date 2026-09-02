@@ -259,7 +259,7 @@ public class ThreadItem extends BaseCustomItem {
             lore.add(Component.text("儀式で効果付きスレッドに変換できます", NamedTextColor.GRAY)
                 .decoration(TextDecoration.ITALIC, false));
         }
-        lore.addAll(equipmentStyleRollLore(type, identity));
+            lore.addAll(equipmentStyleRollLore(meta, type, identity));
         lore.addAll(setEffectLore(type));
         lore.add(Component.text("防具のスレッドスロットにセット可能", NamedTextColor.DARK_GRAY)
             .decoration(TextDecoration.ITALIC, false));
@@ -303,12 +303,22 @@ public class ThreadItem extends BaseCustomItem {
      * {@link #rollLore} のまま(区切り線が差し込み先に溜まる、チャットで無駄に幅を取る)。
      */
     public static List<Component> equipmentStyleRollLore(ThreadType type, ThreadIdentity identity) {
+        return equipmentStyleRollLore(null, type, identity);
+    }
+
+    /**
+     * Equipment-style lore that reuses TF's cached random-roll score when the item carries one.
+     * Quality-only promotions change the stat values but must not reroll the displayed pt.
+     */
+    public static List<Component> equipmentStyleRollLore(org.bukkit.inventory.meta.ItemMeta meta,
+                                                         ThreadType type, ThreadIdentity identity) {
         if (type == null || identity == null || !type.hasEffect()) {
             return List.of();
         }
+        Integer cachedScore = TrinityForgeBridge.readQualityScore(meta).orElse(null);
         return TrinityForgeBridge.threadEquipmentStyleLore(
                 type.getBaseMaterial(), type.getCustomModelData(),
-                identity.quality(), identity.rollSeed());
+                identity.quality(), identity.rollSeed(), cachedScore);
     }
 
     /**

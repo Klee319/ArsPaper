@@ -1789,6 +1789,15 @@ public final class TrinityForgeBridge {
      */
     public static java.util.List<net.kyori.adventure.text.Component> threadEquipmentStyleLore(
             Material material, Integer cmd, int quality, long rollSeed) {
+        return threadEquipmentStyleLore(material, cmd, quality, rollSeed, null);
+    }
+
+    /**
+     * Equipment-style thread lore with an optional cached random-roll score.  The score override is
+     * used by quality-only promotions; all stat values still derive from the new quality.
+     */
+    public static java.util.List<net.kyori.adventure.text.Component> threadEquipmentStyleLore(
+            Material material, Integer cmd, int quality, long rollSeed, Integer qualityScoreOverride) {
         if (material == null) {
             return java.util.List.of();
         }
@@ -1797,9 +1806,37 @@ public final class TrinityForgeBridge {
             if (tf == null || tf.itemFactory() == null) {
                 return java.util.List.of();
             }
-            return tf.itemFactory().statLoreBlock(material, cmd, quality, rollSeed);
+            if (qualityScoreOverride == null) {
+                return tf.itemFactory().statLoreBlock(material, cmd, quality, rollSeed);
+            }
+            // Keep ArsPaper loadable with an older TF thin jar: the override API is additive, so
+            // falling back to the historical call is safe (the score may then be recomputed).
+            try {
+                @SuppressWarnings("unchecked")
+                java.util.List<net.kyori.adventure.text.Component> lore =
+                        (java.util.List<net.kyori.adventure.text.Component>) tf.itemFactory().getClass()
+                                .getMethod("statLoreBlock", Material.class, Integer.class,
+                                        int.class, long.class, Integer.class)
+                                .invoke(tf.itemFactory(), material, cmd, quality, rollSeed,
+                                        qualityScoreOverride);
+                return lore;
+            } catch (ReflectiveOperationException | LinkageError | RuntimeException missingOverrideApi) {
+                return tf.itemFactory().statLoreBlock(material, cmd, quality, rollSeed);
+            }
         } catch (Throwable t) {
             return java.util.List.of();
+        }
+    }
+
+    /** Returns the cached random-roll score when TF has stamped one onto the meta. */
+    public static Optional<Integer> readQualityScore(ItemMeta meta) {
+        if (meta == null) {
+            return Optional.empty();
+        }
+        try {
+            return ItemData.of(meta).qualityScore();
+        } catch (Throwable unavailable) {
+            return Optional.empty();
         }
     }
 
