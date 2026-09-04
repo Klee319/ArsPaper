@@ -242,6 +242,28 @@ public final class GlyphIcons {
     }
 
     /**
+     * <b>今の構成では置けないグリフのアイコン（灰色の染料）。</b>
+     *
+     * <p>2026-09-05 のユーザー報告「グリフ配置のバリデーションが GUI でなされていない。
+     * シナジーのないグリフは灰色の染料のようなものに自動で置き換わったはず」。
+     * 実際この画面は <b>2026-08-22 のアイコン刷新まで「使用不可＝灰色の染料」だった</b>
+     * （{@code GlyphGuiIconAndOrderWiringTest} の記述に旧仕様として残っている）。
+     * 刷新で全グリフへ個別アイコンを付けた際に、この 1 状態だけが絵から抜け落ちて
+     * <b>名前の色と lore の赤字でしか分からなく</b>なっていた ——
+     * 1 ページ 25 個の一覧では、1 個ずつカーソルを当てるまで気づけない。
+     *
+     * <p><b>潰すのは「そのグリフ固有の理由」だけ</b>（形態と非互換 / 直前の効果に非対応 /
+     * 効果の重複 / 増強の上限 / ティア超過）。「まず形態を選べ」「スペルが満杯」のように
+     * <b>そのタブの全グリフへ同時に当てはまる</b>理由まで潰すと一覧が一色になり、
+     * 「どれを持っているか」が絵から消える —— それは 2026-08-22 に一度踏んだ壊れ方そのもの。
+     *
+     * <p>優先順で未解放（石炭）・パーク未所持（鍵）より下に置くのは、
+     * <b>直し方の遠い方から見せる</b>ため。未解放なら筆記台へ、パークが無ければスキルツリーへ
+     * 行く必要があり、シナジーは「今この場で別のグリフを選べばよい」だけで済む。
+     */
+    public static final Material INCOMPATIBLE_ICON = Material.GRAY_DYE;
+
+    /**
      * 解放状態とパークゲートを織り込んだアイコン。<b>グリフ配置（呪文編集）画面はこちらを通す。</b>
      *
      * <p>優先順は <b>パーク未所持（鍵） &gt; 未解放（石炭） &gt; 個別アイコン</b>。
@@ -289,6 +311,53 @@ public final class GlyphIcons {
             return PERK_LOCKED_ICON;
         }
         return resolveForState(glyphKey, type, override, unlocked);
+    }
+
+    /**
+     * 解放状態・パークゲート・<b>今の構成に置けるか</b>まで織り込んだアイコン。
+     * グリフ配置（呪文編集）画面はこちらを通す。
+     *
+     * <p>優先順は <b>パーク未所持（鍵） &gt; 未解放（石炭） &gt; 構成に置けない（灰色の染料）
+     * &gt; 個別アイコン</b>。
+     *
+     * @param comp 対象グリフ
+     * @param config {@code glyphs.yml}。{@code icon:} を書いてあればそれが最優先。null 可
+     * @param unlocked 筆記台で解放済みなら true
+     * @param perkAllowed スキルパークの使用ゲートを満たしていれば true
+     * @param placeable 今の構成へ追加できるなら true。false なら {@link #INCOMPATIBLE_ICON}
+     */
+    public static Material iconFor(SpellComponent comp, GlyphConfig config,
+                                   boolean unlocked, boolean perkAllowed, boolean placeable) {
+        if (!perkAllowed) {
+            return PERK_LOCKED_ICON;
+        }
+        if (!unlocked) {
+            return LOCKED_ICON;
+        }
+        if (!placeable) {
+            return INCOMPATIBLE_ICON;
+        }
+        return iconFor(comp, config);
+    }
+
+    /**
+     * 構成に置けるかまで織り込んだ解決。
+     * {@link #iconFor(SpellComponent, GlyphConfig, boolean, boolean, boolean)} の本体で、
+     * テストからも直接叩く。
+     */
+    public static Material resolveForState(String glyphKey, SpellComponent.ComponentType type,
+                                           String override, boolean unlocked, boolean perkAllowed,
+                                           boolean placeable) {
+        if (!perkAllowed) {
+            return PERK_LOCKED_ICON;
+        }
+        if (!unlocked) {
+            return LOCKED_ICON;
+        }
+        if (!placeable) {
+            return INCOMPATIBLE_ICON;
+        }
+        return resolve(glyphKey, type, override);
     }
 
     /**

@@ -42,8 +42,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *   <li>{@code GlyphBrowserGui}（グリフレシピ）: <b>全部が個別アイコン</b>
  *       ── 未解放こそが主役の画面なので潰すと素材を引く手掛かりが消える</li>
  *   <li>{@code SpellCraftingGui}（グリフ配置／呪文編集）:
- *       <b>パーク未所持=鍵</b> / 未解放=石炭 / 他=個別アイコン
- *       ── 直し方が違う（スキルツリー / 筆記台）ので絵を分ける</li>
+ *       <b>パーク未所持=鍵</b> / 未解放=石炭 /
+ *       <b>今の構成では置けない=灰色の染料</b> / 他=個別アイコン
+ *       ── 直し方が違う（スキルツリー / 筆記台 / その場で選び直し）ので絵を分ける。
+ *       <b>灰色の染料は 2026-08-22 の刷新で一度落ちており、2026-09-05 に戻した</b>
+ *       （ユーザー報告「シナジーのないグリフは灰色の染料のようなものに自動で置き換わったはず」）。
+ *       ただし<b>潰すのはグリフ固有の理由のときだけ</b>（{@code GlyphBlockReason}）──
+ *       「形態未選択」「満杯」まで潰すと一覧が一色になり、解放状態がまた絵から消える</li>
  * </ul>
  *
  * この割り当ては {@link #eachGuiPassesExactlyTheStatesItsSpecCallsFor} が固定する。
@@ -88,6 +93,9 @@ class GlyphGuiIconAndOrderWiringTest {
             assertFalse(src.contains("Material.TRIAL_KEY"),
                     gui + " が鍵を直接書いている。パーク未所持の材質を決めるのは"
                             + " GlyphIcons.PERK_LOCKED_ICON の1箇所");
+            assertFalse(src.contains("Material.GRAY_DYE"),
+                    gui + " が灰色の染料を直接書いている。「今の構成では置けない」の材質を"
+                            + "決めるのは GlyphIcons.INCOMPATIBLE_ICON の1箇所 (2026-09-05)");
         }
     }
 
@@ -131,10 +139,11 @@ class GlyphGuiIconAndOrderWiringTest {
                 "グリフレシピ(解放素材)は潰さず全部を個別アイコンにすること(2026-08-23 指示)。"
                         + "未解放こそが主役の画面なので、1種類の絵に潰すと素材表を引く手掛かりが消える");
 
-        assertEquals(4, maxIconForArity(source("SpellCraftingGui")),
-                "グリフ配置(呪文編集)はパークゲートも渡すこと(2026-08-23 指示)。"
-                        + "未解放(筆記台へ行け)とパーク未所持(スキルツリーへ行け)は直し方が違うので、"
-                        + "同じ石炭に潰すと次にどこへ行けばよいか分からない");
+        assertEquals(5, maxIconForArity(source("SpellCraftingGui")),
+                "グリフ配置(呪文編集)はパークゲート(2026-08-23 指示)に加えて"
+                        + "「今の構成へ置けるか」も渡すこと(2026-09-05 報告)。"
+                        + "未解放(筆記台へ行け)・パーク未所持(スキルツリーへ行け)・"
+                        + "シナジー無し(その場で選び直せ)は直し方が違うので、絵を分ける");
     }
 
     @Test

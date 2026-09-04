@@ -181,20 +181,103 @@ public class SpellCraftingGui extends BaseGui {
         renderControls();
     }
 
+    /**
+     * 構成スロットの不備。{@code compatibility} が true のものだけを保存時の互換性検査が拒む
+     * （{@link #validateCompatibility()}）。false は「表示では赤くするが、保存はこの理由では
+     * 止めない」もの（形態が2つ、など元から素通りしていた構成）。
+     */
+    private record Issue(String message, boolean compatibility) {
+    }
+
+    /**
+     * 構成の各スロットの不備を返す（キー＝構成スロットの添字。不備が無ければ空）。
+     *
+     * <p><b>なぜ「追加時の検査」だけでは足りないか。</b> 保存済みのスペルは
+     * {@link #loadExistingSpell()} が<b>無検査で</b>読み込む。{@code glyphs.yml} の互換表を変えた後や、
+     * 下位ティアの本で開き直した後は、既に組んであるスペルが不正なまま画面に並ぶ。
+     * 追加時にしか検査しないと<b>保存ボタンを押すまで気づけず</b>、しかもどのグリフが悪いのかは
+     * 最後まで分からない（メッセージは 1 行しか出ない）。
+     *
+     * <p>ここは互換性判定の唯一の実装で、保存時の検査もこれを読む。2 本に分けると
+     * 「画面は緑なのに保存が拒まれる」というもっとも直しにくいズレになる。
+     */
+    private Map<Integer, Issue> compositionIssues() {
+        Map<Integer, Issue> issues = new LinkedHashMap<>();
+        GlyphConfig glyphConfig = plugin.getGlyphConfig();
+        SpellComponent form = null;
+        SpellComponent lastTarget = null;
+
+        for (int i = 0; i < composition.length; i++) {
+            SpellComponent comp = composition[i];
+            if (comp == null) continue;
+
+            if (comp.getType() == SpellComponent.ComponentType.FORM) {
+                if (form == null) {
+                    form = comp;
+                    lastTarget = comp;
+                } else {
+                    issues.put(i, new Issue("形態は1つまでです", false));
+                }
+                continue;
+            }
+
+            if (form == null) {
+                // 形態より前に効果/増強が置かれている。保存は SpellRecipe#isValid が拒む。
+                issues.put(i, new Issue("形態(Form)より後ろに置いてください", false));
+                continue;
+            }
+
+            if (comp.getType() == SpellComponent.ComponentType.EFFECT) {
+                if (!glyphConfig.isEffectCompatibleWithForm(
+                        form.getId().getKey(), comp.getId().getKey())) {
+                    issues.put(i, new Issue(GlyphNames.display(form) + "と"
+                            + GlyphNames.display(comp) + "は互換性がありません", true));
+                }
+                lastTarget = comp;
+            } else if (comp.getType() == SpellComponent.ComponentType.AUGMENT) {
+                if (!glyphConfig.isAugmentCompatible(
+                        lastTarget.getId().getKey(), comp.getId().getKey())) {
+                    issues.put(i, new Issue(GlyphNames.display(lastTarget) + "に"
+                            + GlyphNames.display(comp) + "は使えません", true));
+                }
+            }
+        }
+        return issues;
+    }
+
     private void renderComposition() {
+        Map<Integer, Issue> issues = compositionIssues();
         for (int i = 0; i < maxGlyphs; i++) {
             int slot = COMPOSITION_START + i;
             SpellComponent comp = composition[i];
             if (comp != null) {
-                NamedTextColor color = getTypeColor(comp.getType());
+                Issue issue = issues.get(i);
+                boolean perkAllowed =
+                    plugin.getSpellCaster().hasGlyphPermission(viewer, comp.getId().getKey());
+                boolean broken = issue != null || !perkAllowed;
+                NamedTextColor color = broken ? NamedTextColor.RED : getTypeColor(comp.getType());
+
+                List<Component> lore = new ArrayList<>();
+                lore.add(Component.text("種類: " + localizeType(comp.getType()), NamedTextColor.GRAY));
+                lore.add(Component.text("マナ: " + comp.getManaCost(), NamedTextColor.AQUA));
+                if (!perkAllowed) {
+                    lore.add(Component.text("パーク未所持 - スキルツリーで解放してください",
+                        NamedTextColor.RED));
+                }
+                if (issue != null) {
+                    lore.add(Component.text(issue.message(), NamedTextColor.RED));
+                }
+                if (broken) {
+                    lore.add(Component.text("このままでは保存できません", NamedTextColor.RED));
+                }
+                lore.add(Component.text("クリックで除去", NamedTextColor.RED));
+
+                // 置けない状態の絵も GlyphIcons が決める（画面側に材質を書かない）。
                 inventory.setItem(slot, createButton(
-                    com.arspaper.spell.GlyphIcons.iconFor(comp, plugin.getGlyphConfig()),
+                    com.arspaper.spell.GlyphIcons.iconFor(
+                        comp, plugin.getGlyphConfig(), true, perkAllowed, issue == null),
                     Component.text(GlyphNames.display(comp), color),
-                    List.of(
-                        Component.text("種類: " + localizeType(comp.getType()), NamedTextColor.GRAY),
-                        Component.text("マナ: " + comp.getManaCost(), NamedTextColor.AQUA),
-                        Component.text("クリックで除去", NamedTextColor.RED)
-                    )
+                    lore
                 ));
             } else {
                 inventory.setItem(slot, createButton(
@@ -233,8 +316,11 @@ public class SpellCraftingGui extends BaseGui {
             // （筆記台で解放しても使えないので、先に潰すべき詰まりはパークの方）。
             boolean perkAllowed =
                 plugin.getSpellCaster().hasGlyphPermission(viewer, comp.getId().getKey());
-            String disableReason = isUnlocked ? getDisableReason(comp) : null;
-            boolean usable = isUnlocked && disableReason == null;
+            Blocked blocked = isUnlocked ? getDisableReason(comp) : null;
+            boolean usable = isUnlocked && blocked == null;
+            // 「このグリフ固有の理由で置けない」＝シナジー無しだけを灰色の染料へ潰す。
+            // 全グリフに同時に当てはまる理由（形態未選択・満杯）で潰すと一覧が一色になる。
+            boolean placeable = blocked == null || !blocked.glyphSpecific();
 
             NamedTextColor nameColor = usable ? getTypeColor(comp.getType())
                 : isUnlocked ? NamedTextColor.GRAY : NamedTextColor.DARK_GRAY;
@@ -243,11 +329,13 @@ public class SpellCraftingGui extends BaseGui {
             // 全部に個別アイコンを付けたら「解放済みかどうかが絵から消えた」という報告が出たうえ
             // （2026-08-22）、未解放とパーク未所持は<b>直し方が違う</b>（筆記台 / スキルツリー）ので
             // 同じ絵にすると次にどこへ行けばよいか分からない。
-            // 「解放済み・パークあり・今の構成では置けない」は個別アイコンのまま残す
-            // （一覧を見渡すときに知りたいのは「持っているか」の方）。理由は名前の色
-            // （灰=使用不可 / 濃灰=未解放）と lore の赤字で示す。
+            // 2026-09-05: 「解放済み・パークあり・だがシナジーが無い」は<b>灰色の染料</b>へ潰す
+            // （GlyphIcons.INCOMPATIBLE_ICON）。名前の色と lore の赤字だけでは、
+            // 1ページ25個の一覧で1個ずつカーソルを当てるまで気づけなかった。
+            // 潰すのはグリフ固有の理由のときだけで、「形態未選択」「満杯」では潰さない
+            // ——全部灰色になると「どれを持っているか」が絵から消え、2026-08-22 と同じ壊れ方になる。
             Material mat = com.arspaper.spell.GlyphIcons.iconFor(
-                comp, plugin.getGlyphConfig(), isUnlocked, perkAllowed);
+                comp, plugin.getGlyphConfig(), isUnlocked, perkAllowed, placeable);
 
             List<Component> lore = new ArrayList<>();
             if (!comp.getDescription().isEmpty()) {
@@ -269,8 +357,8 @@ public class SpellCraftingGui extends BaseGui {
                 }
             } else if (!isUnlocked) {
                 lore.add(Component.text("未解放 - 筆記台で解放してください", NamedTextColor.RED));
-            } else if (disableReason != null) {
-                lore.add(Component.text(disableReason, NamedTextColor.RED));
+            } else if (blocked != null) {
+                lore.add(Component.text(blocked.message(), NamedTextColor.RED));
             } else {
                 lore.add(Component.text("クリックで追加", NamedTextColor.GREEN));
             }
@@ -295,21 +383,33 @@ public class SpellCraftingGui extends BaseGui {
     }
 
     /**
-     * 現在の構成に対してグリフが追加不可能な理由を返す。
-     * 追加可能ならnullを返す。
+     * パレットのグリフが追加できない理由。追加できるなら null。
+     *
+     * <p>{@link Blocked#glyphSpecific()} は<b>そのグリフ固有の理由か</b>。true のものだけを
+     * 灰色の染料へ潰す（{@code GlyphIcons.INCOMPATIBLE_ICON}）。「まず形態を選べ」「満杯」のように
+     * そのタブの全グリフへ同時に当てはまる理由で潰すと、一覧が一色になって
+     * 「どれを持っているか」が絵から消える。
      */
-    private String getDisableReason(SpellComponent comp) {
-        // 使用ゲート(α): 使用に必要なperkを満たさないglyphは組み込み不可
+    private record Blocked(String message, GlyphBlockReason reason) {
+        boolean glyphSpecific() {
+            return reason.glyphSpecific();
+        }
+    }
+
+    private Blocked getDisableReason(SpellComponent comp) {
+        // 使用ゲート(α): 使用に必要なperkを満たさないglyphは組み込み不可。
+        // 絵は鍵(PERK_LOCKED_ICON)が担当するので、ここでは灰色へ潰さない。
         if (!plugin.getSpellCaster().hasGlyphPermission(viewer, comp.getId().getKey())) {
-            return "使用権限がありません（perk未所持）";
+            return new Blocked("使用権限がありません（perk未所持）", GlyphBlockReason.PERK_MISSING);
         }
 
+        // 満杯はタブの全グリフに当てはまるので潰さない。
         if (firstEmptySlot() < 0) {
-            return "スペルが満杯です";
+            return new Blocked("スペルが満杯です", GlyphBlockReason.SPELL_FULL);
         }
 
         if (comp.getTier() > maxGlyphTier) {
-            return "ティア" + comp.getTier() + " - このブックでは使用不可";
+            return new Blocked("ティア" + comp.getTier() + " - このブックでは使用不可", GlyphBlockReason.TIER_TOO_HIGH);
         }
 
         List<SpellComponent> compacted = compactComposition();
@@ -319,11 +419,11 @@ public class SpellCraftingGui extends BaseGui {
             boolean hasForm = compacted.stream()
                 .anyMatch(c -> c.getType() == SpellComponent.ComponentType.FORM);
             if (hasForm) {
-                return "形態は1つまでです";
+                return new Blocked("形態は1つまでです", GlyphBlockReason.FORM_ALREADY_SET);
             }
             // Formは先頭スロット(index 0)が空いている必要がある
             if (composition[0] != null) {
-                return "先頭スロットが使用中です";
+                return new Blocked("先頭スロットが使用中です", GlyphBlockReason.HEAD_SLOT_TAKEN);
             }
             return null;
         }
@@ -332,7 +432,7 @@ public class SpellCraftingGui extends BaseGui {
         boolean hasForm = compacted.stream()
             .anyMatch(c -> c.getType() == SpellComponent.ComponentType.FORM);
         if (!hasForm) {
-            return "最初に形態(Form)を選択してください";
+            return new Blocked("最初に形態(Form)を選択してください", GlyphBlockReason.NO_FORM);
         }
 
         // Effect: 重複チェック + Form互換性チェック
@@ -341,7 +441,7 @@ public class SpellCraftingGui extends BaseGui {
                 .filter(c -> c.getType() == SpellComponent.ComponentType.EFFECT)
                 .anyMatch(c -> c.getId().equals(comp.getId()));
             if (duplicate) {
-                return "同じ効果は重複できません";
+                return new Blocked("同じ効果は重複できません", GlyphBlockReason.DUPLICATE_EFFECT);
             }
 
             // Form-Effect互換性チェック（glyphs.ymlのeffectsリスト）
@@ -352,7 +452,7 @@ public class SpellCraftingGui extends BaseGui {
                 String formKey = form.getId().getKey();
                 String effectKey = comp.getId().getKey();
                 if (!plugin.getGlyphConfig().isEffectCompatibleWithForm(formKey, effectKey)) {
-                    return "この形態では使用できません";
+                    return new Blocked("この形態では使用できません", GlyphBlockReason.FORM_INCOMPATIBLE);
                 }
             }
         }
@@ -368,11 +468,11 @@ public class SpellCraftingGui extends BaseGui {
                     if (plugin.getGlyphConfig().isAugmentCompatible(tKey, augKey)) {
                         int max = plugin.getGlyphConfig().getMaxAugmentStack(tKey, augKey);
                         if (max < Integer.MAX_VALUE) {
-                            return "上限に達しています (最大" + max + ")";
+                            return new Blocked("上限に達しています (最大" + max + ")", GlyphBlockReason.AUGMENT_LIMIT);
                         }
                     }
                 }
-                return "直前の効果に対応していません";
+                return new Blocked("直前の効果に対応していません", GlyphBlockReason.AUGMENT_INCOMPATIBLE);
             }
         }
 
@@ -400,10 +500,18 @@ public class SpellCraftingGui extends BaseGui {
         inventory.setItem(BTN_UNDO, createButton(
             Material.COMPARATOR, Component.text("設定", NamedTextColor.GOLD)
         ));
+        // 保存できない理由は「押してから」ではなくボタン自身に出す。
+        // 押すまで分からないと、どのグリフを外せばよいのかを総当たりで探すことになる。
+        String blocker = saveBlocker();
+        List<Component> saveLore = new ArrayList<>();
+        saveLore.add(Component.text("合計マナコスト: " + totalCost, NamedTextColor.AQUA));
+        if (blocker != null) {
+            saveLore.add(Component.text(blocker, NamedTextColor.RED));
+        }
         inventory.setItem(BTN_SAVE, createButton(
-            Material.WRITABLE_BOOK,
-            Component.text("スペル保存", NamedTextColor.GREEN),
-            List.of(Component.text("合計マナコスト: " + totalCost, NamedTextColor.AQUA))
+            blocker == null ? Material.WRITABLE_BOOK : Material.BARRIER,
+            Component.text("スペル保存", blocker == null ? NamedTextColor.GREEN : NamedTextColor.RED),
+            saveLore
         ));
     }
 
@@ -526,9 +634,9 @@ public class SpellCraftingGui extends BaseGui {
             return;
         }
 
-        String disableReason = getDisableReason(comp);
-        if (disableReason != null) {
-            clicker.sendMessage(Component.text(disableReason, NamedTextColor.RED));
+        Blocked blocked = getDisableReason(comp);
+        if (blocked != null) {
+            clicker.sendMessage(Component.text(blocked.message(), NamedTextColor.RED));
             return;
         }
 
@@ -545,72 +653,55 @@ public class SpellCraftingGui extends BaseGui {
     }
 
     /**
-     * スペル構成の互換性を検証する。
-     * Form-Effect、Form-Augment、Effect-Augmentの互換性をチェック。
+     * スペル構成の互換性を検証する。実装は {@link #compositionIssues()} 1 本で、
+     * ここはそのうち<b>保存を拒む種類</b>の最初の 1 件を文言にして返すだけ。
+     *
      * @return エラーメッセージ（互換性OK→null）
      */
     private String validateCompatibility() {
-        List<SpellComponent> compacted = compactComposition();
-        if (compacted.isEmpty()) return null;
-
-        GlyphConfig glyphConfig = plugin.getGlyphConfig();
-
-        // Formを取得
-        SpellComponent form = compacted.stream()
-            .filter(c -> c.getType() == SpellComponent.ComponentType.FORM)
-            .findFirst().orElse(null);
-        if (form == null) return null;
-
-        String formKey = form.getId().getKey();
-        SpellComponent lastTarget = form; // 現在の増強対象
-
-        for (SpellComponent comp : compacted) {
-            if (comp.getType() == SpellComponent.ComponentType.FORM) continue;
-
-            if (comp.getType() == SpellComponent.ComponentType.EFFECT) {
-                // Form-Effect互換性
-                String effectKey = comp.getId().getKey();
-                if (!glyphConfig.isEffectCompatibleWithForm(formKey, effectKey)) {
-                    return GlyphNames.display(form) + "と" + GlyphNames.display(comp) + "は互換性がありません";
-                }
-                lastTarget = comp;
-            } else if (comp.getType() == SpellComponent.ComponentType.AUGMENT) {
-                // Augment-Target互換性
-                String augKey = comp.getId().getKey();
-                String targetKey = lastTarget.getId().getKey();
-                if (!glyphConfig.isAugmentCompatible(targetKey, augKey)) {
-                    return GlyphNames.display(lastTarget) + "に" + GlyphNames.display(comp) + "は使えません";
-                }
+        for (Issue issue : compositionIssues().values()) {
+            if (issue.compatibility()) {
+                return issue.message();
             }
         }
         return null;
     }
 
-    private void saveSpell(Player clicker) {
-        List<SpellComponent> compacted = compactComposition();
-        if (compacted.isEmpty()) {
-            clicker.sendMessage(Component.text("スペルが空です！", NamedTextColor.RED));
-            clicker.playSound(clicker.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
-            return;
+    /**
+     * 今の構成で保存ボタンを押したときに拒まれる理由。保存できるなら null。
+     *
+     * <p>{@link #saveSpell} 自身がこれを呼ぶので、<b>ボタンの表示と実際の結果は必ず一致する</b>
+     * （別々に書くと「赤いのに保存できる」「緑なのに拒まれる」が起きる）。
+     */
+    private String saveBlocker() {
+        if (isCompositionEmpty()) {
+            return "スペルが空です！";
         }
-
+        List<SpellComponent> compacted = compactComposition();
         // 使用ゲート(α): perk未所持のglyphが含まれていれば保存拒否（保険）
         for (SpellComponent comp : compacted) {
-            if (!plugin.getSpellCaster().hasGlyphPermission(clicker, comp.getId().getKey())) {
-                clicker.sendMessage(Component.text(
-                    "使用権限のないグリフが含まれています: " + GlyphNames.display(comp), NamedTextColor.RED));
-                clicker.playSound(clicker.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
-                return;
+            if (!plugin.getSpellCaster().hasGlyphPermission(viewer, comp.getId().getKey())) {
+                return "使用権限のないグリフが含まれています: " + GlyphNames.display(comp);
             }
         }
-
-        // 互換性チェック
         String compatError = validateCompatibility();
         if (compatError != null) {
-            clicker.sendMessage(Component.text("互換のないスペル: " + compatError, NamedTextColor.RED));
+            return "互換のないスペル: " + compatError;
+        }
+        if (!new SpellRecipe("", compacted).isValid()) {
+            return "無効なスペルです！形態(Form)で始まる必要があります";
+        }
+        return null;
+    }
+
+    private void saveSpell(Player clicker) {
+        String blocker = saveBlocker();
+        if (blocker != null) {
+            clicker.sendMessage(Component.text(blocker, NamedTextColor.RED));
             clicker.playSound(clicker.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
             return;
         }
+        List<SpellComponent> compacted = compactComposition();
 
         // 既存のスペル名を保持する
         SpellRegistry registry = plugin.getSpellRegistry();
@@ -629,12 +720,8 @@ public class SpellCraftingGui extends BaseGui {
             spellName = slots.get(spellSlot).getName();
         }
 
+        // 構造の検査は saveBlocker() で済んでいる（ここで二重に書くと文言がずれる）。
         SpellRecipe recipe = new SpellRecipe(spellName, compacted);
-        if (!recipe.isValid()) {
-            clicker.sendMessage(Component.text("無効なスペルです！形態(Form)で始まる必要があります", NamedTextColor.RED));
-            clicker.playSound(clicker.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 0.5f, 1.0f);
-            return;
-        }
 
         while (slots.size() <= spellSlot) {
             slots.add(null);
